@@ -151,6 +151,13 @@ th:first-child,td:first-child{width:30px;color:#a3aebd}
 .figure-drag-target{position:absolute;pointer-events:auto;background:transparent;border:1px solid transparent;padding:0;cursor:move;touch-action:none}
 .figure-drag-target:hover,.figure-drag-target:focus-visible{border:1px dashed #205eb0;background:#205eb00a}
 .annotation-buttons{display:flex;gap:8px}
+.add-annotation{color:var(--blue);font-size:11px;padding:8px 10px}
+.legend-controls{padding-bottom:15px;margin-bottom:15px;border-bottom:1px solid var(--border)}
+.legend-controls>.check-options{margin-top:0}
+.legend-controls>.check-options label{font-size:11px}
+.legend-options{margin-top:12px}
+.legend-options summary{cursor:pointer;font-size:11px;color:#6e7c90;margin-bottom:10px}
+#legend-appearance{margin-top:12px}
 .annotation-card{padding:10px 0;border-bottom:1px solid var(--border)}
 .annotation-card summary,#desktop-appearance summary{cursor:pointer;font-size:11px;margin:10px 0}
 .preview-tools{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:8px;font-size:10px;color:#64738a}

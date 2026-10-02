@@ -1,4 +1,4 @@
-import { COLORS, applyPreset, createSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=587ed1cee6e0";
+import { COLORS, applyPreset, createSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=87136c71ec2f";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -31,8 +31,9 @@ function desktopAppearance() {
     <div class="field-grid">${numeric("xLabelPad", "Xラベル余白 (pt)", -30, 100)}${numeric("yLabelPad", "Yラベル余白 (pt)", -30, 100)}${numeric("xTickPad", "X目盛り追加余白 (pt)", -30, 100)}${numeric("yTickPad", "Y目盛り追加余白 (pt)", -30, 100)}</div>
     <div class="field-grid"><label>X対数表記<select data-axis="xLogFormat"><option value="power">累乗</option><option value="decimal">小数</option></select></label><label>Y対数表記<select data-axis="yLogFormat"><option value="power">累乗</option><option value="decimal">小数</option></select></label></div>
     <div class="check-options">${check("hideXLabel", "Xラベルを隠す")}${check("hideYLabel", "Yラベルを隠す")}${check("hideXTickLabels", "X目盛り文字を隠す")}${check("hideYTickLabels", "Y目盛り文字を隠す")}${check("hideXTicks", "X目盛り線を隠す")}${check("hideYTicks", "Y目盛り線を隠す")}${check("hideMinorTicks", "副目盛りを隠す")}${check("spineLeft", "左枠")}${check("spineRight", "右枠")}${check("spineTop", "上枠")}${check("spineBottom", "下枠")}${check("yAxisRight", "Y軸を右側")}${check("xAxisTop", "X軸を上側")}</div></details>
-    <details><summary>凡例・背景・誤差棒</summary><p class="field-hint">凡例は図上でドラッグして移動できます。位置を自動に戻す場合はX・Yを両方空欄にします。</p>
-    <div class="field-grid">${numeric("legendScale", "凡例サイズ倍率", .2)}${numeric("legendFontScale", "凡例文字倍率", .2)}${numeric("legendX", "凡例X (軸比率)", -10, 10, .01)}${numeric("legendY", "凡例Y (軸比率)", -10, 10, .01)}<label>枠線色<input data-axis="spineColor" type="color"></label><label>背景色<input data-axis="backgroundColor" type="color"></label>${numeric("backgroundAlpha", "背景不透明度", 0, 1)}${numeric("markerEdgeWidth", "マーカー縁幅 (pt)", 0, 20)}${numeric("errorLineWidth", "誤差棒幅 (pt)", 0, 20)}${numeric("errorCapSize", "誤差キャップ (pt)", 0, 20)}${numeric("errorCapThick", "キャップ幅 (pt)", 0, 20)}</div></details>`;
+    <details><summary>背景・誤差棒</summary>
+    <div class="field-grid"><label>枠線色<input data-axis="spineColor" type="color"></label><label>背景色<input data-axis="backgroundColor" type="color"></label>${numeric("backgroundAlpha", "背景不透明度", 0, 1)}${numeric("markerEdgeWidth", "マーカー縁幅 (pt)", 0, 20)}${numeric("errorLineWidth", "誤差棒幅 (pt)", 0, 20)}${numeric("errorCapSize", "誤差キャップ (pt)", 0, 20)}${numeric("errorCapThick", "キャップ幅 (pt)", 0, 20)}</div></details>`;
+  $("#legend-appearance").innerHTML = `${numeric("legendScale", "凡例サイズ倍率", .2)}${numeric("legendFontScale", "凡例文字倍率", .2)}${numeric("legendX", "凡例X (軸比率)", -10, 10, .01)}${numeric("legendY", "凡例Y (軸比率)", -10, 10, .01)}`;
 }
 desktopAppearance();
 
@@ -79,7 +80,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=587ed1cee6e0", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=87136c71ec2f", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -502,8 +503,9 @@ $$('[data-add-annotation]').forEach(button => button.addEventListener("click", (
   config.annotations ||= [];
   if (config.annotations.length >= 200) return;
   const type = button.dataset.addAnnotation;
+  const offset=(config.annotations.length % 6)*.04;
   const base = { id: crypto.randomUUID(), type, axes_id: "primary", coordinate_system: "axes_fraction", visible: true, locked: false, zorder: 20, color: "#222222", opacity: 1 };
-  config.annotations.push(type === "text" ? { ...base, x: .15, y: .8, text: "Text", font_size: 7, font_family: config.axes.fontFamily, rotation: 0, horizontal_alignment: "left", vertical_alignment: "baseline", bold: false, italic: false } : { ...base, x1: .2, y1: .7, x2: .4, y2: .7, line_width: .5, line_style: "-", arrow_style: "->", arrow_size: 7 });
+  config.annotations.push(type === "text" ? { ...base, x: .15+offset, y: .8-offset, text: "テキスト", font_size: 7, font_family: config.axes.fontFamily, rotation: 0, horizontal_alignment: "left", vertical_alignment: "baseline", bold: false, italic: false } : { ...base, x1: .2+offset, y1: .7-offset, x2: .4+offset, y2: .7-offset, line_width: .5, line_style: "-", arrow_style: "->", arrow_size: 7 });
   selected=new Set([base.id]);
   drawAnnotations(); changed();
 }));
