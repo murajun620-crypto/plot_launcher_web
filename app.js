@@ -1,4 +1,4 @@
-import { createSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV } from "./state.js?v=44af9d23f892";
+import { COLORS, applyPreset, createSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=15c246a9954d";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -9,6 +9,12 @@ let metadata = null, config = { axes: defaultAxes(), series: [] };
 let loading = false, exporting = false, sample = false, loadedHeader = 1;
 let revision = 0, renderedRevision = -1, renderRunning = false, renderWanted = false, renderTimer;
 let previewURL, figureResult, dragging;
+let presets = [], selected = new Set(), clipboard = [], view = {zoom:1,x:0,y:0}, panning;
+let history = [], future = [], lastState, restoring = false;
+const catalogReady = fetch(new URL("./presets.json" + new URL(import.meta.url).search, import.meta.url)).then(response => {if(!response.ok) throw new Error("プリセットの読み込みに失敗しました"); return response.json();}).then(items => {
+  presets = items; $("#plot-type").replaceChildren(...items.map(item => new Option(item.label,item.id)));
+});
+catalogReady.catch(error => fatal(error.message));
 const loadedFonts = new Set(["Liberation Sans", "Noto Sans JP", "DejaVu Sans"]);
 
 function desktopAppearance() {
@@ -17,9 +23,9 @@ function desktopAppearance() {
   $("#desktop-appearance").innerHTML = `
     <label class="full-field">図のフォント<select id="font-family" data-axis="fontFamily"><option>Liberation Sans</option><option>Noto Sans JP</option><option>DejaVu Sans</option></select></label>
     <label class="full-field">日本語フォント<select id="japanese-font-family" data-axis="japaneseFontFamily"><option>Noto Sans JP</option><option>Liberation Sans</option><option>DejaVu Sans</option></select></label>
-    <button type="button" id="load-font" class="button quiet">手元のフォントを読み込む</button><input id="font-file" type="file" accept=".ttf,.otf" multiple hidden>
+    <button type="button" id="load-font" class="button quiet">手元のフォントを読み込む</button><input id="font-file" type="file" accept=".ttf,.otf,.ttc" multiple hidden>
     <p class="field-hint">Python版のArialと同じ字形には、手元のArialを読み込んでください。標準のLiberation SansはArialと文字幅が互換です。日本語はNoto Sans JP、数式はSTIX Sansを使います。</p>
-    <div class="field-grid">${numeric("tickFontScale", "目盛り文字倍率", .2)}${numeric("labelFontScale", "軸ラベル倍率", .2)}${numeric("spineScale", "枠線倍率", .1, 5)}${numeric("tickLength", "目盛り長さ倍率", 0, 5)}</div>
+    <div class="field-grid">${numeric("tickFontScale", "目盛り文字倍率", .2)}${numeric("labelFontScale", "軸ラベル倍率", .2)}${numeric("spineScale", "枠線倍率", .1, 5)}${numeric("dataLineScale", "データ線倍率", 0, 6)}${numeric("tickLength", "目盛り長さ倍率", 0, 5)}</div>
     <p class="field-hint">倍率1：目盛り7 pt、軸ラベル8 pt、枠線0.8 pt、主目盛り2.5 pt・副目盛り1.25 pt。</p>
     <details><summary>余白・軸の表示</summary>
     <div class="field-grid">${numeric("xLabelPad", "Xラベル余白 (pt)", -30, 100)}${numeric("yLabelPad", "Yラベル余白 (pt)", -30, 100)}${numeric("xTickPad", "X目盛り追加余白 (pt)", -30, 100)}${numeric("yTickPad", "Y目盛り追加余白 (pt)", -30, 100)}</div>
@@ -73,10 +79,11 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=44af9d23f892", import.meta.url), { type: "module" });
-  worker.onmessage = ({ data }) => {
+  worker = new Worker(new URL("./worker.js?v=15c246a9954d", import.meta.url), { type: "module" });
+  worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
+      await catalogReady;
       engineReady = true;
       updateButtons();
       loadSample();
@@ -102,7 +109,60 @@ function choiceOptions(choices, selected) {
   return choices.map(([value, label]) => `<option value="${escapeHTML(value)}"${value === selected ? " selected" : ""}>${escapeHTML(label)}</option>`).join("");
 }
 
+function drawPresetOptions() {
+  const type=config.plotType || "General", options=config.options ||= {};
+  const number=(key,label,def,min=0,max=100,step=.1)=>`<label>${label}<input data-option="${key}" type="number" value="${escapeHTML(options[key] ?? def)}" min="${min}" max="${max}" step="${step}"></label>`;
+  const color=(key,label,def)=>`<label>${label}<input data-option="${key}" value="${escapeHTML(options[key] ?? def)}"></label>`;
+  let html='';
+  const notes={"XPS Fit":"Python版と同じCSV/Au 10列/Ag 8列の配置を自動判定。成分の塗りつぶしは背景との差で描画します。", "Particle Histogram":"選択した粒径列から頻度%と対数正規分布を描画します。ビン幅20 nmはPython版と同じです。", "Raman 3D":"共通のX列と各Y列からウォーターフォールを作成します。Y軸設定は強度（Z軸）に適用します。", "bar_graph_general":"数値X・カテゴリXに対応した集合棒グラフです。", "Roughness":"線＋マーカー、Y対数軸が初期設定です。"};
+  $("#preset-note").textContent=notes[type] || "Python版の描画コード・軸ラベル・単位を使用します。";
+  if(type==='bar_graph_general') html=`<div class="field-grid">${number('barWidth','棒幅',.8,.01,100)}${number('barAlpha','不透明度',.9,0,1)}${number('barEdgeWidth','縁幅 (pt)',.4,0,20)}${color('barEdgeColor','縁色 (auto / #色)','auto')}</div>`;
+  if(type==='Particle Histogram') html=`<label>粒径列<select data-option="diameterColumn">${columnOptions(options.diameterColumn ?? config.series[0]?.y ?? 1)}</select></label>`;
+  if(type==='Raman 3D') html=`<label><input type="checkbox" data-option="normalize" ${options.normalize!==false?'checked':''}>各系列を0〜1に正規化</label><div class="field-grid">${number('depthStep','奥行き間隔',1,.01,10000)}${number('elevation','仰角 (度)',24,-180,180,1)}${number('azimuth','方位角 (度)',-66,-360,360,1)}</div>`;
+  if(type==='XPS Fit') {
+    if(!options.fills?.length && metadata?.columns.length>=8){
+      const csv=metadata.xpsCSV, large=metadata.columns.length>=10;
+      const indices=csv?Array.from({length:metadata.columns.length-7},(_,i)=>i+7):large?[6,7,8,9]:[3,4];
+      options.fills=indices.map((upper,i)=>({x:csv||!large?0:3,upper,lower:csv?3:large?5:2,color:['#F7574A','#56B2FF','#FF9822','#5BCC77'][i%4],alpha:.3}));
+    }
+    html=`<div class="field-grid">${number('scatterSize','散布面積 (pt²)',18,0,500,1)}${number('scatterEdgeWidth','散布縁幅 (pt)',.6,0,20)}${color('scatterEdgeColor','散布縁色','#2A2A2A')}${color('scatterFaceColor','散布塗り色','#ffffff')}${number('scatterAlpha','散布不透明度',.8,0,1)}${color('fitLineColor','fit線色','#2A2A2A')}${number('fitLineWidth','fit線幅 (0=非表示)',0,0,20)}${color('bgLineColor','背景線色','#8A8A8A')}${number('bgLineWidth','背景線幅 (0=非表示)',0,0,20)}</div>`;
+    html+=(options.fills || []).map((fill,index)=>`<details data-fill-index="${index}"><summary>成分 ${index+1}</summary><div class="field-grid">${[['x','X'],['upper','成分Y'],['lower','背景Y']].map(([key,label])=>`<label>${label}<select data-fill="${key}" ${metadata.xpsCSV?'disabled':''}>${columnOptions(fill[key])}</select></label>`).join('')}<label>色<input type="color" data-fill="color" value="${escapeHTML(fill.color)}"></label><label>不透明度<input type="number" data-fill="alpha" min="0" max="1" step=".05" value="${fill.alpha}"></label></div><button type="button" class="button quiet" data-remove-fill="${index}" ${metadata.xpsCSV?'disabled':''}>成分を削除</button></details>`).join('');
+    if(!metadata.xpsCSV) html+='<button type="button" class="button quiet" id="add-fill">成分を追加</button>';
+  }
+  $("#preset-options").innerHTML=html;
+  document.querySelector('.preview-footer > span').textContent=`PlotLauncher Web · ${presets.find(preset=>preset.id===type)?.label || type}`;
+  document.querySelector('#axes-title').textContent=presets.find(preset=>preset.id===type)?.label || type;
+}
+
+$("#plot-type").addEventListener("change",event=>{
+  applyPreset(config,presets.find(item=>item.id===event.target.value));
+  if(!['General','Roughness'].includes(config.plotType))config.series.forEach(item=>{item.mode='line';item.errorMode='none';});
+  if(config.plotType==='Raman 3D') config.series=metadata.columns.slice(1,33).map((col,i)=>createSeries(0,col.index,col.name,i));
+  if(config.plotType==='Particle Histogram')config.options.diameterColumn=Math.min(2,metadata.columns.length-1);
+  drawControls();changed();
+});
+$("#preset-options").addEventListener('click',event=>{
+  if(event.target.id==='add-fill'){config.options.fills.push({x:0,upper:1,lower:2,color:COLORS[config.options.fills.length%COLORS.length],alpha:.3});drawPresetOptions();changed();}
+  const remove=event.target.closest('[data-remove-fill]');
+  if(remove){config.options.fills.splice(Number(remove.dataset.removeFill),1);drawPresetOptions();changed();}
+});
+for(const [id,paired] of [['shared-x-series',false],['paired-series',true]]) $("#"+id).addEventListener('click',()=>{
+  const columns=metadata.columns, pairs=[];
+  for(let i=1;i<columns.length && pairs.length<32;i+=paired?2:1) pairs.push(createSeries(paired?i-1:0,i,columns[i].name,pairs.length));
+  config.series=pairs;drawControls();changed();
+});
+$("#series-colors").addEventListener('click',()=>{config.series.forEach((item,i)=>item.color=COLORS[i%COLORS.length]);drawControls();changed();});
+$("#apply-colormap").addEventListener('click',async()=>{
+  try{const result=await request('colors',{name:$('#color-map').value,count:config.series.length}),target=$('#colormap-target').value;config.series.forEach((item,i)=>{if(target!=='scatter')item.color=result.colors[i];if(target!=='line')item.scatterColor=result.colors[i];});drawControls();changed();}catch(error){status(error.message,'error');}
+});
+$("#apply-offsets").addEventListener('click',()=>{
+  const start=Number($("#offset-start").value), step=Number($("#offset-step").value);
+  config.series.forEach((item,i)=>item.yOffset=start+i*step);drawControls();changed();
+});
+
 function drawControls() {
+  $("#plot-type").value = config.plotType || "General";
+  drawPresetOptions();
   for (const [selector, key] of [["#font-family", "fontFamily"], ["#japanese-font-family", "japaneseFontFamily"]]) {
     const field = $(selector), family = config.axes[key];
     if (![...field.options].some(option => option.value === family)) field.add(new Option(`${family}（要読み込み）`, family));
@@ -113,7 +173,7 @@ function drawControls() {
     return `<div class="series-card" data-series-index="${index}">
       <div class="series-heading"><input data-series-field="color" type="color" value="${escapeHTML(series.color)}" aria-label="系列${index + 1}の色"><input class="series-label" data-series-field="name" value="${escapeHTML(series.name)}" maxlength="200" aria-label="系列${index + 1}の名前"><button type="button" class="icon-button" data-remove="${index}" aria-label="系列${index + 1}を削除"><svg><use href="#i-close"/></svg></button></div>
       <div class="field-grid"><label>X列<select data-series-field="x">${columnOptions(series.x)}</select></label><label>Y列<select data-series-field="y">${columnOptions(series.y)}</select></label></div>
-      <details class="series-advanced"><summary>線・マーカー・誤差</summary>
+      <div class="annotation-buttons"><button type="button" class="button quiet" data-series-up="${index}" ${index===0?'disabled':''}>↑</button><button type="button" class="button quiet" data-series-down="${index}" ${index===config.series.length-1?'disabled':''}>↓</button><button type="button" class="button quiet" data-series-copy="${index}">複製</button></div><details class="series-advanced"><summary>線・マーカー・誤差</summary>
         <label class="draw-mode">描画方法<select data-series-field="mode">${choiceOptions([["line", "線"], ["scatter", "マーカー"], ["line+scatter", "線とマーカー"]], series.mode)}</select></label>
         <div class="field-grid">${input("lineWidth", "線幅 (pt)", 'min="0" max="6" step="0.1"')}<label>線種<select data-series-field="lineStyle">${choiceOptions([["-", "実線"], ["--", "破線"], ["-.", "一点鎖線"], [":", "点線"]], series.lineStyle)}</select></label></div>
         <div class="field-grid"><label>マーカー<select data-series-field="marker">${choiceOptions([["o", "丸"], ["s", "四角"], ["^", "三角 ▲"], ["v", "三角 ▼"], ["D", "ひし形"], ["+", "+"], ["x", "×"], ["*", "星"], ["p", "五角形"], ["h", "六角形"]], series.marker)}</select></label>${input("markerSize", "マーカー面積 (pt²)", 'min="1" max="200" step="1"')}</div>
@@ -129,6 +189,13 @@ function drawControls() {
     if (input.type === "checkbox") input.checked = Boolean(value);
     else input.value = value;
   });
+  const generic=['General','Roughness'].includes(config.plotType || 'General');
+  const markerFields=['mode','marker','markerSize','scatterColor','markerEdgeColor','markerFaceColor','markerEdgeAlpha','markerFaceAlpha','lineStyle','lineAlpha','error','errorMode','errorMin','errorMax'];
+  $$('[data-series-field]').forEach(input=>{if(markerFields.includes(input.dataset.seriesField))input.closest('label').hidden=!generic;});
+  const seriesSection=$('#series-list').closest('.control-section');if(seriesSection)seriesSection.hidden=config.plotType==='Particle Histogram';
+  $('#add-series').hidden=config.plotType==='XPS Fit';
+  if(config.plotType==='XPS Fit')$$('.series-advanced,.series-card .annotation-buttons').forEach(element=>element.hidden=true);
+  if(config.plotType==='Raman 3D')$$('[data-series-field="lineWidth"]').forEach(input=>input.closest('label').hidden=true);
   updateButtons();
   drawAnnotations();
 }
@@ -137,7 +204,7 @@ function drawAnnotations() {
   $("#annotation-list").innerHTML = (config.annotations || []).map((item, index) => {
     const text = (key, label) => `<label>${label}<input data-annotation-field="${key}" value="${escapeHTML(item[key] ?? '')}"></label>`;
     const num = (key, label) => `<label>${label}<input type="number" step="any" data-annotation-field="${key}" value="${escapeHTML(item[key] ?? '')}"></label>`;
-    return `<details class="annotation-card" data-annotation-index="${index}" open><summary>${{text:"文字",arrow:"矢印",segment:"線"}[item.type]} ${index+1}</summary>
+    return `<details class="annotation-card ${selected.has(item.id)?'selected':''}" data-annotation-index="${index}" ${selected.has(item.id)?'open':''}><summary><button type="button" class="button quiet" data-select-annotation="${escapeHTML(item.id)}" aria-pressed="${selected.has(item.id)}">${{text:"文字",arrow:"矢印",segment:"線"}[item.type]} ${index+1} ${escapeHTML(item.text || '')}</button></summary>
       ${item.type === "text" ? text("text", "文字") : ''}
       <div class="field-grid">${item.type === "text" ? num("x", "X") + num("y", "Y") + num("font_size", "文字サイズ (pt)") + num("rotation", "回転 (度)") : num("x1", "始点X") + num("y1", "始点Y") + num("x2", "終点X") + num("y2", "終点Y") + num("line_width", "線幅 (pt)") + text("line_style", "線種 (- / -- / -. / :)")}
       ${item.type === "arrow" ? `<label>矢印<select data-annotation-field="arrow_style">${choiceOptions([["->","片矢印"],["<->","両矢印"],["-|>","塗り矢印"]],item.arrow_style)}</select></label>` + num("arrow_size", "矢印サイズ (pt)") : ''}
@@ -200,7 +267,7 @@ async function loadFile(file, isSample = false, reload = false) {
     if (!reload) args.bytes = await file.arrayBuffer();
     const previous = metadata;
     metadata = await request("load", args);
-    loadedHeader = headerRow;
+    loadedHeader = metadata.headerRow || headerRow;
     sample = reload ? sample : isSample;
     // Retain settings if the same columns are still present after a sheet/header change.
     let retained;
@@ -208,14 +275,24 @@ async function loadFile(file, isSample = false, reload = false) {
       try { retained = restoreSettings(makeSettings(config, previous, headerRow), metadata); } catch {}
     }
     const numeric = metadata.columns.filter(column => column.numeric > 0);
-    const x = numeric[0]?.index ?? 0, y = numeric[1]?.index ?? Math.min(1, metadata.columns.length - 1);
-    config = retained || { axes: defaultAxes(), series: metadata.columns.length >= 2 ? [createSeries(x, y, metadata.columns[y].name)] : [] };
+    const inferred=metadata.plotType || 'General';
+    const x = inferred==='bar_graph_general'?0:numeric[0]?.index ?? 0, y = (inferred==='bar_graph_general'?numeric[0]:numeric[1])?.index ?? Math.min(1, metadata.columns.length - 1);
+    config = retained || { axes: defaultAxes(), plotType: inferred, options: {}, series: metadata.columns.length >= 2 ? [createSeries(x, y, metadata.columns[y].name)] : [] };
+    if(!retained){
+      applyPreset(config,presets.find(item=>item.id===inferred));
+      if(inferred==='XPS Fit')config.series=[createSeries(0,1,metadata.columns[1]?.name || 'Raw')];
+      if(['Raman 3D','Raman Spectrum','EDX','XPS Survey','XPS Core','Roughness'].includes(inferred))config.series=metadata.columns.slice(1,33).map((col,i)=>createSeries(0,col.index,col.name,i));
+      if(['CV/LSV','CA','CP'].includes(inferred))config.series=metadata.columns.filter((col,i)=>i%2===1).slice(0,32).map((col,i)=>createSeries(col.index-1,col.index,col.name,i));
+      if(inferred==='Roughness')config.series.forEach(item=>item.mode='line+scatter');
+      if(inferred==='Particle Histogram')config.options.diameterColumn=Math.min(2,metadata.columns.length-1);
+    }
     if (sample && !reload) {
       config.series = metadata.columns.slice(1).map((column, index) => createSeries(0, column.index, column.name, index));
       config.axes.xLabel = "Potential"; config.axes.xUnit = "V";
       config.axes.yLabel = "Current density"; config.axes.yUnit = "mA/cm^2";
     }
     if (!reload) $("#save-name").value = safeStem(filename);
+    selected.clear(); history=[];future=[];lastState=structuredClone(config);view={zoom:1,x:0,y:0};
     resetPreview();
     drawMetadata();
     drawControls();
@@ -243,6 +320,10 @@ function loadSample() {
 }
 
 function changed() {
+  if (!restoring && lastState && JSON.stringify(lastState)!==JSON.stringify(config)) {
+    history.push(lastState); if(history.length>30)history.shift(); future=[];
+  }
+  lastState=structuredClone(config); $("#undo").disabled=!history.length;$("#redo").disabled=!future.length;
   ++revision;
   $("#figure-stage").classList.add("pending");
   $("#preview-state").className = "preview-state";
@@ -270,6 +351,7 @@ async function renderPreview() {
     $("#initial-message").hidden = true;
     $("#figure-stage").classList.remove("pending");
     figureResult = result;
+    if(result.statistics)$('#preset-note').textContent=`粒径の統計（Python版と同じ）：D50 = ${result.statistics.median.toFixed(3)}、平均 = ${result.statistics.mean.toFixed(3)}。ビン幅20 nm、頻度%。`;
     $("#preview-state").className = "preview-state ready";
     $("#preview-state").textContent = "更新済み";
     $("#figure-size").textContent = `軸領域 ${snapshot.axes.width} × ${snapshot.axes.height} cm`;
@@ -309,7 +391,7 @@ async function exportFigure(format) {
   try {
     const result = await request("export", { config: structuredClone(config), format, dpi: Number($("#png-dpi").value) });
     const bytes = Uint8Array.from(atob(result.base64), character => character.charCodeAt(0));
-    download(new Blob([bytes], { type: { svg: "image/svg+xml", png: "image/png", pdf: "application/pdf" }[format] }), filename);
+    download(new Blob([bytes], { type: { svg: "image/svg+xml", png: "image/png", pdf: "application/pdf", pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation" }[format] }), filename);
     status(`${filename} を保存しました`, "ready");
   } catch (error) { status(error.message, "error"); }
   finally { exporting = false; updateButtons(); }
@@ -319,10 +401,10 @@ $("#data-file").addEventListener("change", event => { const file = event.target.
 $("#drop-zone").addEventListener("click", () => $("#data-file").click());
 for (const type of ["dragenter", "dragover"]) $("#drop-zone").addEventListener(type, event => { event.preventDefault(); if (!event.currentTarget.disabled) event.currentTarget.classList.add("drag-over"); });
 $("#drop-zone").addEventListener("dragleave", event => event.currentTarget.classList.remove("drag-over"));
-$("#drop-zone").addEventListener("drop", event => { event.preventDefault(); event.currentTarget.classList.remove("drag-over"); if (!event.currentTarget.disabled && event.dataTransfer.files[0]) loadFile(event.dataTransfer.files[0]); });
+$("#drop-zone").addEventListener("drop", event => { event.preventDefault();event.stopPropagation();event.currentTarget.classList.remove("drag-over"); const file=event.dataTransfer.files[0];if(!event.currentTarget.disabled && file){if(/\.json$/i.test(file.name))readSettings(file);else loadFile(file);} });
 // Dropping a file elsewhere must not navigate away and discard the settings.
 window.addEventListener("dragover", event => event.preventDefault());
-window.addEventListener("drop", event => event.preventDefault());
+window.addEventListener("drop", event => {event.preventDefault();const file=event.dataTransfer.files[0];if(file && /\.json$/i.test(file.name))readSettings(file);});
 $("#sample-data").addEventListener("click", loadSample);
 $("#sheet-select").addEventListener("change", () => loadFile(null, false, true));
 $("#header-row").addEventListener("change", () => loadFile(null, false, true));
@@ -336,10 +418,17 @@ $("#plot-form").addEventListener("input", event => {
   } else if (input.dataset.annotationField) {
     const item = config.annotations[Number(input.closest("[data-annotation-index]").dataset.annotationIndex)];
     item[input.dataset.annotationField] = input.type === "checkbox" ? input.checked : input.type === "number" ? Number(input.value) : input.value;
+  } else if (input.dataset.option) {
+    config.options ||= {}; config.options[input.dataset.option] = input.type === "checkbox" ? input.checked : input.type === "number" ? Number(input.value) : input.value;
+  } else if (input.dataset.fill) {
+    const fill=config.options.fills[Number(input.closest('[data-fill-index]').dataset.fillIndex)];
+    fill[input.dataset.fill]=input.type === "number" || input.tagName === "SELECT"?Number(input.value):input.value;
   } else return;
   changed();
 });
 $("#series-list").addEventListener("click", event => {
+  const reorder=event.target.closest('[data-series-up],[data-series-down],[data-series-copy]');
+  if(reorder){const kind=Object.keys(reorder.dataset)[0],index=Number(reorder.dataset[kind]);if(kind==='seriesCopy' && config.series.length<32)config.series.splice(index+1,0,structuredClone(config.series[index]));else if(kind!=='seriesCopy'){const other=index+(kind==='seriesUp'?-1:1);[config.series[index],config.series[other]]=[config.series[other],config.series[index]];}drawControls();changed();return;}
   const button = event.target.closest("[data-remove]");
   if (!button) return;
   config.series.splice(Number(button.dataset.remove), 1);
@@ -361,14 +450,27 @@ $("#save-settings").addEventListener("click", () => {
   status("設定JSONを保存しました。データ自体は含まれていません。", "ready");
 });
 $("#open-settings").addEventListener("click", () => $("#settings-file").click());
-$("#settings-file").addEventListener("change", async event => {
-  const file = event.target.files[0]; event.target.value = "";
-  if (!file) return;
+async function readSettings(file) {
+  if(!metadata){status('設定を開く前にExcel/CSVを読み込んでください。','error');return;}
+  if(loading||exporting)return;loading=true;updateButtons();
   try {
     if (file.size > 1024 * 1024) throw new Error("設定JSONは1 MB以内のファイルを選んでください。");
-    config = restoreSettings(JSON.parse(await file.text()), metadata);
+    const saved=JSON.parse(await file.text());config = restoreSettings(saved, metadata);
+    if(saved.plot_type && !saved.format){
+      for(const [source,field,token] of [['line_colormap','color','line'],['scatter_colormap','scatterColor','scatter']]){
+        if(!['viridis','virigit','plasma','spectrum'].includes(saved[source]))continue;
+        const result=await request('colors',{name:saved[source],count:config.series.length});
+        config.series.forEach((item,i)=>{const text=saved.series_items?.[i] || '';if(!text.includes(`${token}=`)||new RegExp(`${token}=auto:`).test(text))item[field]=result.colors[i];});
+      }
+    }
+    selected.clear();
     drawControls(); changed();
   } catch (error) { status(`設定を開けませんでした: ${error.message}`, "error"); }
+  finally{loading=false;updateButtons();if(renderWanted)renderPreview();}
+}
+$("#settings-file").addEventListener("change", async event => {
+  const file = event.target.files[0]; event.target.value = "";
+  if (file) await readSettings(file);
 });
 $("#retry-engine").addEventListener("click", () => location.reload());
 $("#load-font").addEventListener("click", () => $("#font-file").click());
@@ -398,51 +500,80 @@ $$('[data-add-annotation]').forEach(button => button.addEventListener("click", (
   const type = button.dataset.addAnnotation;
   const base = { id: crypto.randomUUID(), type, axes_id: "primary", coordinate_system: "axes_fraction", visible: true, locked: false, zorder: 20, color: "#222222", opacity: 1 };
   config.annotations.push(type === "text" ? { ...base, x: .15, y: .8, text: "Text", font_size: 7, font_family: config.axes.fontFamily, rotation: 0, horizontal_alignment: "left", vertical_alignment: "baseline", bold: false, italic: false } : { ...base, x1: .2, y1: .7, x2: .4, y2: .7, line_width: .5, line_style: "-", arrow_style: "->", arrow_size: 7 });
+  selected=new Set([base.id]);
   drawAnnotations(); changed();
 }));
 $("#annotation-list").addEventListener("click", event => {
+  const select=event.target.closest('[data-select-annotation]');
+  if(select){selectAnnotation(select.dataset.selectAnnotation,event.shiftKey);return;}
   const button = event.target.closest('[data-remove-annotation]');
   if (!button) return;
-  config.annotations.splice(Number(button.dataset.removeAnnotation), 1); drawAnnotations(); changed();
+  const removed=config.annotations.splice(Number(button.dataset.removeAnnotation), 1); selected.delete(removed[0].id); drawAnnotations(); changed();
 });
 
 function positionInteractions() {
   const overlay = $("#figure-interactions"), image = $("#figure-image");
   overlay.replaceChildren();
   if (!figureResult || image.hidden || !image.naturalWidth) return;
-  const imageBox = image.getBoundingClientRect(), parent = $("#figure-paper").getBoundingClientRect();
-  Object.assign(overlay.style, { left: `${imageBox.left-parent.left}px`, top: `${imageBox.top-parent.top}px`, width: `${imageBox.width}px`, height: `${imageBox.height}px` });
-  const targets = [...figureResult.geometry.annotations];
-  if (figureResult.geometry.legend) targets.push({id:"legend",box:figureResult.geometry.legend});
+  const imageBox = image.getBoundingClientRect();
+  Object.assign(overlay.style, {left:'0',top:'0',width:'100%',height:'100%'});
+  const targets = [...figureResult.geometry.annotations].sort((a,b)=>(config.annotations?.find(item=>item.id===a.id)?.zorder??20)-(config.annotations?.find(item=>item.id===b.id)?.zorder??20));
+  if (figureResult.geometry.legend) targets.unshift({id:"legend",box:figureResult.geometry.legend});
   for (const target of targets) {
     const item = config.annotations?.find(item => item.id === target.id);
-    if (item?.locked) continue;
-    const [x,y,w,h]=target.box, button=document.createElement('button');
-    button.type="button"; button.className="figure-drag-target"; button.dataset.dragId=target.id;
+    const [x,y,w,h]=target.box;
+    let button;
+    if(target.points){
+      const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.classList.add('line-hit-area');svg.setAttribute('viewBox',`0 0 ${imageBox.width} ${imageBox.height}`);
+      button=document.createElementNS(svg.namespaceURI,'line');
+      for(const [i,[px,py]] of target.points.entries()){button.setAttribute(`x${i+1}`,px*imageBox.width);button.setAttribute(`y${i+1}`,py*imageBox.height);}
+      button.setAttribute('stroke','transparent');button.setAttribute('stroke-width','20');button.setAttribute('tabindex','0');svg.append(button);overlay.append(svg);
+    } else {
+      button=document.createElement('button');button.type="button";
+      const width=Math.max(w*imageBox.width,24)/view.zoom,height=Math.max(h*imageBox.height,24)/view.zoom;
+      Object.assign(button.style,{left:`calc(${x*100}% - ${Math.max(0,24-w*imageBox.width)/2/view.zoom}px)`,top:`calc(${y*100}% - ${Math.max(0,24-h*imageBox.height)/2/view.zoom}px)`,width:`${width}px`,height:`${height}px`});
+      overlay.append(button);
+    }
+    button.classList.add("figure-drag-target");if(selected.has(target.id))button.classList.add('selected');button.dataset.dragId=target.id;
     button.title=target.id==="legend"?"凡例をドラッグして移動":"注釈をドラッグして移動";
     button.setAttribute('aria-label',button.title);
-    Object.assign(button.style,{left:`${x*100}%`,top:`${y*100}%`,width:`${Math.max(w*imageBox.width,12)}px`,height:`${Math.max(h*imageBox.height,12)}px`});
-    overlay.append(button);
+    if(item?.locked)button.title+='（位置固定）';
+    if(item && selected.has(item.id) && !item.locked){
+      const handles=target.points || [[x+w,y+h],[x+w/2,y-18/imageBox.height]];
+      handles.forEach(([px,py],i)=>{
+        const handle=document.createElement('button');handle.type='button';handle.className='annotation-handle';handle.dataset.dragId=item.id;
+        handle.dataset.handle=target.points?String(i+1):i===0?'resize':'rotate';
+        handle.setAttribute('aria-label',target.points?`注釈の${i===0?'始点':'終点'}を移動`:i===0?'文字サイズを変更':'文字を回転');
+        Object.assign(handle.style,{left:`${px*100}%`,top:`${py*100}%`,width:`${14/view.zoom}px`,height:`${14/view.zoom}px`});overlay.append(handle);
+      });
+    }
   }
 }
-$("#figure-image").addEventListener("load", positionInteractions);
-new ResizeObserver(positionInteractions).observe($("#figure-image"));
+$("#figure-image").addEventListener("load", layoutPreview);
+new ResizeObserver(layoutPreview).observe($("#figure-paper"));
 $("#figure-interactions").addEventListener("pointerdown", event => {
   const target=event.target.closest('[data-drag-id]');
   if(!target || renderedRevision !== revision || loading || exporting || renderRunning) return;
   const id=target.dataset.dragId, item=config.annotations?.find(item=>item.id===id);
+  target.focus({preventScroll:true});
+  if(item){
+    if(event.shiftKey){if(selected.has(id))selected.delete(id);else selected.add(id);}else if(!selected.has(id))selected=new Set([id]);
+    drawAnnotations();
+  }
+  if(item?.locked){positionInteractions();return;}
   const imageBox=$("#figure-image").getBoundingClientRect();
-  dragging={id,item,start:item?structuredClone(item):null,x:event.clientX,y:event.clientY,box:imageBox,axes:figureResult.geometry.axes,legend:figureResult.geometry.legend};
+  dragging={id,item,start:item?structuredClone(item):null,items:(config.annotations||[]).filter(item=>selected.has(item.id)&&!item.locked).map(item=>({item,start:structuredClone(item)})),handle:target.dataset.handle,x:event.clientX,y:event.clientY,box:imageBox,axes:figureResult.geometry.axes,legend:figureResult.geometry.legend};
   target.setPointerCapture(event.pointerId); event.preventDefault();
 });
 $("#figure-interactions").addEventListener("pointermove", event => {
   if(!dragging) return;
   const dx=event.clientX-dragging.x,dy=event.clientY-dragging.y;
-  event.target.style.transform=`translate(${dx}px,${dy}px)`;
+  if(!dragging.handle)event.target.style.transform=`translate(${dx/view.zoom}px,${dy/view.zoom}px)`;
 });
 function finishDrag(event) {
   if(!dragging) return;
   const d=dragging; dragging=null;
+  if(Math.hypot(event.clientX-d.x,event.clientY-d.y)<3){positionInteractions();return;}
   const [ax,ay,aw,ah]=d.axes, dx=(event.clientX-d.x)/d.box.width/aw,dy=-(event.clientY-d.y)/d.box.height/ah;
   if(d.id==="legend") {
     const [x,y,w,h]=d.legend;
@@ -450,17 +581,106 @@ function finishDrag(event) {
     config.axes.legendY=(1-(y+h/2-ay)/ah+dy).toFixed(4);
     $$('[data-axis="legendX"],[data-axis="legendY"]').forEach(input=>input.value=config.axes[input.dataset.axis]);
   } else {
-    const convert=(value,delta,axis)=>{
-      if(d.start.coordinate_system==="axes_fraction") return value+delta;
-      const [low,high]=figureResult[`${axis}Range`];
-      return config.axes[`${axis}Scale`]==="log"?value*Math.exp(delta*(Math.log(high)-Math.log(low))):value+delta*(high-low);
-    };
-    for(const key of d.start.type==="text"?["x","y"]:["x1","y1","x2","y2"]) d.item[key]=convert(Number(d.start[key]),key.startsWith('x')?dx:dy,key[0]);
+    if(d.handle==='resize')d.item.font_size=Math.max(2,Math.min(200,Number(d.start.font_size)+((event.clientX-d.x)-(event.clientY-d.y))/d.box.width*30));
+    else if(d.handle==='rotate'){d.item.rotation=(Number(d.start.rotation)+(event.clientX-d.x)/d.box.width*360)%360;if(event.shiftKey)d.item.rotation=Math.round(d.item.rotation/15)*15;}
+    else for(const {item,start} of d.handle?[{item:d.item,start:d.start}]:d.items){
+      const keys=start.type==='text'?['x','y']:d.handle?[`x${d.handle}`,`y${d.handle}`]:['x1','y1','x2','y2'];
+      for(const key of keys)item[key]=shiftCoordinate(start[key],key.startsWith('x')?dx:dy,figureResult[`${key[0]}Range`],config.axes[`${key[0]}Scale`],start.coordinate_system);
+      if(event.shiftKey && d.handle && start.type!=='text'){
+        const other=d.handle==='1'?'2':'1';
+        const snapped=snapPoint({x:Number(item[`x${other}`]),y:Number(item[`y${other}`])},{x:Number(item[`x${d.handle}`]),y:Number(item[`y${d.handle}`])});item[`x${d.handle}`]=snapped.x;item[`y${d.handle}`]=snapped.y;
+      }
+    }
     drawAnnotations();
   }
   changed();
 }
 $("#figure-interactions").addEventListener("pointerup",finishDrag);
 $("#figure-interactions").addEventListener("pointercancel",()=>{dragging=null;positionInteractions();});
+
+function selectAnnotation(id, multiple=false){
+  if(multiple){if(selected.has(id))selected.delete(id);else selected.add(id);}else selected=new Set([id]);
+  drawAnnotations();positionInteractions();
+}
+function deleteAnnotations(){
+  if(!selected.size || loading || exporting)return;config.annotations=(config.annotations||[]).filter(item=>!selected.has(item.id));selected.clear();drawAnnotations();changed();
+}
+function copyAnnotations(){clipboard=(config.annotations||[]).filter(item=>selected.has(item.id)).map(item=>structuredClone(item));}
+function pasteAnnotations(){
+  config.annotations ||= [];selected.clear();
+  for(const source of clipboard){if(config.annotations.length>=200)break;const item=structuredClone(source);item.id=crypto.randomUUID();item.locked=false;
+    for(const key of item.type==='text'?['x','y']:['x1','y1','x2','y2'])item[key]=shiftCoordinate(item[key],.025,figureResult?.[`${key[0]}Range`]||[0,1],config.axes[`${key[0]}Scale`],item.coordinate_system);
+    config.annotations.push(item);selected.add(item.id);
+  }drawAnnotations();changed();
+}
+$("#delete-annotation").addEventListener('click',deleteAnnotations);
+$("#copy-annotation").addEventListener('click',()=>{copyAnnotations();pasteAnnotations();});
+$("#panel-label").addEventListener('click',()=>{
+  config.annotations ||= [];let label=config.annotations.find(item=>['__panel_label__','panel-label'].includes(item.id));
+  if(!label){label={id:'__panel_label__',type:'text',axes_id:'primary',coordinate_system:'axes_fraction',x:-.15,y:1.08,text:'(a)',font_size:9,font_family:config.axes.fontFamily,rotation:0,color:'#222222',opacity:1,bold:true,italic:false,horizontal_alignment:'left',vertical_alignment:'baseline',visible:true,locked:false,zorder:20};config.annotations.push(label);}
+  selected=new Set([label.id]);drawAnnotations();changed();
+});
+$$('[data-align]').forEach(button=>button.addEventListener('click',async()=>{
+  if(selected.size<2 || loading || exporting)return;
+  loading=true;updateButtons();
+  try{const result=await request('align',{config:structuredClone(config),ids:[...selected],operation:button.dataset.align});config.annotations=result.annotations;drawAnnotations();changed();}
+  catch(error){status(error.message,'error');}
+  finally{loading=false;updateButtons();if(renderWanted)renderPreview();}
+}));
+$$('[data-layer]').forEach(button=>button.addEventListener('click',()=>{const items=config.annotations||[],top=Math.max(20,...items.map(item=>item.zorder||20)),bottom=Math.min(20,...items.map(item=>item.zorder||20));items.filter(item=>selected.has(item.id)).forEach((item,i)=>item.zorder=button.dataset.layer==='front'?top+1+i:bottom-1-i);changed();}));
+function restoreHistory(redo=false){
+  const source=redo?future:history,destination=redo?history:future;if(!source.length)return;
+  destination.push(structuredClone(config));config=source.pop();restoring=true;selected.clear();drawControls();changed();restoring=false;
+}
+$("#undo").addEventListener('click',()=>restoreHistory());$("#redo").addEventListener('click',()=>restoreHistory(true));
+
+function layoutPreview(){
+  const paper=$("#figure-paper"),image=$("#figure-image"),content=$("#figure-content");if(image.hidden||!image.naturalWidth)return;
+  const availableWidth=Math.max(100,paper.clientWidth-40),availableHeight=Math.max(200,paper.clientHeight-40);
+  const scale=Math.min(availableWidth/image.naturalWidth,availableHeight/image.naturalHeight);
+  content.style.width=`${image.naturalWidth*scale}px`;content.style.height=`${image.naturalHeight*scale}px`;
+  content.style.transform=`translate(${view.x}px,${view.y}px) scale(${view.zoom})`;$("#zoom-level").textContent=`${Math.round(view.zoom*100)}%`;
+  positionInteractions();
+}
+function zoomPreview(factor,point={x:0,y:0}){view=zoomAt(view,factor,point);layoutPreview();}
+$("#zoom-in").addEventListener('click',()=>zoomPreview(1.1));$("#zoom-out").addEventListener('click',()=>zoomPreview(1/1.1));
+$("#zoom-reset").addEventListener('click',()=>{view={zoom:1,x:0,y:0};layoutPreview();});
+$("#figure-paper").addEventListener('wheel',event=>{
+  if((!event.ctrlKey && !event.metaKey) || !event.deltaY)return;event.preventDefault();
+  const box=event.currentTarget.getBoundingClientRect();zoomPreview(event.deltaY<0?1.1:1/1.1,{x:event.clientX-box.left-box.width/2,y:event.clientY-box.top-box.height/2});
+},{passive:false});
+$("#figure-paper").addEventListener('pointerdown',event=>{
+  if(event.target.closest('[data-drag-id]') || event.button!==0)return;
+  if(!event.shiftKey)selected.clear();drawAnnotations();positionInteractions();panning={x:event.clientX,y:event.clientY,start:{...view},select:event.shiftKey};event.currentTarget.setPointerCapture(event.pointerId);event.preventDefault();
+});
+$("#figure-paper").addEventListener('pointermove',event=>{
+  if(!panning)return;
+  if(panning.select){const box=event.currentTarget.getBoundingClientRect();let marquee=$('#selection-marquee');if(!marquee){marquee=document.createElement('div');marquee.id='selection-marquee';event.currentTarget.append(marquee);}Object.assign(marquee.style,{left:`${Math.min(event.clientX,panning.x)-box.left}px`,top:`${Math.min(event.clientY,panning.y)-box.top}px`,width:`${Math.abs(event.clientX-panning.x)}px`,height:`${Math.abs(event.clientY-panning.y)}px`});return;}
+  view={...panning.start,x:panning.start.x+event.clientX-panning.x,y:panning.start.y+event.clientY-panning.y};layoutPreview();
+});
+$("#figure-paper").addEventListener('pointerup',event=>{
+  if(panning?.select && figureResult){const box=$('#figure-image').getBoundingClientRect(),left=Math.min(event.clientX,panning.x),right=Math.max(event.clientX,panning.x),top=Math.min(event.clientY,panning.y),bottom=Math.max(event.clientY,panning.y);for(const item of figureResult.geometry.annotations){const [x,y,w,h]=item.box;if(box.left+x*box.width>=left && box.left+(x+w)*box.width<=right && box.top+y*box.height>=top && box.top+(y+h)*box.height<=bottom)selected.add(item.id);}drawAnnotations();positionInteractions();}
+  $('#selection-marquee')?.remove();panning=null;
+});
+$("#figure-paper").addEventListener('pointercancel',()=>{$('#selection-marquee')?.remove();panning=null;});
+$("#figure-interactions").addEventListener('dblclick',event=>{
+  const target=event.target.closest('[data-drag-id]');if(!target || target.dataset.dragId==='legend')return;
+  selectAnnotation(target.dataset.dragId);const index=(config.annotations||[]).findIndex(item=>item.id===target.dataset.dragId);
+  const field=$(`[data-annotation-index="${index}"] input[data-annotation-field="text"]`);field?.focus();field?.select();
+});
+window.addEventListener('keydown',event=>{
+  if(event.target.matches('input,textarea,select') || event.target.isContentEditable)return;
+  const control=event.ctrlKey||event.metaKey,key=event.key.toLowerCase();
+  if(key==='delete'||key==='backspace'){if(selected.size){event.preventDefault();deleteAnnotations();}}
+  else if(key==='escape'){selected.clear();drawAnnotations();positionInteractions();}
+  else if(control&&key==='c'){if(selected.size){event.preventDefault();copyAnnotations();}}
+  else if(control&&key==='a'){event.preventDefault();selected=new Set((config.annotations||[]).filter(item=>item.visible).map(item=>item.id));drawAnnotations();positionInteractions();}
+  else if(control&&key==='v'){if(clipboard.length){event.preventDefault();pasteAnnotations();}}
+  else if(control&&key==='z'){event.preventDefault();restoreHistory(event.shiftKey);}
+  else if(control&&key==='y'){event.preventDefault();restoreHistory(true);}
+  else if(control&&['+','=','-','0'].includes(key)){event.preventDefault();if(key==='0')$('#zoom-reset').click();else zoomPreview(key==='-'?1/1.1:1.1);}
+  else if(control&&key==='s'){event.preventDefault();$('#save-settings').click();}
+  else if(control&&key==='o'){event.preventDefault();$('#open-settings').click();}
+});
 try { startWorker(); }
 catch (error) { fatal(`描画機能を開始できませんでした。ブラウザを更新してください。${error.message}`); }

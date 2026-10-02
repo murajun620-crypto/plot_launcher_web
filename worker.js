@@ -31,6 +31,13 @@ async function initialize() {
   pyodide.FS.writeFile("/app/NotoSansJP.ttf", files[3]);
   ["Regular", "Bold", "Italic", "BoldItalic"].forEach((style, index) => pyodide.FS.writeFile(`/app/LiberationSans-${style}.ttf`, files[4 + index]));
   ["annotation_model.py", "annotation_manager.py"].forEach((name, index) => pyodide.FS.writeFile(`/app/python/${name}`, files[8 + index]));
+  const catalog = JSON.parse(await fetchAsset("./presets.json"));
+  pyodide.FS.writeFile("/app/presets.json", JSON.stringify(catalog));
+  pyodide.FS.mkdirTree("/app/assets");
+  pyodide.FS.writeFile("/app/assets/plot-template.pptx", await fetchAsset("./assets/plot-template.pptx", true));
+  await Promise.all([...new Set([...catalog.map(preset => preset.script), "xps_csv.py", "desktop_defaults.py"])].map(async name => {
+    pyodide.FS.writeFile(`/app/python/${name}`, await fetchAsset(`./python/${name}`));
+  }));
   await pyodide.runPythonAsync("import sys\nsys.path.insert(0, '/app/python')\nfrom engine import PlotEngine\n_engine = PlotEngine('/app/python', '/app/NotoSansJP.ttf')\n_dispatch = _engine.dispatch");
   dispatch = pyodide.globals.get("_dispatch");
   self.postMessage({ type: "ready" });

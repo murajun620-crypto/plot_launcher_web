@@ -1,12 +1,41 @@
 // src/plot_settings.py: default_auto_series_colors(), same order and shades.
 export const COLORS = ["#1F8FE0", "#D4291E", "#2BA84D", "#D77207", "#7D3EDD", "#787878", "#666666", "#0052A8", "#A10000", "#009F22"];
+export const PLOT_TYPES = ["CV/LSV", "CA", "CP", "EDX", "XPS Survey", "XPS Core", "XPS Fit", "XAFS", "Raman Spectrum", "AFM Section", "Particle Histogram", "General", "Roughness", "bar_graph_general", "Raman 3D"];
+
+export function applyPreset(config, preset) {
+  config.plotType = preset.id;
+  const [xLabel, xUnit, yLabel, yUnit] = preset.labels;
+  Object.assign(config.axes, {xLabel: xLabel === "auto" ? "" : xLabel, xUnit, yLabel: yLabel === "auto" ? "" : yLabel, yUnit});
+  const spectrum = ["EDX", "XPS Survey", "XPS Core", "XPS Fit", "XAFS", "Raman Spectrum"].includes(preset.id);
+  Object.assign(config.axes, {hideYTickLabels: spectrum, hideYTicks: spectrum, xScale: "linear", yScale: preset.id === "Roughness" ? "log" : "linear", grid: preset.id === "Raman 3D"});
+  if (preset.id === "Roughness") config.series.forEach(series => series.mode = "line+scatter");
+  config.options ||= {};
+}
+
+export function zoomAt(view, factor, point) {
+  const zoom = Math.max(.25, Math.min(4, view.zoom * factor));
+  const ratio = zoom / view.zoom;
+  return {zoom, x: point.x - (point.x - view.x) * ratio, y: point.y - (point.y - view.y) * ratio};
+}
+
+export function shiftCoordinate(value, delta, range, scale, coordinateSystem) {
+  if (coordinateSystem === "axes_fraction") return Number(value) + delta;
+  const [low, high] = range;
+  return scale === "log" ? Number(value) * Math.exp(delta * (Math.log(high) - Math.log(low))) : Number(value) + delta * (high - low);
+}
+
+export function snapPoint(anchor, point) {
+  const dx=point.x-anchor.x,dy=point.y-anchor.y,length=Math.hypot(dx,dy);
+  const angle=Math.round(Math.atan2(dy,dx)*180/Math.PI/15)*15*Math.PI/180;
+  return {x:anchor.x+length*Math.cos(angle),y:anchor.y+length*Math.sin(angle)};
+}
 
 export function defaultAxes() {
   return {
     xLabel: "", yLabel: "", xUnit: "auto", yUnit: "auto", xScale: "linear", yScale: "linear",
     xMin: "", xMax: "", yMin: "", yMax: "", xStep: "", yStep: "", width: 4, height: 3,
     fontFamily: "Liberation Sans", japaneseFontFamily: "Noto Sans JP", fontScale: 1, tickFontScale: 1, labelFontScale: 1,
-    spineScale: 1, tickLength: 1, xLabelPad: 0, yLabelPad: 0, xTickPad: 0, yTickPad: 0,
+    spineScale: 1, dataLineScale: 1, tickLength: 1, xLabelPad: 0, yLabelPad: 0, xTickPad: 0, yTickPad: 0,
     xLogFormat: "power", yLogFormat: "power", hideXLabel: false, hideYLabel: false,
     hideXTickLabels: false, hideYTickLabels: false, hideXTicks: false, hideYTicks: false,
     hideMinorTicks: false, spineLeft: true, spineRight: true, spineTop: true, spineBottom: true,
@@ -22,13 +51,17 @@ export function createSeries(x, y, name, index = 0) {
 }
 
 export function safeStem(name) {
-  return String(name || "graph").replace(/(?:\.plot)?\.(xlsx|xlsm|xls|csv|svg|png|pdf|json)$/i, "").replace(/[\\/:*?"<>|\x00-\x1f]/g, "_").slice(0, 120).replace(/[. ]+$/, "") || "graph";
+  return String(name || "graph").replace(/(?:\.plot)?\.(xlsx|xlsm|xls|csv|svg|png|pdf|pptx|json)$/i, "").replace(/[\\/:*?"<>|\x00-\x1f]/g, "_").slice(0, 120).replace(/[. ]+$/, "") || "graph";
 }
 
 export function makeSettings(config, metadata, headerRow) {
+  const options = structuredClone(config.options || {});
+  if (options.diameterColumn !== undefined) options.diameterColumnName = metadata.columns[Number(options.diameterColumn)]?.name;
+  for (const fill of options.fills || []) for (const key of ["x", "upper", "lower"]) fill[`${key}Name`] = metadata.columns[Number(fill[key])]?.name;
   return {
     format: "plotlauncher-web", version: 1,
     data: { filename: metadata.filename, sheet: metadata.sheets[metadata.sheetIndex], headerRow },
+    plotType: config.plotType || "General", options,
     axes: structuredClone(config.axes), annotations: structuredClone(config.annotations || []),
     series: config.series.map(series => ({ ...series, xColumn: metadata.columns[Number(series.x)]?.name, yColumn: metadata.columns[Number(series.y)]?.name, errorColumn: series.error === "" ? "" : metadata.columns[Number(series.error)]?.name, errorMinColumn: series.errorMin === "" ? "" : metadata.columns[Number(series.errorMin)]?.name, errorMaxColumn: series.errorMax === "" ? "" : metadata.columns[Number(series.errorMax)]?.name })),
   };
@@ -74,7 +107,12 @@ export function restoreSettings(document, metadata) {
     }
     return result;
   });
-  const restored = { axes, series };
+  const plotType = document.plotType || "General";
+  if (!PLOT_TYPES.includes(plotType)) throw new Error("設定JSONのプロット種別を確認してください。");
+  const restored = { axes, series, plotType, options: structuredClone(document.options || {}) };
+  const optionColumn = key => { if (restored.options[`${key}Name`]) restored.options[key] = find(restored.options[`${key}Name`]); };
+  optionColumn("diameterColumn");
+  for (const fill of restored.options.fills || []) for (const key of ["x", "upper", "lower"]) if (fill[`${key}Name`]) fill[key] = find(fill[`${key}Name`]);
   if (document.annotations?.length) {
     if (!Array.isArray(document.annotations) || document.annotations.length > 200) throw new Error("設定JSONの注釈を確認してください。");
     restored.annotations = structuredClone(document.annotations);
@@ -85,8 +123,8 @@ export function restoreSettings(document, metadata) {
 // Read the actual v4.1 desktop snapshot structure. Unsupported plot types are
 // rejected so a different scientific plot is never silently drawn as General.
 function fromDesktopSettings(saved, metadata) {
-  if (saved.plot_type !== "General") throw new Error(`Python版「${saved.plot_type}」の描画形式は、現在のWeb版では未対応です。`);
-  const axes = defaultAxes(), general = saved.general_options || {}, styles = saved.style_scales || {}, options = saved.axis_options || {};
+  if (!PLOT_TYPES.includes(saved.plot_type)) throw new Error(`Python版「${saved.plot_type}」の描画形式は未対応です。`);
+  const axes = defaultAxes(), general = saved.general_options || {}, styles = saved.style_scales || {}, axisOptions = saved.axis_options || {};
   axes.fontFamily = "Arial";
   axes.width = saved.axes_size_cm?.w ?? 4; axes.height = saved.axes_size_cm?.h ?? 3;
   axes.spineScale = styles.line_width ?? 1; axes.tickFontScale = styles.tick_font ?? 1;
@@ -96,8 +134,8 @@ function fromDesktopSettings(saved, metadata) {
   axes.legendScale = saved.legend_scale?.size ?? 1; axes.legendFontScale = saved.legend_scale?.font ?? 1;
   axes.spineColor = saved.spine_color === "black" ? "#000000" : saved.spine_color || "#000000";
   for (const axis of ["x", "y"]) {
-    axes[`${axis}Scale`] = options[`${axis}scale`] || "linear";
-    axes[`${axis}LogFormat`] = options[`${axis}log_format`] || "power";
+    axes[`${axis}Scale`] = axisOptions[`${axis}scale`] || "linear";
+    axes[`${axis}LogFormat`] = axisOptions[`${axis}log_format`] || "power";
     axes[`${axis}Min`] = saved.range_auto?.[axis] ? "" : String(saved[`${axis}_range`]?.min ?? "");
     axes[`${axis}Max`] = saved.range_auto?.[axis] ? "" : String(saved[`${axis}_range`]?.max ?? "");
     axes[`${axis}Step`] = saved.tick_auto?.[axis] ? "" : String(saved.tick_step?.[axis] ?? "");
@@ -106,8 +144,8 @@ function fromDesktopSettings(saved, metadata) {
     axes[`${axis}LabelPad`] = saved.axis_padding?.[`${axis}_label`] || 0;
     axes[`${axis}TickPad`] = saved.axis_padding?.[`${axis}_tick`] || 0;
   }
-  for (const [key, source] of Object.entries({hideXLabel:"hide_xlabel",hideYLabel:"hide_ylabel",hideXTickLabels:"hide_xticklabels",hideYTickLabels:"hide_yticklabels",hideXTicks:"hide_xticks",hideYTicks:"hide_yticks",hideMinorTicks:"hide_minorticks",yAxisRight:"yaxis_right",xAxisTop:"xaxis_top"})) axes[key] = options[source] ?? false;
-  for (const side of ["Left", "Right", "Top", "Bottom"]) axes[`spine${side}`] = !options[`hide_spine_${side.toLowerCase()}`];
+  for (const [key, source] of Object.entries({hideXLabel:"hide_xlabel",hideYLabel:"hide_ylabel",hideXTickLabels:"hide_xticklabels",hideYTickLabels:"hide_yticklabels",hideXTicks:"hide_xticks",hideYTicks:"hide_yticks",hideMinorTicks:"hide_minorticks",yAxisRight:"yaxis_right",xAxisTop:"xaxis_top"})) axes[key] = axisOptions[source] ?? false;
+  for (const side of ["Left", "Right", "Top", "Bottom"]) axes[`spine${side}`] = !axisOptions[`hide_spine_${side.toLowerCase()}`];
   axes.markerEdgeWidth = general.scatter_edge_width ?? .6;
   axes.errorLineWidth = general.error_linewidth ?? .8; axes.errorCapSize = general.error_capsize ?? 3; axes.errorCapThick = general.error_capthick ?? .8;
   const shades = {
@@ -119,7 +157,7 @@ function fromDesktopSettings(saved, metadata) {
     gray:["#E0E0E0","#D2D2D2","#C4C4C4","#B6B6B6","#A8A8A8","#9A9A9A","#8A8A8A","#787878","#626262","#4A4A4A"],
     black:["#E6E6E6","#D5D5D5","#C4C4C4","#B3B3B3","#A2A2A2","#8F8F8F","#7C7C7C","#666666","#4A4A4A","#2A2A2A"],
   };
-  const color = (base, shade, fallback = "auto") => base === "white" ? "#ffffff" : shades[base]?.[Number(shade)] || (/^#[0-9a-f]{6}$/i.test(base) ? base : base === "none" ? "none" : fallback);
+  const color = (base, shade, fallback = "auto") => base === "custom" && /^#[0-9a-f]{6}$/i.test(shade) ? shade : base === "white" ? "#ffffff" : shades[base]?.[Number(shade)] || (/^#[0-9a-f]{6}$/i.test(base) ? base : base === "none" ? "none" : fallback);
   if (saved.figure_background) {
     axes.backgroundColor = color(saved.figure_background.base, saved.figure_background.shade, "#ffffff");
     axes.backgroundAlpha = saved.figure_background.alpha ?? 0;
@@ -154,7 +192,25 @@ function fromDesktopSettings(saved, metadata) {
     result.error=Number(err)>=0?Number(err):''; result.errorMin=Number(mini)>=0?Number(mini):''; result.errorMax=Number(maxi)>=0?Number(maxi):'';
     return result;
   });
-  return makeSettings({axes,series,annotations:saved.annotations || []}, metadata, saved.header_row || 1);
+  if (!series.length && metadata.columns.length >= 2) {
+    if (["CV/LSV","CA","CP"].includes(saved.plot_type)) {
+      for(let y=1;y<metadata.columns.length && series.length<32;y+=2)series.push(createSeries(y-1,y,metadata.columns[y].name,series.length));
+    } else if (["EDX","Raman Spectrum","XPS Survey","XPS Core","Roughness","Raman 3D"].includes(saved.plot_type)) {
+      metadata.columns.slice(1,33).forEach(column=>series.push(createSeries(0,column.index,column.name,series.length)));
+    } else series.push(createSeries(0, 1, metadata.columns[1].name));
+  }
+  for(const [i,item] of series.entries())item.yOffset=Number(item.yOffset)+Number(saved.y_offset_start || 0)+i*Number(saved.y_offset_step || 0);
+  const xps = saved.xpsfit_options || {}, options = {};
+  for (const [key, source] of Object.entries({scatterSize:"scatter_size",scatterEdgeWidth:"scatter_edge_width",scatterAlpha:"scatter_alpha",fitLineColor:"fit_line_color",fitLineWidth:"fit_line_width",bgLineColor:"bg_line_color",bgLineWidth:"bg_line_width"})) if (xps[source] !== undefined) options[key] = xps[source];
+  options.scatterEdgeColor = color(xps.scatter_edge_base, xps.scatter_edge_shade, "#2A2A2A");
+  options.scatterFaceColor = color(xps.scatter_face_base, xps.scatter_face_shade, "#ffffff");
+  options.fills = (saved.fill_items || []).map(item => {
+    const fields = Object.fromEntries(item.split('|').map(part => {const at=part.indexOf('=');return [part.slice(0,at).trim(),part.slice(at+1).trim()];}));
+    return {x:Number(fields.x.split(':')[0]),upper:Number(fields.y1.split(':')[0]),lower:Number(fields.y2.split(':')[0]),color:fields.color.split(':')[2],alpha:Number(fields.alpha)};
+  });
+  if(saved.plot_type==='Particle Histogram')options.diameterColumn=Math.min(2,metadata.columns.length-1);
+  axes.dataLineScale = styles.plot_width ?? 1;
+  return makeSettings({axes,series,plotType:saved.plot_type,options,annotations:saved.annotations || []}, metadata, saved.header_row || 1);
 }
 
 export function sampleCSV() {

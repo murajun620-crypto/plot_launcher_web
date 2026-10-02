@@ -7,6 +7,7 @@ unchanged from src by scripts/build_web.py and runs with the Agg backend.
 from __future__ import annotations
 
 import base64
+import ast
 from contextlib import contextmanager, redirect_stdout
 from io import BytesIO, StringIO
 import json
@@ -15,6 +16,9 @@ import os
 from pathlib import Path
 import runpy
 import sys
+import zipfile
+from xml.etree import ElementTree as ET
+from xml.sax.saxutils import escape
 from types import ModuleType, SimpleNamespace
 
 import matplotlib
@@ -22,6 +26,7 @@ import matplotlib
 matplotlib.use("Agg")
 from matplotlib import font_manager, pyplot as plt
 from matplotlib.colors import is_color_like
+from matplotlib.backends.backend_svg import RendererSVG
 import numpy as np
 import pandas as pd
 
@@ -72,6 +77,7 @@ def plot_environment(values, frame, sheet_name, filename):
         return frame, sheet_name, frame.columns.tolist(), book, "/data", filename
 
     adapter.load_df_xlwings_with_dialog_and_names = load_table
+    adapter.load_xpsfit_csv_table = lambda _path: (frame, frame.columns.tolist())
     sys.modules["df_utils"] = adapter
     original_fonts = plot_utils.configure_plot_fonts
     def browser_fonts():
@@ -98,6 +104,26 @@ def plot_environment(values, frame, sheet_name, filename):
 class PlotEngine:
     def __init__(self, source_dir=None, font_path=None):
         self.source_dir = Path(source_dir or Path(__file__).parent)
+        catalog_path = self.source_dir.parent / "presets.json"
+        if catalog_path.exists():
+            catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+        else:
+            tree = ast.parse((self.source_dir / "launcher_constants.py").read_text(encoding="utf-8-sig"))
+            constants = {node.targets[0].id: ast.literal_eval(node.value) for node in tree.body if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name) and node.targets[0].id in {"SCRIPT_MAP", "AXIS_LABEL_DEFAULTS"}}
+            catalog = [{"id": key, "script": script, "labels": constants["AXIS_LABEL_DEFAULTS"][key]} for key, script in constants["SCRIPT_MAP"].items()]
+        self.presets = {preset["id"]: preset for preset in catalog}
+        try:
+            from desktop_defaults import infer_plot_type_from_filename, gradient_colors_from_name
+        except ImportError:
+            import re, unicodedata
+            source = (self.source_dir / "plot_settings.py").read_text(encoding="utf-8-sig")
+            scope = {"Path": Path, "re": re, "unicodedata": unicodedata, "SCRIPT_MAP": self.presets, "mpl_cm": matplotlib.cm, "mpl_colors": matplotlib.colors}
+            for node in ast.parse(source).body:
+                if isinstance(node, ast.FunctionDef) and node.name in {"_filename_match_parts", "infer_plot_type_from_filename", "gradient_colors_from_name"}:
+                    exec(compile(ast.Module(body=[node], type_ignores=[]), "desktop_defaults", "exec"), scope)
+            infer_plot_type_from_filename, gradient_colors_from_name = scope["infer_plot_type_from_filename"], scope["gradient_colors_from_name"]
+        self.infer_plot_type = infer_plot_type_from_filename
+        self.gradient_colors = gradient_colors_from_name
         self.frame = None
         self.figure = None
         self.filename = ""
@@ -132,6 +158,12 @@ class PlotEngine:
         suffix = Path(filename).suffix.lower()
         if suffix == ".csv":
             sheets = ["CSV"]
+            # XPS exports can start with instrument metadata, before the table.
+            import csv
+            with open(path, encoding="utf-8-sig", errors="replace", newline="") as stream:
+                xps_header = next((i + 1 for i, row in enumerate(csv.reader(stream)) if len(row) >= 2 and row[0].strip().lower() == "abscissa" and row[1].strip().lower() == "ordinate"), None)
+            if xps_header and header_row == 1:
+                header = xps_header
             try:
                 frame = pd.read_csv(path, encoding="utf-8-sig", header=int(header) - 1, nrows=MAX_ROWS + 1)
             except UnicodeDecodeError:
@@ -167,20 +199,31 @@ class PlotEngine:
         ]
         rows = [[None if pd.isna(value) else str(value)[:140] for value in row] for row in frame.head(8).itertuples(index=False, name=None)]
         self.frame, self.filename, self.sheet_name = frame, filename, sheet_name
-        return {"filename": filename, "sheets": sheets, "sheetIndex": sheets.index(sheet_name), "columns": columns, "rowCount": len(frame), "rows": rows}
+        self.xps_csv = suffix == ".csv" and bool(xps_header)
+        return {"filename": filename, "sheets": sheets, "sheetIndex": sheets.index(sheet_name), "columns": columns, "rowCount": len(frame), "rows": rows, "headerRow": int(header), "xpsCSV": self.xps_csv, "plotType": "XPS Fit" if self.xps_csv else self.infer_plot_type(filename)}
 
     def _prepare(self, config):
+        preset = config.get("plotType", "General")
+        if preset not in self.presets:
+            raise ValueError("プロット種別を選び直してください。")
         if self.frame is None:
             raise ValueError("先にExcel/CSVファイルを読み込んでください。")
         series = config.get("series", [])
+        options = config.get("options", {})
+        if not isinstance(options, dict):
+            raise ValueError("専用プロットの設定を確認してください。")
+        if preset in {"XPS Fit", "Particle Histogram"} and series:
+            first = series[0]
+            diameter = options.get("diameterColumn", min(2, len(self.frame.columns) - 1)) if self.frame is not None else 0
+            series = [{"x": first.get("x", 0) if preset == "XPS Fit" else diameter, "y": first.get("y", 1) if preset == "XPS Fit" else diameter, "name": first.get("name", "Raw")}]
         if not 1 <= len(series) <= MAX_SERIES:
             raise ValueError(f"系列を1〜{MAX_SERIES}個追加してください。")
         count = len(self.frame.columns)
         if count < 2:
             raise ValueError("X列とY列が必要です。シートとヘッダー行を確認してください。")
         axes = config.get("axes", {})
-        width = number(axes.get("width", 4), "軸領域の幅", minimum=2, maximum=24)
-        height = number(axes.get("height", 3), "軸領域の高さ", minimum=2, maximum=24)
+        width = number(axes.get("width", 4), "軸領域の幅", minimum=0.5, maximum=24)
+        height = number(axes.get("height", 3), "軸領域の高さ", minimum=0.5, maximum=24)
         font_scale = number(axes.get("fontScale", 1), "文字サイズ", minimum=0.5, maximum=3)
         family = axes.get("fontFamily", self.font_family)
         japanese_family = axes.get("japaneseFontFamily", "Noto Sans JP")
@@ -197,6 +240,7 @@ class PlotEngine:
             "PLOT_LEGEND_FONTSCALE": str(font_scale * number(axes.get("legendFontScale", 1), "凡例文字倍率", minimum=0.2, maximum=3)),
             "PLOT_LEGEND_SCALE": str(number(axes.get("legendScale", 1), "凡例サイズ倍率", minimum=0.2, maximum=3)),
             "PLOT_LINEWIDTH_SCALE": str(number(axes.get("spineScale", 1), "枠線倍率", minimum=0.1, maximum=5)),
+            "PLOT_DATA_LINE_SCALE": str(number(axes.get("dataLineScale", 1), "データ線倍率", minimum=0, maximum=6)),
             "PLOT_TICK_LENGTH": str(2.5 * number(axes.get("tickLength", 1), "目盛り長さ倍率", minimum=0, maximum=5)),
             "PLOT_SPINE_COLOR": str(axes.get("spineColor", "#000000")),
             "PLOT_PREVIEW_LEGEND": "1" if axes.get("legend", True) else "0",
@@ -277,6 +321,11 @@ class PlotEngine:
             yoff = number(item.get("yOffset", 0), "Yオフセット")
             x = pd.to_numeric(frame.iloc[:, xi], errors="coerce").to_numpy(dtype=float) + xoff
             y = pd.to_numeric(frame.iloc[:, yi], errors="coerce").to_numpy(dtype=float) + yoff
+            categorical = preset == "bar_graph_general" and not np.isfinite(x).all()
+            if categorical:
+                x = np.arange(len(frame), dtype=float)
+            if preset == "Particle Histogram":
+                x = np.arange(len(frame), dtype=float)
             finite = np.isfinite(x) & np.isfinite(y)
             valid = finite.copy()
             if values["PLOT_XSCALE"] == "log":
@@ -324,6 +373,8 @@ class PlotEngine:
             # offsets on a shared input column cannot affect other series.
             draw_x = len(draw_columns)
             draw_columns[f"_x_{index}"] = np.where(valid, x, np.nan)
+            if categorical:
+                draw_columns[f"_x_{index}"] = frame.iloc[:, xi].astype(str).to_numpy()
             draw_y = len(draw_columns)
             draw_columns[f"_y_{index}"] = np.where(valid, y, np.nan)
             draw_error = -1
@@ -384,6 +435,58 @@ class PlotEngine:
         }
         values.update({target: ",".join(keys[key]) for key, target in mappings.items()})
         values["PLOT_SERIES_LABELS_JSON"] = json.dumps(keys["names"], ensure_ascii=False)
+        for key, env, default, lo, hi in (
+            ("barWidth", "BAR_WIDTH", .8, .01, 100), ("barAlpha", "BAR_ALPHA", .9, 0, 1),
+            ("barEdgeWidth", "BAR_EDGE_WIDTH", .4, 0, 20),
+            ("depthStep", "R3D_DEPTH_STEP", 1, .01, 10000),
+            ("scatterSize", "XPSFIT_SCATTER_SIZE", 18, 0, 500),
+            ("scatterEdgeWidth", "XPSFIT_SCATTER_EDGE_WIDTH", .6, 0, 20),
+            ("scatterAlpha", "XPSFIT_SCATTER_ALPHA", .8, 0, 1),
+            ("fitLineWidth", "XPSFIT_FIT_LINE_WIDTH", 0, 0, 20),
+            ("bgLineWidth", "XPSFIT_BG_LINE_WIDTH", 0, 0, 20),
+        ):
+            values[f"PLOT_{env}"] = str(number(options.get(key, default), key, minimum=lo, maximum=hi))
+        for key, env, default in (("barEdgeColor", "BAR_EDGE_COLOR", "auto"), ("scatterEdgeColor", "XPSFIT_SCATTER_EDGE_COLOR", "#2A2A2A"), ("scatterFaceColor", "XPSFIT_SCATTER_FACE_COLOR", "#ffffff"), ("fitLineColor", "XPSFIT_FIT_LINE_COLOR", "#2A2A2A"), ("bgLineColor", "XPSFIT_BG_LINE_COLOR", "#8A8A8A")):
+            value = str(options.get(key, default))
+            if value not in {"auto", "none"} and not is_color_like(value):
+                raise ValueError("専用設定の色を確認してください。")
+            values[f"PLOT_{env}"] = value
+        values["PLOT_R3D_NORMALIZE"] = "1" if options.get("normalize", True) else "0"
+        if preset == "Particle Histogram":
+            diameter = column_index(options.get("diameterColumn", series[0]["y"]), count, "粒径")
+            data = pd.to_numeric(self.frame.iloc[:, diameter], errors="coerce").replace([np.inf, -np.inf], np.nan)
+            if not (np.isfinite(data) & (data > 0)).any():
+                raise ValueError("粒径には正の数値が必要です。")
+            if data.max() / 20 > 10000:
+                raise ValueError("粒径の単位・列を確認してください。Web版では幅20 nmのビンを1万個以内にしてください。")
+            diagnostics = [{"name": str(self.frame.columns[diameter]), "points": int((np.isfinite(data) & (data > 0)).sum())}]
+            return pd.DataFrame({"_index": np.arange(len(data)), "_unused": data, str(self.frame.columns[diameter]): data}), values, diagnostics, warnings
+        if preset == "XPS Fit":
+            if count < 8:
+                raise ValueError("XPS FitはPython版と同じ8列以上の表が必要です（CSV: A=abscissa、B=ordinate、D=background、G=fit、H以降=peak）。")
+            fills = options.get("fills", [])
+            rules, colors, alphas = [], [], []
+            for fill in fills:
+                rules.append(":".join(str(column_index(fill.get(key), count, "XPS成分")) for key in ("x", "upper", "lower")))
+                color = str(fill.get("color", "#F7574A"))
+                if not is_color_like(color):
+                    raise ValueError("XPS成分の色を確認してください。")
+                colors.append(color)
+                alphas.append(str(number(fill.get("alpha", .3), "XPS成分の不透明度", minimum=0, maximum=1)))
+            values["PLOT_XPSFIT_FILL_MAP"] = ",".join(rules)
+            values["PLOT_XPSFIT_FILL_COLORS"] = ",".join(colors)
+            values["PLOT_XPSFIT_FILL_ALPHAS"] = ",".join(alphas)
+            values["PLOT_XPSFIT_SCATTER_MAP"] = f'{series[0]["x"]}:{series[0]["y"]}'
+            if getattr(self, "xps_csv", False):
+                values["PLOT_XLSX_PATH"] = "/data/xps.csv"
+            return self.frame.apply(pd.to_numeric, errors="coerce"), values, diagnostics, warnings
+        if preset == "Raman 3D":
+            # Native waterfall consumes first X plus all subsequent Y columns.
+            first_x = np.asarray(draw_columns["_x_0"])
+            for index in range(1, len(series)):
+                if not np.array_equal(first_x, np.asarray(draw_columns[f"_x_{index}"]), equal_nan=True):
+                    raise ValueError("Raman 3Dでは各系列に同じX列・Xオフセットを指定してください。")
+            return pd.DataFrame({"_x": first_x, **{f"_y_{i}": draw_columns[f"_y_{i}"] for i in range(len(series))}}), values, diagnostics, warnings
         return pd.DataFrame(draw_columns), values, diagnostics, warnings
 
     def render(self, config):
@@ -392,8 +495,16 @@ class PlotEngine:
         figure = None
         try:
             with plot_environment(values, frame, self.sheet_name, self.filename), redirect_stdout(StringIO()):
-                namespace = runpy.run_path(str(self.source_dir / "generic_xy_base.py"), run_name="__main__")
+                preset = config.get("plotType", "General")
+                namespace = runpy.run_path(str(self.source_dir / self.presets[preset]["script"]), run_name="__main__")
                 figure, axes = namespace["fig"], namespace["ax"]
+                statistics = None
+                if preset == "Particle Histogram":
+                    statistics = {"median": float(namespace["median"]), "mean": float(namespace["mean"])}
+                    if namespace["sigma"] <= 1e-12:
+                        warnings.append("すべて同じ粒径のため対数正規分布曲線は描画されません。")
+                if preset == "bar_graph_general" and not namespace.get("is_numeric_x", True):
+                    axes.set_xticks(np.arange(len(frame)), [str(value) for value in frame.iloc[:, 0]])
                 position = config.get("axes", {}).get("legendPosition", "best")
                 if position not in {"best", "upper right", "upper left", "lower right", "lower left"}:
                     raise ValueError("凡例の位置を選び直してください。")
@@ -402,18 +513,37 @@ class PlotEngine:
                     # Preserve apply_preview_legend()'s spacing and handle sizes.
                     if values["PLOT_LEGEND_X"] == "":
                         legend.set_loc(position)
-                    for text, series in zip(legend.get_texts(), diagnostics):
-                        text.set_text(series["name"])
+                    if preset not in {"XPS Fit", "Particle Histogram"}:
+                        for text, series in zip(legend.get_texts(), diagnostics):
+                            text.set_text(series["name"])
                 if config.get("axes", {}).get("grid", False):
                     axes.grid(True, alpha=0.15, linewidth=0.5)
                 else:
                     axes.grid(False)
-                plot_utils.ensure_axis_limits_include_data(axes)
+                if preset in {"General", "Roughness"}:
+                    plot_utils.ensure_axis_limits_include_data(axes)
+                if preset == "Raman 3D":
+                    options = config.get("options", {})
+                    axes.view_init(elev=number(options.get("elevation", 24), "仰角", minimum=-180, maximum=180), azim=number(options.get("azimuth", -66), "方位角", minimum=-360, maximum=360))
+                    plot_utils.apply_plot_background_from_env(figure, axes)
+                    overlay = figure.add_axes(axes.get_position(), frameon=False)
+                    overlay.set_xlim(axes.get_xlim()); overlay.set_ylim(axes.get_zlim())
+                    overlay.set_axis_off()
+                    annotation_axes = overlay
+                else:
+                    annotation_axes = axes
                 annotations = config.get("annotations", [])
                 if not isinstance(annotations, list) or len(annotations) > 200:
                     raise ValueError("注釈は200個以内にしてください。")
+                native_annotations = json.loads(json.dumps(annotations))
+                for item in native_annotations:
+                    if item.get("type") != "text" and item.get("coordinate_system") == "axes_fraction":
+                        for suffix in ("1", "2"):
+                            xy = annotation_axes.transData.inverted().transform(annotation_axes.transAxes.transform((item[f"x{suffix}"], item[f"y{suffix}"])))
+                            item[f"x{suffix}"], item[f"y{suffix}"] = map(float, xy)
+                        item["coordinate_system"] = "data"
                 collection = AnnotationCollection()
-                annotation_warnings = collection.load_list(annotations)
+                annotation_warnings = collection.load_list(native_annotations)
                 if annotation_warnings:
                     raise ValueError("注釈の設定を確認してください。")
                 for annotation in collection.items:
@@ -422,7 +552,7 @@ class PlotEngine:
                             annotation.font_family = config.get("axes", {}).get("fontFamily", self.font_family)
                         annotation.font_family = [annotation.font_family, config.get("axes", {}).get("japaneseFontFamily", "Noto Sans JP"), "DejaVu Sans"]
                 manager = AnnotationManager(collection, logger=warnings.append)
-                manager.attach(figure, axes)
+                manager.attach(figure, annotation_axes)
                 figure.canvas.draw()
                 # Hide off-screen log ticks before calculating the export box.
                 for axis, limits in ((axes.xaxis, axes.get_xlim()), (axes.yaxis, axes.get_ylim())):
@@ -434,9 +564,16 @@ class PlotEngine:
                 figure.canvas.draw()
                 plot_utils.expand_figure_to_include_artists(figure)
                 image = BytesIO()
-                figure.savefig(image, format="svg", bbox_inches="tight", pad_inches=0.05, transparent=values["PLOT_FIGURE_BACKGROUND_ALPHA"] == "0")
-                renderer = figure.canvas.get_renderer()
-                box = figure.get_tightbbox(renderer).padded(0.05)
+                extra_artists = [axes.xaxis.label, axes.yaxis.label, axes.zaxis.label] if preset == "Raman 3D" else None
+                figure.savefig(image, format="svg", bbox_inches="tight", bbox_extra_artists=extra_artists, pad_inches=0.05, transparent=values["PLOT_FIGURE_BACKGROUND_ALPHA"] == "0")
+                # Hit areas must use SVG text metrics, exactly as the preview,
+                # rather than Agg bitmap metrics (noticeably different fonts).
+                original_dpi = figure.dpi
+                figure.set_dpi(72)
+                size = figure.get_size_inches() * 72
+                renderer = RendererSVG(*size, StringIO())
+                figure.draw(renderer)
+                box = figure.get_tightbbox(renderer, bbox_extra_artists=extra_artists).padded(0.05)
                 # Normalized SVG coordinates, Y increasing downwards, for WYSIWYG dragging.
                 def svg_box(artist_box):
                     b = artist_box.transformed(figure.dpi_scale_trans.inverted())
@@ -447,29 +584,140 @@ class PlotEngine:
                     if isinstance(artist, list):
                         artist = artist[0]
                     if artist is not None and annotation.visible:
-                        geometry["annotations"].append({"id": annotation.id, "box": svg_box(artist.get_window_extent(renderer))})
+                        entry = {"id": annotation.id, "box": svg_box(artist.get_window_extent(renderer))}
+                        if annotation.type != "text":
+                            points = annotation_axes.transData.transform([(annotation.x1, annotation.y1), (annotation.x2, annotation.y2)]) / figure.dpi
+                            entry["points"] = [[(x - box.x0) / box.width, (box.y1 - y) / box.height] for x, y in points]
+                        geometry["annotations"].append(entry)
+                figure.set_dpi(original_dpi)
             if self.figure is not None:
                 plt.close(self.figure)
             self.figure = figure
             self.transparent = values["PLOT_FIGURE_BACKGROUND_ALPHA"] == "0"
             self.annotation_manager = manager
-            return {"svg": image.getvalue().decode("utf-8"), "series": diagnostics, "warnings": warnings, "xRange": list(axes.get_xlim()), "yRange": list(axes.get_ylim()), "geometry": geometry, "fontFamily": family if (family := config.get("axes", {}).get("fontFamily")) else self.font_family}
+            self.export_extra_artists = extra_artists
+            return {"svg": image.getvalue().decode("utf-8"), "series": diagnostics, "warnings": warnings, "statistics": statistics, "xRange": list(annotation_axes.get_xlim()), "yRange": list(annotation_axes.get_ylim()), "geometry": geometry, "fontFamily": family if (family := config.get("axes", {}).get("fontFamily")) else self.font_family}
         except Exception:
             for figure_number in set(plt.get_fignums()) - previous_figures:
                 plt.close(figure_number)
             raise
 
     def export(self, config, format_name, dpi=1200):
-        if format_name not in {"svg", "png", "pdf"}:
-            raise ValueError("SVG・PNG・PDFのいずれかを選んでください。")
+        if format_name not in {"svg", "png", "pdf", "pptx"}:
+            raise ValueError("SVG・PNG・PDF・PowerPointのいずれかを選んでください。")
         self.render(config)
+        if format_name == "pptx":
+            return {"format": "pptx", "base64": base64.b64encode(self.powerpoint_file()).decode("ascii")}
         resolution = number(dpi, "PNG解像度", minimum=150, maximum=1200)
         width, height = self.figure.get_size_inches()
         if format_name == "png" and width * height * resolution**2 > 25_000_000:
             raise ValueError("画像が大きすぎます。軸領域のサイズまたはPNG解像度を小さくしてください。")
         image = BytesIO()
-        self.figure.savefig(image, format=format_name, dpi=resolution, bbox_inches="tight", pad_inches=0.03, transparent=self.transparent)
+        self.figure.savefig(image, format=format_name, dpi=resolution, bbox_inches="tight", bbox_extra_artists=self.export_extra_artists, pad_inches=0.03, transparent=self.transparent)
         return {"format": format_name, "base64": base64.b64encode(image.getvalue()).decode("ascii")}
+
+    def powerpoint_file(self):
+        """One slide: vector SVG with PNG fallback, editable panel caption.
+
+        Uses the checked-in blank slide template, and only Python stdlib in WASM.
+        """
+        p = "http://schemas.openxmlformats.org/presentationml/2006/main"
+        a = "http://schemas.openxmlformats.org/drawingml/2006/main"
+        r = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+        svg_ns = "http://schemas.microsoft.com/office/drawing/2016/SVG/main"
+        rel_ns = "http://schemas.openxmlformats.org/package/2006/relationships"
+        for prefix, ns in (("p", p), ("a", a), ("r", r), ("asvg", svg_ns)):
+            ET.register_namespace(prefix, ns)
+        figure = self.figure
+        figure.canvas.draw()
+        renderer = figure.canvas.get_renderer()
+        bbox = figure.get_tightbbox(renderer, bbox_extra_artists=self.export_extra_artists).padded(.03)
+        caption = next((item for item in self.annotation_manager.annotations.items if item.id in {"__panel_label__", "panel-label"} and item.visible), None)
+        caption_artist = self.annotation_manager.artist_by_id.get(caption.id) if caption else None
+        caption_bbox = caption_artist.get_window_extent(renderer).transformed(figure.dpi_scale_trans.inverted()) if caption_artist else None
+        if caption_artist:
+            caption_artist.set_visible(False)
+        images = {}
+        try:
+            for fmt in ("svg", "png"):
+                buffer = BytesIO()
+                figure.savefig(buffer, format=fmt, bbox_inches=bbox, dpi=300, transparent=self.transparent)
+                images[fmt] = buffer.getvalue()
+        finally:
+            if caption_artist:
+                caption_artist.set_visible(True)
+        template = self.source_dir.parent / "assets/plot-template.pptx"
+        if not template.exists():
+            template = self.source_dir.parent / "web/assets/plot-template.pptx"
+        with zipfile.ZipFile(template) as source:
+            parts = {name: source.read(name) for name in source.namelist()}
+        slide = ET.fromstring(parts["ppt/slides/slide1.xml"])
+        relationships = ET.fromstring(parts["ppt/slides/_rels/slide1.xml.rels"])
+        image_id = slide.find(f".//{{{a}}}blip").get(f"{{{r}}}embed")
+        png_target = next(item.get("Target") for item in relationships if item.get("Id") == image_id)
+        parts["ppt/" + png_target.removeprefix("../")] = images["png"]
+        ET.SubElement(relationships, f"{{{rel_ns}}}Relationship", {"Id": "rIdWebSVG", "Type": r + "/image", "Target": "../media/plot.svg"})
+        blip = slide.find(f".//{{{a}}}blip")
+        ext = ET.SubElement(ET.SubElement(blip, f"{{{a}}}extLst"), f"{{{a}}}ext", {"uri": "{96DAC541-7B7A-43D3-8B79-37D633B846F1}"})
+        ET.SubElement(ext, f"{{{svg_ns}}}svgBlip", {f"{{{r}}}embed": "rIdWebSVG"})
+        # Preserve physical dimensions; large figures get a larger blank slide.
+        width, height = max(13.333333, bbox.width + 1), max(7.5, bbox.height + 1)
+        x, y = (width - bbox.width) / 2, (height - bbox.height) / 2
+        emu = lambda value: str(round(value * 914400))
+        transform = slide.find(f".//{{{p}}}pic/{{{p}}}spPr/{{{a}}}xfrm")
+        transform.find(f"{{{a}}}off").attrib.update(x=emu(x), y=emu(y))
+        transform.find(f"{{{a}}}ext").attrib.update(cx=emu(bbox.width), cy=emu(bbox.height))
+        presentation = ET.fromstring(parts["ppt/presentation.xml"])
+        presentation.find(f"{{{p}}}sldSz").attrib.update(cx=emu(width), cy=emu(height))
+        if caption_bbox is not None:
+            color = matplotlib.colors.to_hex(caption.color).lstrip("#").upper()
+            font = caption.font_family[0] if isinstance(caption.font_family, list) else caption.font_family
+            shape = ET.fromstring(f'''<p:sp xmlns:p="{p}" xmlns:a="{a}"><p:nvSpPr><p:cNvPr id="3" name="Panel label"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm rot="{round(-caption.rotation*60000)}"><a:off x="{emu(x+caption_bbox.x0-bbox.x0)}" y="{emu(y+bbox.y1-caption_bbox.y1)}"/><a:ext cx="{emu(caption_bbox.width+.02)}" cy="{emu(caption_bbox.height+.02)}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/></p:spPr><p:txBody><a:bodyPr lIns="0" rIns="0" tIns="0" bIns="0" anchor="ctr"/><a:lstStyle/><a:p><a:pPr/><a:r><a:rPr sz="{round(caption.font_size*100)}" b="{int(caption.bold)}" i="{int(caption.italic)}"><a:solidFill><a:srgbClr val="{color}"><a:alpha val="{round(caption.opacity*100000)}"/></a:srgbClr></a:solidFill><a:latin typeface="{escape(str(font), {'"': '&quot;'})}"/></a:rPr><a:t>{escape(caption.text)}</a:t></a:r><a:endParaRPr/></a:p></p:txBody></p:sp>''')
+            slide.find(f".//{{{p}}}spTree").append(shape)
+        content_types = ET.fromstring(parts["[Content_Types].xml"])
+        ET.SubElement(content_types, "{http://schemas.openxmlformats.org/package/2006/content-types}Default", {"Extension": "svg", "ContentType": "image/svg+xml"})
+        for name, element in (("ppt/slides/slide1.xml", slide), ("ppt/slides/_rels/slide1.xml.rels", relationships), ("ppt/presentation.xml", presentation), ("[Content_Types].xml", content_types)):
+            parts[name] = ET.tostring(element, encoding="utf-8", xml_declaration=True)
+        parts["ppt/media/plot.svg"] = images["svg"]
+        output = BytesIO()
+        with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as destination:
+            for name, data in parts.items():
+                destination.writestr(name, data)
+        return output.getvalue()
+
+    def align_annotations(self, config, ids, operation):
+        self.render(config)
+        manager = self.annotation_manager
+        manager.selected_ids = set(ids)
+        # The desktop alignment algorithm is retained. Its offsets are adapted
+        # to display coordinates for mixed axes-fraction/data and log axes.
+        manager._annotation_bounds = manager._annotation_display_bounds
+        def offset_in_display(annotation, dx, dy):
+            ax = manager.axes[annotation.axes_id]
+            transform = manager._annotation_transform(annotation, ax)
+            suffixes = ("",) if annotation.type == "text" else ("1", "2")
+            for suffix in suffixes:
+                xy = transform.inverted().transform(transform.transform((getattr(annotation, f"x{suffix}"), getattr(annotation, f"y{suffix}"))) + np.array([dx, dy]))
+                setattr(annotation, f"x{suffix}", float(xy[0]))
+                setattr(annotation, f"y{suffix}", float(xy[1]))
+            manager._update_annotation_artist(annotation)
+        manager._offset_annotation = offset_in_display
+        manager.align_selected(operation)
+        items = json.loads(json.dumps(config.get("annotations", [])))
+        for item in items:
+            annotation = manager.annotations.get(item["id"])
+            if annotation is None:
+                continue
+            if annotation.type == "text":
+                item.update(x=float(annotation.x), y=float(annotation.y))
+            else:
+                for suffix in ("1", "2"):
+                    xy = (getattr(annotation, f"x{suffix}"), getattr(annotation, f"y{suffix}"))
+                    if item.get("coordinate_system") == "axes_fraction":
+                        ax = manager.axes["primary"]
+                        xy = ax.transAxes.inverted().transform(ax.transData.transform(xy))
+                    item[f"x{suffix}"], item[f"y{suffix}"] = map(float, xy)
+        return {"annotations": items}
 
     def dispatch(self, operation, payload):
         args = json.loads(payload)
@@ -481,6 +729,10 @@ class PlotEngine:
             result = self.export(args["config"], args["format"], args.get("dpi", 1200))
         elif operation == "font":
             result = self.add_font(args["path"])
+        elif operation == "colors":
+            result = {"colors": self.gradient_colors(args["name"], int(number(args["count"], "系列数", minimum=1, maximum=32)))}
+        elif operation == "align":
+            result = self.align_annotations(args["config"], args["ids"], args["operation"])
         else:
             raise ValueError("未対応の操作です。")
         return json.dumps(result, ensure_ascii=False, allow_nan=False)

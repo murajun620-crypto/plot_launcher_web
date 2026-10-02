@@ -145,6 +145,22 @@ th:first-child,td:first-child{width:30px;color:#a3aebd}
 .annotation-buttons{display:flex;gap:8px}
 .annotation-card{padding:10px 0;border-bottom:1px solid var(--border)}
 .annotation-card summary,#desktop-appearance summary{cursor:pointer;font-size:11px;margin:10px 0}
+.preview-tools{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:8px;font-size:10px;color:#64738a}
+.preview-tools output{min-width:42px;text-align:center}
+.paper{height:430px;min-height:300px;flex:none;padding:0;touch-action:none;cursor:grab}
+#figure-content{position:relative;flex-shrink:0;transform-origin:center;}
+#figure-content img{width:100%;height:100%;max-height:none;object-fit:fill;user-select:none;-webkit-user-drag:none}
+.line-hit-area{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.line-hit-area line{pointer-events:stroke;cursor:move;touch-action:none}
+.line-hit-area line:hover,.line-hit-area line.selected{stroke:#205eb030}
+.figure-drag-target.selected{border:1px dashed #205eb0;background:#205eb00a}
+.annotation-handle{position:absolute;transform:translate(-50%,-50%);border:1px solid #205eb0;border-radius:50%;background:#fff;pointer-events:auto;cursor:crosshair;padding:0;touch-action:none}
+.annotation-card.selected{border-left:3px solid #205eb0;padding-left:8px;background:#f4f8ff}
+.annotation-card summary{list-style:none}
+.annotation-card summary button{width:100%;text-align:left;white-space:normal}
+.annotation-buttons{flex-wrap:wrap}
+#preset-options details{margin-top:8px}
+#selection-marquee{position:absolute;border:1px dashed #205eb0;background:#205eb015;pointer-events:none;z-index:100}
 #desktop-appearance>.field-grid{margin-top:12px}
 button:focus-visible,summary:focus-visible,a:focus-visible{outline:2px solid #abc8f3;outline-offset:3px}
 @keyframes spin{to{transform:rotate(360deg)}

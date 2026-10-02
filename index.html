@@ -6,8 +6,8 @@
   <meta name="description" content="Excel・CSVの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=44af9d23f892">
-  <script type="module" src="./app.js?v=44af9d23f892"></script>
+  <link rel="stylesheet" href="./style.css?v=15c246a9954d">
+  <script type="module" src="./app.js?v=15c246a9954d"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -58,14 +58,17 @@
 
       <form id="plot-form" novalidate>
         <fieldset id="plot-fields" disabled>
+          <section class="control-section"><label>グラフのプリセット<select id="plot-type"></select></label><p id="preset-note" class="field-hint"></p><div id="preset-options"></div></section>
           <section class="control-section">
             <div class="section-heading"><h2><span class="step">02</span>系列</h2><span id="series-count" class="section-note">0 系列</span></div>
             <div id="series-list" class="series-list"><p class="empty-series">ファイルを読み込むと、X列・Y列を選べます。</p></div>
             <button id="add-series" class="button add-series" type="button"><svg><use href="#i-plus"/></svg>系列を追加</button>
+            <div class="field-grid"><label>連続配色<select id="color-map"><option value="viridis">Viridis</option><option value="plasma">Plasma</option><option value="spectrum">Spectrum</option></select></label><label>適用先<select id="colormap-target"><option value="both">線とマーカー</option><option value="line">線</option><option value="scatter">マーカー</option></select></label></div><button id="apply-colormap" type="button" class="button quiet">配色を適用</button>
+            <details><summary>系列の一括操作</summary><div class="annotation-buttons"><button id="shared-x-series" type="button" class="button quiet">共通X・全Y</button><button id="paired-series" type="button" class="button quiet">XYペア</button><button id="series-colors" type="button" class="button quiet">配色を戻す</button></div><div class="field-grid"><label>Yオフセット開始<input id="offset-start" type="number" value="0" step="any"></label><label>Yオフセット間隔<input id="offset-step" type="number" value="0" step="any"></label></div><button id="apply-offsets" type="button" class="button quiet">全系列へ適用</button></details>
           </section>
 
           <section class="control-section">
-            <div class="section-heading"><h2><span class="step">03</span>軸とサイズ</h2><span class="section-note">一般グラフ</span></div>
+            <div class="section-heading"><h2><span class="step">03</span>軸とサイズ</h2><span id="axes-title" class="section-note">一般</span></div>
             <label class="full-field">X軸ラベル<input id="x-label" data-axis="xLabel" type="text" maxlength="500" placeholder="空欄で列名を使用"></label>
             <label class="full-field">Y軸ラベル<input id="y-label" data-axis="yLabel" type="text" maxlength="500" placeholder="空欄で列名を使用"></label>
             <div class="field-grid"><label>X軸単位<input data-axis="xUnit" value="auto" placeholder="auto / V / cm^-1"></label><label>Y軸単位<input data-axis="yUnit" value="auto" placeholder="auto / mA/cm^2"></label></div>
@@ -90,6 +93,7 @@
             <div class="section-heading"><h2>注釈</h2><span class="section-note">図上で移動</span></div>
             <div class="annotation-buttons"><button type="button" class="button quiet" data-add-annotation="text">文字</button><button type="button" class="button quiet" data-add-annotation="arrow">矢印</button><button type="button" class="button quiet" data-add-annotation="segment">線</button></div>
             <div id="annotation-list"></div>
+            <div class="annotation-buttons"><button type="button" class="button quiet" id="panel-label">(a) ラベル</button><button type="button" class="button quiet" id="copy-annotation">複製</button><button type="button" class="button quiet" id="delete-annotation">選択を削除</button></div><details><summary>注釈の整列・重なり</summary><div class="annotation-buttons"><button type="button" class="button quiet" data-align="left">左揃え</button><button type="button" class="button quiet" data-align="center_h">左右中央</button><button type="button" class="button quiet" data-align="right">右揃え</button><button type="button" class="button quiet" data-align="top">上揃え</button><button type="button" class="button quiet" data-align="center_v">上下中央</button><button type="button" class="button quiet" data-align="bottom">下揃え</button><button type="button" class="button quiet" data-align="distribute_h">左右均等</button><button type="button" class="button quiet" data-align="distribute_v">上下均等</button><button type="button" class="button quiet" data-layer="front">最前面</button><button type="button" class="button quiet" data-layer="back">最背面</button></div></details><p class="field-hint">図または一覧で選択。Shiftで複数選択。Deleteで削除、Ctrl+C / Vでコピー。線の端点は丸いハンドルで移動できます。</p>
           </section>
         </fieldset>
       </form>
@@ -103,13 +107,17 @@
           <button class="button export-button" data-export="svg" disabled title="ベクター形式。拡大しても鮮明です。"><svg><use href="#i-download"/></svg>SVG</button>
           <button class="button export-button" data-export="pdf" disabled title="文書・論文に使えるベクター形式です。">PDF</button>
           <button class="button export-button primary" data-export="png" disabled title="画像として保存します。">PNG</button>
+          <button class="button export-button" data-export="pptx" disabled title="SVGの図と編集可能なパネルラベルを含むスライドを保存します。">PPTX</button>
         </div>
       </div>
       <div class="figure-options"><span id="preview-state" class="preview-state">準備中</span><span class="toolbar-divider"></span><span id="figure-size">軸領域 4 × 3 cm</span><div class="save-options"><label>保存名<input id="save-name" value="graph" aria-label="保存するファイルの名前" maxlength="120"></label><label>PNG<select id="png-dpi" aria-label="PNGの解像度"><option value="150">150 dpi</option><option value="300">300 dpi</option><option value="600">600 dpi</option><option value="1200" selected>1200 dpi（Python版）</option></select></label></div></div>
       <div id="figure-stage" class="figure-stage" aria-busy="true">
+        <div class="preview-tools"><button type="button" class="button quiet" id="undo">元に戻す</button><button type="button" class="button quiet" id="redo">やり直す</button><button type="button" class="button quiet" id="zoom-out" aria-label="プレビューを縮小">−</button><output id="zoom-level">100%</output><button type="button" class="button quiet" id="zoom-in" aria-label="プレビューを拡大">＋</button><button type="button" class="button quiet" id="zoom-reset">画面に合わせる</button><span>Ctrl＋ホイールで拡大・縮小／余白をドラッグで移動</span></div>
         <div class="paper" id="figure-paper">
+          <div id="figure-content">
           <img id="figure-image" alt="作成したグラフのプレビュー" hidden>
           <div id="figure-interactions" aria-label="凡例と注釈の移動"></div>
+          </div>
           <div id="initial-message" class="initial-message"><div class="spinner"></div><strong>描画機能を準備しています</strong><p>初回は読み込みに時間がかかることがあります。</p></div>
         </div>
         <div class="stage-caption"><span>プレビューは画面に合わせて拡大表示しています</span><button id="refresh-preview" class="button quiet" disabled><svg><use href="#i-refresh"/></svg>更新</button></div>
