@@ -5,7 +5,7 @@ let pyodide, dispatch, currentPath = "", uploadNumber = 0;
 
 function progress(text) { self.postMessage({ type: "progress", text }); }
 async function fetchAsset(relative, binary = false) {
-  const response = await fetch(new URL(relative, import.meta.url));
+  const response = await fetch(new URL(relative + new URL(import.meta.url).search, import.meta.url));
   if (!response.ok) throw new Error(`必要なファイルを読み込めませんでした (${response.status}): ${relative}`);
   return binary ? new Uint8Array(await response.arrayBuffer()) : response.text();
 }
@@ -22,11 +22,15 @@ async function initialize() {
   const files = await Promise.all([
     fetchAsset("./python/engine.py"), fetchAsset("./python/plot_utils.py"),
     fetchAsset("./python/generic_xy_base.py"), fetchAsset("./assets/fonts/NotoSansJP.ttf", true),
+    ...["Regular", "Bold", "Italic", "BoldItalic"].map(style => fetchAsset(`./assets/fonts/LiberationSans-${style}.ttf`, true)),
+    fetchAsset("./python/annotation_model.py"), fetchAsset("./python/annotation_manager.py"),
   ]);
   pyodide.FS.mkdirTree("/app/python");
   pyodide.FS.mkdirTree("/data");
   ["engine.py", "plot_utils.py", "generic_xy_base.py"].forEach((name, index) => pyodide.FS.writeFile(`/app/python/${name}`, files[index]));
   pyodide.FS.writeFile("/app/NotoSansJP.ttf", files[3]);
+  ["Regular", "Bold", "Italic", "BoldItalic"].forEach((style, index) => pyodide.FS.writeFile(`/app/LiberationSans-${style}.ttf`, files[4 + index]));
+  ["annotation_model.py", "annotation_manager.py"].forEach((name, index) => pyodide.FS.writeFile(`/app/python/${name}`, files[8 + index]));
   await pyodide.runPythonAsync("import sys\nsys.path.insert(0, '/app/python')\nfrom engine import PlotEngine\n_engine = PlotEngine('/app/python', '/app/NotoSansJP.ttf')\n_dispatch = _engine.dispatch");
   dispatch = pyodide.globals.get("_dispatch");
   self.postMessage({ type: "ready" });
@@ -54,6 +58,11 @@ self.onmessage = ({ data }) => {
           pyodide.FS.writeFile(uploadPath, new Uint8Array(args.bytes));
         }
         payload = { path: uploadPath || currentPath, filename: args.filename, sheet_index: args.sheetIndex ?? 0, header_row: args.headerRow ?? 1 };
+      }
+      if (operation === "font") {
+        const path = `/app/user-font-${++uploadNumber}.ttf`;
+        pyodide.FS.writeFile(path, new Uint8Array(args.bytes));
+        payload = { path };
       }
       const result = JSON.parse(dispatch(operation, JSON.stringify(payload)));
       if (uploadPath) {

@@ -6,8 +6,8 @@
   <meta name="description" content="Excel・CSVの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css">
-  <script type="module" src="./app.js"></script>
+  <link rel="stylesheet" href="./style.css?v=44af9d23f892">
+  <script type="module" src="./app.js?v=44af9d23f892"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -68,6 +68,7 @@
             <div class="section-heading"><h2><span class="step">03</span>軸とサイズ</h2><span class="section-note">一般グラフ</span></div>
             <label class="full-field">X軸ラベル<input id="x-label" data-axis="xLabel" type="text" maxlength="500" placeholder="空欄で列名を使用"></label>
             <label class="full-field">Y軸ラベル<input id="y-label" data-axis="yLabel" type="text" maxlength="500" placeholder="空欄で列名を使用"></label>
+            <div class="field-grid"><label>X軸単位<input data-axis="xUnit" value="auto" placeholder="auto / V / cm^-1"></label><label>Y軸単位<input data-axis="yUnit" value="auto" placeholder="auto / mA/cm^2"></label></div>
             <div class="axis-group">
               <div class="axis-group-title">X軸<select id="x-scale" data-axis="xScale" aria-label="X軸の種類"><option value="linear">線形</option><option value="log">対数</option></select></div>
               <div class="field-grid three"><label>最小<input id="x-min" data-axis="xMin" type="number" step="any" placeholder="自動"></label><label>最大<input id="x-max" data-axis="xMax" type="number" step="any" placeholder="自動"></label><label>目盛り<input id="x-step" data-axis="xStep" type="number" step="any" placeholder="自動"></label></div>
@@ -76,13 +77,19 @@
               <div class="axis-group-title">Y軸<select id="y-scale" data-axis="yScale" aria-label="Y軸の種類"><option value="linear">線形</option><option value="log">対数</option></select></div>
               <div class="field-grid three"><label>最小<input id="y-min" data-axis="yMin" type="number" step="any" placeholder="自動"></label><label>最大<input id="y-max" data-axis="yMax" type="number" step="any" placeholder="自動"></label><label>目盛り<input id="y-step" data-axis="yStep" type="number" step="any" placeholder="自動"></label></div>
             </div>
-            <div class="field-grid size-fields"><label>軸領域の幅 <span>cm</span><input id="axes-width" data-axis="width" type="number" min="2" max="24" step="0.1" value="8" required></label><label>軸領域の高さ <span>cm</span><input id="axes-height" data-axis="height" type="number" min="2" max="24" step="0.1" value="5" required></label></div>
+            <div class="field-grid size-fields"><label>軸領域の幅 <span>cm</span><input id="axes-width" data-axis="width" type="number" min="2" max="24" step="0.1" value="4" required></label><label>軸領域の高さ <span>cm</span><input id="axes-height" data-axis="height" type="number" min="2" max="24" step="0.1" value="3" required></label></div>
             <p class="field-hint">保存した図には、軸ラベルなどの余白が加わります。</p>
             <details class="appearance-options">
               <summary>表示オプション</summary>
               <div class="field-grid"><label>文字サイズ倍率<input id="font-scale" data-axis="fontScale" type="number" min="0.5" max="3" step="0.1" value="1" required></label><label>凡例の位置<select id="legend-position" data-axis="legendPosition"><option value="best">自動</option><option value="upper right">右上</option><option value="upper left">左上</option><option value="lower right">右下</option><option value="lower left">左下</option></select></label></div>
               <div class="check-options"><label><input id="show-legend" data-axis="legend" type="checkbox" checked>凡例を表示</label><label><input id="show-grid" data-axis="grid" type="checkbox">グリッド</label><label><input id="transparent" data-axis="transparent" type="checkbox" checked>背景を透明にする</label></div>
+              <div id="desktop-appearance"></div>
             </details>
+          </section>
+          <section class="control-section">
+            <div class="section-heading"><h2>注釈</h2><span class="section-note">図上で移動</span></div>
+            <div class="annotation-buttons"><button type="button" class="button quiet" data-add-annotation="text">文字</button><button type="button" class="button quiet" data-add-annotation="arrow">矢印</button><button type="button" class="button quiet" data-add-annotation="segment">線</button></div>
+            <div id="annotation-list"></div>
           </section>
         </fieldset>
       </form>
@@ -98,10 +105,11 @@
           <button class="button export-button primary" data-export="png" disabled title="画像として保存します。">PNG</button>
         </div>
       </div>
-      <div class="figure-options"><span id="preview-state" class="preview-state">準備中</span><span class="toolbar-divider"></span><span id="figure-size">軸領域 8 × 5 cm</span><div class="save-options"><label>保存名<input id="save-name" value="graph" aria-label="保存するファイルの名前" maxlength="120"></label><label>PNG<select id="png-dpi" aria-label="PNGの解像度"><option value="150">150 dpi</option><option value="300" selected>300 dpi</option><option value="600">600 dpi</option></select></label></div></div>
+      <div class="figure-options"><span id="preview-state" class="preview-state">準備中</span><span class="toolbar-divider"></span><span id="figure-size">軸領域 4 × 3 cm</span><div class="save-options"><label>保存名<input id="save-name" value="graph" aria-label="保存するファイルの名前" maxlength="120"></label><label>PNG<select id="png-dpi" aria-label="PNGの解像度"><option value="150">150 dpi</option><option value="300">300 dpi</option><option value="600">600 dpi</option><option value="1200" selected>1200 dpi（Python版）</option></select></label></div></div>
       <div id="figure-stage" class="figure-stage" aria-busy="true">
         <div class="paper" id="figure-paper">
           <img id="figure-image" alt="作成したグラフのプレビュー" hidden>
+          <div id="figure-interactions" aria-label="凡例と注釈の移動"></div>
           <div id="initial-message" class="initial-message"><div class="spinner"></div><strong>描画機能を準備しています</strong><p>初回は読み込みに時間がかかることがあります。</p></div>
         </div>
         <div class="stage-caption"><span>プレビューは画面に合わせて拡大表示しています</span><button id="refresh-preview" class="button quiet" disabled><svg><use href="#i-refresh"/></svg>更新</button></div>

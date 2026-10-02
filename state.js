@@ -1,11 +1,24 @@
-export const COLORS = ["#2361b5", "#14866e", "#dd7b38", "#9466ac", "#d45564", "#657994"];
+// src/plot_settings.py: default_auto_series_colors(), same order and shades.
+export const COLORS = ["#1F8FE0", "#D4291E", "#2BA84D", "#D77207", "#7D3EDD", "#787878", "#666666", "#0052A8", "#A10000", "#009F22"];
 
 export function defaultAxes() {
-  return { xLabel: "", yLabel: "", xScale: "linear", yScale: "linear", xMin: "", xMax: "", yMin: "", yMax: "", xStep: "", yStep: "", width: 8, height: 5, fontScale: 1, legend: true, legendPosition: "best", transparent: true, grid: false };
+  return {
+    xLabel: "", yLabel: "", xUnit: "auto", yUnit: "auto", xScale: "linear", yScale: "linear",
+    xMin: "", xMax: "", yMin: "", yMax: "", xStep: "", yStep: "", width: 4, height: 3,
+    fontFamily: "Liberation Sans", japaneseFontFamily: "Noto Sans JP", fontScale: 1, tickFontScale: 1, labelFontScale: 1,
+    spineScale: 1, tickLength: 1, xLabelPad: 0, yLabelPad: 0, xTickPad: 0, yTickPad: 0,
+    xLogFormat: "power", yLogFormat: "power", hideXLabel: false, hideYLabel: false,
+    hideXTickLabels: false, hideYTickLabels: false, hideXTicks: false, hideYTicks: false,
+    hideMinorTicks: false, spineLeft: true, spineRight: true, spineTop: true, spineBottom: true,
+    yAxisRight: false, xAxisTop: false, spineColor: "#000000",
+    legend: true, legendPosition: "best", legendX: "", legendY: "", legendScale: 1, legendFontScale: 1,
+    transparent: true, backgroundColor: "#ffffff", backgroundAlpha: 1, grid: false,
+    markerEdgeWidth: 0.6, errorLineWidth: 0.8, errorCapSize: 3, errorCapThick: 0.8,
+  };
 }
 
 export function createSeries(x, y, name, index = 0) {
-  return { x, y, name, color: COLORS[index % COLORS.length], mode: "line", lineWidth: 1.2, lineStyle: "-", marker: "o", markerSize: 18, xOffset: 0, yOffset: 0, error: "" };
+  return { x, y, name, color: COLORS[index % COLORS.length], scatterColor: "auto", mode: "line", lineWidth: 1, lineStyle: "-", lineAlpha: 1, marker: "o", markerSize: 18, markerEdgeColor: "auto", markerFaceColor: "auto", markerEdgeAlpha: 0.8, markerFaceAlpha: 0.8, xOffset: 0, yOffset: 0, error: "", errorMode: "auto", errorMin: "", errorMax: "" };
 }
 
 export function safeStem(name) {
@@ -16,12 +29,13 @@ export function makeSettings(config, metadata, headerRow) {
   return {
     format: "plotlauncher-web", version: 1,
     data: { filename: metadata.filename, sheet: metadata.sheets[metadata.sheetIndex], headerRow },
-    axes: structuredClone(config.axes),
-    series: config.series.map(series => ({ ...series, xColumn: metadata.columns[Number(series.x)]?.name, yColumn: metadata.columns[Number(series.y)]?.name, errorColumn: series.error === "" ? "" : metadata.columns[Number(series.error)]?.name })),
+    axes: structuredClone(config.axes), annotations: structuredClone(config.annotations || []),
+    series: config.series.map(series => ({ ...series, xColumn: metadata.columns[Number(series.x)]?.name, yColumn: metadata.columns[Number(series.y)]?.name, errorColumn: series.error === "" ? "" : metadata.columns[Number(series.error)]?.name, errorMinColumn: series.errorMin === "" ? "" : metadata.columns[Number(series.errorMin)]?.name, errorMaxColumn: series.errorMax === "" ? "" : metadata.columns[Number(series.errorMax)]?.name })),
   };
 }
 
 export function restoreSettings(document, metadata) {
+  if (document?.plot_type && !document.format) return restoreSettings(fromDesktopSettings(document, metadata), metadata);
   if (document?.format !== "plotlauncher-web" || document.version !== 1 || !Array.isArray(document.series) || document.series.length < 1 || document.series.length > 32 || !document.axes || typeof document.axes !== "object") {
     throw new Error("PlotLauncher Webで保存した設定JSONを選んでください。");
   }
@@ -31,6 +45,9 @@ export function restoreSettings(document, metadata) {
     return index;
   };
   const axes = defaultAxes();
+  for (const axis of ["x", "y"]) {
+    if (!Object.hasOwn(document.axes, `${axis}Unit`) && document.axes[`${axis}Label`]) axes[`${axis}Unit`] = "";
+  }
   for (const key of Object.keys(axes)) {
     if (Object.hasOwn(document.axes, key)) {
       const value = document.axes[key];
@@ -43,7 +60,7 @@ export function restoreSettings(document, metadata) {
     if (!item || typeof item !== "object" || typeof item.xColumn !== "string" || typeof item.yColumn !== "string") throw new Error("設定JSONの系列設定を確認してください。");
     const result = createSeries(find(item.xColumn), find(item.yColumn), item.yColumn, index);
     for (const key of Object.keys(result)) {
-      if (["x", "y", "error"].includes(key)) continue;
+      if (["x", "y", "error", "errorMin", "errorMax"].includes(key)) continue;
       if (Object.hasOwn(item, key)) {
         if (!["string", "number"].includes(typeof item[key])) throw new Error("設定JSONの系列設定を確認してください。");
         result[key] = item[key];
@@ -51,9 +68,93 @@ export function restoreSettings(document, metadata) {
     }
     if (item.errorColumn !== undefined && typeof item.errorColumn !== "string") throw new Error("設定JSONの誤差列を確認してください。");
     result.error = item.errorColumn ? find(item.errorColumn) : "";
+    for (const key of ["errorMin", "errorMax"]) {
+      if (item[`${key}Column`] !== undefined && typeof item[`${key}Column`] !== "string") throw new Error("設定JSONの誤差列を確認してください。");
+      result[key] = item[`${key}Column`] ? find(item[`${key}Column`]) : "";
+    }
     return result;
   });
-  return { axes, series };
+  const restored = { axes, series };
+  if (document.annotations?.length) {
+    if (!Array.isArray(document.annotations) || document.annotations.length > 200) throw new Error("設定JSONの注釈を確認してください。");
+    restored.annotations = structuredClone(document.annotations);
+  }
+  return restored;
+}
+
+// Read the actual v4.1 desktop snapshot structure. Unsupported plot types are
+// rejected so a different scientific plot is never silently drawn as General.
+function fromDesktopSettings(saved, metadata) {
+  if (saved.plot_type !== "General") throw new Error(`Python版「${saved.plot_type}」の描画形式は、現在のWeb版では未対応です。`);
+  const axes = defaultAxes(), general = saved.general_options || {}, styles = saved.style_scales || {}, options = saved.axis_options || {};
+  axes.fontFamily = "Arial";
+  axes.width = saved.axes_size_cm?.w ?? 4; axes.height = saved.axes_size_cm?.h ?? 3;
+  axes.spineScale = styles.line_width ?? 1; axes.tickFontScale = styles.tick_font ?? 1;
+  axes.labelFontScale = styles.label_font ?? 1; axes.tickLength = styles.tick_length ?? 1;
+  axes.legend = saved.preview_legend ?? true;
+  axes.legendX = saved.legend_position?.x ?? ""; axes.legendY = saved.legend_position?.y ?? "";
+  axes.legendScale = saved.legend_scale?.size ?? 1; axes.legendFontScale = saved.legend_scale?.font ?? 1;
+  axes.spineColor = saved.spine_color === "black" ? "#000000" : saved.spine_color || "#000000";
+  for (const axis of ["x", "y"]) {
+    axes[`${axis}Scale`] = options[`${axis}scale`] || "linear";
+    axes[`${axis}LogFormat`] = options[`${axis}log_format`] || "power";
+    axes[`${axis}Min`] = saved.range_auto?.[axis] ? "" : String(saved[`${axis}_range`]?.min ?? "");
+    axes[`${axis}Max`] = saved.range_auto?.[axis] ? "" : String(saved[`${axis}_range`]?.max ?? "");
+    axes[`${axis}Step`] = saved.tick_auto?.[axis] ? "" : String(saved.tick_step?.[axis] ?? "");
+    axes[`${axis}Label`] = saved.axis_labels?.[`${axis}_text`] === "auto" ? "" : saved.axis_labels?.[`${axis}_text`] || "";
+    axes[`${axis}Unit`] = saved.axis_labels?.[`${axis}_unit`] ?? "auto";
+    axes[`${axis}LabelPad`] = saved.axis_padding?.[`${axis}_label`] || 0;
+    axes[`${axis}TickPad`] = saved.axis_padding?.[`${axis}_tick`] || 0;
+  }
+  for (const [key, source] of Object.entries({hideXLabel:"hide_xlabel",hideYLabel:"hide_ylabel",hideXTickLabels:"hide_xticklabels",hideYTickLabels:"hide_yticklabels",hideXTicks:"hide_xticks",hideYTicks:"hide_yticks",hideMinorTicks:"hide_minorticks",yAxisRight:"yaxis_right",xAxisTop:"xaxis_top"})) axes[key] = options[source] ?? false;
+  for (const side of ["Left", "Right", "Top", "Bottom"]) axes[`spine${side}`] = !options[`hide_spine_${side.toLowerCase()}`];
+  axes.markerEdgeWidth = general.scatter_edge_width ?? .6;
+  axes.errorLineWidth = general.error_linewidth ?? .8; axes.errorCapSize = general.error_capsize ?? 3; axes.errorCapThick = general.error_capthick ?? .8;
+  const shades = {
+    blue:["#D8EBFF","#BFE0FF","#A5D5FF","#8BC9FF","#70BEFF","#56B2FF","#3CA6F5","#1F8FE0","#0C74C2","#0052A8"],
+    red:["#FFD1CC","#FFB9B1","#FFA198","#FF897F","#FF7166","#F7574A","#E93E31","#D4291E","#BC170C","#A10000"],
+    green:["#D8F5DF","#BFEECB","#A6E7B7","#8DDEA2","#74D68D","#5BCC77","#43C262","#2BA84D","#158E38","#009F22"],
+    orange:["#FFE3C2","#FFD4A2","#FFC582","#FFB662","#FFA742","#FF9822","#F28610","#D77207","#BC5E03","#A14B00"],
+    purple:["#E8D9FF","#DAC3FF","#CCADFF","#BE97FF","#AF81F8","#A06BEB","#9155DD","#7D3EDD","#6725C3","#5A1FA8"],
+    gray:["#E0E0E0","#D2D2D2","#C4C4C4","#B6B6B6","#A8A8A8","#9A9A9A","#8A8A8A","#787878","#626262","#4A4A4A"],
+    black:["#E6E6E6","#D5D5D5","#C4C4C4","#B3B3B3","#A2A2A2","#8F8F8F","#7C7C7C","#666666","#4A4A4A","#2A2A2A"],
+  };
+  const color = (base, shade, fallback = "auto") => base === "white" ? "#ffffff" : shades[base]?.[Number(shade)] || (/^#[0-9a-f]{6}$/i.test(base) ? base : base === "none" ? "none" : fallback);
+  if (saved.figure_background) {
+    axes.backgroundColor = color(saved.figure_background.base, saved.figure_background.shade, "#ffffff");
+    axes.backgroundAlpha = saved.figure_background.alpha ?? 0;
+    axes.transparent = Number(axes.backgroundAlpha) === 0;
+  }
+  const find = (index, name) => {
+    const ci = metadata.columns.findIndex(column => column.name === name);
+    if (ci >= 0) return ci;
+    // Older snapshots may store normalized/duplicate header names; retain the
+    // explicit column index only when the requested name cannot be resolved.
+    if (Number.isInteger(index) && index >= 0 && index < metadata.columns.length) return index;
+    throw new Error(`Python版設定の列「${name}」が見つかりません。`);
+  };
+  let items = saved.series_items || [];
+  if (!Array.isArray(items)) throw new Error("Python版設定の系列を確認してください。");
+  if (!items.length && saved.series_map_var) items = saved.series_map_var.split(',').map(pair => { const [x,y]=pair.split(':').map(Number); return `x=${x}: ${metadata.columns[x]?.name || ''} | y=${y}: ${metadata.columns[y]?.name || ''}`; });
+  const series = items.map((item, index) => {
+    if (typeof item !== "string") throw new Error("Python版設定の系列を確認してください。");
+    const fields = Object.fromEntries(item.split('|').map(part => { const at=part.indexOf('='); return [part.slice(0,at).trim(),part.slice(at+1).trim()]; }));
+    const col = key => { const at=fields[key]?.indexOf(':'); if(at<0 || at===undefined) throw new Error("Python版設定の列指定を確認してください。"); return find(Number(fields[key].slice(0,at)), fields[key].slice(at+1).trim()); };
+    const x=col('x'), y=col('y'), result=createSeries(x,y,metadata.columns[y].name,index);
+    const decode = value => new TextDecoder().decode(Uint8Array.from(atob(value),c=>c.charCodeAt(0)));
+    result.name = fields.legend_label_b64 ? decode(fields.legend_label_b64) : fields.legend_label || saved.series_legend_labels?.[index] || result.name;
+    const tupleColor = (token,fallback) => { if(!token)return fallback; const [base,shade,hex]=token.split(':'); return base==='auto'?fallback:hex || color(base,shade,fallback); };
+    result.color=tupleColor(fields.line,result.color); result.scatterColor=tupleColor(fields.scatter,result.color);
+    result.markerEdgeColor=color(fields.marker_edge_color || general.scatter_edge_base, fields.marker_edge_alpha || general.scatter_edge_shade);
+    result.markerFaceColor=color(fields.marker_face_color || general.scatter_face_base, fields.marker_face_alpha || general.scatter_face_shade);
+    for(const [key,source,fallback] of [["xOffset","xoff",0],["yOffset","yoff",0],["lineWidth","linewidth",general.line_width??1],["markerSize","size",general.scatter_size??18],["lineAlpha","line_opacity",1],["markerEdgeAlpha","marker_edge_opacity",fields.marker_alpha??general.scatter_alpha??.8],["markerFaceAlpha","marker_face_opacity",fields.marker_alpha??general.scatter_alpha??.8]]) result[key]=fields[source]??fallback;
+    result.mode=fields.draw_mode || (general.scatter_enabled ? (general.plot_enabled ? 'line+scatter':'scatter'):'line');
+    result.marker=fields.marker || 'o'; result.lineStyle=fields.linestyle || '-';
+    const [mode,err,mini,maxi]=(fields.error || 'none:-1:-1:-1').split(':'); result.errorMode=mode;
+    result.error=Number(err)>=0?Number(err):''; result.errorMin=Number(mini)>=0?Number(mini):''; result.errorMax=Number(maxi)>=0?Number(maxi):'';
+    return result;
+  });
+  return makeSettings({axes,series,annotations:saved.annotations || []}, metadata, saved.header_row || 1);
 }
 
 export function sampleCSV() {

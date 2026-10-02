@@ -138,6 +138,14 @@ th:first-child,td:first-child{width:30px;color:#a3aebd}
 .preview-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:23px;font-size:9px;color:#a1adbd}
 .preview-footer>span:first-child{letter-spacing:.2px}
 [hidden]{display:none!important}
+.paper{position:relative}
+#figure-interactions{position:absolute;pointer-events:none}
+.figure-drag-target{position:absolute;pointer-events:auto;background:transparent;border:1px solid transparent;padding:0;cursor:move;touch-action:none}
+.figure-drag-target:hover,.figure-drag-target:focus-visible{border:1px dashed #205eb0;background:#205eb00a}
+.annotation-buttons{display:flex;gap:8px}
+.annotation-card{padding:10px 0;border-bottom:1px solid var(--border)}
+.annotation-card summary,#desktop-appearance summary{cursor:pointer;font-size:11px;margin:10px 0}
+#desktop-appearance>.field-grid{margin-top:12px}
 button:focus-visible,summary:focus-visible,a:focus-visible{outline:2px solid #abc8f3;outline-offset:3px}
 @keyframes spin{to{transform:rotate(360deg)}
 }
