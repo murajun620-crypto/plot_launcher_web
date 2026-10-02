@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Excel・CSVの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
+  <title>PlotLauncher Web</title>
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+  <link rel="stylesheet" href="./style.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 3v17h17M7 15l4-6 4 3 5-7"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V3m-5 5 5-5 5 5M4 15v5h16v-5"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v13m-5-5 5 5 5-5M4 16v5h16v-5"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5M19 12a7 7 0 0 0-12-5L4 10m1 2a7 7 0 0 0 12 5l3-3"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H5v18h14V8l-5-5Zm0 0v5h5M8 13h8M8 17h8"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+  </svg>
+
+  <header class="app-header">
+    <a class="brand" href="./" aria-label="PlotLauncher Web ホーム">
+      <span class="brand-mark"><svg><use href="#i-chart"/></svg></span>
+      <span>PlotLauncher <span class="brand-web">Web</span></span>
+    </a>
+    <div class="header-actions">
+      <span class="privacy-note"><span class="privacy-dot"></span>データはブラウザ内で処理</span>
+      <button id="open-settings" class="button quiet" disabled><svg><use href="#i-upload"/></svg><span>設定を開く</span></button>
+      <button id="save-settings" class="button quiet" disabled><svg><use href="#i-download"/></svg><span>設定を保存</span></button>
+      <input id="settings-file" type="file" accept=".json,application/json" hidden>
+    </div>
+  </header>
+
+  <div class="workspace">
+    <aside class="controls" aria-label="グラフの設定">
+      <section class="control-section data-section">
+        <div class="section-heading"><h2><span class="step">01</span>データ</h2><span class="section-note">Excel / CSV</span></div>
+        <button id="drop-zone" class="drop-zone" disabled>
+          <span class="upload-mark"><svg><use href="#i-upload"/></svg></span>
+          <strong>ファイルを選択</strong>
+          <span>ここへドラッグ＆ドロップ</span>
+          <small>.xlsx · .xlsm · .xls · .csv</small>
+        </button>
+        <input id="data-file" type="file" accept=".xlsx,.xlsm,.xls,.csv" hidden>
+        <button id="sample-data" class="sample-button" disabled>サンプルデータを使う <span aria-hidden="true">↗</span></button>
+        <div id="file-summary" class="file-summary" hidden>
+          <svg><use href="#i-file"/></svg><div><strong id="file-name"></strong><span id="file-stats"></span></div><span id="sample-badge" class="badge" hidden>サンプル</span>
+        </div>
+        <div class="field-grid data-options">
+          <label>シート<select id="sheet-select" disabled><option>未読み込み</option></select></label>
+          <label>ヘッダー行<input id="header-row" type="number" min="1" max="1000" step="1" value="1" disabled></label>
+        </div>
+        <p class="field-hint">列名が並ぶ行を指定してください。</p>
+      </section>
+
+      <form id="plot-form" novalidate>
+        <fieldset id="plot-fields" disabled>
+          <section class="control-section">
+            <div class="section-heading"><h2><span class="step">02</span>系列</h2><span id="series-count" class="section-note">0 系列</span></div>
+            <div id="series-list" class="series-list"><p class="empty-series">ファイルを読み込むと、X列・Y列を選べます。</p></div>
+            <button id="add-series" class="button add-series" type="button"><svg><use href="#i-plus"/></svg>系列を追加</button>
+          </section>
+
+          <section class="control-section">
+            <div class="section-heading"><h2><span class="step">03</span>軸とサイズ</h2><span class="section-note">一般グラフ</span></div>
+            <label class="full-field">X軸ラベル<input id="x-label" data-axis="xLabel" type="text" maxlength="500" placeholder="空欄で列名を使用"></label>
+            <label class="full-field">Y軸ラベル<input id="y-label" data-axis="yLabel" type="text" maxlength="500" placeholder="空欄で列名を使用"></label>
+            <div class="axis-group">
+              <div class="axis-group-title">X軸<select id="x-scale" data-axis="xScale" aria-label="X軸の種類"><option value="linear">線形</option><option value="log">対数</option></select></div>
+              <div class="field-grid three"><label>最小<input id="x-min" data-axis="xMin" type="number" step="any" placeholder="自動"></label><label>最大<input id="x-max" data-axis="xMax" type="number" step="any" placeholder="自動"></label><label>目盛り<input id="x-step" data-axis="xStep" type="number" step="any" placeholder="自動"></label></div>
+            </div>
+            <div class="axis-group">
+              <div class="axis-group-title">Y軸<select id="y-scale" data-axis="yScale" aria-label="Y軸の種類"><option value="linear">線形</option><option value="log">対数</option></select></div>
+              <div class="field-grid three"><label>最小<input id="y-min" data-axis="yMin" type="number" step="any" placeholder="自動"></label><label>最大<input id="y-max" data-axis="yMax" type="number" step="any" placeholder="自動"></label><label>目盛り<input id="y-step" data-axis="yStep" type="number" step="any" placeholder="自動"></label></div>
+            </div>
+            <div class="field-grid size-fields"><label>軸領域の幅 <span>cm</span><input id="axes-width" data-axis="width" type="number" min="2" max="24" step="0.1" value="8" required></label><label>軸領域の高さ <span>cm</span><input id="axes-height" data-axis="height" type="number" min="2" max="24" step="0.1" value="5" required></label></div>
+            <p class="field-hint">保存した図には、軸ラベルなどの余白が加わります。</p>
+            <details class="appearance-options">
+              <summary>表示オプション</summary>
+              <div class="field-grid"><label>文字サイズ倍率<input id="font-scale" data-axis="fontScale" type="number" min="0.5" max="3" step="0.1" value="1" required></label><label>凡例の位置<select id="legend-position" data-axis="legendPosition"><option value="best">自動</option><option value="upper right">右上</option><option value="upper left">左上</option><option value="lower right">右下</option><option value="lower left">左下</option></select></label></div>
+              <div class="check-options"><label><input id="show-legend" data-axis="legend" type="checkbox" checked>凡例を表示</label><label><input id="show-grid" data-axis="grid" type="checkbox">グリッド</label><label><input id="transparent" data-axis="transparent" type="checkbox" checked>背景を透明にする</label></div>
+            </details>
+          </section>
+        </fieldset>
+      </form>
+      <div class="controls-footer"><span class="auto-dot"></span>変更するとプレビューを更新します</div>
+    </aside>
+
+    <main class="preview-area">
+      <div class="preview-toolbar">
+        <div><span class="eyebrow">FIGURE</span><h1>グラフプレビュー</h1></div>
+        <div class="export-buttons" role="group" aria-label="グラフを保存">
+          <button class="button export-button" data-export="svg" disabled title="ベクター形式。拡大しても鮮明です。"><svg><use href="#i-download"/></svg>SVG</button>
+          <button class="button export-button" data-export="pdf" disabled title="文書・論文に使えるベクター形式です。">PDF</button>
+          <button class="button export-button primary" data-export="png" disabled title="画像として保存します。">PNG</button>
+        </div>
+      </div>
+      <div class="figure-options"><span id="preview-state" class="preview-state">準備中</span><span class="toolbar-divider"></span><span id="figure-size">軸領域 8 × 5 cm</span><div class="save-options"><label>保存名<input id="save-name" value="graph" aria-label="保存するファイルの名前" maxlength="120"></label><label>PNG<select id="png-dpi" aria-label="PNGの解像度"><option value="150">150 dpi</option><option value="300" selected>300 dpi</option><option value="600">600 dpi</option></select></label></div></div>
+      <div id="figure-stage" class="figure-stage" aria-busy="true">
+        <div class="paper" id="figure-paper">
+          <img id="figure-image" alt="作成したグラフのプレビュー" hidden>
+          <div id="initial-message" class="initial-message"><div class="spinner"></div><strong>描画機能を準備しています</strong><p>初回は読み込みに時間がかかることがあります。</p></div>
+        </div>
+        <div class="stage-caption"><span>プレビューは画面に合わせて拡大表示しています</span><button id="refresh-preview" class="button quiet" disabled><svg><use href="#i-refresh"/></svg>更新</button></div>
+      </div>
+      <div id="status" class="status" role="status" aria-live="polite"><span class="status-dot"></span><span id="status-text">描画機能を読み込んでいます…</span><button id="retry-engine" class="button quiet" hidden>再読み込み</button></div>
+      <details id="plot-warnings" class="plot-warnings" hidden><summary>描画データの確認</summary><ul id="warning-list"></ul></details>
+      <details id="data-preview" class="data-preview" hidden><summary><span>読み込んだデータ</span><span id="table-caption"></span></summary><div class="table-scroll"><table id="data-table"><thead></thead><tbody></tbody></table></div><p>先頭8行を表示。グラフには読み込んだ全行を使用します。</p></details>
+      <footer class="preview-footer"><span>PlotLauncher Web · 一般グラフ</span><span>Excelで変更した内容は、保存してから読み込んでください。</span></footer>
+    </main>
+  </div>
+  <noscript>このアプリを使用するにはJavaScriptを有効にしてください。</noscript>
+</body>
+</html>
