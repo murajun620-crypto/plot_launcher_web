@@ -1,4 +1,4 @@
-import { COLORS, applyPreset, createSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=87136c71ec2f";
+import { COLORS, applyPreset, createSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=8f5dcf95e768";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -9,6 +9,7 @@ let metadata = null, config = { axes: defaultAxes(), series: [] };
 let loading = false, exporting = false, sample = false, loadedHeader = 1;
 let revision = 0, renderedRevision = -1, renderRunning = false, renderWanted = false, renderTimer;
 let previewURL, figureResult, dragging;
+let powerpoint = null, officeConnecting = false;
 let presets = [], selected = new Set(), clipboard = [], view = {zoom:1,x:0,y:0}, panning;
 let history = [], future = [], lastState, restoring = false;
 const catalogReady = fetch(new URL("./presets.json" + new URL(import.meta.url).search, import.meta.url)).then(response => {if(!response.ok) throw new Error("プリセットの読み込みに失敗しました"); return response.json();}).then(items => {
@@ -55,6 +56,8 @@ function updateButtons() {
   $("#add-series").disabled = config.series.length >= 32 || (metadata?.columns.length ?? 0) < 2;
   $("#load-font").disabled = !engineReady || busy;
   $$('[data-export]').forEach(button => { button.disabled = !engineReady || busy || renderedRevision !== revision || renderRunning; });
+  $("#copy-image").disabled = !engineReady || busy || renderedRevision !== revision || renderRunning;
+  $("#send-powerpoint").disabled = !engineReady || busy || renderedRevision !== revision || renderRunning || officeConnecting;
   $("#figure-stage").setAttribute("aria-busy", String(loading || exporting || renderRunning || !engineReady));
 }
 
@@ -80,7 +83,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=87136c71ec2f", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=8f5dcf95e768", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -387,6 +390,30 @@ function download(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
+async function copyFigureImage() {
+  if (exporting || loading || renderRunning || renderedRevision !== revision || !engineReady) return;
+  if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") {
+    status("このブラウザでは画像コピーを使用できません。HTTPSのChrome・Edge・Safari等で開くか、PNGを保存してください。", "error");
+    return;
+  }
+  exporting = true; updateButtons();
+  status("グラフの画像をコピーしています…");
+  try {
+    // Call write during the click gesture. Safari accepts a promised Blob,
+    // so rendering in the worker does not consume the user activation.
+    const png = request("export", { config: structuredClone(config), format: "png", dpi: Number($("#png-dpi").value) }).then(result =>
+      new Blob([Uint8Array.from(atob(result.base64), character => character.charCodeAt(0))], { type: "image/png" }));
+    png.catch(() => {});
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
+    status("グラフの画像をコピーしました。PowerPointなどで貼り付け（Ctrl/Command＋V）できます。", "ready");
+  } catch (error) {
+    status(error.name === "NotAllowedError" ? "画像コピーが許可されませんでした。ブラウザのクリップボード書き込みを許可して、もう一度「画像をコピー」を押してください。" : `画像をコピーできませんでした: ${error.message}`, "error");
+  } finally {
+    exporting = false; updateButtons();
+    if (renderWanted) renderPreview();
+  }
+}
+
 async function exportFigure(format) {
   if (exporting || loading || renderedRevision !== revision) return;
   exporting = true;
@@ -400,6 +427,66 @@ async function exportFigure(format) {
     status(`${filename} を保存しました`, "ready");
   } catch (error) { status(error.message, "error"); }
   finally { exporting = false; updateButtons(); }
+}
+
+async function connectPowerPoint() {
+  if (new URL(window.location.href).searchParams.get("office") !== "powerpoint") return;
+  officeConnecting = true; updateButtons();
+  $("#powerpoint-connection").textContent = "PowerPointに接続しています…";
+  let timer;
+  try {
+    const ready = new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = "https://appsforoffice.microsoft.com/lib/1/hosted/office.js";
+      script.onload = () => {
+        if (!window.Office?.onReady) { reject(new Error("Officeの接続機能を読み込めませんでした。")); return; }
+        window.Office.onReady().then(info => resolve({ office: window.Office, info }), reject);
+      };
+      script.onerror = () => reject(new Error("Officeの接続機能を読み込めませんでした。ネットワーク接続を確認してください。"));
+      document.head.append(script);
+    });
+    const {office, info} = await Promise.race([ready, new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error("PowerPointとの接続が時間切れになりました。アドインを開き直してください。")), 15000);
+    })]);
+    if (info.host !== office.HostType.PowerPoint) throw new Error("PowerPoint内のPlotLauncherアドインから開いてください。");
+    if (!office.context.requirements.isSetSupported("ImageCoercion", "1.1")) throw new Error("このPowerPointは画像挿入に対応していません。PowerPointを更新してください。");
+    powerpoint = office;
+    $(".brand").href = "./index.html?office=powerpoint";
+    $("#powerpoint-connection").textContent = "PowerPoint接続済み · 選択中のスライドへ挿入";
+    $("#powerpoint-help").hidden = true;
+  } catch (error) {
+    $("#powerpoint-connection").textContent = error.message;
+  } finally { clearTimeout(timer); officeConnecting = false; updateButtons(); }
+}
+
+async function sendToPowerPoint() {
+  if (exporting || loading || renderRunning || renderedRevision !== revision || !engineReady || officeConnecting) return;
+  if (!powerpoint) {
+    $("#powerpoint-help").hidden = false;
+    $("#powerpoint-help").focus();
+    status("直接送信にはPowerPointアドインの登録が必要です。表示された導入手順をご覧ください。", "ready");
+    return;
+  }
+  exporting = true; updateButtons(); status("PowerPointの選択中のスライドに挿入しています…");
+  try {
+    const svg = figureResult.svg;
+    // Matplotlib's root dimensions include labels and margins, in points.
+    // Explicit dimensions preserve the physical size independently of zoom.
+    const root = svg.match(/<svg\b[^>]*>/)?.[0] || "";
+    const width = Number(root.match(/\bwidth="([\d.]+)pt"/)?.[1]);
+    const height = Number(root.match(/\bheight="([\d.]+)pt"/)?.[1]);
+    if (!(width > 0 && height > 0)) throw new Error("図の寸法を取得できませんでした。プレビューを更新してください。");
+    const vector = powerpoint.context.requirements.isSetSupported("ImageCoercion", "1.2");
+    const data = vector ? svg : (await request("export", {config:structuredClone(config),format:"png",dpi:Number($("#png-dpi").value)})).base64;
+    await new Promise((resolve, reject) => {
+      powerpoint.context.document.setSelectedDataAsync(data, {
+        coercionType: vector ? powerpoint.CoercionType.XmlSvg : powerpoint.CoercionType.Image,
+        imageLeft: 24, imageTop: 24, imageWidth: width, imageHeight: height
+      }, result => result.status === powerpoint.AsyncResultStatus.Succeeded ? resolve() : reject(new Error(result.error?.message || "スライドに挿入できませんでした。")));
+    });
+    status(`PowerPointの選択中のスライドに${vector ? "SVG" : "PNG"}画像を挿入しました。`, "ready");
+  } catch (error) { status(`PowerPointへ送信できませんでした: ${error.message} 編集可能なスライドを選択して、もう一度お試しください。`, "error"); }
+  finally { exporting = false; updateButtons(); if (renderWanted) renderPreview(); }
 }
 
 $("#data-file").addEventListener("change", event => { const file = event.target.files[0]; event.target.value = ""; if (file) loadFile(file); });
@@ -450,6 +537,8 @@ $("#add-series").addEventListener("click", () => {
 });
 $("#refresh-preview").addEventListener("click", () => { clearTimeout(renderTimer); renderWanted = true; renderPreview(); });
 $$('[data-export]').forEach(button => button.addEventListener("click", () => exportFigure(button.dataset.export)));
+$("#copy-image").addEventListener("click", copyFigureImage);
+$("#send-powerpoint").addEventListener("click", sendToPowerPoint);
 $("#save-settings").addEventListener("click", () => {
   download(new Blob([JSON.stringify(makeSettings(config, metadata, loadedHeader), null, 2)], { type: "application/json" }), `${safeStem($("#save-name").value)}.plot.json`);
   status("設定JSONを保存しました。データ自体は含まれていません。", "ready");
@@ -688,5 +777,6 @@ window.addEventListener('keydown',event=>{
   else if(control&&key==='s'){event.preventDefault();$('#save-settings').click();}
   else if(control&&key==='o'){event.preventDefault();$('#open-settings').click();}
 });
+connectPowerPoint();
 try { startWorker(); }
 catch (error) { fatal(`描画機能を開始できませんでした。ブラウザを更新してください。${error.message}`); }

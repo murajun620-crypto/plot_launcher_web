@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PowerPoint連携 · PlotLauncher Web</title>
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#f6f8fc;color:#25334a;font:15px/1.85 system-ui,sans-serif}main{max-width:850px;margin:auto;padding:36px 24px 70px}h1{font-size:26px}h2{font-size:20px;margin-top:30px}a{color:#245bc8}code{overflow-wrap:anywhere;background:#eef1f8;padding:3px 5px}section{background:white;border:1px solid #e0e5ed;border-radius:12px;padding:20px 24px;margin-top:20px}.download{display:inline-block;background:#245bc8;color:white;border-radius:8px;padding:10px 20px;text-decoration:none}li{margin:8px 0}.note{font-size:13px;color:#526079}summary{cursor:pointer;font-weight:600}
+  </style>
+</head>
+<body><main>
+  <a href="./">← PlotLauncher Web</a>
+  <h1>グラフをPowerPointへ送信する</h1>
+  <p>PowerPoint内の作業ウィンドウでPlotLauncher Webを使い、「PowerPointへ送信」を押すと、選択中のスライドに図を挿入できます。Pythonのインストールは不要です。</p>
+  <p><a class="download" href="./powerpoint-manifest.xml" download>アドイン定義（XML）をダウンロード</a></p>
+  <p class="note">現行のPowerPoint（Windows / Mac / Web）の画像挿入APIを使用します。SVG対応環境ではベクター画像、それ以外は指定した解像度のPNGを挿入します。導入方法はOfficeの版と学校のアカウント設定で異なります。</p>
+  <section><h2>学校で学生へ配布する場合</h2>
+    <p>Microsoft 365管理者に上のXMLを渡し、<a href="https://learn.microsoft.com/en-us/microsoft-365/admin/manage/manage-deployment-of-add-ins?view=o365-worldwide" target="_blank" rel="noopener">Officeアドインの集中展開</a>で対象の学生へ配布してください。学生はPowerPointの「ホーム → アドイン」からPlotLauncher Webを開きます。</p>
+    <p class="note">下の手動登録は試用・開発確認用です。学校での継続配布には管理者による展開を使用してください。アドインの利用が学校の設定で制限されている場合も、管理者への確認が必要です。</p>
+  </section>
+  <section><h2>まず手動で試す</h2>
+    <details open><summary>PowerPoint Web</summary><ol>
+      <li>PowerPoint Webで編集可能なプレゼンテーションを開きます。</li>
+      <li>「ホーム → アドイン → その他の設定（More Settings）」を開き、「マイ アドインのアップロード」を選びます。旧UIでは「挿入 → アドイン → マイ アドイン → マイ アドインの管理」にあります。</li>
+      <li>ダウンロードした <code>powerpoint-manifest.xml</code> を選択してアップロードします。</li>
+      <li>PlotLauncher Webの作業ウィンドウが表示されます。</li>
+    </ol><p class="note"><a href="https://learn.microsoft.com/en-us/office/dev/add-ins/testing/sideload-office-add-ins-for-testing" target="_blank" rel="noopener">MicrosoftのWeb版登録手順</a>。ブラウザのデータを消したり別のブラウザに変えたりすると再登録が必要です。</p></details>
+    <details><summary>MacのPowerPoint</summary><ol>
+      <li>Finderの「移動 → フォルダへ移動」で <code>~/Library/Containers/com.microsoft.Powerpoint/Data/Documents</code> を開きます。</li>
+      <li><code>wef</code> フォルダを作成し、その中へ <code>powerpoint-manifest.xml</code> をコピーします。</li>
+      <li>PowerPointを終了して再起動し、「ホーム → アドイン」からPlotLauncher Webを選びます。</li>
+    </ol><p class="note"><a href="https://learn.microsoft.com/en-us/office/dev/add-ins/testing/sideload-an-office-add-in-on-mac" target="_blank" rel="noopener">MicrosoftのMac版登録手順</a></p></details>
+    <details><summary>WindowsのPowerPoint</summary><ol>
+      <li>試用用のフォルダに <code>powerpoint-manifest.xml</code> を保存し、フォルダの「プロパティ → 共有」で自分がアクセスできる共有フォルダにします。共有先のパス（<code>\\PC名\フォルダ名</code>）を控えます。</li>
+      <li>PowerPointの「ファイル → オプション → トラストセンター → トラストセンターの設定 → 信頼できるアドイン カタログ」で、その共有パスを追加し「メニューに表示」を有効にします。</li>
+      <li>PowerPointを再起動し、「ホーム → アドイン → 詳細設定 → 共有フォルダー」でPlotLauncher Webを追加します。</li>
+    </ol><p class="note"><a href="https://learn.microsoft.com/en-us/office/dev/add-ins/testing/create-a-network-shared-folder-catalog-for-task-pane-and-content-add-ins" target="_blank" rel="noopener">MicrosoftのWindows版登録手順</a>。学校の端末では管理者による集中展開を推奨します。</p></details>
+  </section>
+  <section><h2>図を挿入する</h2><ol>
+    <li>送信先のスライドを選択し、PowerPoint内のPlotLauncher WebでExcel / CSVを読み込みます。</li>
+    <li>プリセット・フォント・注釈を設定し、プレビューが「更新済み」になるまで待ちます。</li>
+    <li>「PowerPoint接続済み」を確認して「PowerPointへ送信」を押します。</li>
+  </ol><p>表示倍率にかかわらず、図の寸法（ラベル・余白を含む）を保って挿入します。挿入するのは一枚の画像です。編集可能な別のパネルラベルが必要な場合は、PPTX保存を使用してください。</p>
+  <p>通常のブラウザで作成中の図は「設定を保存」でJSONを保存し、アドインで同じデータとフォントを読み込み、「設定を開く」で復元できます。</p></section>
+  <section><h2>画像をコピーして貼り付ける</h2>
+    <p>通常のブラウザでは「画像をコピー」を押し、PowerPointでCtrl＋V（MacではCommand＋V）を押します。PNGの解像度は画面の選択値（標準1200 dpi）を使用します。クリップボード書き込みが許可されない環境ではPNGを保存して挿入してください。</p>
+    <p class="note">単独のブラウザから、PC上で開いているPowerPointに直接アクセスすることはできません。直接送信はPowerPointのアドイン内で使用してください。</p>
+  </section>
+</main></body></html>

@@ -6,8 +6,8 @@
   <meta name="description" content="Excel・CSVの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=87136c71ec2f">
-  <script type="module" src="./app.js?v=87136c71ec2f"></script>
+  <link rel="stylesheet" href="./style.css?v=8f5dcf95e768">
+  <script type="module" src="./app.js?v=8f5dcf95e768"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -112,11 +112,20 @@
       <div class="preview-toolbar">
         <div><span class="eyebrow">FIGURE</span><h1>グラフプレビュー</h1></div>
         <div class="export-buttons" role="group" aria-label="グラフを保存">
+          <button class="button export-button" id="copy-image" disabled title="現在のグラフをPNG画像としてコピーします。PowerPointなどへ貼り付けられます。">画像をコピー</button>
+          <button class="button export-button" id="send-powerpoint" disabled title="PowerPointアドイン内では選択中のスライドに直接挿入します。">PowerPointへ送信</button>
           <button class="button export-button" data-export="svg" disabled title="ベクター形式。拡大しても鮮明です。"><svg><use href="#i-download"/></svg>SVG</button>
           <button class="button export-button" data-export="pdf" disabled title="文書・論文に使えるベクター形式です。">PDF</button>
           <button class="button export-button primary" data-export="png" disabled title="画像として保存します。">PNG</button>
           <button class="button export-button" data-export="pptx" disabled title="SVGの図と編集可能なパネルラベルを含むスライドを保存します。">PPTX</button>
         </div>
+      </div>
+      <div class="powerpoint-info"><span id="powerpoint-connection">直接送信はPowerPointアドイン内で使用できます</span> · <a href="./powerpoint.html" target="_blank" rel="noopener">導入手順</a></div>
+      <div id="powerpoint-help" class="powerpoint-help" hidden tabindex="-1">
+        <strong>PowerPointへの直接送信</strong>
+        <p>アドインを登録し、PowerPoint内でPlotLauncher Webを開いてください。送信先は、そのPowerPointで選択中のスライドです。</p>
+        <p><a href="./powerpoint.html" target="_blank" rel="noopener">Windows / Mac の登録手順</a> · <a href="./powerpoint-manifest.xml" download>アドイン定義をダウンロード</a></p>
+        <p>ブラウザで作成中の図は「設定を保存」からJSONを保存し、アドイン内で同じデータ・フォントと設定JSONを読み込むと引き継げます。「画像をコピー」からの貼り付けも使用できます。</p>
       </div>
       <div class="figure-options"><span id="preview-state" class="preview-state">準備中</span><span class="toolbar-divider"></span><span id="figure-size">軸領域 4 × 3 cm</span><div class="save-options"><label>保存名<input id="save-name" value="graph" aria-label="保存するファイルの名前" maxlength="120"></label><label>PNG<select id="png-dpi" aria-label="PNGの解像度"><option value="150">150 dpi</option><option value="300">300 dpi</option><option value="600">600 dpi</option><option value="1200" selected>1200 dpi（Python版）</option></select></label></div></div>
       <div id="figure-stage" class="figure-stage" aria-busy="true">
