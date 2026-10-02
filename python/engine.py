@@ -117,7 +117,7 @@ class PlotEngine:
         except ImportError:
             import re, unicodedata
             source = (self.source_dir / "plot_settings.py").read_text(encoding="utf-8-sig")
-            scope = {"Path": Path, "re": re, "unicodedata": unicodedata, "SCRIPT_MAP": self.presets, "mpl_cm": matplotlib.cm, "mpl_colors": matplotlib.colors}
+            scope = {"Path": Path, "re": re, "unicodedata": unicodedata, "SCRIPT_MAP": self.presets, "mpl_cm": SimpleNamespace(get_cmap=matplotlib.colormaps.get_cmap), "mpl_colors": matplotlib.colors}
             for node in ast.parse(source).body:
                 if isinstance(node, ast.FunctionDef) and node.name in {"_filename_match_parts", "infer_plot_type_from_filename", "gradient_colors_from_name"}:
                     exec(compile(ast.Module(body=[node], type_ignores=[]), "desktop_defaults", "exec"), scope)

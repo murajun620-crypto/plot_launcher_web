@@ -1,6 +1,8 @@
 import re, unicodedata, json
 from pathlib import Path
-from matplotlib import cm as mpl_cm, colors as mpl_colors
+from types import SimpleNamespace
+from matplotlib import colormaps, colors as mpl_colors
+mpl_cm = SimpleNamespace(get_cmap=colormaps.get_cmap)
 SCRIPT_MAP = {p['id']: p['script'] for p in json.loads((Path(__file__).parent.parent / 'presets.json').read_text())}
 
 def _filename_match_parts(path_text: str) -> tuple[str, set[str], str]:
