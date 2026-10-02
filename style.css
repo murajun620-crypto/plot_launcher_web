@@ -28,6 +28,14 @@ svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke
 fieldset{margin:0;padding:0;border:0;min-width:0}
 .control-section{padding:25px 24px;border-bottom:1px solid var(--border)}
 .section-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:17px}
+.control-section>summary.section-heading{cursor:pointer;list-style:none;user-select:none}
+.control-section>summary.section-heading::-webkit-details-marker{display:none}
+.control-section>summary.section-heading::marker{content:""}
+.control-section>summary.section-heading::after{content:"";width:7px;height:7px;border-right:1.5px solid var(--muted);border-bottom:1.5px solid var(--muted);transform:rotate(-45deg);flex-shrink:0}
+.control-section[open]>summary.section-heading::after{transform:rotate(45deg)}
+.control-section:not([open])>summary.section-heading{margin-bottom:0}
+.control-section>summary.section-heading .section-note{margin-left:auto}
+.control-section>summary.section-heading:hover h2{color:var(--blue)}
 .section-heading h2{font-size:13px;margin:0;font-weight:650;display:flex;align-items:center;gap:10px}
 .step{color:#9ba7b7;font-family:ui-monospace,monospace;font-weight:400;font-size:11px}
 .section-note{color:var(--muted);font-size:10px}

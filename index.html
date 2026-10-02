@@ -6,8 +6,8 @@
   <meta name="description" content="Excel・CSVの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=4c813c49a729">
-  <script type="module" src="./app.js?v=4c813c49a729"></script>
+  <link rel="stylesheet" href="./style.css?v=587ed1cee6e0">
+  <script type="module" src="./app.js?v=587ed1cee6e0"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -36,8 +36,8 @@
 
   <div class="workspace">
     <aside class="controls" aria-label="グラフの設定">
-      <section class="control-section data-section">
-        <div class="section-heading"><h2><span class="step">01</span>データ</h2><span class="section-note">Excel / CSV</span></div>
+      <details class="control-section data-section" open>
+        <summary class="section-heading"><h2><span class="step">01</span>データ</h2><span class="section-note">Excel / CSV</span></summary>
         <button id="drop-zone" class="drop-zone" disabled>
           <span class="upload-mark"><svg><use href="#i-upload"/></svg></span>
           <strong>ファイルを選択</strong>
@@ -54,21 +54,21 @@
           <label>ヘッダー行<input id="header-row" type="number" min="1" max="1000" step="1" value="1" disabled></label>
         </div>
         <p class="field-hint">列名が並ぶ行を指定してください。</p>
-      </section>
+      </details>
 
       <form id="plot-form" novalidate>
         <fieldset id="plot-fields" disabled>
-          <section class="control-section"><label>グラフのプリセット<select id="plot-type"></select></label><p id="preset-note" class="field-hint"></p><div id="preset-options"></div></section>
-          <section class="control-section">
-            <div class="section-heading"><h2><span class="step">02</span>系列</h2><span id="series-count" class="section-note">0 系列</span></div>
+          <details class="control-section" open><summary class="section-heading"><h2>プリセット</h2></summary><label>グラフのプリセット<select id="plot-type"></select></label><p id="preset-note" class="field-hint"></p><div id="preset-options"></div></details>
+          <details class="control-section" open>
+            <summary class="section-heading"><h2><span class="step">02</span>系列</h2><span id="series-count" class="section-note">0 系列</span></summary>
             <div id="series-list" class="series-list"><p class="empty-series">ファイルを読み込むと、X列・Y列を選べます。</p></div>
             <button id="add-series" class="button add-series" type="button"><svg><use href="#i-plus"/></svg>系列を追加</button>
             <div id="series-colormap"><div class="field-grid"><label>連続配色<select id="color-map"><option value="viridis">Viridis</option><option value="plasma">Plasma</option><option value="spectrum">Spectrum</option></select></label><label>適用先<select id="colormap-target"><option value="both">線とマーカー</option><option value="line">線</option><option value="scatter">マーカー</option></select></label></div><button id="apply-colormap" type="button" class="button quiet">配色を適用</button></div>
             <details id="series-batch"><summary>系列の一括操作</summary><div class="annotation-buttons"><button id="shared-x-series" type="button" class="button quiet">共通X・全Y</button><button id="paired-series" type="button" class="button quiet">XYペア</button><button id="series-colors" type="button" class="button quiet">配色を戻す</button></div><div class="field-grid"><label>Yオフセット開始<input id="offset-start" type="number" value="0" step="any"></label><label>Yオフセット間隔<input id="offset-step" type="number" value="0" step="any"></label></div><button id="apply-offsets" type="button" class="button quiet">全系列へ適用</button></details>
-          </section>
+          </details>
 
-          <section class="control-section">
-            <div class="section-heading"><h2><span class="step">03</span>軸とサイズ</h2><span id="axes-title" class="section-note">一般</span></div>
+          <details class="control-section" open>
+            <summary class="section-heading"><h2><span class="step">03</span>軸とサイズ</h2><span id="axes-title" class="section-note">一般</span></summary>
             <label class="full-field">X軸ラベル<input id="x-label" data-axis="xLabel" type="text" maxlength="500" placeholder="空欄で列名を使用"></label>
             <label class="full-field">Y軸ラベル<input id="y-label" data-axis="yLabel" type="text" maxlength="500" placeholder="空欄で列名を使用"></label>
             <div class="field-grid"><label>X軸単位<input data-axis="xUnit" value="auto" placeholder="auto / V / cm^-1"></label><label>Y軸単位<input data-axis="yUnit" value="auto" placeholder="auto / mA/cm^2"></label></div>
@@ -88,13 +88,13 @@
               <div class="check-options"><label><input id="show-legend" data-axis="legend" type="checkbox" checked>凡例を表示</label><label><input id="show-grid" data-axis="grid" type="checkbox">グリッド</label><label><input id="transparent" data-axis="transparent" type="checkbox" checked>背景を透明にする</label></div>
               <div id="desktop-appearance"></div>
             </details>
-          </section>
-          <section class="control-section">
-            <div class="section-heading"><h2>注釈</h2><span class="section-note">図上で移動</span></div>
+          </details>
+          <details class="control-section" open>
+            <summary class="section-heading"><h2>注釈</h2><span class="section-note">図上で移動</span></summary>
             <div class="annotation-buttons"><button type="button" class="button quiet" data-add-annotation="text">文字</button><button type="button" class="button quiet" data-add-annotation="arrow">矢印</button><button type="button" class="button quiet" data-add-annotation="segment">線</button></div>
             <div id="annotation-list"></div>
             <div class="annotation-buttons"><button type="button" class="button quiet" id="panel-label">(a) ラベル</button><button type="button" class="button quiet" id="copy-annotation">複製</button><button type="button" class="button quiet" id="delete-annotation">選択を削除</button></div><details><summary>注釈の整列・重なり</summary><div class="annotation-buttons"><button type="button" class="button quiet" data-align="left">左揃え</button><button type="button" class="button quiet" data-align="center_h">左右中央</button><button type="button" class="button quiet" data-align="right">右揃え</button><button type="button" class="button quiet" data-align="top">上揃え</button><button type="button" class="button quiet" data-align="center_v">上下中央</button><button type="button" class="button quiet" data-align="bottom">下揃え</button><button type="button" class="button quiet" data-align="distribute_h">左右均等</button><button type="button" class="button quiet" data-align="distribute_v">上下均等</button><button type="button" class="button quiet" data-layer="front">最前面</button><button type="button" class="button quiet" data-layer="back">最背面</button></div></details><p class="field-hint">図または一覧で選択。Shiftで複数選択。Deleteで削除、Ctrl+C / Vでコピー。線の端点は丸いハンドルで移動できます。</p>
-          </section>
+          </details>
         </fieldset>
       </form>
       <div class="controls-footer"><span class="auto-dot"></span>変更するとプレビューを更新します</div>
