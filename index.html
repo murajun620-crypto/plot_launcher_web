@@ -6,8 +6,8 @@
   <meta name="description" content="Excel・CSVの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=6a8be6b85045">
-  <script type="module" src="./app.js?v=6a8be6b85045"></script>
+  <link rel="stylesheet" href="./style.css?v=4c813c49a729">
+  <script type="module" src="./app.js?v=4c813c49a729"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -63,8 +63,8 @@
             <div class="section-heading"><h2><span class="step">02</span>系列</h2><span id="series-count" class="section-note">0 系列</span></div>
             <div id="series-list" class="series-list"><p class="empty-series">ファイルを読み込むと、X列・Y列を選べます。</p></div>
             <button id="add-series" class="button add-series" type="button"><svg><use href="#i-plus"/></svg>系列を追加</button>
-            <div class="field-grid"><label>連続配色<select id="color-map"><option value="viridis">Viridis</option><option value="plasma">Plasma</option><option value="spectrum">Spectrum</option></select></label><label>適用先<select id="colormap-target"><option value="both">線とマーカー</option><option value="line">線</option><option value="scatter">マーカー</option></select></label></div><button id="apply-colormap" type="button" class="button quiet">配色を適用</button>
-            <details><summary>系列の一括操作</summary><div class="annotation-buttons"><button id="shared-x-series" type="button" class="button quiet">共通X・全Y</button><button id="paired-series" type="button" class="button quiet">XYペア</button><button id="series-colors" type="button" class="button quiet">配色を戻す</button></div><div class="field-grid"><label>Yオフセット開始<input id="offset-start" type="number" value="0" step="any"></label><label>Yオフセット間隔<input id="offset-step" type="number" value="0" step="any"></label></div><button id="apply-offsets" type="button" class="button quiet">全系列へ適用</button></details>
+            <div id="series-colormap"><div class="field-grid"><label>連続配色<select id="color-map"><option value="viridis">Viridis</option><option value="plasma">Plasma</option><option value="spectrum">Spectrum</option></select></label><label>適用先<select id="colormap-target"><option value="both">線とマーカー</option><option value="line">線</option><option value="scatter">マーカー</option></select></label></div><button id="apply-colormap" type="button" class="button quiet">配色を適用</button></div>
+            <details id="series-batch"><summary>系列の一括操作</summary><div class="annotation-buttons"><button id="shared-x-series" type="button" class="button quiet">共通X・全Y</button><button id="paired-series" type="button" class="button quiet">XYペア</button><button id="series-colors" type="button" class="button quiet">配色を戻す</button></div><div class="field-grid"><label>Yオフセット開始<input id="offset-start" type="number" value="0" step="any"></label><label>Yオフセット間隔<input id="offset-step" type="number" value="0" step="any"></label></div><button id="apply-offsets" type="button" class="button quiet">全系列へ適用</button></details>
           </section>
 
           <section class="control-section">
@@ -80,7 +80,7 @@
               <div class="axis-group-title">Y軸<select id="y-scale" data-axis="yScale" aria-label="Y軸の種類"><option value="linear">線形</option><option value="log">対数</option></select></div>
               <div class="field-grid three"><label>最小<input id="y-min" data-axis="yMin" type="number" step="any" placeholder="自動"></label><label>最大<input id="y-max" data-axis="yMax" type="number" step="any" placeholder="自動"></label><label>目盛り<input id="y-step" data-axis="yStep" type="number" step="any" placeholder="自動"></label></div>
             </div>
-            <div class="field-grid size-fields"><label>軸領域の幅 <span>cm</span><input id="axes-width" data-axis="width" type="number" min="2" max="24" step="0.1" value="4" required></label><label>軸領域の高さ <span>cm</span><input id="axes-height" data-axis="height" type="number" min="2" max="24" step="0.1" value="3" required></label></div>
+            <div class="field-grid size-fields"><label>軸領域の幅 <span>cm</span><input id="axes-width" data-axis="width" type="number" min="0.5" max="24" step="0.1" value="4" required></label><label>軸領域の高さ <span>cm</span><input id="axes-height" data-axis="height" type="number" min="0.5" max="24" step="0.1" value="3" required></label></div>
             <p class="field-hint">保存した図には、軸ラベルなどの余白が加わります。</p>
             <details class="appearance-options">
               <summary>表示オプション</summary>
