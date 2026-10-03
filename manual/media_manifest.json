@@ -1,0 +1,604 @@
+{
+  "captured_on": "2026-10-04",
+  "sources": {
+    "PlotLauncher": {
+      "version": "1.2.0",
+      "url": "https://murajun620-crypto.github.io/plot_launcher_web/"
+    },
+    "MiFiTo": {
+      "version": "1.1.0",
+      "url": "https://murajun620-crypto.github.io/Microscopy_figure_tools_web/"
+    }
+  },
+  "capture_method": "Real browser screenshots; ordered operation states; no synthetic UI",
+  "gifs": {
+    "assets/plot-preset.gif": {
+      "title": "プリセットを切り替える",
+      "poster": "assets/plot-03-preset.jpg",
+      "duration_ms": 8000,
+      "dimensions": [
+        1265,
+        712
+      ],
+      "steps": [
+        {
+          "capture": "frames/plot-preset-cv.jpg",
+          "duration_ms": 2600,
+          "description": "CV/LSV"
+        },
+        {
+          "capture": "frames/plot-preset-raman.jpg",
+          "duration_ms": 3200,
+          "description": "Raman Spectrum"
+        },
+        {
+          "capture": "frames/plot-preset-cv.jpg",
+          "duration_ms": 2200,
+          "description": "CV/LSVに戻す"
+        }
+      ]
+    },
+    "assets/plot-color.gif": {
+      "title": "系列の表示と色を変える",
+      "poster": "assets/plot-05-series.jpg",
+      "duration_ms": 10600,
+      "dimensions": [
+        1265,
+        712
+      ],
+      "steps": [
+        {
+          "capture": "frames/plot-preset-cv.jpg",
+          "duration_ms": 2000,
+          "description": "系列1を表示"
+        },
+        {
+          "capture": "frames/plot-series-hidden.jpg",
+          "duration_ms": 2600,
+          "description": "系列1を隠す"
+        },
+        {
+          "capture": "assets/plot-04-color.jpg",
+          "duration_ms": 3000,
+          "description": "色パネルを開く"
+        },
+        {
+          "capture": "assets/plot-05-series.jpg",
+          "duration_ms": 3000,
+          "description": "紫に変更"
+        }
+      ]
+    },
+    "assets/plot-axis.gif": {
+      "title": "軸ラベルを編集して移動する",
+      "poster": "assets/plot-06-axis-editor.jpg",
+      "duration_ms": 12000,
+      "dimensions": [
+        1265,
+        712
+      ],
+      "steps": [
+        {
+          "capture": "assets/plot-05-series.jpg",
+          "duration_ms": 1800,
+          "description": "X軸ラベルをダブルクリック"
+        },
+        {
+          "capture": "assets/plot-06-axis-editor.jpg",
+          "duration_ms": 2400,
+          "description": "ラベルの設定を開く"
+        },
+        {
+          "capture": "frames/plot-axis-value.jpg",
+          "duration_ms": 2600,
+          "description": "Potentialへ変更"
+        },
+        {
+          "capture": "frames/plot-axis-applied.jpg",
+          "duration_ms": 2200,
+          "description": "設定を閉じる"
+        },
+        {
+          "capture": "frames/plot-axis-dragged.jpg",
+          "duration_ms": 3000,
+          "description": "ラベルをドラッグ"
+        }
+      ]
+    },
+    "assets/plot-annotation.gif": {
+      "title": "注釈を追加・移動・削除する",
+      "poster": "assets/plot-08-annotation-moved.jpg",
+      "duration_ms": 12800,
+      "dimensions": [
+        1265,
+        712
+      ],
+      "steps": [
+        {
+          "capture": "frames/plot-annotation-added.jpg",
+          "duration_ms": 2200,
+          "description": "テキストを追加"
+        },
+        {
+          "capture": "assets/plot-07-annotation.jpg",
+          "duration_ms": 2800,
+          "description": "Condition Aを入力"
+        },
+        {
+          "capture": "assets/plot-08-annotation-moved.jpg",
+          "duration_ms": 2600,
+          "description": "ドラッグして移動"
+        },
+        {
+          "capture": "frames/plot-annotation-deleted.jpg",
+          "duration_ms": 2400,
+          "description": "選択を削除"
+        },
+        {
+          "capture": "frames/plot-annotation-restored.jpg",
+          "duration_ms": 2800,
+          "description": "元に戻す"
+        }
+      ]
+    },
+    "assets/mifito-calibration.gif": {
+      "title": "既知の長さを測って校正する",
+      "poster": "assets/mifito-03-measure.jpg",
+      "duration_ms": 10400,
+      "dimensions": [
+        1280,
+        720
+      ],
+      "steps": [
+        {
+          "capture": "frames/mifito-calibration-reset.jpg",
+          "duration_ms": 2200,
+          "description": "校正をリセットし測定モードにする"
+        },
+        {
+          "capture": "frames/mifito-calibration-point1.jpg",
+          "duration_ms": 1800,
+          "description": "基準線の片端を選ぶ"
+        },
+        {
+          "capture": "assets/mifito-03-measure.jpg",
+          "duration_ms": 3000,
+          "description": "反対側を選び5 µmを確認"
+        },
+        {
+          "capture": "assets/mifito-04-calibrated.jpg",
+          "duration_ms": 3400,
+          "description": "測定から校正"
+        }
+      ]
+    },
+    "assets/mifito-crop.gif": {
+      "title": "3対2にトリミングする",
+      "poster": "assets/mifito-05-crop-selection.jpg",
+      "duration_ms": 8400,
+      "dimensions": [
+        1280,
+        720
+      ],
+      "steps": [
+        {
+          "capture": "assets/mifito-04-calibrated.jpg",
+          "duration_ms": 1800,
+          "description": "校正済みの元の範囲"
+        },
+        {
+          "capture": "assets/mifito-05-crop-selection.jpg",
+          "duration_ms": 3400,
+          "description": "3対2・画像幅を維持で範囲指定"
+        },
+        {
+          "capture": "assets/mifito-06-cropped.jpg",
+          "duration_ms": 3200,
+          "description": "範囲を適用"
+        }
+      ]
+    },
+    "assets/mifito-labels.gif": {
+      "title": "パネルラベルを一括適用する",
+      "poster": "assets/mifito-08-label.jpg",
+      "duration_ms": 10400,
+      "dimensions": [
+        1280,
+        720
+      ],
+      "steps": [
+        {
+          "capture": "frames/mifito-label-alpha.jpg",
+          "duration_ms": 1800,
+          "description": "a・b・cの形式"
+        },
+        {
+          "capture": "frames/mifito-label-format.jpg",
+          "duration_ms": 2800,
+          "description": "a-1・a-2・a-3を選ぶ"
+        },
+        {
+          "capture": "assets/mifito-08-label.jpg",
+          "duration_ms": 2800,
+          "description": "ラベルを適用"
+        },
+        {
+          "capture": "frames/mifito-label-next.jpg",
+          "duration_ms": 3000,
+          "description": "次の画像のa-2を確認"
+        }
+      ]
+    },
+    "assets/mifito-batch.gif": {
+      "title": "3枚を一括保存する",
+      "poster": "assets/mifito-09-batch-save.jpg",
+      "duration_ms": 9200,
+      "dimensions": [
+        1280,
+        720
+      ],
+      "steps": [
+        {
+          "capture": "frames/mifito-batch-ready.jpg",
+          "duration_ms": 2200,
+          "description": "一括保存を開く"
+        },
+        {
+          "capture": "assets/mifito-09-batch-save.jpg",
+          "duration_ms": 3400,
+          "description": "PNG・SVG・設定JSONを選ぶ"
+        },
+        {
+          "capture": "frames/mifito-batch-saved.jpg",
+          "duration_ms": 3600,
+          "description": "3枚・9ファイルのダウンロード開始"
+        }
+      ]
+    }
+  },
+  "attachments": [
+    {
+      "file": "assets/mifito-01-start.jpg",
+      "bytes": 72063,
+      "dimensions": [
+        1280,
+        720
+      ],
+      "articles": [
+        "01-common.md"
+      ]
+    },
+    {
+      "file": "assets/mifito-02-sample.jpg",
+      "bytes": 79839,
+      "dimensions": [
+        1280,
+        720
+      ],
+      "articles": [
+        "03-mifito.md"
+      ]
+    },
+    {
+      "file": "assets/mifito-03-measure.jpg",
+      "bytes": 76686,
+      "dimensions": [
+        1280,
+        720
+      ],
+      "articles": [
+        "03-mifito.md"
+      ]
+    },
+    {
+      "file": "assets/mifito-04-calibrated.jpg",
+      "bytes": 78825,
+      "dimensions": [
+        1280,
+        720
+      ],
+      "articles": [
+        "03-mifito.md"
+      ]
+    },
+    {
+      "file": "assets/mifito-05-crop-selection.jpg",
+      "bytes": 81993,
+      "dimensions": [
+        1280,
+        720
+      ],
+      "articles": [
+        "03-mifito.md"
+      ]
+    },
+    {
+      "file": "assets/mifito-06-cropped.jpg",
+      "bytes": 76176,
+      "dimensions": [
+        1280,
+        720
+      ],
+      "articles": [
+        "03-mifito.md"
+      ]
+    },
+    {
+      "file": "assets/mifito-07-scale.jpg",
+      "bytes": 75767,
+      "dimensions": [
+        1280,
+        720
+      ],
+      "articles": [
+        "03-mifito.md"
+      ]
+    },
+    {
+      "file": "assets/mifito-08-label.jpg",
+      "bytes": 76054,
+      "dimensions": [
+        1280,
+        720
+      ],
+      "articles": [
+        "03-mifito.md"
+      ]
+    },
+    {
+      "file": "assets/mifito-09-batch-save.jpg",
+      "bytes": 59372,
+      "dimensions": [
+        1280,
+        720
+      ],
+      "articles": [
+        "01-common.md",
+        "03-mifito.md"
+      ]
+    },
+    {
+      "file": "assets/mifito-10-batch-targets.jpg",
+      "bytes": 78540,
+      "dimensions": [
+        1280,
+        720
+      ],
+      "articles": [
+        "03-mifito.md"
+      ]
+    },
+    {
+      "file": "assets/mifito-11-settings-menu.jpg",
+      "bytes": 80348,
+      "dimensions": [
+        1280,
+        720
+      ],
+      "articles": [
+        "01-common.md"
+      ]
+    },
+    {
+      "file": "assets/mifito-batch.gif",
+      "bytes": 698227,
+      "dimensions": [
+        1280,
+        720
+      ],
+      "articles": [
+        "03-mifito.md"
+      ]
+    },
+    {
+      "file": "assets/mifito-calibration.gif",
+      "bytes": 1053176,
+      "dimensions": [
+        1280,
+        720
+      ],
+      "articles": [
+        "03-mifito.md"
+      ]
+    },
+    {
+      "file": "assets/mifito-crop.gif",
+      "bytes": 797844,
+      "dimensions": [
+        1280,
+        720
+      ],
+      "articles": [
+        "03-mifito.md"
+      ]
+    },
+    {
+      "file": "assets/mifito-labels.gif",
+      "bytes": 1083585,
+      "dimensions": [
+        1280,
+        720
+      ],
+      "articles": [
+        "03-mifito.md"
+      ]
+    },
+    {
+      "file": "assets/plot-01-start.jpg",
+      "bytes": 82749,
+      "dimensions": [
+        1265,
+        712
+      ],
+      "articles": [
+        "01-common.md"
+      ]
+    },
+    {
+      "file": "assets/plot-02-sample.jpg",
+      "bytes": 100885,
+      "dimensions": [
+        1265,
+        712
+      ],
+      "articles": [
+        "02-plotlauncher.md"
+      ]
+    },
+    {
+      "file": "assets/plot-03-preset.jpg",
+      "bytes": 100050,
+      "dimensions": [
+        1265,
+        712
+      ],
+      "articles": [
+        "02-plotlauncher.md"
+      ]
+    },
+    {
+      "file": "assets/plot-04-color.jpg",
+      "bytes": 79458,
+      "dimensions": [
+        1265,
+        712
+      ],
+      "articles": [
+        "02-plotlauncher.md"
+      ]
+    },
+    {
+      "file": "assets/plot-05-series.jpg",
+      "bytes": 96796,
+      "dimensions": [
+        1265,
+        712
+      ],
+      "articles": [
+        "02-plotlauncher.md"
+      ]
+    },
+    {
+      "file": "assets/plot-06-axis-editor.jpg",
+      "bytes": 63861,
+      "dimensions": [
+        1265,
+        712
+      ],
+      "articles": [
+        "02-plotlauncher.md"
+      ]
+    },
+    {
+      "file": "assets/plot-07-annotation.jpg",
+      "bytes": 93967,
+      "dimensions": [
+        1265,
+        712
+      ],
+      "articles": [
+        "02-plotlauncher.md"
+      ]
+    },
+    {
+      "file": "assets/plot-08-annotation-moved.jpg",
+      "bytes": 95146,
+      "dimensions": [
+        1265,
+        712
+      ],
+      "articles": [
+        "02-plotlauncher.md"
+      ]
+    },
+    {
+      "file": "assets/plot-09-save.jpg",
+      "bytes": 69387,
+      "dimensions": [
+        1265,
+        712
+      ],
+      "articles": [
+        "01-common.md",
+        "02-plotlauncher.md"
+      ]
+    },
+    {
+      "file": "assets/plot-10-ticks.jpg",
+      "bytes": 63886,
+      "dimensions": [
+        1265,
+        712
+      ],
+      "articles": [
+        "02-plotlauncher.md"
+      ]
+    },
+    {
+      "file": "assets/plot-11-series-editor.jpg",
+      "bytes": 68857,
+      "dimensions": [
+        1265,
+        712
+      ],
+      "articles": [
+        "02-plotlauncher.md"
+      ]
+    },
+    {
+      "file": "assets/plot-12-background.jpg",
+      "bytes": 67562,
+      "dimensions": [
+        1265,
+        712
+      ],
+      "articles": [
+        "02-plotlauncher.md"
+      ]
+    },
+    {
+      "file": "assets/plot-annotation.gif",
+      "bytes": 1657844,
+      "dimensions": [
+        1265,
+        712
+      ],
+      "articles": [
+        "02-plotlauncher.md"
+      ]
+    },
+    {
+      "file": "assets/plot-axis.gif",
+      "bytes": 1456458,
+      "dimensions": [
+        1265,
+        712
+      ],
+      "articles": [
+        "02-plotlauncher.md"
+      ]
+    },
+    {
+      "file": "assets/plot-color.gif",
+      "bytes": 1266313,
+      "dimensions": [
+        1265,
+        712
+      ],
+      "articles": [
+        "02-plotlauncher.md"
+      ]
+    },
+    {
+      "file": "assets/plot-preset.gif",
+      "bytes": 1007355,
+      "dimensions": [
+        1265,
+        712
+      ],
+      "articles": [
+        "02-plotlauncher.md"
+      ]
+    }
+  ]
+}
