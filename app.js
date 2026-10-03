@@ -1,4 +1,5 @@
-import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=f54e297e4bb9";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=f930b32363e5";
+import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=f930b32363e5";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -70,13 +71,16 @@ function desktopAppearance() {
   $("#legend-appearance").innerHTML = `${numeric("legendScale", "凡例サイズ倍率", .2)}${numeric("legendFontScale", "凡例文字倍率", .2)}${numeric("legendX", "凡例X (軸比率)", -10, 10, .01)}${numeric("legendY", "凡例Y (軸比率)", -10, 10, .01)}`;
 }
 desktopAppearance();
+compactHelp();
 
 function status(text, kind = "working") {
   $("#status-text").textContent = text;
   $("#status").dataset.kind = kind;
+  if ($("#save-dialog").open) {$("#save-progress").textContent = text; $("#save-progress").dataset.kind = kind;}
 }
 
 function updateButtons() {
+  compactHelp();
   const busy = loading || exporting;
   $("#open-project").disabled = !engineReady || busy;
   $("#save-project").disabled = !engineReady || busy || !sourceData || !metadata || !config.series.length;
@@ -91,6 +95,9 @@ function updateButtons() {
   $("#add-series").disabled = config.series.length >= 32 || (metadata?.columns.length ?? 0) < 2;
   $("#load-font").disabled = !engineReady || busy;
   $$('[data-export]').forEach(button => { button.disabled = !engineReady || busy || renderedRevision !== revision || renderRunning; });
+  $("#open-save").disabled = !engineReady || busy || renderedRevision !== revision || renderRunning;
+  $("#confirm-save").disabled = !engineReady || busy || renderedRevision !== revision || renderRunning;
+  for (const id of ["#save-name", "#png-dpi", "#save-destination", "#choose-save-folder", "#close-save"]) $(id).disabled = busy;
   $("#copy-image").disabled = !engineReady || busy || renderedRevision !== revision || renderRunning;
   $("#figure-stage").setAttribute("aria-busy", String(loading || exporting || renderRunning || !engineReady));
   $('#save-destination').disabled = $('#choose-save-folder').disabled = busy;
@@ -119,7 +126,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=f54e297e4bb9", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=f930b32363e5", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -274,7 +281,8 @@ function drawPresetOptions() {
   const color=(key,label,def)=>`<label>${label}<input data-option="${key}" value="${escapeHTML(options[key] ?? def)}"></label>`;
   let html='';
   const notes={"XPS Fit":"CSV/Au 10列/Ag 8列の配置を自動判定。成分の塗りつぶしは背景との差で描画します。", "Particle Histogram":"選択した粒径列から頻度%と対数正規分布を描画します。ビン幅は20 nmです。", "Raman 3D":"共通のX列と各Y列からウォーターフォールを作成します。Y軸設定は強度（Z軸）に適用します。", "bar_graph_general":"数値X・カテゴリXに対応した集合棒グラフです。", "Roughness":"線＋マーカー、Y対数軸が初期設定です。"};
-  $("#preset-note").textContent=notes[type] || "プリセットに合わせて軸ラベル・単位を設定します。";
+  $("#plot-type").title=notes[type] || "プリセットに合わせて軸ラベル・単位を設定します。";
+  $("#preset-note").textContent=""; $("#preset-note").hidden=true;
   if(type==='bar_graph_general') html=`<div class="field-grid">${number('barWidth','棒幅',.8,.01,100)}${number('barAlpha','不透明度',.9,0,1)}${number('barEdgeWidth','縁幅 (pt)',.4,0,20)}${color('barEdgeColor','縁色 (auto / #色)','auto')}</div>`;
   if(type==='Particle Histogram') html=`<label>粒径列<select data-option="diameterColumn">${columnOptions(options.diameterColumn ?? config.series[0]?.y ?? 1)}</select></label><div class="field-grid">${color("histogramColor","分布の色","#70BEFF")}${number("histogramAlpha","分布の不透明度",1,0,1)}${color("histogramFitColor","分布曲線の色","#FF7166")}${number("histogramFitWidth","分布曲線の線幅 (pt)",.8,0,20)}</div>`;
   if(type==='Raman 3D') html=`<label><input type="checkbox" data-option="normalize" ${options.normalize!==false?'checked':''}>各系列を0〜1に正規化</label><div class="field-grid"><label>奥行きラベル<input data-option="depthLabel" value="${escapeHTML(options.depthLabel ?? "Series")}"></label>${number('depthStep','奥行き間隔',1,.01,10000)}${number('elevation','仰角 (度)',24,-180,180,1)}${number('azimuth','方位角 (度)',-66,-360,360,1)}</div>`;
@@ -526,7 +534,7 @@ async function renderPreview() {
     $("#initial-message").hidden = true;
     $("#figure-stage").classList.remove("pending");
     figureResult = result;
-    if(result.statistics)$('#preset-note').textContent=`粒径の統計：D50 = ${result.statistics.median.toFixed(3)}、平均 = ${result.statistics.mean.toFixed(3)}。ビン幅20 nm、頻度%。`;
+    if(result.statistics){$('#preset-note').hidden=false;$('#preset-note').textContent=`粒径の統計：D50 = ${result.statistics.median.toFixed(3)}、平均 = ${result.statistics.mean.toFixed(3)}。ビン幅20 nm、頻度%。`;}
     $("#preview-state").className = "preview-state ready";
     $("#preview-state").textContent = "更新済み";
     $("#figure-size").textContent = `軸領域 ${snapshot.axes.width} × ${snapshot.axes.height} cm`;
@@ -561,10 +569,8 @@ function download(blob, filename) {
 function refreshSaveDestination() {
   const mode=$('#save-destination').value;
   $('#choose-save-folder').hidden=mode!=='folder';
-  $('#save-folder-info').textContent=mode==='source'
-    ? sourceDirectory ? `保存先：${sourceDirectory.name}` : sourceHandle ? '初回保存時に元ファイルのフォルダを開きます。保存先を確認してください。' : '初回保存時に保存先フォルダを確認してください。'
-    : mode==='folder' ? saveDirectory ? `保存先：${saveDirectory.name}` : '初回保存時に保存先フォルダを選べます。'
-    : folderSupported ? 'ブラウザの保存先へダウンロードします。' : 'このブラウザではフォルダを指定できないため、ブラウザの保存先へダウンロードします。';
+  $('#save-folder-info').textContent=mode==='download'?'ブラウザの保存先':(mode==='source'?sourceDirectory:saveDirectory)?.name || '未選択';
+  $('#save-folder-info').title='初回保存時にフォルダを確認します。非対応ブラウザではダウンロードします。';
 }
 function directoryOptions(startIn) {
   return {id:'plotlauncher-files',mode:'readwrite',...(startIn?{startIn}:{})};
@@ -616,12 +622,13 @@ $('#choose-save-folder').addEventListener('click',async()=>{
 });
 for(const [selector,description,accept,open] of [
   ['#data-file','Excel / CSV',{'application/octet-stream':['.xlsx','.xlsm','.xls','.csv']},loadFile],
-  ['#project-file','PlotLauncherプロジェクト',{'application/json':['.plotproject','.json']},readProject]
+  ['#project-file','PlotLauncherプロジェクト',{'application/json':['.plotproject','.json']},readProject],
+  ['#settings-file','設定JSON',{'application/json':['.json']},readSettings]
 ]) $(selector).addEventListener('click',async event=>{
   if(typeof window.showOpenFilePicker!=='function')return;
   event.preventDefault();if(loading||exporting||!engineReady)return;
   try {
-    const [handle]=await window.showOpenFilePicker({id:'plotlauncher-files',multiple:false,types:[{description,accept}]});
+    const [handle]=await window.showOpenFilePicker({...filePickerOptions('plotlauncher-files',description,accept,saveDirectory||sourceDirectory||sourceHandle),multiple:false});
     const file=await handle.getFile();sourceHandles.set(file,handle);await open(file);
   } catch(error){if(error.name!=='AbortError')status(error.message,'error');}
 });
@@ -651,20 +658,40 @@ async function copyFigureImage() {
   }
 }
 
-async function exportFigure(format) {
+function openSaveDialog() {
+  if ($('#open-save').disabled) return;
+  $('#save-progress').textContent = '';
+  refreshSaveDestination(); $('#save-dialog').showModal();
+}
+$('#open-save').addEventListener('click', openSaveDialog);
+$('#close-save').addEventListener('click', () => {if (!exporting) $('#save-dialog').close();});
+$('#save-dialog').addEventListener('cancel', event => {if (exporting) event.preventDefault();});
+$('#confirm-save').addEventListener('click', () => exportFigure($$('[data-export]').filter(input => input.checked).map(input => input.dataset.export)));
+async function exportFigure(formats) {
   if (exporting || loading || renderedRevision !== revision) return;
-  exporting = true;
-  const filename = `${safeStem($("#save-name").value)}.${format}`;
-  updateButtons();
-  status(`${format.toUpperCase()}ファイルを作成しています…`);
+  formats = typeof formats === 'string' ? [formats] : formats;
+  if (!formats.length) {status('保存形式を1つ以上選択してください。', 'error'); return;}
+  exporting = true; updateButtons();
+  const stem = safeStem($('#save-name').value), snapshot = structuredClone(config), dpi = Number($('#png-dpi').value);
+  const saved = [];
   try {
     const saveFile = await prepareSaver();
-    const result = await request("export", { config: structuredClone(config), format, dpi: Number($("#png-dpi").value) });
-    const bytes = Uint8Array.from(atob(result.base64), character => character.charCodeAt(0));
-    const savedName = await saveFile(new Blob([bytes], { type: { svg: "image/svg+xml", png: "image/png", pdf: "application/pdf", pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation" }[format] }), filename);
-    status(`${savedName} を保存しました`, "ready");
-  } catch (error) { status(error.name==='AbortError'?'保存をキャンセルしました。':error.message, error.name==='AbortError'?'ready':'error'); }
-  finally { exporting = false; updateButtons(); }
+    for (const format of formats) {
+      status(`${format.toUpperCase()}ファイルを作成しています…`);
+      const result = await request('export', {config:snapshot, format, dpi});
+      const bytes = Uint8Array.from(atob(result.base64), character => character.charCodeAt(0));
+      saved.push(await saveFile(new Blob([bytes], {type:{svg:'image/svg+xml',png:'image/png',pdf:'application/pdf',pptx:'application/vnd.openxmlformats-officedocument.presentationml.presentation'}[format]}), `${stem}.${format}`));
+    }
+    status(`${saved.join('、')} を保存しました`, 'ready');
+  } catch (error) {
+    const message = error.name === 'AbortError' ? '保存をキャンセルしました。' : error.message;
+    status(`${message}${saved.length ? ` 保存済み：${saved.join('、')}` : ''}`, error.name === 'AbortError' ? 'ready' : 'error');
+  } finally {exporting = false; updateButtons();}
+}
+
+async function prepareDocumentSaver(name, description, extension) {
+  const fallback = () => prepareSaver();
+  return documentSaver({name, id:'plotlauncher-files', description, accept:{'application/json':[extension]}, startIn:saveDirectory||sourceDirectory||sourceHandle, fallback});
 }
 
 $("#data-file").addEventListener("change", event => { const file = event.target.files[0]; event.target.value = ""; if (file) loadFile(file); });
@@ -744,7 +771,7 @@ $("#add-series").addEventListener("click", () => {
   changed();
 });
 $("#refresh-preview").addEventListener("click", () => { clearTimeout(renderTimer); renderWanted = true; renderPreview(); });
-$$('[data-export]').forEach(button => button.addEventListener("click", () => exportFigure(button.dataset.export)));
+
 $("#copy-image").addEventListener("click", copyFigureImage);
 $("#open-project").addEventListener("click", () => $("#project-file").click());
 $("#project-file").addEventListener("change", event => {
@@ -754,7 +781,8 @@ async function saveProject() {
   if(!engineReady || loading || exporting || !sourceData || !metadata || !config.series.length)return;
   exporting=true;updateButtons();
   try {
-    const saveFile=await prepareSaver();
+    const name=`${safeStem($("#save-name").value)}.plotproject`;
+    const saveFile=await prepareDocumentSaver(name,"PlotLauncherプロジェクト",".plotproject");
     const savedState=projectEditState();
     const project=makeProject(makeSettings(config,metadata,loadedHeader), {...sourceData,sheetIndex:metadata.sheetIndex,headerRow:loadedHeader,sample}, [...importedFonts.values()], {
       saveName:$("#save-name").value,pngDpi:Number($("#png-dpi").value),view:{...view},sections:$$('#controls-panel .control-section').map(section=>section.open)
@@ -808,7 +836,8 @@ $('#save-settings').addEventListener('click', async()=>{
   if(loading||exporting||!metadata||!config.series.length)return;
   exporting=true;updateButtons();
   try {
-    const saveFile=await prepareSaver();
+    const name=`${safeStem($('#save-name').value)}.plot.json`;
+    const saveFile=await prepareDocumentSaver(name,'設定JSON','.json');
     const filename=await saveFile(new Blob([JSON.stringify(makeSettings(config,metadata,loadedHeader),null,2)],{type:'application/json'}),`${safeStem($('#save-name').value)}.plot.json`);
     status(`${filename} を保存しました。データ自体は含まれていません。`,'ready');
   } catch(error){status(error.name==='AbortError'?'保存をキャンセルしました。':error.message,error.name==='AbortError'?'ready':'error');}
@@ -1191,7 +1220,7 @@ function highlightTicks(event,active){
 for(const name of ['pointerover','focusin'])$('#figure-interactions').addEventListener(name,event=>highlightTicks(event,true));
 for(const name of ['pointerout','focusout'])$('#figure-interactions').addEventListener(name,event=>highlightTicks(event,false));
 window.addEventListener('keydown',event=>{
-  if($('#color-panel').open || $('#axis-editor').open || $('#element-editor').open)return;
+  if($('#color-panel').open || $('#axis-editor').open || $('#element-editor').open || $('#save-dialog').open)return;
   if(event.target.matches('input,textarea,select') || event.target.isContentEditable)return;
   const control=event.ctrlKey||event.metaKey,key=event.key.toLowerCase();
   if(key==='delete'||key==='backspace'){if(selected.size){event.preventDefault();deleteAnnotations();}}
@@ -1203,7 +1232,7 @@ window.addEventListener('keydown',event=>{
   else if(control&&key==='y'){event.preventDefault();restoreHistory(true);}
   else if(control&&['+','=','-','0'].includes(key)){event.preventDefault();if(key==='0')$('#zoom-reset').click();else zoomPreview(key==='-'?1/1.1:1.1);}
   else if(control&&key==='s'){event.preventDefault();$(event.shiftKey?'#save-settings':'#save-project').click();}
-  else if(control&&key==='o'){event.preventDefault();$(event.shiftKey?'#open-settings':'#open-project').click();}
+  else if(control&&key==='o'){event.preventDefault();$(event.altKey?'#data-file':event.shiftKey?'#open-settings':'#open-project').click();}
 });
 try { startWorker(); }
 catch (error) { fatal(`描画機能を開始できませんでした。ブラウザを更新してください。${error.message}`); }

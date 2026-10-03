@@ -40,7 +40,8 @@ fieldset{margin:0;padding:0;border:0;min-width:0}
 .section-heading h2{font-size:13px;margin:0;font-weight:650;display:flex;align-items:center;gap:10px}
 .step{color:#9ba7b7;font-family:ui-monospace,monospace;font-weight:400;font-size:11px}
 .section-note{color:var(--muted);font-size:10px}
-.drop-zone{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border:1px dashed #bbcce2;border-radius:9px;background:#f8fbff;min-height:147px;width:100%;color:#667c98;transition:background .2s,border-color .2s}
+.drop-zone{width:100%;min-height:36px;padding:9px 12px;border-radius:6px}
+.drop-zone.drag-over{outline:3px solid #78a8e4;outline-offset:2px}
 .drop-zone strong{font-size:13px;font-weight:600;color:var(--blue)}
 .drop-zone>span:not(.upload-mark){font-size:10px}
 .drop-zone small{color:#94a2b5;font-size:10px;margin-top:4px}
@@ -235,3 +236,32 @@ button:focus-visible,summary:focus-visible,a:focus-visible{outline:2px solid #ab
 .axis-tick-target.highlighted{background:#205eb018;border:1px dashed #205eb0}
 #element-editor{width:min(430px,calc(100vw - 24px))}
 #element-editor .series-card{border:0;padding:0}
+
+/* Common file/save controls shared with MiFiTo. Keep brand colors independent. */
+.header-actions{gap:6px;white-space:nowrap}
+.header-actions .privacy-note,.header-actions .privacy{font-size:0;margin-right:2px}
+.brand-version,.app-version{font-size:10px;font-weight:400;border:1px solid var(--border);border-radius:4px;padding:2px 5px;letter-spacing:0;white-space:nowrap}
+.save-dialog{width:min(520px,92vw);max-height:85dvh;padding:20px;border:1px solid var(--border);border-radius:12px;box-shadow:0 12px 48px #202d3e40;color:inherit}
+.save-dialog::backdrop{background:#202d3e66}
+.save-dialog[open]{display:flex;flex-direction:column;overflow:hidden}
+.save-dialog .dialog-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.save-dialog h2{font-size:16px;margin:0}
+.save-panel{display:flex;flex-direction:column;gap:12px;overflow-y:auto;padding:0;min-height:0}
+.save-panel>*{flex-shrink:0}
+.save-panel label{display:flex;flex-direction:column;gap:5px;font-size:12px;min-width:0}
+.save-panel .check{flex-direction:row;align-items:center;gap:7px}
+.save-formats{border:0;padding:0;margin:0;min-width:0}
+.save-formats legend{font-size:12px;margin-bottom:6px;padding:0}
+.save-format-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 10px}
+.save-format-grid .check{min-height:32px}
+.save-destination{display:flex;gap:10px;align-items:end}
+.save-destination>label{flex:1;min-width:0}
+.save-actions{display:flex;gap:8px;padding-top:12px;margin-top:12px;border-top:1px solid var(--border)}
+.save-actions .primary{flex:1}
+.save-progress{font-size:12px;line-height:1.6;min-height:20px;overflow-wrap:anywhere}
+.save-progress[data-kind=error]{color:#b3393b}
+.save-folder-info{font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.preview-file-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.preview-file-actions>.primary{min-width:140px}
+
+button.drop-zone:not(:disabled):hover{background:#164c92;border-color:var(--blue);color:#fff}
