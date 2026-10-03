@@ -765,6 +765,10 @@ def _axis_data_bounds(ax: plt.Axes) -> tuple[tuple[float, float] | None, tuple[f
             y_parts.append(yvals)
 
     for collection in ax.collections:
+        # Filled regions and error lines have a dummy (0, 0) offset in
+        # display coordinates. Only data-coordinate offsets are observations.
+        if not collection.get_offset_transform().contains_branch(ax.transData):
+            continue
         try:
             offsets = np.asarray(collection.get_offsets(), dtype=float)
         except Exception:

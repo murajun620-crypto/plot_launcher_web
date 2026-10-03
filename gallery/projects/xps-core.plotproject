@@ -1,0 +1,133 @@
+{
+  "format": "plotlauncher-project",
+  "version": 1,
+  "settings": {
+    "format": "plotlauncher-web",
+    "version": 1,
+    "data": {
+      "filename": "xps-core.csv",
+      "sheet": "CSV",
+      "headerRow": 1
+    },
+    "plotType": "XPS Core",
+    "axes": {
+      "width": 6.7,
+      "height": 4.8,
+      "fontFamily": "Liberation Sans",
+      "japaneseFontFamily": "Noto Sans JP",
+      "fontScale": 1,
+      "tickFontScale": 1,
+      "labelFontScale": 1,
+      "xLabel": "Binding energy",
+      "xUnit": "eV",
+      "yLabel": "Intensity",
+      "yUnit": "arb. units",
+      "xScale": "linear",
+      "yScale": "linear",
+      "legend": false,
+      "legendPosition": "best",
+      "legendFontScale": 0.88,
+      "legendScale": 0.85,
+      "hideYTickLabels": true,
+      "hideYTicks": true,
+      "transparent": false,
+      "backgroundColor": "#ffffff",
+      "backgroundAlpha": 1,
+      "plotBackgroundEnabled": true,
+      "plotBackgroundColor": "#ffffff",
+      "plotBackgroundAlpha": 1,
+      "grid": false,
+      "xMin": "79",
+      "xMax": "93",
+      "xStep": "4",
+      "yMin": "0",
+      "yMax": "7600"
+    },
+    "series": [
+      {
+        "x": 0,
+        "y": 1,
+        "name": "Au 4f",
+        "visible": true,
+        "color": "#0072B2",
+        "scatterColor": "auto",
+        "mode": "line",
+        "lineWidth": 0.85,
+        "lineStyle": "-",
+        "lineAlpha": 1,
+        "marker": "o",
+        "markerSize": 9,
+        "markerEdgeColor": "auto",
+        "markerFaceColor": "auto",
+        "markerEdgeAlpha": 1,
+        "markerFaceAlpha": 0.85,
+        "xOffset": 0,
+        "yOffset": 0,
+        "error": "",
+        "errorMode": "auto",
+        "errorMin": "",
+        "errorMax": "",
+        "xColumn": "Binding energy / eV",
+        "yColumn": "Au 4f / counts",
+        "errorColumn": "",
+        "errorMinColumn": "",
+        "errorMaxColumn": ""
+      }
+    ],
+    "options": {},
+    "annotations": [
+      {
+        "id": "text-Au 4f$_{7/2}$-0.62-0.92",
+        "type": "text",
+        "coordinate_system": "axes_fraction",
+        "x": 0.62,
+        "y": 0.92,
+        "text": "Au 4f$_{7/2}$",
+        "font_size": 7,
+        "color": "#222222",
+        "font_family": "Liberation Sans",
+        "horizontal_alignment": "left",
+        "vertical_alignment": "center"
+      },
+      {
+        "id": "text-Au 4f$_{5/2}$-0.18-0.74",
+        "type": "text",
+        "coordinate_system": "axes_fraction",
+        "x": 0.18,
+        "y": 0.74,
+        "text": "Au 4f$_{5/2}$",
+        "font_size": 7,
+        "color": "#222222",
+        "font_family": "Liberation Sans",
+        "horizontal_alignment": "left",
+        "vertical_alignment": "center"
+      }
+    ]
+  },
+  "data": {
+    "filename": "xps-core.csv",
+    "base64": "77u/QmluZGluZyBlbmVyZ3kgLyBlVixBdSA0ZiAvIGNvdW50cw0KNzksMjYwDQo3OS4wNSwyNTENCjc5LjEsMjQ5DQo3OS4xNSwyNDUNCjc5LjIsMjU1DQo3OS4yNSwyODkNCjc5LjMsMjcxDQo3OS4zNSwyNTYNCjc5LjQsMjYwDQo3OS40NSwyNzQNCjc5LjUsMjQwDQo3OS41NSwyNzENCjc5LjYsMjcwDQo3OS42NSwyNTYNCjc5LjcsMjczDQo3OS43NSwyNzgNCjc5LjgsMjk0DQo3OS44NSwyNzcNCjc5LjksMjg0DQo3OS45NSwyOTINCjgwLDI1Mw0KODAuMDUsMjkyDQo4MC4xLDI4MA0KODAuMTUsMjcxDQo4MC4yLDI3NA0KODAuMjUsMjg0DQo4MC4zLDI5MA0KODAuMzUsMjk4DQo4MC40LDMwMw0KODAuNDUsMjY4DQo4MC41LDMwNg0KODAuNTUsMjc2DQo4MC42LDMwMg0KODAuNjUsMjgxDQo4MC43LDI3OQ0KODAuNzUsMzAzDQo4MC44LDI3OA0KODAuODUsMjkwDQo4MC45LDMwMA0KODAuOTUsMzI4DQo4MSwzMzMNCjgxLjA1LDMyNg0KODEuMSwzMjUNCjgxLjE1LDMyMA0KODEuMiwzMjYNCjgxLjI1LDMxMA0KODEuMywzMzUNCjgxLjM1LDMxOQ0KODEuNCwzMjQNCjgxLjQ1LDMyOQ0KODEuNSwzNTENCjgxLjU1LDM3MA0KODEuNiwzMzINCjgxLjY1LDMzNw0KODEuNywzMjENCjgxLjc1LDM0OQ0KODEuOCwzNDUNCjgxLjg1LDM2NA0KODEuOSwzODUNCjgxLjk1LDM4NQ0KODIsMzg0DQo4Mi4wNSwzODkNCjgyLjEsMzQ4DQo4Mi4xNSwzOTANCjgyLjIsNDM4DQo4Mi4yNSwzNjYNCjgyLjMsNDI4DQo4Mi4zNSw0NDQNCjgyLjQsNDAwDQo4Mi40NSw0NzENCjgyLjUsNDI5DQo4Mi41NSw0OTUNCjgyLjYsNDU5DQo4Mi42NSw1MDMNCjgyLjcsNTE1DQo4Mi43NSw1NDENCjgyLjgsNTQwDQo4Mi44NSw1NjMNCjgyLjksNTk4DQo4Mi45NSw2MzMNCjgzLDcxNQ0KODMuMDUsODI2DQo4My4xLDg2Mw0KODMuMTUsOTcwDQo4My4yLDExNzINCjgzLjI1LDEzMDYNCjgzLjMsMTU2MQ0KODMuMzUsMTg1NA0KODMuNCwyMTgyDQo4My40NSwyNDg5DQo4My41LDI5MjcNCjgzLjU1LDMzODINCjgzLjYsMzg1MQ0KODMuNjUsNDU0Mw0KODMuNyw0ODU1DQo4My43NSw1MzcwDQo4My44LDU5NjkNCjgzLjg1LDYyODYNCjgzLjksNjY0MQ0KODMuOTUsNjg5NQ0KODQsNjg0Nw0KODQuMDUsNjczNA0KODQuMSw2NjEzDQo4NC4xNSw2MjEwDQo4NC4yLDU4NjANCjg0LjI1LDU0OTcNCjg0LjMsNDkyNg0KODQuMzUsNDM5Mg0KODQuNCwzODE0DQo4NC40NSwzNDA3DQo4NC41LDMwMjgNCjg0LjU1LDI2OTgNCjg0LjYsMjE4NQ0KODQuNjUsMTg1Mw0KODQuNywxNjY1DQo4NC43NSwxNDkyDQo4NC44LDEyNjUNCjg0Ljg1LDExMDcNCjg0LjksOTYwDQo4NC45NSw5MDkNCjg1LDg1MA0KODUuMDUsNzcyDQo4NS4xLDcxNw0KODUuMTUsNzI5DQo4NS4yLDY4OQ0KODUuMjUsNjY2DQo4NS4zLDYzOA0KODUuMzUsNjM3DQo4NS40LDY2OQ0KODUuNDUsNjM0DQo4NS41LDY2Ng0KODUuNTUsNjE4DQo4NS42LDYyNg0KODUuNjUsNjYzDQo4NS43LDYyNQ0KODUuNzUsNjE2DQo4NS44LDYyOA0KODUuODUsNjgyDQo4NS45LDY1Ng0KODUuOTUsNjMxDQo4Niw3MTYNCjg2LjA1LDY0Nw0KODYuMSw2OTMNCjg2LjE1LDY2Nw0KODYuMiw2NjENCjg2LjI1LDY5MA0KODYuMyw3MTMNCjg2LjM1LDY3NQ0KODYuNCw3MzMNCjg2LjQ1LDc0MA0KODYuNSw3NjANCjg2LjU1LDc5MQ0KODYuNiw4MjUNCjg2LjY1LDg5NQ0KODYuNyw5NDUNCjg2Ljc1LDk3OA0KODYuOCwxMDY1DQo4Ni44NSwxMTc4DQo4Ni45LDEyNjgNCjg2Ljk1LDE0MzUNCjg3LDE2MzANCjg3LjA1LDE4ODgNCjg3LjEsMjI0MQ0KODcuMTUsMjQ1Mw0KODcuMiwyNzYxDQo4Ny4yNSwzMTM0DQo4Ny4zLDM0NDYNCjg3LjM1LDM5MDENCjg3LjQsNDEzNA0KODcuNDUsNDY3Nw0KODcuNSw0ODgwDQo4Ny41NSw1MjUzDQo4Ny42LDUzNzQNCjg3LjY1LDU1NjMNCjg3LjcsNTYxMg0KODcuNzUsNTM0Ng0KODcuOCw1MTU3DQo4Ny44NSw0OTA5DQo4Ny45LDQ1NzQNCjg3Ljk1LDQxNjYNCjg4LDM4MjYNCjg4LjA1LDMzMjANCjg4LjEsMjk0Nw0KODguMTUsMjc2NA0KODguMiwyNDA3DQo4OC4yNSwyMTIyDQo4OC4zLDE4NDkNCjg4LjM1LDE2ODANCjg4LjQsMTQ5Nw0KODguNDUsMTMxNQ0KODguNSwxMjM0DQo4OC41NSwxMTI0DQo4OC42LDEwMjMNCjg4LjY1LDk4NQ0KODguNyw5MzUNCjg4Ljc1LDk0NA0KODguOCw4NzANCjg4Ljg1LDgyMA0KODguOSw4MjkNCjg4Ljk1LDgyMA0KODksODA5DQo4OS4wNSw3ODUNCjg5LjEsNzc2DQo4OS4xNSw3NTgNCjg5LjIsODEyDQo4OS4yNSw4MjQNCjg5LjMsNzM2DQo4OS4zNSw3NDMNCjg5LjQsNzQyDQo4OS40NSw3NDMNCjg5LjUsNzc4DQo4OS41NSw3NTQNCjg5LjYsODAxDQo4OS42NSw3NDkNCjg5LjcsNzM1DQo4OS43NSw3OTkNCjg5LjgsNzMzDQo4OS44NSw3NjYNCjg5LjksNzkzDQo4OS45NSw3MjkNCjkwLDcyMQ0KOTAuMDUsNjk2DQo5MC4xLDc1OQ0KOTAuMTUsNzYzDQo5MC4yLDczOA0KOTAuMjUsNzM5DQo5MC4zLDcyMA0KOTAuMzUsNzI0DQo5MC40LDc2OA0KOTAuNDUsNzE3DQo5MC41LDc2NQ0KOTAuNTUsNzI3DQo5MC42LDcyMg0KOTAuNjUsNzM5DQo5MC43LDc0NA0KOTAuNzUsNjk2DQo5MC44LDc0OQ0KOTAuODUsNzY3DQo5MC45LDczMg0KOTAuOTUsNzY3DQo5MSw3NTUNCjkxLjA1LDc0OA0KOTEuMSw3MTYNCjkxLjE1LDc3Mw0KOTEuMiw3MzANCjkxLjI1LDc1Ng0KOTEuMyw3NDUNCjkxLjM1LDc4Mg0KOTEuNCw3NDINCjkxLjQ1LDc5MQ0KOTEuNSw3MTQNCjkxLjU1LDc2NQ0KOTEuNiw3MjYNCjkxLjY1LDc3Mg0KOTEuNyw3NjINCjkxLjc1LDc3MQ0KOTEuOCw3MjMNCjkxLjg1LDgyMw0KOTEuOSw3NTgNCjkxLjk1LDc1NQ0KOTIsNzAzDQo5Mi4wNSw3NTQNCjkyLjEsNzM3DQo5Mi4xNSw3NzINCjkyLjIsNzQ4DQo5Mi4yNSw3NzgNCjkyLjMsNzQzDQo5Mi4zNSw3MzMNCjkyLjQsNjg2DQo5Mi40NSw3NDQNCjkyLjUsNzM5DQo5Mi41NSw3MjcNCjkyLjYsNzg2DQo5Mi42NSw3MzINCjkyLjcsNzUxDQo5Mi43NSw3OTkNCjkyLjgsNzgwDQo5Mi44NSw2NzANCjkyLjksNzgzDQo5Mi45NSw3NzcNCjkzLDc1NA0K",
+    "sheetIndex": 0,
+    "headerRow": 1,
+    "sample": false
+  },
+  "fonts": [],
+  "workspace": {
+    "saveName": "xps-core",
+    "pngDpi": 1200,
+    "view": {
+      "zoom": 1,
+      "x": 0,
+      "y": 0
+    },
+    "sections": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  }
+}

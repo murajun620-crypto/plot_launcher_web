@@ -1,0 +1,127 @@
+{
+  "format": "plotlauncher-web",
+  "version": 1,
+  "data": {
+    "filename": "xps-fit.csv",
+    "sheet": "CSV",
+    "headerRow": 1
+  },
+  "plotType": "XPS Fit",
+  "axes": {
+    "width": 6.7,
+    "height": 4.8,
+    "fontFamily": "Liberation Sans",
+    "japaneseFontFamily": "Noto Sans JP",
+    "fontScale": 1,
+    "tickFontScale": 1,
+    "labelFontScale": 1,
+    "xLabel": "Binding energy",
+    "xUnit": "eV",
+    "yLabel": "Intensity",
+    "yUnit": "arb. units",
+    "xScale": "linear",
+    "yScale": "linear",
+    "legend": false,
+    "legendPosition": "best",
+    "legendFontScale": 0.88,
+    "legendScale": 0.85,
+    "hideYTickLabels": true,
+    "hideYTicks": true,
+    "transparent": false,
+    "backgroundColor": "#ffffff",
+    "backgroundAlpha": 1,
+    "plotBackgroundEnabled": true,
+    "plotBackgroundColor": "#ffffff",
+    "plotBackgroundAlpha": 1,
+    "grid": false,
+    "xStep": "4",
+    "yMin": "0",
+    "yMax": "8500"
+  },
+  "series": [
+    {
+      "x": 0,
+      "y": 1,
+      "name": "Synthetic observation",
+      "visible": true,
+      "color": "#0072B2",
+      "scatterColor": "auto",
+      "mode": "line",
+      "lineWidth": 0.85,
+      "lineStyle": "-",
+      "lineAlpha": 1,
+      "marker": "o",
+      "markerSize": 9,
+      "markerEdgeColor": "auto",
+      "markerFaceColor": "auto",
+      "markerEdgeAlpha": 1,
+      "markerFaceAlpha": 0.85,
+      "xOffset": 0,
+      "yOffset": 0,
+      "error": "",
+      "errorMode": "auto",
+      "errorMin": "",
+      "errorMax": "",
+      "xColumn": "Abscissa",
+      "yColumn": "Ordinate",
+      "errorColumn": "",
+      "errorMinColumn": "",
+      "errorMaxColumn": ""
+    }
+  ],
+  "options": {
+    "scatterSize": 6,
+    "scatterEdgeWidth": 0.4,
+    "scatterEdgeColor": "#3c3c3c",
+    "scatterFaceColor": "#ffffff",
+    "scatterAlpha": 0.65,
+    "fitLineWidth": 0.95,
+    "fitLineColor": "#333333",
+    "bgLineWidth": 0.7,
+    "bgLineColor": "#888888",
+    "fills": [
+      {
+        "x": 0,
+        "upper": 7,
+        "lower": 3,
+        "color": "#0072B2",
+        "alpha": 0.32
+      },
+      {
+        "x": 0,
+        "upper": 8,
+        "lower": 3,
+        "color": "#D55E00",
+        "alpha": 0.32
+      }
+    ]
+  },
+  "annotations": [
+    {
+      "id": "text-Au 4f$_{7/2}$-0.62-0.92",
+      "type": "text",
+      "coordinate_system": "axes_fraction",
+      "x": 0.62,
+      "y": 0.92,
+      "text": "Au 4f$_{7/2}$",
+      "font_size": 7,
+      "color": "#222222",
+      "font_family": "Liberation Sans",
+      "horizontal_alignment": "left",
+      "vertical_alignment": "center"
+    },
+    {
+      "id": "text-Au 4f$_{5/2}$-0.18-0.74",
+      "type": "text",
+      "coordinate_system": "axes_fraction",
+      "x": 0.18,
+      "y": 0.74,
+      "text": "Au 4f$_{5/2}$",
+      "font_size": 7,
+      "color": "#222222",
+      "font_family": "Liberation Sans",
+      "horizontal_alignment": "left",
+      "vertical_alignment": "center"
+    }
+  ]
+}

@@ -1,0 +1,109 @@
+{
+  "format": "plotlauncher-project",
+  "version": 1,
+  "settings": {
+    "format": "plotlauncher-web",
+    "version": 1,
+    "data": {
+      "filename": "particle-histogram.csv",
+      "sheet": "CSV",
+      "headerRow": 1
+    },
+    "plotType": "Particle Histogram",
+    "axes": {
+      "width": 6.7,
+      "height": 4.8,
+      "fontFamily": "Liberation Sans",
+      "japaneseFontFamily": "Noto Sans JP",
+      "fontScale": 1,
+      "tickFontScale": 1,
+      "labelFontScale": 1,
+      "xLabel": "Particle diameter",
+      "xUnit": "nm",
+      "yLabel": "Frequency",
+      "yUnit": "%",
+      "xScale": "linear",
+      "yScale": "linear",
+      "legend": false,
+      "legendPosition": "best",
+      "legendFontScale": 0.88,
+      "legendScale": 0.85,
+      "hideYTickLabels": false,
+      "hideYTicks": false,
+      "transparent": false,
+      "backgroundColor": "#ffffff",
+      "backgroundAlpha": 1,
+      "plotBackgroundEnabled": true,
+      "plotBackgroundColor": "#ffffff",
+      "plotBackgroundAlpha": 1,
+      "grid": false,
+      "xMin": "60",
+      "xMax": "440",
+      "xStep": "100",
+      "yMin": "0",
+      "yMax": "20",
+      "yStep": "5"
+    },
+    "series": [
+      {
+        "x": 0,
+        "y": 1,
+        "name": "Diameter",
+        "visible": true,
+        "color": "#0072B2",
+        "scatterColor": "auto",
+        "mode": "line",
+        "lineWidth": 0.85,
+        "lineStyle": "-",
+        "lineAlpha": 1,
+        "marker": "o",
+        "markerSize": 9,
+        "markerEdgeColor": "auto",
+        "markerFaceColor": "auto",
+        "markerEdgeAlpha": 1,
+        "markerFaceAlpha": 0.85,
+        "xOffset": 0,
+        "yOffset": 0,
+        "error": "",
+        "errorMode": "auto",
+        "errorMin": "",
+        "errorMax": "",
+        "xColumn": "Particle ID",
+        "yColumn": "Diameter / nm",
+        "errorColumn": "",
+        "errorMinColumn": "",
+        "errorMaxColumn": ""
+      }
+    ],
+    "options": {
+      "diameterColumn": 1
+    },
+    "annotations": []
+  },
+  "data": {
+    "filename": "particle-histogram.csv",
+    "base64": "77u/UGFydGljbGUgSUQsRGlhbWV0ZXIgLyBubQ0KMSwxNzAuMjc1ODgxDQoyLDI0NC44MTI1NzkNCjMsMjE3LjQxNDY4Mw0KNCw5MC45MTA5Mjg0DQo1LDI0Mi42MjM1MzINCjYsMjY0LjU0Mzg2Nw0KNywxODkuNzI5MTQ2DQo4LDEyMC45MjEwMDUNCjksMjIwLjYxNjY5Mw0KMTAsMTE0LjkwNzI5Mg0KMTEsMTgxLjA2NTA5Ng0KMTIsMTYzLjAwMDQzMg0KMTMsMTIwLjgyMzMxDQoxNCwxMzYuNDU3Njc0DQoxNSwxNTYuOTYyNzc4DQoxNiwyMzIuNjExMTEyDQoxNywxMjcuNTIxOTQ2DQoxOCwyMzEuMjc1OTc0DQoxOSwxODcuMzUxODY0DQoyMCwxMjguMTA1OTQzDQoyMSwxNjAuOTY2MDU1DQoyMiwzMDQuMDQ5NTI2DQoyMywxMzMuNDg3MDUyDQoyNCwyMTEuNjc5MjAxDQoyNSwyMTguODU2OTcyDQoyNiwxMTcuMTQ0Mjk4DQoyNywyMTkuOTMyNTAyDQoyOCwyOTYuNzMyNjQ4DQoyOSwyMzIuMzkzMDQNCjMwLDI3NC41Mjg2NjYNCjMxLDE2OS42MzkyMTQNCjMyLDE3Mi4wNDY1NjYNCjMzLDg5LjE0OTI0NDkNCjM0LDE5Ni4xMzM0OA0KMzUsMTE5LjM5ODgyNA0KMzYsMTYyLjA3NjE1OA0KMzcsMjk1LjMxNzgyMw0KMzgsMTkyLjA2OTQ4Ng0KMzksMTEzLjEzNDc1Mw0KNDAsMTczLjYyNDI2Ng0KNDEsMTIyLjkxNTU0DQo0MiwxMzkuMTE5NTIyDQo0MywxNTEuNjQ3NTcxDQo0NCwxMzkuNTAxODgxDQo0NSw4NS44NTM3MjcxDQo0NiwxODIuMjExMjU5DQo0NywxOTQuNjk0NzcNCjQ4LDI2Mi4xOTAxNTcNCjQ5LDI4MC4zNTM0MQ0KNTAsMTM3LjUwNzMxOQ0KNTEsMTY3LjgzMzczNA0KNTIsMTU1Ljk0NTAwOQ0KNTMsMTgxLjg3MTIzNg0KNTQsMjE1LjAyNTQ2NA0KNTUsMjQyLjgzMjQ3NQ0KNTYsMTc4LjMxNTQyDQo1NywxOTAuMzAwNzA4DQo1OCwxMjMuOTYwMDA5DQo1OSwxNDQuNTg4MTYzDQo2MCwxNjQuNTMyMzE0DQo2MSwxNzIuMjIzMTM0DQo2MiwxNTguNjg3OTIxDQo2MywxNTQuMDI2NjIzDQo2NCwxODQuNTIzMTUzDQo2NSwxNjEuMzA5OTI4DQo2NiwzMTIuMTUzMzcxDQo2NywxNDQuMDQ3MTc2DQo2OCwxODkuMzMxNzI3DQo2OSwxNzUuMjY4MjMzDQo3MCwxNzYuMzUzMzA2DQo3MSwyMjcuNzYwNzA0DQo3MiwzNDMuOTgxODENCjczLDM0Mi44OTEyNzYNCjc0LDMwMi45NDczMjgNCjc1LDExMi41ODg2MzcNCjc2LDEzNC41MzQ1MTcNCjc3LDExMS44NTgwNQ0KNzgsMjYwLjA5OTg0Ng0KNzksMjAxLjI5NTMzDQo4MCwxNzguNTI5NDENCjgxLDE0NS41NDg4Ng0KODIsMTU4LjYyOTYwMQ0KODMsNDg1LjMzNzQzNw0KODQsMTc2LjI1MDk3MQ0KODUsMTkxLjI5NjQ2NA0KODYsMjA3LjczNTI3OA0KODcsMTg1LjU3NjQ4Mg0KODgsMTkyLjY2MTk1NA0KODksMjY3LjQzNDc5Ng0KOTAsMjI0LjA2MTYzMQ0KOTEsMjM2LjQwMzM5MQ0KOTIsMjA0LjYyNTg3NQ0KOTMsODAuNDk1NDc0Mw0KOTQsMTUwLjI2MDA1Mw0KOTUsMTUxLjU3MTY2Mw0KOTYsMTAwLjA2ODc4Ng0KOTcsMjExLjg4MzExNQ0KOTgsMjE2LjkyNTI0Ng0KOTksMTkxLjI4NTUwMw0KMTAwLDE4NS44NjA0ODMNCjEwMSwxOTMuMTYxMTcxDQoxMDIsMTg2Ljg1ODM0Mg0KMTAzLDI4MS44NDAwNTkNCjEwNCwyNTQuMjIwNzQ2DQoxMDUsMjM2LjAxNTI2OQ0KMTA2LDIyMC4xMzM0MzYNCjEwNywzMTcuNDk0OTINCjEwOCwyNTkuMjc4OTkyDQoxMDksMTgxLjUwNTU3NA0KMTEwLDE5Ni4yNzcxMjQNCjExMSwxMDguNDUxNjA5DQoxMTIsMjg2LjM4OTkzDQoxMTMsMTAyLjAyOTIwMg0KMTE0LDIzNy41MzkxNTINCjExNSwyMTkuMDc0NjY3DQoxMTYsMTU5LjQzNTQ5Mw0KMTE3LDEyNC4xOTExNjQNCjExOCwxMjguNTIzMjM1DQoxMTksMjE4LjE0NzA3OQ0KMTIwLDE1NS43NTI4ODQNCjEyMSwxNzguMzc2NzQ3DQoxMjIsMTI3LjI0OTQNCjEyMywxOTYuNzcwNzgNCjEyNCwxMDQuNjUyODE4DQoxMjUsMTk5LjU1NDI4Nw0KMTI2LDIwMy40NDcwODYNCjEyNywxNTEuNjg0MTA2DQoxMjgsMTkzLjgyNDcxOQ0KMTI5LDI3My42NjcyNTYNCjEzMCwyNDUuMzIwNDA4DQoxMzEsMTE4LjI2NTUzOA0KMTMyLDEzMy43MTEyOTYNCjEzMywyNjYuNjY4NjAzDQoxMzQsMjMwLjQ1MTA3Ng0KMTM1LDMyMC44MzYzODYNCjEzNiwxMTEuMTAyMTc4DQoxMzcsMjI3LjUwNzc5Ng0KMTM4LDIwNy43OTY3NTYNCjEzOSwzODIuMDcyNjMzDQoxNDAsMTM5Ljk3Mjg5Nw0KMTQxLDEwOS45MjY2NzgNCjE0MiwxOTUuODM1MDQ5DQoxNDMsMTcyLjg2NDMxMQ0KMTQ0LDI4NS43MzQxOTgNCjE0NSwyMTguMjExOTMzDQoxNDYsMjE4LjQ5MDUyMw0KMTQ3LDE3NC44NjAwNw0KMTQ4LDE0OC41OTc5MTQNCjE0OSwyNTEuMzMyNTUyDQoxNTAsMTc4LjU3NjMyMQ0KMTUxLDI5Ni42Nzg2MQ0KMTUyLDIyMS43NDQ2MjcNCjE1MywyNDMuMjQ5MjAyDQoxNTQsMTc0LjI3ODU0NA0KMTU1LDEyMS42MDk4OTQNCjE1NiwyODEuMzg1OTkyDQoxNTcsMTg3LjY5NDU0OQ0KMTU4LDE3My4xMzEwNzkNCjE1OSwxMzkuMzk0MTM1DQoxNjAsMTQ1LjQyNjkwNA0KMTYxLDEyMC43MjczMDYNCjE2MiwyNzQuOTUxODQ5DQoxNjMsMjI3LjMyMjY2OA0KMTY0LDE4MS41MjE0NzgNCjE2NSwyNjUuNDI2NzQzDQoxNjYsMTc3LjIyNjczMw0KMTY3LDE3Ni4xMTE0NjYNCjE2OCwxODguOTI2ODIyDQoxNjksMjc4LjEwMTU5DQoxNzAsMTQ3LjU4NzU1NQ0KMTcxLDIzMi40MTMzODINCjE3MiwyMTEuNzEwMjE2DQoxNzMsMjE3LjQxNjEzNw0KMTc0LDIwNS4xMzA5NA0KMTc1LDE2MC40MjAzMjUNCjE3NiwxNDQuMzAwNzQxDQoxNzcsMjgyLjQwMDI5NQ0KMTc4LDIwMS45ODE0NjQNCjE3OSwyNTguNjMwNTINCjE4MCw4OC4xNjkxNzc4DQoxODEsMTE1Ljk4NDAyDQoxODIsMTk1LjA0MTk5Mg0KMTgzLDE5NC4xMDM1MjcNCjE4NCwxNjcuMTE5NzM1DQoxODUsMTUyLjM4MDU0OA0KMTg2LDI2NS43NDE3NTcNCjE4NywxNzQuODI0NDYyDQoxODgsMTk5LjQ4MTU2MQ0KMTg5LDI1NC45NzIyOTENCjE5MCw5NS4yOTQ3OTI4DQo=",
+    "sheetIndex": 0,
+    "headerRow": 1,
+    "sample": false
+  },
+  "fonts": [],
+  "workspace": {
+    "saveName": "particle-histogram",
+    "pngDpi": 1200,
+    "view": {
+      "zoom": 1,
+      "x": 0,
+      "y": 0
+    },
+    "sections": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  }
+}
