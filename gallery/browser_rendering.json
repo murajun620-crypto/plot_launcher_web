@@ -1,34 +1,47 @@
 {
   "renderer": "web application in browser",
   "exportRoute": "application UI save button",
-  "created": "2026-10-03T22:25:51.056668+00:00",
+  "created": "2026-10-03T23:04:08.474683+00:00",
   "projects": [
     {
       "slug": "cv",
-      "projectSha256": "8435d91dc03c3bf16bf30ac0c7324dff07f3a6b9f0f331a1d3b4c1eb29052f21",
+      "projectSha256": "709225332d9532d8387b372669ba38911ed67387c58d7b7eb087d34c3c525c2b",
       "files": [
         {
           "path": "figures/cv.png",
-          "bytes": 475804,
-          "sha256": "1dd84857364208d3387004911dca8114df082f0cf673065b4230141aeb1beb8c"
+          "bytes": 327426,
+          "sha256": "dc1750d4994db97df021f20a72427cfdce812cdbc3ee6ea16eab0f252b070e6a"
         },
         {
           "path": "figures/cv.svg",
-          "bytes": 80140,
-          "sha256": "746438a4116baccd758c6ddd480078cac90830db8e46ca98ce3d9f7408de806e"
+          "bytes": 58576,
+          "sha256": "7b3ce96ec236773730563ab90d7c75d480ac73b2052085851c1c7a52c5de001b"
         },
         {
           "path": "figures/cv.pdf",
-          "bytes": 33605,
-          "sha256": "308db293107cad1417aaa4cab07b13e894c8f0d7fc8cbcfcf024df2bbdb8f80e"
+          "bytes": 25113,
+          "sha256": "0bdc4511a535c0b79edda73e16aaf1a51ab887d2b2c0bfcd7f1c6fe913481693"
         },
         {
           "path": "assets/cv.png",
-          "bytes": 173073,
-          "sha256": "a959b8427ce690b0878ca4abc3a61986c364cd32403bfbd331058aa5ea6a93e1"
+          "bytes": 198104,
+          "sha256": "84ccaf3abfc3c1fa4e93a38a5b02ae579fcfb1dc17f12eceb48570e81c6b1c9b"
         }
       ],
       "uiVerified": true,
+      "typography": {
+        "width": 4.0,
+        "height": 3.0,
+        "fontScale": 1.0,
+        "tickFontScale": 1.0,
+        "labelFontScale": 1.0,
+        "legendScale": 1.0,
+        "legendFontScale": 1.0
+      },
+      "svgTextSizesPt": [
+        7.0,
+        8.0
+      ],
       "xRange": [
         -0.2,
         0.6
@@ -40,103 +53,142 @@
     },
     {
       "slug": "lsv",
-      "projectSha256": "1bbafa7aebd66141708d933ee75f65ff12bd4e6d08db301da90f352b1fd84aa1",
+      "projectSha256": "1af5a4514583487caced4ba9cba91232e77bbf5a1f761583247a55525d22adf7",
       "files": [
         {
           "path": "figures/lsv.png",
-          "bytes": 285915,
-          "sha256": "bd4b817d9b76b216d12ac10783f64f8c53e6ab7736b9d5ace447794022f721ed"
+          "bytes": 226546,
+          "sha256": "c948c50791ff0ffb2327744a07c58611d59e146f4858bcd42f45936e7cb2c25f"
         },
         {
           "path": "figures/lsv.svg",
-          "bytes": 43493,
-          "sha256": "b3d721a4dec5192d889f8420cc3861564d261587ac8ae7e627417a8c50b0249e"
+          "bytes": 36417,
+          "sha256": "32539bcc4e46970cdd7c0a6e1c74386aea0d2d177d8f56d07233ab0131c64495"
         },
         {
           "path": "figures/lsv.pdf",
-          "bytes": 19750,
-          "sha256": "fa5aece6ed029d18269c77ef7a5dc8c3232ceb07853586503116fd0da335d403"
+          "bytes": 17206,
+          "sha256": "6cbbf9cd5e20db9f405ee706a230a2cc209679f20f25ff890f44ad39ad5d41ce"
         },
         {
           "path": "assets/lsv.png",
-          "bytes": 97179,
-          "sha256": "79dc0272c361d5b7751807008b842ab7b681d10feb3990088c95516353d0f123"
+          "bytes": 130941,
+          "sha256": "f6b7e72b35cee666b447df04d20cac0963e7f02e7f2761822f359874de713275"
         }
       ],
       "uiVerified": true,
+      "typography": {
+        "width": 4.0,
+        "height": 3.0,
+        "fontScale": 1.0,
+        "tickFontScale": 1.0,
+        "labelFontScale": 1.0,
+        "legendScale": 1.0,
+        "legendFontScale": 1.0
+      },
+      "svgTextSizesPt": [
+        7.0,
+        8.0
+      ],
       "xRange": [
         1.2,
         1.65
       ],
       "yRange": [
-        0,
-        80
+        0.0,
+        80.0
       ]
     },
     {
       "slug": "ca",
-      "projectSha256": "9a23d28e91d78aa1314ba72d658aacc7287e671a51b544233c60c2b6c9d078d7",
+      "projectSha256": "64a518c7a806fc48980e8e079289c98cb02fedd1d5aeeb367bd2ae2b47dde751",
       "files": [
         {
           "path": "figures/ca.png",
-          "bytes": 258164,
-          "sha256": "2f82382b201e175f882ab8fdec0e79a8ef4448265c10ceb65da1cd56370fc022"
+          "bytes": 191282,
+          "sha256": "78509d8b411ac769bbc1ab18e424e7cab7464d25a76d929416afbea139e45b3f"
         },
         {
           "path": "figures/ca.svg",
-          "bytes": 32794,
-          "sha256": "048b33eef4a734f1cee8654f7922da5cc5782a072718d5c63676023ac76ab423"
+          "bytes": 27008,
+          "sha256": "8a8f77eb2466098910887f9d2cf06977efd1a40e1239d0ba1c714f8bb8e80620"
         },
         {
           "path": "figures/ca.pdf",
-          "bytes": 17082,
-          "sha256": "0e3ec9ecee0fe638d96b60cdabe2e599a5204e8d7fe9c9fdc1e4791dc9e3b025"
+          "bytes": 14820,
+          "sha256": "6ed081e0150b3ba3c2f71f9196706b2504818df166a343a37aa26cd6e508f503"
         },
         {
           "path": "assets/ca.png",
-          "bytes": 92603,
-          "sha256": "bf5fd4e244112024b749f1f3df2576ffb9591eb12ba863f861d59790c1e52992"
+          "bytes": 111534,
+          "sha256": "55517237e6f60ec7a8144d8bcec1c333cc0daefdcbdc5683e853729bf1e2b16d"
         }
       ],
       "uiVerified": true,
+      "typography": {
+        "width": 4.0,
+        "height": 3.0,
+        "fontScale": 1.0,
+        "tickFontScale": 1.0,
+        "labelFontScale": 1.0,
+        "legendScale": 1.0,
+        "legendFontScale": 1.0
+      },
+      "svgTextSizesPt": [
+        7.0,
+        8.0
+      ],
       "xRange": [
-        0,
-        12
+        0.0,
+        12.0
       ],
       "yRange": [
-        0,
+        0.0,
         2.2
       ]
     },
     {
       "slug": "cp",
-      "projectSha256": "7812b5c1f59845a2469ce499401c2732dba6b8607bb169d123ddf37bc6d02ba4",
+      "projectSha256": "38c6d2cd9f6c42159a4437df6fca343d36ddb85a986c2bf42a4dd577d62b6f5e",
       "files": [
         {
           "path": "figures/cp.png",
-          "bytes": 410487,
-          "sha256": "35bc83df8dda030c09a6f1fc0219b79c8da00bfee581317dd0f7b26b0e57d3cd"
+          "bytes": 263839,
+          "sha256": "031a2f0562a98977d70b9ac333c8afdb625a3cbab541df37fa7f495aa8fb97b3"
         },
         {
           "path": "figures/cp.svg",
-          "bytes": 77519,
-          "sha256": "2ffb507b3f8ba46815301c0d8784176dadae3b35f3cdfd685a29b0b5b82665d6"
+          "bytes": 72264,
+          "sha256": "bb459b73895c31483dddeb3050143d9e6922ecf57cc76ca8274abc9643fe011d"
         },
         {
           "path": "figures/cp.pdf",
-          "bytes": 32806,
-          "sha256": "783cc2a0606af7846c65d4a23844531707d893ec756b3ebc40fcf6470f9f1369"
+          "bytes": 30613,
+          "sha256": "2d0ec8e5c4dd49c34a9b86c67c17632da58314357327bda9bb4f4e4f6be95c7a"
         },
         {
           "path": "assets/cp.png",
-          "bytes": 144099,
-          "sha256": "6bc596c3f75d7c218d4445f5008fa866e2db4a17f8b30be7e9975c76af2b8cc9"
+          "bytes": 152288,
+          "sha256": "d0cfbeee2de0f554f0d501298a90c5aaf79dac6c9b541989a02d0a1c36d5d068"
         }
       ],
       "uiVerified": true,
+      "typography": {
+        "width": 4.0,
+        "height": 3.0,
+        "fontScale": 1.0,
+        "tickFontScale": 1.0,
+        "labelFontScale": 1.0,
+        "legendScale": 1.0,
+        "legendFontScale": 1.0
+      },
+      "svgTextSizesPt": [
+        7.0,
+        8.0
+      ],
       "xRange": [
-        0,
-        7200
+        0.0,
+        7200.0
       ],
       "yRange": [
         1.47,
@@ -145,173 +197,242 @@
     },
     {
       "slug": "edx",
-      "projectSha256": "fd5b6c29ef62f6b3b061424ce43dd7ad0e88884e2d8a993965e29061dda894c9",
+      "projectSha256": "3b9fed47bba5221717480b9eff3fe083d743aeeb3d209bc04edc74dcef9ae799",
       "files": [
         {
           "path": "figures/edx.png",
-          "bytes": 240057,
-          "sha256": "4c117746af41266d868cd26f7ab36778b655d795a94b72156e5d475417457562"
+          "bytes": 161214,
+          "sha256": "44bb18cccbc0c6b1018d17752625b1cde5167dff5c099a755ef5ba221f080c39"
         },
         {
           "path": "figures/edx.svg",
-          "bytes": 43770,
-          "sha256": "f6b179bcf38019f74a6b070c05a18efbd3d4b1d76550ec35102f8a3246d40e2e"
+          "bytes": 38747,
+          "sha256": "a1adb79af282576d66d398fc7c7c07925b16e94f5664fe634d44b8d13fd2b549"
         },
         {
           "path": "figures/edx.pdf",
-          "bytes": 17388,
-          "sha256": "b9fb11f414d2d513afa93a110b40b7a656765bb10f5ebbfa48b94c082d9fa107"
+          "bytes": 15417,
+          "sha256": "e95000b0881870ca31ff221aa0de7d901b6abfb64d8a408297fdd134c249e1fa"
         },
         {
           "path": "assets/edx.png",
-          "bytes": 82514,
-          "sha256": "2ff3bf62421de618c6247e5e1e2ee0b62f76a2e5ba1c09fa7686c617c35c35cb"
+          "bytes": 96630,
+          "sha256": "dbedd71076263650b8c98b86fd73c41902c74be45b1655a6c199f5fa49c2075b"
         }
       ],
       "uiVerified": true,
+      "typography": {
+        "width": 4.0,
+        "height": 3.0,
+        "fontScale": 1.0,
+        "tickFontScale": 1.0,
+        "labelFontScale": 1.0,
+        "legendScale": 1.0,
+        "legendFontScale": 1.0
+      },
+      "svgTextSizesPt": [
+        6.0,
+        7.0,
+        8.0
+      ],
       "xRange": [
-        0,
-        12
+        0.0,
+        12.0
       ],
       "yRange": [
-        0,
-        3450
+        0.0,
+        3450.0
       ]
     },
     {
       "slug": "xps-survey",
-      "projectSha256": "e05f4f7d8266a91b6c44b6a58cc830065811cecfcb34b73fa757fc0bf04e2a0f",
+      "projectSha256": "293424b0524a62a24a70fe020b9fc4fafe55c934dbdf1582dfd0e299ecfa27e2",
       "files": [
         {
           "path": "figures/xps-survey.png",
-          "bytes": 276425,
-          "sha256": "83ee2b8b27eecf5f0d9affbaa1918ad0ad1bf1abb4d56e09b21187ff15bb2037"
+          "bytes": 186025,
+          "sha256": "1496482b120980ee96d4eeb7852e67bd59b9408bc0f96f18e2c009d91195426e"
         },
         {
           "path": "figures/xps-survey.svg",
-          "bytes": 62902,
-          "sha256": "50a9e042a460eb12e2719cdec7c379f9c35fceecdc387f8b43331ebd34487c2f"
+          "bytes": 57758,
+          "sha256": "1b5b4ac770755b44c96d640f4c4a03e2f9883c13a0620d32965cd9b2be5847ed"
         },
         {
           "path": "figures/xps-survey.pdf",
-          "bytes": 23077,
-          "sha256": "421b027dd58aa506f338203193cdb4bc81e33cc65aaf43a3fbcaaacaf8c6cb41"
+          "bytes": 21199,
+          "sha256": "85dda6da23c37f55406067998ceebe2fed567b18aac963e371a036bed18559e0"
         },
         {
           "path": "assets/xps-survey.png",
-          "bytes": 101203,
-          "sha256": "951ea1a6962fbaeb7bb6f90293b9e1a02fa8e69b333b7d5170b5ade2c9745ef0"
+          "bytes": 119316,
+          "sha256": "f53fa18febbecb91875d1dc4e8f4827b63bb57dd119bff00fb5809f13c6867b3"
         }
       ],
       "uiVerified": true,
+      "typography": {
+        "width": 4.0,
+        "height": 3.0,
+        "fontScale": 1.0,
+        "tickFontScale": 1.0,
+        "labelFontScale": 1.0,
+        "legendScale": 1.0,
+        "legendFontScale": 1.0
+      },
+      "svgTextSizesPt": [
+        6.0,
+        7.0,
+        8.0
+      ],
       "xRange": [
-        1000,
-        0
+        1000.0,
+        0.0
       ],
       "yRange": [
-        0,
-        8500
+        0.0,
+        8500.0
       ]
     },
     {
       "slug": "xps-core",
-      "projectSha256": "b9920ab381ab40e530f975b027b6c4070697a8a8b4190f7a0f9b9a19f01cff5f",
+      "projectSha256": "cdfc0fb80fc82cb6a2734525e854a05ee907c74b5a860749443f4b3cf431de73",
       "files": [
         {
           "path": "figures/xps-core.png",
-          "bytes": 258480,
-          "sha256": "6650bd640526a0a71bcebb5f5e24053db8f646cb19ad3ae47b1c087b2d088af1"
+          "bytes": 176084,
+          "sha256": "06136c7a5f5c7892917d9349de7f984ebaf7bc77b6ab9cdfbc33258149c5547e"
         },
         {
           "path": "figures/xps-core.svg",
-          "bytes": 31469,
-          "sha256": "18daf03409c695872a42c59c575088a37c9be0fb322dfd79821eee383db879cb"
+          "bytes": 29564,
+          "sha256": "ce16152213f6f18649214c3678f9fa883d7950571bf5743822147816882df0ae"
         },
         {
           "path": "figures/xps-core.pdf",
-          "bytes": 16262,
-          "sha256": "26b6db0e7495a1be7eaca68b58a69247bac758d5fb3154cad36acfc93c9a48f0"
+          "bytes": 16011,
+          "sha256": "3fb71149b5b2363c799f48d63e4dbc91e815166d683cbcdcb30a82d51d0086ef"
         },
         {
           "path": "assets/xps-core.png",
-          "bytes": 99827,
-          "sha256": "2d25556d2d6543df18b9271fd2b86a7e33f7c859a5f8fcf65bc897cf17642d9c"
+          "bytes": 120617,
+          "sha256": "1d9bf17a51fddfca782b91929de1c105edd58d1f6d87d30a7c74428d47cd17b7"
         }
       ],
       "uiVerified": true,
+      "typography": {
+        "width": 4.0,
+        "height": 3.0,
+        "fontScale": 1.0,
+        "tickFontScale": 1.0,
+        "labelFontScale": 1.0,
+        "legendScale": 1.0,
+        "legendFontScale": 1.0
+      },
+      "svgTextSizesPt": [
+        6.0,
+        7.0,
+        8.0
+      ],
       "xRange": [
-        93,
-        79
+        93.0,
+        79.0
       ],
       "yRange": [
-        0,
-        7600
+        0.0,
+        8500.0
       ]
     },
     {
       "slug": "xps-fit",
-      "projectSha256": "dd9cc2d568d359ce78975a18deb3d7310993137e3dcb81529a36a6dbb1864ad7",
+      "projectSha256": "61e8066a1cddf005aa02047ef312ca89eb3277d46b13535ad89c37a32843083b",
       "files": [
         {
           "path": "figures/xps-fit.png",
-          "bytes": 496855,
-          "sha256": "0cf4add8b67994cd71c5515f25055a7fb356444fbe42bb1081be0caf4ad29cd2"
+          "bytes": 360529,
+          "sha256": "a68d6a9aa7bda8c19df91dd0db76156b3ab0596808fa45ce362372d2a184a822"
         },
         {
           "path": "figures/xps-fit.svg",
-          "bytes": 103770,
-          "sha256": "c2cdcf251f626f53dae27736bdfd58fb1fb5dd873874aa4401a31ef9c01d945e"
+          "bytes": 100975,
+          "sha256": "d978f9634198332dbb38e7885bffb06c849d5bd24aabdb464f26b78c9db1508b"
         },
         {
           "path": "figures/xps-fit.pdf",
-          "bytes": 23917,
-          "sha256": "a5040172936427ba7f419d4030dce1dad3e5a1c28cc05311e19f7d0365841a34"
+          "bytes": 23481,
+          "sha256": "5a710b4a0b1309a341efc8794c265e692a275996285d57ee6cc59eb39a3f44e5"
         },
         {
           "path": "assets/xps-fit.png",
-          "bytes": 130005,
-          "sha256": "8ac248233fb387cf4b457ce0af059d56138fa1d6ad7dc0bb29f4ebc57c82c79d"
+          "bytes": 168273,
+          "sha256": "20f2f50e1fe7de068fbed734eb4b4b97e3be4fae69175de51c350df4c82dcff3"
         }
       ],
       "uiVerified": true,
+      "typography": {
+        "width": 4.0,
+        "height": 3.0,
+        "fontScale": 1.0,
+        "tickFontScale": 1.0,
+        "labelFontScale": 1.0,
+        "legendScale": 1.0,
+        "legendFontScale": 1.0
+      },
+      "svgTextSizesPt": [
+        6.0,
+        7.0,
+        8.0
+      ],
       "xRange": [
-        93,
-        79
+        93.0,
+        79.0
       ],
       "yRange": [
-        0,
-        8500
+        0.0,
+        8500.0
       ]
     },
     {
       "slug": "xafs",
-      "projectSha256": "1a8e3868560eb6193f8ddd8ce4773ece1cdc9c5a9c7d219e8f09377c53649498",
+      "projectSha256": "01a84e1d7e6fc29cf7de0fa22d4a492227e562d498b45bf35b19cdc8eee451a1",
       "files": [
         {
           "path": "figures/xafs.png",
-          "bytes": 296832,
-          "sha256": "a3902674cf9593b26bd318ac69190a78d7ec04b23dd4e9f0f7756e72dc5e762c"
+          "bytes": 182624,
+          "sha256": "29abd7afc3b7f38d1c5f7eb51a52a2098d83db666babb122108b8eec7273c623"
         },
         {
           "path": "figures/xafs.svg",
-          "bytes": 65620,
-          "sha256": "35e3797ce19a2b3804eb01836aa5d41b4b49549728c47536b4c0a447da8e9025"
+          "bytes": 54968,
+          "sha256": "acfe0607d46a24fca85af538aa1924080582c575e429dea8165b4239e460299e"
         },
         {
           "path": "figures/xafs.pdf",
-          "bytes": 28623,
-          "sha256": "3c564f51ab4f4d729d65a940a91b71c627151af3daa2fdc17caba253dcca998b"
+          "bytes": 25102,
+          "sha256": "15aa56cc67ce1a301a2124ef148842f49ee244d830c572e597c08cfe76024af6"
         },
         {
           "path": "assets/xafs.png",
-          "bytes": 106889,
-          "sha256": "7873867357813cfc05b520f2f7e6eafbfcc46515b8b0cd1b5b132de41da91ecf"
+          "bytes": 121926,
+          "sha256": "3cd410225599d33dfb33d797eefe49c689c4b9f210f8c3713df7cbf7922354e9"
         }
       ],
       "uiVerified": true,
+      "typography": {
+        "width": 4.0,
+        "height": 3.0,
+        "fontScale": 1.0,
+        "tickFontScale": 1.0,
+        "labelFontScale": 1.0,
+        "legendScale": 1.0,
+        "legendFontScale": 1.0
+      },
+      "svgTextSizesPt": [
+        7.0,
+        8.0
+      ],
       "xRange": [
-        -40,
-        260
+        -40.0,
+        260.0
       ],
       "yRange": [
         -0.05,
@@ -320,246 +441,340 @@
     },
     {
       "slug": "raman",
-      "projectSha256": "537a3e589c44cd3c6128a2b342b9e7de22dcefbf044bcf4076be29e88999e077",
+      "projectSha256": "2cc542d0e4c28fe0752dad383e31c0c9fa1730c3b805f51ca246de798a08866e",
       "files": [
         {
           "path": "figures/raman.png",
-          "bytes": 374875,
-          "sha256": "47bc9ee42c54dcce2cf2c9edaff1fe6afeac3a5eb9848c60d4625fa855263bda"
+          "bytes": 251050,
+          "sha256": "afa9af29339775faf9387a272f1847ad422f1f69dea2b5d1c5ab1f640e95fbc5"
         },
         {
           "path": "figures/raman.svg",
-          "bytes": 86921,
-          "sha256": "d77881eb0a3a59e73018cedc2b3408b7101e44c6add614da55aa27563339edd1"
+          "bytes": 75597,
+          "sha256": "8105b76354eefc1b5f4d53f30a682d6a521f80bafabb1a7a12544f46d7058b75"
         },
         {
           "path": "figures/raman.pdf",
-          "bytes": 30333,
-          "sha256": "41473ff5b37ea511a9ea20795a79c776ddce7f2b4f2ad343552f78b878f560eb"
+          "bytes": 26913,
+          "sha256": "70244a3c2c42c29ba82741ba75e85bd09bfe80185cfb6c16cb30593503b9f406"
         },
         {
           "path": "assets/raman.png",
-          "bytes": 146641,
-          "sha256": "9e5980533024b312b5da8be032f3a948d3f53772b05d2dc5942787fe629b9bbb"
+          "bytes": 168335,
+          "sha256": "3190f0237d4aa5bc4bb339f043f0db84b42ff29d50434bd6e610ded9d7be3942"
         }
       ],
       "uiVerified": true,
+      "typography": {
+        "width": 4.0,
+        "height": 3.0,
+        "fontScale": 1.0,
+        "tickFontScale": 1.0,
+        "labelFontScale": 1.0,
+        "legendScale": 0.9,
+        "legendFontScale": 0.9
+      },
+      "svgTextSizesPt": [
+        6.0,
+        6.3,
+        7.0,
+        8.0
+      ],
       "xRange": [
-        1000,
-        3000
+        1000.0,
+        3000.0
       ],
       "yRange": [
-        0,
-        3300
+        0.0,
+        3300.0
       ]
     },
     {
       "slug": "afm-section",
-      "projectSha256": "c8c24fc7d72bee7417e6d32c98c593d6ee3b7c625004e56e2e95c07bf271ed4c",
+      "projectSha256": "e8a6d18eac967dded62cc53ed3247878828c4382153d636105faf3d405dc34f7",
       "files": [
         {
           "path": "figures/afm-section.png",
-          "bytes": 457393,
-          "sha256": "b5a2e54ae251ce554739b4229cd06bc3b383d746203d9da23a63ce00c7da2e1a"
+          "bytes": 293441,
+          "sha256": "714b01c74ee3f2a71c36f1cadbaa298d8a2d50a4a75321854f01bdca032e35d3"
         },
         {
           "path": "figures/afm-section.svg",
-          "bytes": 43924,
-          "sha256": "8c95c8b7781bf3ecb408833422c76c8ff7d7e0f269bdf81a10fcbbc41fca2e95"
+          "bytes": 37667,
+          "sha256": "8a02015851b9cb1c40a7ae6a2b1af4f42ddf86fa2cfd41120e599840edc5469c"
         },
         {
           "path": "figures/afm-section.pdf",
-          "bytes": 19635,
-          "sha256": "74eddc1252890c8d0fb4ad770b1b8f79cecc44381bca90346a88c4bd84dadf83"
+          "bytes": 17418,
+          "sha256": "abb2621a13ed87305411189bbe64fee306ebf094fdbc48ba22e2ebad260712d6"
         },
         {
           "path": "assets/afm-section.png",
-          "bytes": 189750,
-          "sha256": "b39bbd2aeaa57830685c03b2c5a39468aa1e71395ec10f4a752ab5121ad413b7"
+          "bytes": 214512,
+          "sha256": "99f0a77192343c9c104b2bce418e5b11ed2912ecf9689dff16d98e3eff9fd31d"
         }
       ],
       "uiVerified": true,
+      "typography": {
+        "width": 4.0,
+        "height": 3.0,
+        "fontScale": 1.0,
+        "tickFontScale": 1.0,
+        "labelFontScale": 1.0,
+        "legendScale": 0.9,
+        "legendFontScale": 0.9
+      },
+      "svgTextSizesPt": [
+        6.3,
+        7.0,
+        8.0
+      ],
       "xRange": [
-        0,
+        0.0,
         3.1
       ],
       "yRange": [
-        0,
-        65
+        0.0,
+        65.0
       ]
     },
     {
       "slug": "particle-histogram",
-      "projectSha256": "8b14cdb0cb3f2686800133f1e1b305c063a6fc397414b176ac96233efb0f1a43",
+      "projectSha256": "f9b6bac3fb962807ed4e388c5d06856176ca6e226dcad556f7ee39f7938797b3",
       "files": [
         {
           "path": "figures/particle-histogram.png",
-          "bytes": 210473,
-          "sha256": "d6a187dd68152dc59dfe7dc05be92a208019680df2c2e7c040934dddadcd12bb"
+          "bytes": 156102,
+          "sha256": "2af28881f7797b9145aad4dd476a9352234e216c8dcc8522587078ed2f91d9e1"
         },
         {
           "path": "figures/particle-histogram.svg",
-          "bytes": 34198,
-          "sha256": "4f0031d57d1bf41a64636eff9712935a06bd1532415e4b6ef682b0da1aa2a27c"
+          "bytes": 33729,
+          "sha256": "b5501677eeb37b952a84c84e0eee1b28a49f4d127cbc6984161958e8be9b19c9"
         },
         {
           "path": "figures/particle-histogram.pdf",
-          "bytes": 11491,
-          "sha256": "c01add0058c8a49015f1d6800c952654df8e055b83118e822f4a0141fee3e02a"
+          "bytes": 11314,
+          "sha256": "344b04643d042b8f01d06e2145ab819a31962ea307b6c256ce7c73ac07c71dca"
         },
         {
           "path": "assets/particle-histogram.png",
-          "bytes": 79197,
-          "sha256": "951f741edc4cedb989583444adfc580b19f52b3b42f3f7f44f896d7e76b6cf42"
+          "bytes": 102019,
+          "sha256": "3e2ecdc37a8f8f00c98f5a8f73489509579f33eaa1c5c6ba66bc6a4a4cd3b7bb"
         }
       ],
       "uiVerified": true,
+      "typography": {
+        "width": 4.0,
+        "height": 3.0,
+        "fontScale": 1.0,
+        "tickFontScale": 1.0,
+        "labelFontScale": 1.0,
+        "legendScale": 1.0,
+        "legendFontScale": 1.0
+      },
+      "svgTextSizesPt": [
+        7.0,
+        8.0
+      ],
       "xRange": [
-        60,
-        440
+        60.0,
+        440.0
       ],
       "yRange": [
-        0,
-        20
+        0.0,
+        20.0
       ]
     },
     {
       "slug": "general",
-      "projectSha256": "c95af0da27a2184990a2e68f6a02d35d11dc56b1b87e35de37583cb14cf9b7b5",
+      "projectSha256": "307a0fefdce22c6717c9f9280dff7416a6c4367571e8aee17d648bf8c9ebbede",
       "files": [
         {
           "path": "figures/general.png",
-          "bytes": 239277,
-          "sha256": "9a346a5fc29f0860266600016eefae626d96740f407c097e8cda757b316db05a"
+          "bytes": 195950,
+          "sha256": "c6b79a2e2375ad940977dc42f782d1cbfd9c2542d6b495b2e2fae8edcb0d23bf"
         },
         {
           "path": "figures/general.svg",
-          "bytes": 36450,
-          "sha256": "1a4d988295455c6fcdc880df45d1228fffdd32eef6ec43657b88cec8e5a42e69"
+          "bytes": 35639,
+          "sha256": "447119bdd2dd19ba14d036ae4af14431b62094d3ef88152360108e05930cb48e"
         },
         {
           "path": "figures/general.pdf",
-          "bytes": 15896,
-          "sha256": "4ed6356a7514de461f1ebef8cc78ca1a47df9eb5ca502dfd490d80bb97b02777"
+          "bytes": 15765,
+          "sha256": "4efdc7c92e71ffbab2df6a3e28b68a8f5e0f3fd52e79be5cfd5eae817e935638"
         },
         {
           "path": "assets/general.png",
-          "bytes": 81303,
-          "sha256": "58f534e4356181ef401db0568907b95b3169df3fefb0c5770aa3f3bde177b088"
+          "bytes": 113154,
+          "sha256": "dc3a71f75431943d4f71c7143856922ac1cc535175a18157a9aa158edff6e5ad"
         }
       ],
       "uiVerified": true,
+      "typography": {
+        "width": 4.0,
+        "height": 3.0,
+        "fontScale": 1.0,
+        "tickFontScale": 1.0,
+        "labelFontScale": 1.0,
+        "legendScale": 1.0,
+        "legendFontScale": 1.0
+      },
+      "svgTextSizesPt": [
+        7.0,
+        8.0
+      ],
       "xRange": [
-        0,
-        12
+        0.0,
+        12.0
       ],
       "yRange": [
-        0,
-        48
+        0.0,
+        48.0
       ]
     },
     {
       "slug": "roughness",
-      "projectSha256": "a5b5a9b0c3e090e953f823e08e815d4c1acaf6490536b3edc6e79b70a2202b1a",
+      "projectSha256": "256b967e620d52875e5496710237e83a1b7974c8cd34a53ec6d6c94ecbd465b2",
       "files": [
         {
           "path": "figures/roughness.png",
-          "bytes": 304608,
-          "sha256": "944950b23f7d7dca6225333e8b732a97b1f58cf88a94be0e5ea9ead0033f2c97"
+          "bytes": 226003,
+          "sha256": "dfec5b126c165accff7bd34ff2e6fe21b86291b4846bad02aeb4ac51c4d84631"
         },
         {
           "path": "figures/roughness.svg",
-          "bytes": 40134,
-          "sha256": "d1c4fa7301a3a0b5f1527bd9bdd7b9c8645ac22988ff1905ee7f3f78d99cb28d"
+          "bytes": 40052,
+          "sha256": "d889b540cb6ff6ecd9b9283542ba617af1a91e7be5e4e464d797fd9fa83b0c06"
         },
         {
           "path": "figures/roughness.pdf",
-          "bytes": 12975,
-          "sha256": "838beabcc2cf402219bec8ad20f6415532c2b0db3c721f91df303046546280b0"
+          "bytes": 12948,
+          "sha256": "8c3e32422b46f4de69fe5b323f0306e26d5709a792b5902935dc99e73105ffe9"
         },
         {
           "path": "assets/roughness.png",
-          "bytes": 102676,
-          "sha256": "a6ed38b70cfaf6b5138ae0db4b51a5dc00aaebf736d0cdd4621740258270187b"
+          "bytes": 134292,
+          "sha256": "618156310cd5e0047046e46f5bdbbb194714746c917aad196d575bbc0f415315"
         }
       ],
       "uiVerified": true,
+      "typography": {
+        "width": 4.0,
+        "height": 3.0,
+        "fontScale": 1.0,
+        "tickFontScale": 1.0,
+        "labelFontScale": 1.0,
+        "legendScale": 1.0,
+        "legendFontScale": 1.0
+      },
+      "svgTextSizesPt": [
+        7.0,
+        8.0
+      ],
       "xRange": [
-        0,
-        30
+        0.0,
+        30.0
       ],
       "yRange": [
         0.4,
-        60
+        60.0
       ]
     },
     {
       "slug": "bar",
-      "projectSha256": "6c72214f34356821606672bab36ad88ed3c6a11a4857e6bad4a9fadd287aff58",
+      "projectSha256": "2246111568d09419220d5feba250b19a189c66d30fc50a246621d68ef96df006",
       "files": [
         {
           "path": "figures/bar.png",
-          "bytes": 202883,
-          "sha256": "eb4e086bc551fb9b15c11b5f7a5db79e3581461ecdc9fbf98f8d940e3806905f"
+          "bytes": 151534,
+          "sha256": "be6e288659b44621a988b8b3be789dfc411d35b7b86e6559b7271486133cdc07"
         },
         {
           "path": "figures/bar.svg",
-          "bytes": 29654,
-          "sha256": "461fb4644d32542c8ee84e3795f0e2bdfff3fc5bd9d8d0fd1d39ef65541b186a"
+          "bytes": 26694,
+          "sha256": "28a8845e143377a0920cb95c8201d0b3239634fbde531ccff0e216a47a398762"
         },
         {
           "path": "figures/bar.pdf",
-          "bytes": 14751,
-          "sha256": "5a14002388127a7e7962334a56267b777f3478a64ffae8bd287bc964093847d0"
+          "bytes": 11588,
+          "sha256": "64e72e001978d5eebd985c798e9febc15628e306396b2cabaef402f414da5050"
         },
         {
           "path": "assets/bar.png",
-          "bytes": 60631,
-          "sha256": "5f15994f82d355fae30c949559f1a830fa0f6493d8c37362a29fc4248e297ea4"
+          "bytes": 80941,
+          "sha256": "03cb5ef67d8fabb14f5d02f2caa4fc1b427f7c3e1343cdfb27c9cad35b1e6783"
         }
       ],
       "uiVerified": true,
+      "typography": {
+        "width": 4.0,
+        "height": 3.0,
+        "fontScale": 1.0,
+        "tickFontScale": 1.0,
+        "labelFontScale": 1.0,
+        "legendScale": 1.0,
+        "legendFontScale": 1.0
+      },
+      "svgTextSizesPt": [
+        6.0,
+        7.0,
+        8.0
+      ],
       "xRange": [
         -0.42999999999999994,
         2.4299999999999997
       ],
       "yRange": [
-        0,
-        440
+        0.0,
+        440.0
       ]
     },
     {
       "slug": "raman-3d",
-      "projectSha256": "1b160bec9c2abde59b7e721b34ada9bf60c16782b86d8edc1174652220947d7c",
+      "projectSha256": "2f623148a579120be417c91993af7dfc87a2fb3c47e11231c9fe8cd84b1c7b65",
       "files": [
         {
           "path": "figures/raman-3d.png",
-          "bytes": 801913,
-          "sha256": "c5aba3fc9d69c4153c4ac0063c99eaee0631cb48185e6df2ab6f3b01c7cdccec"
+          "bytes": 528642,
+          "sha256": "b13cd74f307d5246c9655d87a5e43afc239f874cfbb3979256730c0a7b0e6eef"
         },
         {
           "path": "figures/raman-3d.svg",
-          "bytes": 115813,
-          "sha256": "c05fe08e6753d0d4c159d20033ccdc822fc74a07460495028766429163e55304"
+          "bytes": 101609,
+          "sha256": "abd5c867b25515ca04305fa043d525d8eedfe0ea7f228e0eb2dcba66f586c38b"
         },
         {
           "path": "figures/raman-3d.pdf",
-          "bytes": 51435,
-          "sha256": "3aa0f33c3c1b63f76dcb1c42e98bb126ad3882fbd28ebe557d2c0cc388a9222d"
+          "bytes": 46299,
+          "sha256": "ea19cb20785432d510ac7b89d678fa6e723a7a7cfb9461b307f9ab0c9df6d254"
         },
         {
           "path": "assets/raman-3d.png",
-          "bytes": 252335,
-          "sha256": "6f5f5c7d674eb728860ba760b5610f7dec0d1919b00fa9e7b2091bb1cc5971f8"
+          "bytes": 210731,
+          "sha256": "e21cb2b5caa708797774f10c6cb1c8f20fbdebc4ce622746de52e59a5823074e"
         }
       ],
       "uiVerified": true,
+      "typography": {
+        "width": 6.0,
+        "height": 4.0,
+        "fontScale": 1.0,
+        "tickFontScale": 1.0,
+        "labelFontScale": 1.0,
+        "legendScale": 1.0,
+        "legendFontScale": 1.0
+      },
+      "svgTextSizesPt": [
+        10.0
+      ],
       "xRange": [
-        1000,
-        3000
+        1000.0,
+        3000.0
       ],
       "yRange": [
-        0,
+        0.0,
         1.08
       ]
     }

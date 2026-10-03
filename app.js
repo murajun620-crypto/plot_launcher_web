@@ -1,5 +1,5 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=d39ba3a431a1";
-import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=d39ba3a431a1";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=a983aae91885";
+import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=a983aae91885";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -126,7 +126,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=d39ba3a431a1", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=a983aae91885", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -826,7 +826,7 @@ async function openGalleryProject() {
   const slug = new URLSearchParams(location.search).get('gallery');
   if (!slug || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return;
   try {
-    const response = await fetch(new URL(`gallery/projects/${slug}.plotproject`, import.meta.url));
+    const response = await fetch(new URL(`gallery/projects/${slug}.plotproject`, import.meta.url), {cache:'no-cache'});
     if (!response.ok) throw new Error('ギャラリーのプロジェクトを開けませんでした。');
     await readProject(new File([await response.blob()], `${slug}.plotproject`, {type:'application/octet-stream'}));
   } catch (error) { status(error.message, 'error'); }

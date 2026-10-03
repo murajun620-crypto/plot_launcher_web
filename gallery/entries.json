@@ -14,8 +14,8 @@
     ],
     "rows": 1601,
     "dimensions": [
-      3726,
-      2607
+      2450,
+      1756
     ],
     "series": [
       {
@@ -107,8 +107,8 @@
       }
     ],
     "axes": {
-      "width": 6.7,
-      "height": 4.8,
+      "width": 4,
+      "height": 3,
       "fontFamily": "Liberation Sans",
       "japaneseFontFamily": "Noto Sans JP",
       "fontScale": 1,
@@ -122,8 +122,8 @@
       "yScale": "linear",
       "legend": true,
       "legendPosition": "upper left",
-      "legendFontScale": 0.88,
-      "legendScale": 0.85,
+      "legendFontScale": 1,
+      "legendScale": 1,
       "hideYTickLabels": false,
       "hideYTicks": false,
       "transparent": false,
@@ -158,8 +158,8 @@
     ],
     "rows": 450,
     "dimensions": [
-      3544,
-      2649
+      2269,
+      1799
     ],
     "series": [
       {
@@ -251,8 +251,8 @@
       }
     ],
     "axes": {
-      "width": 6.7,
-      "height": 4.8,
+      "width": 4,
+      "height": 3,
       "fontFamily": "Liberation Sans",
       "japaneseFontFamily": "Noto Sans JP",
       "fontScale": 1,
@@ -266,8 +266,8 @@
       "yScale": "linear",
       "legend": true,
       "legendPosition": "upper left",
-      "legendFontScale": 0.88,
-      "legendScale": 0.85,
+      "legendFontScale": 1,
+      "legendScale": 1,
       "hideYTickLabels": false,
       "hideYTicks": false,
       "transparent": false,
@@ -302,8 +302,8 @@
     ],
     "rows": 550,
     "dimensions": [
-      3642,
-      2607
+      2366,
+      1756
     ],
     "series": [
       {
@@ -395,8 +395,8 @@
       }
     ],
     "axes": {
-      "width": 6.7,
-      "height": 4.8,
+      "width": 4,
+      "height": 3,
       "fontFamily": "Liberation Sans",
       "japaneseFontFamily": "Noto Sans JP",
       "fontScale": 1,
@@ -410,8 +410,8 @@
       "yScale": "linear",
       "legend": true,
       "legendPosition": "upper right",
-      "legendFontScale": 0.88,
-      "legendScale": 0.85,
+      "legendFontScale": 1,
+      "legendScale": 1,
       "hideYTickLabels": false,
       "hideYTicks": false,
       "transparent": false,
@@ -446,8 +446,8 @@
     ],
     "rows": 800,
     "dimensions": [
-      3752,
-      2649
+      2476,
+      1799
     ],
     "series": [
       {
@@ -539,8 +539,8 @@
       }
     ],
     "axes": {
-      "width": 6.7,
-      "height": 4.8,
+      "width": 4,
+      "height": 3,
       "fontFamily": "Liberation Sans",
       "japaneseFontFamily": "Noto Sans JP",
       "fontScale": 1,
@@ -554,8 +554,8 @@
       "yScale": "linear",
       "legend": true,
       "legendPosition": "lower right",
-      "legendFontScale": 0.88,
-      "legendScale": 0.85,
+      "legendFontScale": 1,
+      "legendScale": 1,
       "hideYTickLabels": false,
       "hideYTicks": false,
       "transparent": false,
@@ -588,8 +588,8 @@
     ],
     "rows": 1191,
     "dimensions": [
-      3527,
-      2607
+      2251,
+      1756
     ],
     "series": [
       {
@@ -623,8 +623,8 @@
       }
     ],
     "axes": {
-      "width": 6.7,
-      "height": 4.8,
+      "width": 4,
+      "height": 3,
       "fontFamily": "Liberation Sans",
       "japaneseFontFamily": "Noto Sans JP",
       "fontScale": 1,
@@ -638,8 +638,8 @@
       "yScale": "linear",
       "legend": false,
       "legendPosition": "best",
-      "legendFontScale": 0.88,
-      "legendScale": 0.85,
+      "legendFontScale": 1,
+      "legendScale": 1,
       "hideYTickLabels": true,
       "hideYTicks": true,
       "transparent": false,
@@ -671,8 +671,8 @@
     ],
     "rows": 2001,
     "dimensions": [
-      3494,
-      2607
+      2219,
+      1756
     ],
     "series": [
       {
@@ -706,8 +706,8 @@
       }
     ],
     "axes": {
-      "width": 6.7,
-      "height": 4.8,
+      "width": 4,
+      "height": 3,
       "fontFamily": "Liberation Sans",
       "japaneseFontFamily": "Noto Sans JP",
       "fontScale": 1,
@@ -721,8 +721,8 @@
       "yScale": "linear",
       "legend": false,
       "legendPosition": "best",
-      "legendFontScale": 0.88,
-      "legendScale": 0.85,
+      "legendFontScale": 1,
+      "legendScale": 1,
       "hideYTickLabels": true,
       "hideYTicks": true,
       "transparent": false,
@@ -754,8 +754,8 @@
     ],
     "rows": 281,
     "dimensions": [
-      3462,
-      2607
+      2186,
+      1756
     ],
     "series": [
       {
@@ -789,8 +789,8 @@
       }
     ],
     "axes": {
-      "width": 6.7,
-      "height": 4.8,
+      "width": 4,
+      "height": 3,
       "fontFamily": "Liberation Sans",
       "japaneseFontFamily": "Noto Sans JP",
       "fontScale": 1,
@@ -804,8 +804,8 @@
       "yScale": "linear",
       "legend": false,
       "legendPosition": "best",
-      "legendFontScale": 0.88,
-      "legendScale": 0.85,
+      "legendFontScale": 1,
+      "legendScale": 1,
       "hideYTickLabels": true,
       "hideYTicks": true,
       "transparent": false,
@@ -819,7 +819,7 @@
       "xMax": "93",
       "xStep": "4",
       "yMin": "0",
-      "yMax": "7600"
+      "yMax": "8500"
     },
     "options": {},
     "statistics": null
@@ -844,8 +844,8 @@
     ],
     "rows": 281,
     "dimensions": [
-      3495,
-      2607
+      2220,
+      1756
     ],
     "series": [
       {
@@ -879,8 +879,8 @@
       }
     ],
     "axes": {
-      "width": 6.7,
-      "height": 4.8,
+      "width": 4,
+      "height": 3,
       "fontFamily": "Liberation Sans",
       "japaneseFontFamily": "Noto Sans JP",
       "fontScale": 1,
@@ -894,8 +894,8 @@
       "yScale": "linear",
       "legend": false,
       "legendPosition": "best",
-      "legendFontScale": 0.88,
-      "legendScale": 0.85,
+      "legendFontScale": 1,
+      "legendScale": 1,
       "hideYTickLabels": true,
       "hideYTicks": true,
       "transparent": false,
@@ -954,8 +954,8 @@
     ],
     "rows": 1000,
     "dimensions": [
-      3495,
-      2611
+      2220,
+      1760
     ],
     "series": [
       {
@@ -1018,8 +1018,8 @@
       }
     ],
     "axes": {
-      "width": 6.7,
-      "height": 4.8,
+      "width": 4,
+      "height": 3,
       "fontFamily": "Liberation Sans",
       "japaneseFontFamily": "Noto Sans JP",
       "fontScale": 1,
@@ -1027,14 +1027,14 @@
       "labelFontScale": 1,
       "xLabel": "Photon energy − E$_0$",
       "xUnit": "eV",
-      "yLabel": "Normalized absorption",
-      "yUnit": "arb. units",
+      "yLabel": "Absorption",
+      "yUnit": "norm.",
       "xScale": "linear",
       "yScale": "linear",
       "legend": true,
       "legendPosition": "upper right",
-      "legendFontScale": 0.88,
-      "legendScale": 0.85,
+      "legendFontScale": 1,
+      "legendScale": 1,
       "hideYTickLabels": true,
       "hideYTicks": true,
       "transparent": false,
@@ -1068,8 +1068,8 @@
     ],
     "rows": 1001,
     "dimensions": [
-      3625,
-      2626
+      2349,
+      1776
     ],
     "series": [
       {
@@ -1161,8 +1161,8 @@
       }
     ],
     "axes": {
-      "width": 6.7,
-      "height": 4.8,
+      "width": 4,
+      "height": 3,
       "fontFamily": "Liberation Sans",
       "japaneseFontFamily": "Noto Sans JP",
       "fontScale": 1,
@@ -1176,8 +1176,8 @@
       "yScale": "linear",
       "legend": true,
       "legendPosition": "upper right",
-      "legendFontScale": 0.88,
-      "legendScale": 0.85,
+      "legendFontScale": 0.9,
+      "legendScale": 0.9,
       "hideYTickLabels": true,
       "hideYTicks": true,
       "transparent": false,
@@ -1210,8 +1210,8 @@
     ],
     "rows": 768,
     "dimensions": [
-      3525,
-      2607
+      2249,
+      1756
     ],
     "series": [
       {
@@ -1274,8 +1274,8 @@
       }
     ],
     "axes": {
-      "width": 6.7,
-      "height": 4.8,
+      "width": 4,
+      "height": 3,
       "fontFamily": "Liberation Sans",
       "japaneseFontFamily": "Noto Sans JP",
       "fontScale": 1,
@@ -1288,9 +1288,9 @@
       "xScale": "linear",
       "yScale": "linear",
       "legend": true,
-      "legendPosition": "upper right",
-      "legendFontScale": 0.88,
-      "legendScale": 0.85,
+      "legendPosition": "upper left",
+      "legendFontScale": 0.9,
+      "legendScale": 0.9,
       "hideYTickLabels": false,
       "hideYTicks": false,
       "transparent": false,
@@ -1323,8 +1323,8 @@
     ],
     "rows": 190,
     "dimensions": [
-      3525,
-      2649
+      2249,
+      1799
     ],
     "series": [
       {
@@ -1358,8 +1358,8 @@
       }
     ],
     "axes": {
-      "width": 6.7,
-      "height": 4.8,
+      "width": 4,
+      "height": 3,
       "fontFamily": "Liberation Sans",
       "japaneseFontFamily": "Noto Sans JP",
       "fontScale": 1,
@@ -1373,8 +1373,8 @@
       "yScale": "linear",
       "legend": false,
       "legendPosition": "best",
-      "legendFontScale": 0.88,
-      "legendScale": 0.85,
+      "legendFontScale": 1,
+      "legendScale": 1,
       "hideYTickLabels": false,
       "hideYTicks": false,
       "transparent": false,
@@ -1415,8 +1415,8 @@
     ],
     "rows": 240,
     "dimensions": [
-      3609,
-      2607
+      2334,
+      1756
     ],
     "series": [
       {
@@ -1479,8 +1479,8 @@
       }
     ],
     "axes": {
-      "width": 6.7,
-      "height": 4.8,
+      "width": 4,
+      "height": 3,
       "fontFamily": "Liberation Sans",
       "japaneseFontFamily": "Noto Sans JP",
       "fontScale": 1,
@@ -1494,8 +1494,8 @@
       "yScale": "linear",
       "legend": true,
       "legendPosition": "lower right",
-      "legendFontScale": 0.88,
-      "legendScale": 0.85,
+      "legendFontScale": 1,
+      "legendScale": 1,
       "hideYTickLabels": false,
       "hideYTicks": false,
       "transparent": false,
@@ -1531,8 +1531,8 @@
     ],
     "rows": 9,
     "dimensions": [
-      3635,
-      2607
+      2359,
+      1756
     ],
     "series": [
       {
@@ -1595,8 +1595,8 @@
       }
     ],
     "axes": {
-      "width": 6.7,
-      "height": 4.8,
+      "width": 4,
+      "height": 3,
       "fontFamily": "Liberation Sans",
       "japaneseFontFamily": "Noto Sans JP",
       "fontScale": 1,
@@ -1610,8 +1610,8 @@
       "yScale": "log",
       "legend": true,
       "legendPosition": "upper right",
-      "legendFontScale": 0.88,
-      "legendScale": 0.85,
+      "legendFontScale": 1,
+      "legendScale": 1,
       "hideYTickLabels": false,
       "hideYTicks": false,
       "transparent": false,
@@ -1636,7 +1636,7 @@
     "title": "棒グラフ 反復試験の比較",
     "model": "独立した5反復の模擬過電圧を生成し、平均と標本SDを棒と誤差棒で示す。",
     "parameters": "想定平均370/275/220 mV、模擬反復のノイズSD9/7/5 mV、n=5。LSVとは別の比較例で、同一測定の要約ではない。",
-    "reading": "カテゴリ名をX列に置く。Yは平均、3列目はSD。現在の棒グラフ描画は誤差列を自動描画しないため、この作例ではSDから算出した線の注釈で誤差棒を表示している。値を変更したら注釈も更新する。有意差やp値は作成していない。",
+    "reading": "10 mA cm⁻²での模擬過電圧を比較。カテゴリ名をX列に置く。Yは平均、3列目はSD。現在の棒グラフ描画は誤差列を自動描画しないため、この作例ではSDから算出した線の注釈で誤差棒を表示している。値を変更したら注釈も更新する。有意差やp値は作成していない。",
     "columns": [
       "Sample",
       "Mean / mV",
@@ -1644,8 +1644,8 @@
     ],
     "rows": 3,
     "dimensions": [
-      3609,
-      2607
+      2314,
+      1756
     ],
     "series": [
       {
@@ -1679,8 +1679,8 @@
       }
     ],
     "axes": {
-      "width": 6.7,
-      "height": 4.8,
+      "width": 4,
+      "height": 3,
       "fontFamily": "Liberation Sans",
       "japaneseFontFamily": "Noto Sans JP",
       "fontScale": 1,
@@ -1688,14 +1688,14 @@
       "labelFontScale": 1,
       "xLabel": "Sample",
       "xUnit": "",
-      "yLabel": "Overpotential at 10 mA cm$^{-2}$",
+      "yLabel": "Overpotential",
       "yUnit": "mV",
       "xScale": "linear",
       "yScale": "linear",
       "legend": false,
       "legendPosition": "best",
-      "legendFontScale": 0.88,
-      "legendScale": 0.85,
+      "legendFontScale": 1,
+      "legendScale": 1,
       "hideYTickLabels": false,
       "hideYTicks": false,
       "transparent": false,
@@ -1735,8 +1735,8 @@
     ],
     "rows": 1001,
     "dimensions": [
-      2934,
-      2631
+      2577,
+      2128
     ],
     "series": [
       {
@@ -1915,23 +1915,23 @@
       }
     ],
     "axes": {
-      "width": 7.1,
-      "height": 5.4,
+      "width": 6,
+      "height": 4,
       "fontFamily": "Liberation Sans",
       "japaneseFontFamily": "Noto Sans JP",
-      "fontScale": 0.9,
+      "fontScale": 1,
       "tickFontScale": 1,
       "labelFontScale": 1,
       "xLabel": "Raman shift",
       "xUnit": "cm$^{-1}$",
-      "yLabel": "Normalized intensity",
+      "yLabel": "Normalized",
       "yUnit": "",
       "xScale": "linear",
       "yScale": "linear",
       "legend": false,
       "legendPosition": "best",
-      "legendFontScale": 0.88,
-      "legendScale": 0.85,
+      "legendFontScale": 1,
+      "legendScale": 1,
       "hideYTickLabels": false,
       "hideYTicks": false,
       "transparent": false,

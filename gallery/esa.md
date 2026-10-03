@@ -4,7 +4,7 @@ PlotLauncherで作れる15種類のグラフを、16作例で紹介します。C
 
 **全データは人工的に生成した模擬データです。実験結果や論文掲載データではありません。** 図の見やすさ、単位、線幅、フォント、余白を論文図の体裁に合わせています。投稿時は各雑誌の規定と実測データに合わせて調整してください。
 
-[PlotLauncherを開く](https://murajun620-crypto.github.io/plot_launcher_web/) · [学生向けマニュアル](https://murajun620-crypto.github.io/plot_launcher_web/manual/) · [全プロジェクトを保存（ZIP）](projects.zip?v=27e45f64cf51) · [esa掲載用一式](gallery.zip?v=27e45f64cf51)
+[PlotLauncherを開く](https://murajun620-crypto.github.io/plot_launcher_web/) · [学生向けマニュアル](https://murajun620-crypto.github.io/plot_launcher_web/manual/) · [全プロジェクトを保存（ZIP）](projects.zip?v=f8d1d2c4f236) · [esa掲載用一式](gallery.zip?v=f8d1d2c4f236)
 
 ## 作例の一覧
 
@@ -29,26 +29,26 @@ PlotLauncherで作れる15種類のグラフを、16作例で紹介します。C
 
 ## 全作例のプロジェクト
 
-[全16プロジェクトを保存（ZIP）](projects.zip?v=27e45f64cf51)
+[全16プロジェクトを保存（ZIP）](projects.zip?v=f8d1d2c4f236)
 
 |作例|プロジェクト|
 |---|---|
-|CV 掃引速度による酸化還元応答|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=cv) · [保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/cv.plotproject?v=27e45f64cf51)|
-|LSV 触媒の分極曲線|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=lsv) · [保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/lsv.plotproject?v=27e45f64cf51)|
-|CA 濃度による電流減衰|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=ca) · [保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/ca.plotproject?v=27e45f64cf51)|
-|CP 定電流保持時の電位推移|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=cp) · [保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/cp.plotproject?v=27e45f64cf51)|
-|EDX Au粒子とSiO₂基板のスペクトル|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=edx) · [保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/edx.plotproject?v=27e45f64cf51)|
-|XPS Survey 表面元素の全体像|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xps-survey) · [保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/xps-survey.plotproject?v=27e45f64cf51)|
-|XPS Core Au 4fダブレット|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xps-core) · [保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/xps-core.plotproject?v=27e45f64cf51)|
-|XPS Fit 成分と合成曲線を重ねる|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xps-fit) · [保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/xps-fit.plotproject?v=27e45f64cf51)|
-|XAFS 吸収端と吸収端後の構造|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xafs) · [保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/xafs.plotproject?v=27e45f64cf51)|
-|Raman Spectrum 炭素材料のバンド比較|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=raman) · [保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/raman.plotproject?v=27e45f64cf51)|
-|AFM Section 高さマップから取り出した断面|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=afm-section) · [保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/afm-section.plotproject?v=27e45f64cf51)|
-|粒径ヒストグラム 対数正規分布|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=particle-histogram) · [保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/particle-histogram.plotproject?v=27e45f64cf51)|
-|一般グラフ 飽和応答と反復データ|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=general) · [保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/general.plotproject?v=27e45f64cf51)|
-|Roughness 研磨時間と表面粗さ|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=roughness) · [保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/roughness.plotproject?v=27e45f64cf51)|
-|棒グラフ 反復試験の比較|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=bar) · [保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/bar.plotproject?v=27e45f64cf51)|
-|Raman 3D 時系列スペクトル|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=raman-3d) · [保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/raman-3d.plotproject?v=27e45f64cf51)|
+|CV 掃引速度による酸化還元応答|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=cv) · [保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/cv.plotproject?v=f8d1d2c4f236)|
+|LSV 触媒の分極曲線|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=lsv) · [保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/lsv.plotproject?v=f8d1d2c4f236)|
+|CA 濃度による電流減衰|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=ca) · [保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/ca.plotproject?v=f8d1d2c4f236)|
+|CP 定電流保持時の電位推移|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=cp) · [保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/cp.plotproject?v=f8d1d2c4f236)|
+|EDX Au粒子とSiO₂基板のスペクトル|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=edx) · [保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/edx.plotproject?v=f8d1d2c4f236)|
+|XPS Survey 表面元素の全体像|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xps-survey) · [保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/xps-survey.plotproject?v=f8d1d2c4f236)|
+|XPS Core Au 4fダブレット|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xps-core) · [保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/xps-core.plotproject?v=f8d1d2c4f236)|
+|XPS Fit 成分と合成曲線を重ねる|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xps-fit) · [保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/xps-fit.plotproject?v=f8d1d2c4f236)|
+|XAFS 吸収端と吸収端後の構造|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xafs) · [保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/xafs.plotproject?v=f8d1d2c4f236)|
+|Raman Spectrum 炭素材料のバンド比較|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=raman) · [保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/raman.plotproject?v=f8d1d2c4f236)|
+|AFM Section 高さマップから取り出した断面|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=afm-section) · [保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/afm-section.plotproject?v=f8d1d2c4f236)|
+|粒径ヒストグラム 対数正規分布|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=particle-histogram) · [保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/particle-histogram.plotproject?v=f8d1d2c4f236)|
+|一般グラフ 飽和応答と反復データ|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=general) · [保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/general.plotproject?v=f8d1d2c4f236)|
+|Roughness 研磨時間と表面粗さ|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=roughness) · [保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/roughness.plotproject?v=f8d1d2c4f236)|
+|棒グラフ 反復試験の比較|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=bar) · [保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/bar.plotproject?v=f8d1d2c4f236)|
+|Raman 3D 時系列スペクトル|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=raman-3d) · [保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/raman-3d.plotproject?v=f8d1d2c4f236)|
 
 ## プロジェクトで再現する
 
@@ -62,11 +62,11 @@ CSVから作る場合は、1行目を見出しにし、X列とY列を選びま�
 
 ## CV 掃引速度による酸化還元応答
 
-![CV 掃引速度による酸化還元応答 模擬データ](https://murajun620-crypto.github.io/plot_launcher_web/gallery/assets/cv.png?v=27e45f64cf51)
+![CV 掃引速度による酸化還元応答 模擬データ](https://murajun620-crypto.github.io/plot_launcher_web/gallery/assets/cv.png?v=f8d1d2c4f236)
 
 酸化・還元ピークと、掃引速度による電流増加。Xの行順序を保ち、電位で並べ替えない。
 
-[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=cv) · [CSV](https://murajun620-crypto.github.io/plot_launcher_web/gallery/data/cv.csv?v=27e45f64cf51) · [プロジェクトを保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/cv.plotproject?v=27e45f64cf51) · [PNG 1200 dpi](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/cv.png?v=27e45f64cf51) · [SVG](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/cv.svg?v=27e45f64cf51) · [PDF](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/cv.pdf?v=27e45f64cf51)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=cv) · [CSV](https://murajun620-crypto.github.io/plot_launcher_web/gallery/data/cv.csv?v=f8d1d2c4f236) · [プロジェクトを保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/cv.plotproject?v=f8d1d2c4f236) · [PNG 1200 dpi](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/cv.png?v=f8d1d2c4f236) · [SVG](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/cv.svg?v=f8d1d2c4f236) · [PDF](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/cv.pdf?v=f8d1d2c4f236)
 
 ### データの作り方
 
@@ -86,11 +86,11 @@ Fickの一次元拡散方程式を陰的差分で解き、電極表面はNernst�
 
 ## LSV 触媒の分極曲線
 
-![LSV 触媒の分極曲線 模擬データ](https://murajun620-crypto.github.io/plot_launcher_web/gallery/assets/lsv.png?v=27e45f64cf51)
+![LSV 触媒の分極曲線 模擬データ](https://murajun620-crypto.github.io/plot_launcher_web/gallery/assets/lsv.png?v=f8d1d2c4f236)
 
 立ち上がりと高電流域の形。OERを想定した作例で、触媒性能を示す実測結果ではない。
 
-[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=lsv) · [CSV](https://murajun620-crypto.github.io/plot_launcher_web/gallery/data/lsv.csv?v=27e45f64cf51) · [プロジェクトを保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/lsv.plotproject?v=27e45f64cf51) · [PNG 1200 dpi](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/lsv.png?v=27e45f64cf51) · [SVG](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/lsv.svg?v=27e45f64cf51) · [PDF](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/lsv.pdf?v=27e45f64cf51)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=lsv) · [CSV](https://murajun620-crypto.github.io/plot_launcher_web/gallery/data/lsv.csv?v=f8d1d2c4f236) · [プロジェクトを保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/lsv.plotproject?v=f8d1d2c4f236) · [PNG 1200 dpi](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/lsv.png?v=f8d1d2c4f236) · [SVG](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/lsv.svg?v=f8d1d2c4f236) · [PDF](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/lsv.pdf?v=f8d1d2c4f236)
 
 ### データの作り方
 
@@ -110,11 +110,11 @@ Tafel近似は[MITのButler–Volmer講義資料](https://ocw.mit.edu/courses/10
 
 ## CA 濃度による電流減衰
 
-![CA 濃度による電流減衰 模擬データ](https://murajun620-crypto.github.io/plot_launcher_web/gallery/assets/ca.png?v=27e45f64cf51)
+![CA 濃度による電流減衰 模擬データ](https://murajun620-crypto.github.io/plot_launcher_web/gallery/assets/ca.png?v=f8d1d2c4f236)
 
 初期過渡応答の後にt⁻¹ᐟ²で減衰。濃度が2倍になると拡散電流も2倍になる。
 
-[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=ca) · [CSV](https://murajun620-crypto.github.io/plot_launcher_web/gallery/data/ca.csv?v=27e45f64cf51) · [プロジェクトを保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/ca.plotproject?v=27e45f64cf51) · [PNG 1200 dpi](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/ca.png?v=27e45f64cf51) · [SVG](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/ca.svg?v=27e45f64cf51) · [PDF](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/ca.pdf?v=27e45f64cf51)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=ca) · [CSV](https://murajun620-crypto.github.io/plot_launcher_web/gallery/data/ca.csv?v=f8d1d2c4f236) · [プロジェクトを保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/ca.plotproject?v=f8d1d2c4f236) · [PNG 1200 dpi](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/ca.png?v=f8d1d2c4f236) · [SVG](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/ca.svg?v=f8d1d2c4f236) · [PDF](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/ca.pdf?v=f8d1d2c4f236)
 
 ### データの作り方
 
@@ -134,11 +134,11 @@ Cottrell式 j=nF√D C/√(πt)に、短時間の充電電流と計測ノイズ�
 
 ## CP 定電流保持時の電位推移
 
-![CP 定電流保持時の電位推移 模擬データ](https://murajun620-crypto.github.io/plot_launcher_web/gallery/assets/cp.png?v=27e45f64cf51)
+![CP 定電流保持時の電位推移 模擬データ](https://murajun620-crypto.github.io/plot_launcher_web/gallery/assets/cp.png?v=f8d1d2c4f236)
 
 初期のなじみと長時間ドリフト。安定性の実証には実測・反復試験が必要。
 
-[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=cp) · [CSV](https://murajun620-crypto.github.io/plot_launcher_web/gallery/data/cp.csv?v=27e45f64cf51) · [プロジェクトを保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/cp.plotproject?v=27e45f64cf51) · [PNG 1200 dpi](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/cp.png?v=27e45f64cf51) · [SVG](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/cp.svg?v=27e45f64cf51) · [PDF](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/cp.pdf?v=27e45f64cf51)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=cp) · [CSV](https://murajun620-crypto.github.io/plot_launcher_web/gallery/data/cp.csv?v=f8d1d2c4f236) · [プロジェクトを保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/cp.plotproject?v=f8d1d2c4f236) · [PNG 1200 dpi](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/cp.png?v=f8d1d2c4f236) · [SVG](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/cp.svg?v=f8d1d2c4f236) · [PDF](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/cp.pdf?v=f8d1d2c4f236)
 
 ### データの作り方
 
@@ -158,11 +158,11 @@ Cottrell式 j=nF√D C/√(πt)に、短時間の充電電流と計測ノイズ�
 
 ## EDX Au粒子とSiO₂基板のスペクトル
 
-![EDX Au粒子とSiO₂基板のスペクトル 模擬データ](https://murajun620-crypto.github.io/plot_launcher_web/gallery/assets/edx.png?v=27e45f64cf51)
+![EDX Au粒子とSiO₂基板のスペクトル 模擬データ](https://murajun620-crypto.github.io/plot_launcher_web/gallery/assets/edx.png?v=f8d1d2c4f236)
 
 低エネルギー主ピークと弱い高エネルギーAu線。EDXマップと同じ元素を使う。
 
-[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=edx) · [CSV](https://murajun620-crypto.github.io/plot_launcher_web/gallery/data/edx.csv?v=27e45f64cf51) · [プロジェクトを保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/edx.plotproject?v=27e45f64cf51) · [PNG 1200 dpi](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/edx.png?v=27e45f64cf51) · [SVG](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/edx.svg?v=27e45f64cf51) · [PDF](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/edx.pdf?v=27e45f64cf51)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=edx) · [CSV](https://murajun620-crypto.github.io/plot_launcher_web/gallery/data/edx.csv?v=f8d1d2c4f236) · [プロジェクトを保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/edx.plotproject?v=f8d1d2c4f236) · [PNG 1200 dpi](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/edx.png?v=f8d1d2c4f236) · [SVG](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/edx.svg?v=f8d1d2c4f236) · [PDF](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/edx.pdf?v=f8d1d2c4f236)
 
 ### データの作り方
 
@@ -182,11 +182,11 @@ O K、Si K、Au M/Lの近似ピーク位置に、エネルギー依存の検出�
 
 ## XPS Survey 表面元素の全体像
 
-![XPS Survey 表面元素の全体像 模擬データ](https://murajun620-crypto.github.io/plot_launcher_web/gallery/assets/xps-survey.png?v=27e45f64cf51)
+![XPS Survey 表面元素の全体像 模擬データ](https://murajun620-crypto.github.io/plot_launcher_web/gallery/assets/xps-survey.png?v=f8d1d2c4f236)
 
 XPSの結合エネルギーは左が高く右が低い。Surveyで全体を確認し、CoreとFitで拡大する。
 
-[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xps-survey) · [CSV](https://murajun620-crypto.github.io/plot_launcher_web/gallery/data/xps-survey.csv?v=27e45f64cf51) · [プロジェクトを保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/xps-survey.plotproject?v=27e45f64cf51) · [PNG 1200 dpi](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/xps-survey.png?v=27e45f64cf51) · [SVG](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/xps-survey.svg?v=27e45f64cf51) · [PDF](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/xps-survey.pdf?v=27e45f64cf51)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xps-survey) · [CSV](https://murajun620-crypto.github.io/plot_launcher_web/gallery/data/xps-survey.csv?v=f8d1d2c4f236) · [プロジェクトを保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/xps-survey.plotproject?v=f8d1d2c4f236) · [PNG 1200 dpi](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/xps-survey.png?v=f8d1d2c4f236) · [SVG](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/xps-survey.svg?v=f8d1d2c4f236) · [PDF](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/xps-survey.pdf?v=f8d1d2c4f236)
 
 ### データの作り方
 
@@ -206,11 +206,11 @@ Auの主要線は[HarwellXPSのAu解説](https://www.harwellxps.guru/xpskb/gold/
 
 ## XPS Core Au 4fダブレット
 
-![XPS Core Au 4fダブレット 模擬データ](https://murajun620-crypto.github.io/plot_launcher_web/gallery/assets/xps-core.png?v=27e45f64cf51)
+![XPS Core Au 4fダブレット 模擬データ](https://murajun620-crypto.github.io/plot_launcher_web/gallery/assets/xps-core.png?v=f8d1d2c4f236)
 
 ピークの位置、幅、分裂。装置分解能や帯電条件は実測に合わせる。
 
-[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xps-core) · [CSV](https://murajun620-crypto.github.io/plot_launcher_web/gallery/data/xps-core.csv?v=27e45f64cf51) · [プロジェクトを保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/xps-core.plotproject?v=27e45f64cf51) · [PNG 1200 dpi](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/xps-core.png?v=27e45f64cf51) · [SVG](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/xps-core.svg?v=27e45f64cf51) · [PDF](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/xps-core.pdf?v=27e45f64cf51)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xps-core) · [CSV](https://murajun620-crypto.github.io/plot_launcher_web/gallery/data/xps-core.csv?v=f8d1d2c4f236) · [プロジェクトを保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/xps-core.plotproject?v=f8d1d2c4f236) · [PNG 1200 dpi](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/xps-core.png?v=f8d1d2c4f236) · [SVG](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/xps-core.svg?v=f8d1d2c4f236) · [PDF](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/xps-core.pdf?v=f8d1d2c4f236)
 
 ### データの作り方
 
@@ -230,11 +230,11 @@ Au 4f₇ᐟ₂/4f₅ᐟ₂の二重線。分裂3.67 eV、同じ幅、面積比4:
 
 ## XPS Fit 成分と合成曲線を重ねる
 
-![XPS Fit 成分と合成曲線を重ねる 模擬データ](https://murajun620-crypto.github.io/plot_launcher_web/gallery/assets/xps-fit.png?v=27e45f64cf51)
+![XPS Fit 成分と合成曲線を重ねる 模擬データ](https://murajun620-crypto.github.io/plot_launcher_web/gallery/assets/xps-fit.png?v=f8d1d2c4f236)
 
 観測点、合成線、背景、色分け成分を比較。専用CSVではアプリが各ピークに背景を足して塗りつぶす。
 
-[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xps-fit) · [CSV](https://murajun620-crypto.github.io/plot_launcher_web/gallery/data/xps-fit.csv?v=27e45f64cf51) · [プロジェクトを保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/xps-fit.plotproject?v=27e45f64cf51) · [PNG 1200 dpi](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/xps-fit.png?v=27e45f64cf51) · [SVG](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/xps-fit.svg?v=27e45f64cf51) · [PDF](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/xps-fit.pdf?v=27e45f64cf51)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xps-fit) · [CSV](https://murajun620-crypto.github.io/plot_launcher_web/gallery/data/xps-fit.csv?v=f8d1d2c4f236) · [プロジェクトを保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/xps-fit.plotproject?v=f8d1d2c4f236) · [PNG 1200 dpi](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/xps-fit.png?v=f8d1d2c4f236) · [SVG](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/xps-fit.svg?v=f8d1d2c4f236) · [PDF](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/xps-fit.pdf?v=f8d1d2c4f236)
 
 ### データの作り方
 
@@ -256,11 +256,11 @@ Coreと同じ模擬観測値に生成モデル・背景・2成分を重ねた。
 
 ## XAFS 吸収端と吸収端後の構造
 
-![XAFS 吸収端と吸収端後の構造 模擬データ](https://murajun620-crypto.github.io/plot_launcher_web/gallery/assets/xafs.png?v=27e45f64cf51)
+![XAFS 吸収端と吸収端後の構造 模擬データ](https://murajun620-crypto.github.io/plot_launcher_web/gallery/assets/xafs.png?v=f8d1d2c4f236)
 
 吸収端のシフト、白線、吸収端後の減衰振動。配位数や酸化数の推定に使える定量計算ではない。
 
-[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xafs) · [CSV](https://murajun620-crypto.github.io/plot_launcher_web/gallery/data/xafs.csv?v=27e45f64cf51) · [プロジェクトを保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/xafs.plotproject?v=27e45f64cf51) · [PNG 1200 dpi](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/xafs.png?v=27e45f64cf51) · [SVG](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/xafs.svg?v=27e45f64cf51) · [PDF](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/xafs.pdf?v=27e45f64cf51)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xafs) · [CSV](https://murajun620-crypto.github.io/plot_launcher_web/gallery/data/xafs.csv?v=f8d1d2c4f236) · [プロジェクトを保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/xafs.plotproject?v=f8d1d2c4f236) · [PNG 1200 dpi](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/xafs.png?v=f8d1d2c4f236) · [SVG](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/xafs.svg?v=f8d1d2c4f236) · [PDF](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/xafs.pdf?v=f8d1d2c4f236)
 
 ### データの作り方
 
@@ -280,11 +280,11 @@ arctan型吸収端、白線ピーク、sin(2kR+φ)の減衰振動を重ねた概
 
 ## Raman Spectrum 炭素材料のバンド比較
 
-![Raman Spectrum 炭素材料のバンド比較 模擬データ](https://murajun620-crypto.github.io/plot_launcher_web/gallery/assets/raman.png?v=27e45f64cf51)
+![Raman Spectrum 炭素材料のバンド比較 模擬データ](https://murajun620-crypto.github.io/plot_launcher_web/gallery/assets/raman.png?v=f8d1d2c4f236)
 
 ピークの強度比と幅を見比べる。縦オフセットしたスペクトルの絶対強度を相互比較しない。
 
-[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=raman) · [CSV](https://murajun620-crypto.github.io/plot_launcher_web/gallery/data/raman.csv?v=27e45f64cf51) · [プロジェクトを保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/raman.plotproject?v=27e45f64cf51) · [PNG 1200 dpi](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/raman.png?v=27e45f64cf51) · [SVG](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/raman.svg?v=27e45f64cf51) · [PDF](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/raman.pdf?v=27e45f64cf51)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=raman) · [CSV](https://murajun620-crypto.github.io/plot_launcher_web/gallery/data/raman.csv?v=f8d1d2c4f236) · [プロジェクトを保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/raman.plotproject?v=f8d1d2c4f236) · [PNG 1200 dpi](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/raman.png?v=f8d1d2c4f236) · [SVG](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/raman.svg?v=f8d1d2c4f236) · [PDF](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/raman.pdf?v=f8d1d2c4f236)
 
 ### データの作り方
 
@@ -304,11 +304,11 @@ D、G、2Dバンドに幅を持たせ、弱い蛍光背景とPoissonノイズを
 
 ## AFM Section 高さマップから取り出した断面
 
-![AFM Section 高さマップから取り出した断面 模擬データ](https://murajun620-crypto.github.io/plot_launcher_web/gallery/assets/afm-section.png?v=27e45f64cf51)
+![AFM Section 高さマップから取り出した断面 模擬データ](https://murajun620-crypto.github.io/plot_launcher_web/gallery/assets/afm-section.png?v=f8d1d2c4f236)
 
 高さマップと断面を同じデータで説明できる。断面の各山は探針の影響を含む見かけの形状。
 
-[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=afm-section) · [CSV](https://murajun620-crypto.github.io/plot_launcher_web/gallery/data/afm-section.csv?v=27e45f64cf51) · [プロジェクトを保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/afm-section.plotproject?v=27e45f64cf51) · [PNG 1200 dpi](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/afm-section.png?v=27e45f64cf51) · [SVG](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/afm-section.svg?v=27e45f64cf51) · [PDF](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/afm-section.pdf?v=27e45f64cf51)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=afm-section) · [CSV](https://murajun620-crypto.github.io/plot_launcher_web/gallery/data/afm-section.csv?v=f8d1d2c4f236) · [プロジェクトを保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/afm-section.plotproject?v=f8d1d2c4f236) · [PNG 1200 dpi](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/afm-section.png?v=f8d1d2c4f236) · [SVG](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/afm-section.svg?v=f8d1d2c4f236) · [PDF](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/afm-section.pdf?v=f8d1d2c4f236)
 
 ### データの作り方
 
@@ -328,11 +328,11 @@ MiFiTo用AFMナノ粒状表面と同一の高さ配列から、2本の水平断�
 
 ## 粒径ヒストグラム 対数正規分布
 
-![粒径ヒストグラム 対数正規分布 模擬データ](https://murajun620-crypto.github.io/plot_launcher_web/gallery/assets/particle-histogram.png?v=27e45f64cf51)
+![粒径ヒストグラム 対数正規分布 模擬データ](https://murajun620-crypto.github.io/plot_launcher_web/gallery/assets/particle-histogram.png?v=f8d1d2c4f236)
 
 生の粒径を1行1粒子で入れる。計算済みの頻度表は粒径入力にしない。
 
-[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=particle-histogram) · [CSV](https://murajun620-crypto.github.io/plot_launcher_web/gallery/data/particle-histogram.csv?v=27e45f64cf51) · [プロジェクトを保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/particle-histogram.plotproject?v=27e45f64cf51) · [PNG 1200 dpi](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/particle-histogram.png?v=27e45f64cf51) · [SVG](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/particle-histogram.svg?v=27e45f64cf51) · [PDF](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/particle-histogram.pdf?v=27e45f64cf51)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=particle-histogram) · [CSV](https://murajun620-crypto.github.io/plot_launcher_web/gallery/data/particle-histogram.csv?v=f8d1d2c4f236) · [プロジェクトを保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/particle-histogram.plotproject?v=f8d1d2c4f236) · [PNG 1200 dpi](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/particle-histogram.png?v=f8d1d2c4f236) · [SVG](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/particle-histogram.svg?v=f8d1d2c4f236) · [PDF](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/particle-histogram.pdf?v=f8d1d2c4f236)
 
 ### データの作り方
 
@@ -354,11 +354,11 @@ SEM粒子モデルに与えた190個の投影径を、そのまま粒径入力�
 
 ## 一般グラフ 飽和応答と反復データ
 
-![一般グラフ 飽和応答と反復データ 模擬データ](https://murajun620-crypto.github.io/plot_launcher_web/gallery/assets/general.png?v=27e45f64cf51)
+![一般グラフ 飽和応答と反復データ 模擬データ](https://murajun620-crypto.github.io/plot_launcher_web/gallery/assets/general.png?v=f8d1d2c4f236)
 
 散布点・対称誤差棒・生成モデルを併記。曲線と点はX列が別でもよい。
 
-[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=general) · [CSV](https://murajun620-crypto.github.io/plot_launcher_web/gallery/data/general.csv?v=27e45f64cf51) · [プロジェクトを保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/general.plotproject?v=27e45f64cf51) · [PNG 1200 dpi](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/general.png?v=27e45f64cf51) · [SVG](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/general.svg?v=27e45f64cf51) · [PDF](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/general.pdf?v=27e45f64cf51)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=general) · [CSV](https://murajun620-crypto.github.io/plot_launcher_web/gallery/data/general.csv?v=f8d1d2c4f236) · [プロジェクトを保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/general.plotproject?v=f8d1d2c4f236) · [PNG 1200 dpi](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/general.png?v=f8d1d2c4f236) · [SVG](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/general.svg?v=f8d1d2c4f236) · [PDF](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/general.pdf?v=f8d1d2c4f236)
 
 ### データの作り方
 
@@ -378,11 +378,11 @@ Langmuir型q=qmax C/(K+C)から各濃度5回の独立模擬反復を作り、平
 
 ## Roughness 研磨時間と表面粗さ
 
-![Roughness 研磨時間と表面粗さ 模擬データ](https://murajun620-crypto.github.io/plot_launcher_web/gallery/assets/roughness.png?v=27e45f64cf51)
+![Roughness 研磨時間と表面粗さ 模擬データ](https://murajun620-crypto.github.io/plot_launcher_web/gallery/assets/roughness.png?v=f8d1d2c4f236)
 
 対数Y軸で、初期改善と下限への収束を比較。AFM作例とは別の仮想研磨試験。
 
-[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=roughness) · [CSV](https://murajun620-crypto.github.io/plot_launcher_web/gallery/data/roughness.csv?v=27e45f64cf51) · [プロジェクトを保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/roughness.plotproject?v=27e45f64cf51) · [PNG 1200 dpi](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/roughness.png?v=27e45f64cf51) · [SVG](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/roughness.svg?v=27e45f64cf51) · [PDF](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/roughness.pdf?v=27e45f64cf51)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=roughness) · [CSV](https://murajun620-crypto.github.io/plot_launcher_web/gallery/data/roughness.csv?v=f8d1d2c4f236) · [プロジェクトを保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/roughness.plotproject?v=f8d1d2c4f236) · [PNG 1200 dpi](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/roughness.png?v=f8d1d2c4f236) · [SVG](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/roughness.svg?v=f8d1d2c4f236) · [PDF](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/roughness.pdf?v=f8d1d2c4f236)
 
 ### データの作り方
 
@@ -402,11 +402,11 @@ Rq(t)=Rq∞+(Rq₀−Rq∞) exp(−t/τ)に乗法性のばらつきを加え、�
 
 ## 棒グラフ 反復試験の比較
 
-![棒グラフ 反復試験の比較 模擬データ](https://murajun620-crypto.github.io/plot_launcher_web/gallery/assets/bar.png?v=27e45f64cf51)
+![棒グラフ 反復試験の比較 模擬データ](https://murajun620-crypto.github.io/plot_launcher_web/gallery/assets/bar.png?v=f8d1d2c4f236)
 
-カテゴリ名をX列に置く。Yは平均、3列目はSD。現在の棒グラフ描画は誤差列を自動描画しないため、この作例ではSDから算出した線の注釈で誤差棒を表示している。値を変更したら注釈も更新する。有意差やp値は作成していない。
+10 mA cm⁻²での模擬過電圧を比較。カテゴリ名をX列に置く。Yは平均、3列目はSD。現在の棒グラフ描画は誤差列を自動描画しないため、この作例ではSDから算出した線の注釈で誤差棒を表示している。値を変更したら注釈も更新する。有意差やp値は作成していない。
 
-[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=bar) · [CSV](https://murajun620-crypto.github.io/plot_launcher_web/gallery/data/bar.csv?v=27e45f64cf51) · [プロジェクトを保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/bar.plotproject?v=27e45f64cf51) · [PNG 1200 dpi](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/bar.png?v=27e45f64cf51) · [SVG](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/bar.svg?v=27e45f64cf51) · [PDF](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/bar.pdf?v=27e45f64cf51)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=bar) · [CSV](https://murajun620-crypto.github.io/plot_launcher_web/gallery/data/bar.csv?v=f8d1d2c4f236) · [プロジェクトを保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/bar.plotproject?v=f8d1d2c4f236) · [PNG 1200 dpi](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/bar.png?v=f8d1d2c4f236) · [SVG](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/bar.svg?v=f8d1d2c4f236) · [PDF](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/bar.pdf?v=f8d1d2c4f236)
 
 ### データの作り方
 
@@ -426,11 +426,11 @@ Rq(t)=Rq∞+(Rq₀−Rq∞) exp(−t/τ)に乗法性のばらつきを加え、�
 
 ## Raman 3D 時系列スペクトル
 
-![Raman 3D 時系列スペクトル 模擬データ](https://murajun620-crypto.github.io/plot_launcher_web/gallery/assets/raman-3d.png?v=27e45f64cf51)
+![Raman 3D 時系列スペクトル 模擬データ](https://murajun620-crypto.github.io/plot_launcher_web/gallery/assets/raman-3d.png?v=f8d1d2c4f236)
 
 時系列のバンド形状変化を俯瞰。個別正規化しているため絶対強度の増減を示す図ではない。
 
-[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=raman-3d) · [CSV](https://murajun620-crypto.github.io/plot_launcher_web/gallery/data/raman-3d.csv?v=27e45f64cf51) · [プロジェクトを保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/raman-3d.plotproject?v=27e45f64cf51) · [PNG 1200 dpi](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/raman-3d.png?v=27e45f64cf51) · [SVG](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/raman-3d.svg?v=27e45f64cf51) · [PDF](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/raman-3d.pdf?v=27e45f64cf51)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=raman-3d) · [CSV](https://murajun620-crypto.github.io/plot_launcher_web/gallery/data/raman-3d.csv?v=f8d1d2c4f236) · [プロジェクトを保存](https://murajun620-crypto.github.io/plot_launcher_web/gallery/projects/raman-3d.plotproject?v=f8d1d2c4f236) · [PNG 1200 dpi](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/raman-3d.png?v=f8d1d2c4f236) · [SVG](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/raman-3d.svg?v=f8d1d2c4f236) · [PDF](https://murajun620-crypto.github.io/plot_launcher_web/gallery/figures/raman-3d.pdf?v=f8d1d2c4f236)
 
 ### データの作り方
 
@@ -448,14 +448,14 @@ Rq(t)=Rq∞+(Rq₀−Rq∞) exp(−t/τ)に乗法性のばらつきを加え、�
 
 ## 図の体裁とデータの注意点
 
-- 軸ラベルと目盛りは太字にせず、Liberation Sansで統一。元の軸領域は通常6.7×4.8 cm、Raman 3Dは7.1×5.4 cm。保存幅はラベルの長さで変わります。
+- 軸ラベルと目盛りは太字にせず、Liberation Sansで統一。軸領域は2DがWeb版標準の4×3 cm、Raman 3Dが3D描画標準の6×4 cm。軸ラベル・目盛りの文字倍率は1で、2Dグラフの目盛りは7 pt、軸ラベルは8 pt。凡例は標準7 ptを基準に、RamanとAFM断面では6.3 ptに調整。テキスト注釈は小さめの6 pt。Raman 3Dの軸文字はWeb版の3D描画標準10 ptです。保存幅はラベルの長さで変わります。
 - PNGは1200 dpi、SVGとPDFは線と文字をベクトルで保存。高いdpiは元データや測定精度を改善するものではありません。
 - 色に加えて系列名・ピーク名・位置で図を読めるようにしています。点と線、誤差棒の意味は各作例に記載。
 - General、Roughness、棒グラフの誤差棒は独立模擬反復5回の標本SD。元の反復データもCSVで添付。
 - XPS Fitの線は既知の生成モデルで、実測データへのフィッティングではありません。XAFSは形状を説明する概念モデルです。
 
-反復CSV：[一般グラフ](https://murajun620-crypto.github.io/plot_launcher_web/gallery/data/general_replicates.csv?v=27e45f64cf51)、[粗さ](https://murajun620-crypto.github.io/plot_launcher_web/gallery/data/roughness_replicates.csv?v=27e45f64cf51)、[棒グラフ](https://murajun620-crypto.github.io/plot_launcher_web/gallery/data/bar_replicates.csv?v=27e45f64cf51)。
+反復CSV：[一般グラフ](https://murajun620-crypto.github.io/plot_launcher_web/gallery/data/general_replicates.csv?v=f8d1d2c4f236)、[粗さ](https://murajun620-crypto.github.io/plot_launcher_web/gallery/data/roughness_replicates.csv?v=f8d1d2c4f236)、[棒グラフ](https://murajun620-crypto.github.io/plot_launcher_web/gallery/data/bar_replicates.csv?v=f8d1d2c4f236)。
 
 サンセリフ書体、判読できる文字、適切な線幅、写真へのスケールバーという方針は、[Natureの最終図版ガイド](https://www.nature.com/documents/NRJs-guide-to-preparing-final-artwork.pdf)を参考にしました。特定誌の採択や科学的妥当性を保証する意味ではありません。
 
-乱数の初期値は20261004。掲載図のPNG・SVG・PDFは、全16プロジェクトをPlotLauncher Web v1.2.1のアプリ画面で開き、保存ボタンから出力しました。CSVと描画設定は各プロジェクトに同梱しています。
+乱数の初期値は20261004。掲載図のPNG・SVG・PDFは、全16プロジェクトをPlotLauncher Webのアプリ画面で開き、保存ボタンから出力しました。CSVと描画設定は各プロジェクトに同梱しています。
