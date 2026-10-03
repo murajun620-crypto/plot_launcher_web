@@ -469,7 +469,7 @@ class PlotEngine:
             return pd.DataFrame({"_index": np.arange(len(data)), "_unused": data, str(self.frame.columns[diameter]): data}), values, diagnostics, warnings
         if preset == "XPS Fit":
             if count < 8:
-                raise ValueError("XPS FitはPython版と同じ8列以上の表が必要です（CSV: A=abscissa、B=ordinate、D=background、G=fit、H以降=peak）。")
+                raise ValueError("XPS Fitは8列以上の表が必要です（CSV: A=abscissa、B=ordinate、D=background、G=fit、H以降=peak）。")
             fills = options.get("fills", [])
             rules, colors, alphas = [], [], []
             for fill in fills:
@@ -531,13 +531,21 @@ class PlotEngine:
                 if preset == "Raman 3D":
                     options = config.get("options", {})
                     axes.view_init(elev=number(options.get("elevation", 24), "仰角", minimum=-180, maximum=180), azim=number(options.get("azimuth", -66), "方位角", minimum=-360, maximum=360))
-                    plot_utils.apply_plot_background_from_env(figure, axes)
                     overlay = figure.add_axes(axes.get_position(), frameon=False)
                     overlay.set_xlim(axes.get_xlim()); overlay.set_ylim(axes.get_zlim())
                     overlay.set_axis_off()
                     annotation_axes = overlay
                 else:
                     annotation_axes = axes
+                # Paint the background once, including the margins. Transparent
+                # axes avoid doubling the opacity of a translucent figure.
+                plot_utils.apply_plot_background_from_env(figure, [])
+                for target in figure.axes:
+                    target.patch.set_facecolor("none")
+                    target.patch.set_alpha(0)
+                    if target.name == "3d":
+                        for axis in (target.xaxis, target.yaxis, target.zaxis):
+                            axis.pane.set_fill(False)
                 editable_axes = [("x", axes.xaxis), ("y", axes.zaxis if preset == "Raman 3D" else axes.yaxis)]
                 positioned_labels = {}
                 if preset == "Raman 3D":

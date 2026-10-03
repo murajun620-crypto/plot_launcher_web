@@ -1,4 +1,4 @@
-import { COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=3025bf57cbc7";
+import { COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=95b301358e0d";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -31,7 +31,7 @@ function desktopAppearance() {
     <label class="full-field">図のフォント<select id="font-family" data-axis="fontFamily"><option>Liberation Sans</option><option>Noto Sans JP</option><option>DejaVu Sans</option></select></label>
     <label class="full-field">日本語フォント<select id="japanese-font-family" data-axis="japaneseFontFamily"><option>Noto Sans JP</option><option>Liberation Sans</option><option>DejaVu Sans</option></select></label>
     <button type="button" id="load-font" class="button quiet">手元のフォントを読み込む</button><input id="font-file" type="file" accept=".ttf,.otf,.ttc" multiple hidden>
-    <p class="field-hint">Python版のArialと同じ字形には、手元のArialを読み込んでください。標準のLiberation SansはArialと文字幅が互換です。日本語はNoto Sans JP、数式はSTIX Sansを使います。</p>
+    <p class="field-hint">Arialを使う場合は、手元のフォントを読み込んでください。標準のLiberation SansはArialと文字幅が互換です。日本語はNoto Sans JP、数式はSTIX Sansを使います。</p>
     <div class="field-grid">${numeric("tickFontScale", "目盛り文字倍率", .2)}${numeric("labelFontScale", "軸ラベル倍率", .2)}${numeric("spineScale", "枠線倍率", .1, 5)}${numeric("dataLineScale", "データ線倍率", 0, 6)}${numeric("tickLength", "目盛り長さ倍率", 0, 5)}</div>
     <p class="field-hint">倍率1：目盛り7 pt、軸ラベル8 pt、枠線0.8 pt、主目盛り2.5 pt・副目盛り1.25 pt。</p>
     <details><summary>余白・軸の表示</summary>
@@ -92,7 +92,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=3025bf57cbc7", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=95b301358e0d", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -246,8 +246,8 @@ function drawPresetOptions() {
   const number=(key,label,def,min=0,max=100,step=.1)=>`<label>${label}<input data-option="${key}" type="number" value="${escapeHTML(options[key] ?? def)}" min="${min}" max="${max}" step="${step}"></label>`;
   const color=(key,label,def)=>`<label>${label}<input data-option="${key}" value="${escapeHTML(options[key] ?? def)}"></label>`;
   let html='';
-  const notes={"XPS Fit":"Python版と同じCSV/Au 10列/Ag 8列の配置を自動判定。成分の塗りつぶしは背景との差で描画します。", "Particle Histogram":"選択した粒径列から頻度%と対数正規分布を描画します。ビン幅20 nmはPython版と同じです。", "Raman 3D":"共通のX列と各Y列からウォーターフォールを作成します。Y軸設定は強度（Z軸）に適用します。", "bar_graph_general":"数値X・カテゴリXに対応した集合棒グラフです。", "Roughness":"線＋マーカー、Y対数軸が初期設定です。"};
-  $("#preset-note").textContent=notes[type] || "Python版の描画コード・軸ラベル・単位を使用します。";
+  const notes={"XPS Fit":"CSV/Au 10列/Ag 8列の配置を自動判定。成分の塗りつぶしは背景との差で描画します。", "Particle Histogram":"選択した粒径列から頻度%と対数正規分布を描画します。ビン幅は20 nmです。", "Raman 3D":"共通のX列と各Y列からウォーターフォールを作成します。Y軸設定は強度（Z軸）に適用します。", "bar_graph_general":"数値X・カテゴリXに対応した集合棒グラフです。", "Roughness":"線＋マーカー、Y対数軸が初期設定です。"};
+  $("#preset-note").textContent=notes[type] || "プリセットに合わせて軸ラベル・単位を設定します。";
   if(type==='bar_graph_general') html=`<div class="field-grid">${number('barWidth','棒幅',.8,.01,100)}${number('barAlpha','不透明度',.9,0,1)}${number('barEdgeWidth','縁幅 (pt)',.4,0,20)}${color('barEdgeColor','縁色 (auto / #色)','auto')}</div>`;
   if(type==='Particle Histogram') html=`<label>粒径列<select data-option="diameterColumn">${columnOptions(options.diameterColumn ?? config.series[0]?.y ?? 1)}</select></label>`;
   if(type==='Raman 3D') html=`<label><input type="checkbox" data-option="normalize" ${options.normalize!==false?'checked':''}>各系列を0〜1に正規化</label><div class="field-grid">${number('depthStep','奥行き間隔',1,.01,10000)}${number('elevation','仰角 (度)',24,-180,180,1)}${number('azimuth','方位角 (度)',-66,-360,360,1)}</div>`;
@@ -497,7 +497,7 @@ async function renderPreview() {
     $("#initial-message").hidden = true;
     $("#figure-stage").classList.remove("pending");
     figureResult = result;
-    if(result.statistics)$('#preset-note').textContent=`粒径の統計（Python版と同じ）：D50 = ${result.statistics.median.toFixed(3)}、平均 = ${result.statistics.mean.toFixed(3)}。ビン幅20 nm、頻度%。`;
+    if(result.statistics)$('#preset-note').textContent=`粒径の統計：D50 = ${result.statistics.median.toFixed(3)}、平均 = ${result.statistics.mean.toFixed(3)}。ビン幅20 nm、頻度%。`;
     $("#preview-state").className = "preview-state ready";
     $("#preview-state").textContent = "更新済み";
     $("#figure-size").textContent = `軸領域 ${snapshot.axes.width} × ${snapshot.axes.height} cm`;
@@ -655,6 +655,20 @@ function applyControlInput(event) {
   if (input.dataset.axis) {
     const key = input.dataset.axis;
     config.axes[key] = input.type === "checkbox" ? input.checked : input.value;
+    if (['backgroundColor','backgroundAlpha','transparent'].includes(key)) {
+      if (key === 'backgroundColor') {
+        config.axes.transparent = false;
+        if (Number(config.axes.backgroundAlpha) === 0) config.axes.backgroundAlpha = 1;
+      } else if (key === 'backgroundAlpha') {
+        config.axes.transparent = Number(config.axes.backgroundAlpha) === 0;
+      } else if (!config.axes.transparent && Number(config.axes.backgroundAlpha) === 0) config.axes.backgroundAlpha = 1;
+      for (const related of ['backgroundColor','backgroundAlpha','transparent']) {
+        $$(`[data-axis="${related}"]`).forEach(field => {
+          if (field.type === 'checkbox') field.checked = config.axes[related];
+          else field.value = config.axes[related];
+        });
+      }
+    }
     if (/^[xy]LabelPad$/.test(key)) config.axes[`${key[0]}LabelX`] = config.axes[`${key[0]}LabelY`] = "";
     $$(`#plot-form [data-axis="${key}"]`).forEach(field => {if(field !== input) {field.value = input.value; field.checked = input.checked;}});
   }

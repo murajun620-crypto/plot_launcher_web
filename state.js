@@ -176,7 +176,7 @@ export function restoreSettings(document, metadata) {
 // Read the actual v4.1 desktop snapshot structure. Unsupported plot types are
 // rejected so a different scientific plot is never silently drawn as General.
 function fromDesktopSettings(saved, metadata) {
-  if (!PLOT_TYPES.includes(saved.plot_type)) throw new Error(`Python版「${saved.plot_type}」の描画形式は未対応です。`);
+  if (!PLOT_TYPES.includes(saved.plot_type)) throw new Error(`「${saved.plot_type}」の描画形式は未対応です。`);
   const axes = defaultAxes(), general = saved.general_options || {}, styles = saved.style_scales || {}, axisOptions = saved.axis_options || {};
   axes.fontFamily = "Arial";
   axes.width = saved.axes_size_cm?.w ?? 4; axes.height = saved.axes_size_cm?.h ?? 3;
@@ -214,15 +214,15 @@ function fromDesktopSettings(saved, metadata) {
     // Older snapshots may store normalized/duplicate header names; retain the
     // explicit column index only when the requested name cannot be resolved.
     if (Number.isInteger(index) && index >= 0 && index < metadata.columns.length) return index;
-    throw new Error(`Python版設定の列「${name}」が見つかりません。`);
+    throw new Error(`設定の列「${name}」が見つかりません。`);
   };
   let items = saved.series_items || [];
-  if (!Array.isArray(items)) throw new Error("Python版設定の系列を確認してください。");
+  if (!Array.isArray(items)) throw new Error("設定の系列を確認してください。");
   if (!items.length && saved.series_map_var) items = saved.series_map_var.split(',').map(pair => { const [x,y]=pair.split(':').map(Number); return `x=${x}: ${metadata.columns[x]?.name || ''} | y=${y}: ${metadata.columns[y]?.name || ''}`; });
   const series = items.map((item, index) => {
-    if (typeof item !== "string") throw new Error("Python版設定の系列を確認してください。");
+    if (typeof item !== "string") throw new Error("設定の系列を確認してください。");
     const fields = Object.fromEntries(item.split('|').map(part => { const at=part.indexOf('='); return [part.slice(0,at).trim(),part.slice(at+1).trim()]; }));
-    const col = key => { const at=fields[key]?.indexOf(':'); if(at<0 || at===undefined) throw new Error("Python版設定の列指定を確認してください。"); return find(Number(fields[key].slice(0,at)), fields[key].slice(at+1).trim()); };
+    const col = key => { const at=fields[key]?.indexOf(':'); if(at<0 || at===undefined) throw new Error("設定の列指定を確認してください。"); return find(Number(fields[key].slice(0,at)), fields[key].slice(at+1).trim()); };
     const x=col('x'), y=col('y'), result=createSeries(x,y,metadata.columns[y].name,index);
     const decode = value => new TextDecoder().decode(Uint8Array.from(atob(value),c=>c.charCodeAt(0)));
     result.name = fields.legend_label_b64 ? decode(fields.legend_label_b64) : fields.legend_label || saved.series_legend_labels?.[index] || result.name;
