@@ -1,5 +1,15 @@
 // src/plot_settings.py: default_auto_series_colors(), same order and shades.
 export const COLORS = ["#1F8FE0", "#D4291E", "#2BA84D", "#D77207", "#7D3EDD", "#787878", "#666666", "#0052A8", "#A10000", "#009F22"];
+export const COLOR_PALETTE = {
+    blue:["#D8EBFF","#BFE0FF","#A5D5FF","#8BC9FF","#70BEFF","#56B2FF","#3CA6F5","#1F8FE0","#0C74C2","#0052A8"],
+    red:["#FFD1CC","#FFB9B1","#FFA198","#FF897F","#FF7166","#F7574A","#E93E31","#D4291E","#BC170C","#A10000"],
+    green:["#D8F5DF","#BFEECB","#A6E7B7","#8DDEA2","#74D68D","#5BCC77","#43C262","#2BA84D","#158E38","#009F22"],
+    orange:["#FFE3C2","#FFD4A2","#FFC582","#FFB662","#FFA742","#FF9822","#F28610","#D77207","#BC5E03","#A14B00"],
+    purple:["#E8D9FF","#DAC3FF","#CCADFF","#BE97FF","#AF81F8","#A06BEB","#9155DD","#7D3EDD","#6725C3","#5A1FA8"],
+    gray:["#E0E0E0","#D2D2D2","#C4C4C4","#B6B6B6","#A8A8A8","#9A9A9A","#8A8A8A","#787878","#626262","#4A4A4A"],
+    black:["#E6E6E6","#D5D5D5","#C4C4C4","#B3B3B3","#A2A2A2","#8F8F8F","#7C7C7C","#666666","#4A4A4A","#2A2A2A"],
+  };
+
 export const PLOT_TYPES = ["CV/LSV", "CA", "CP", "EDX", "XPS Survey", "XPS Core", "XPS Fit", "XAFS", "Raman Spectrum", "AFM Section", "Particle Histogram", "General", "Roughness", "bar_graph_general", "Raman 3D"];
 
 export function applyPreset(config, preset) {
@@ -32,6 +42,7 @@ export function snapPoint(anchor, point) {
 
 export function defaultAxes() {
   return {
+    xLabelX: "", xLabelY: "", yLabelX: "", yLabelY: "",
     xLabel: "", yLabel: "", xUnit: "auto", yUnit: "auto", xScale: "linear", yScale: "linear",
     xMin: "", xMax: "", yMin: "", yMax: "", xStep: "", yStep: "", width: 4, height: 3,
     fontFamily: "Liberation Sans", japaneseFontFamily: "Noto Sans JP", fontScale: 1, tickFontScale: 1, labelFontScale: 1,
@@ -148,16 +159,8 @@ function fromDesktopSettings(saved, metadata) {
   for (const side of ["Left", "Right", "Top", "Bottom"]) axes[`spine${side}`] = !axisOptions[`hide_spine_${side.toLowerCase()}`];
   axes.markerEdgeWidth = general.scatter_edge_width ?? .6;
   axes.errorLineWidth = general.error_linewidth ?? .8; axes.errorCapSize = general.error_capsize ?? 3; axes.errorCapThick = general.error_capthick ?? .8;
-  const shades = {
-    blue:["#D8EBFF","#BFE0FF","#A5D5FF","#8BC9FF","#70BEFF","#56B2FF","#3CA6F5","#1F8FE0","#0C74C2","#0052A8"],
-    red:["#FFD1CC","#FFB9B1","#FFA198","#FF897F","#FF7166","#F7574A","#E93E31","#D4291E","#BC170C","#A10000"],
-    green:["#D8F5DF","#BFEECB","#A6E7B7","#8DDEA2","#74D68D","#5BCC77","#43C262","#2BA84D","#158E38","#009F22"],
-    orange:["#FFE3C2","#FFD4A2","#FFC582","#FFB662","#FFA742","#FF9822","#F28610","#D77207","#BC5E03","#A14B00"],
-    purple:["#E8D9FF","#DAC3FF","#CCADFF","#BE97FF","#AF81F8","#A06BEB","#9155DD","#7D3EDD","#6725C3","#5A1FA8"],
-    gray:["#E0E0E0","#D2D2D2","#C4C4C4","#B6B6B6","#A8A8A8","#9A9A9A","#8A8A8A","#787878","#626262","#4A4A4A"],
-    black:["#E6E6E6","#D5D5D5","#C4C4C4","#B3B3B3","#A2A2A2","#8F8F8F","#7C7C7C","#666666","#4A4A4A","#2A2A2A"],
-  };
-  const color = (base, shade, fallback = "auto") => base === "custom" && /^#[0-9a-f]{6}$/i.test(shade) ? shade : base === "white" ? "#ffffff" : shades[base]?.[Number(shade)] || (/^#[0-9a-f]{6}$/i.test(base) ? base : base === "none" ? "none" : fallback);
+
+  const color = (base, shade, fallback = "auto") => base === "custom" && /^#[0-9a-f]{6}$/i.test(shade) ? shade : base === "white" ? "#ffffff" : COLOR_PALETTE[base]?.[Number(shade)] || (/^#[0-9a-f]{6}$/i.test(base) ? base : base === "none" ? "none" : fallback);
   if (saved.figure_background) {
     axes.backgroundColor = color(saved.figure_background.base, saved.figure_background.shade, "#ffffff");
     axes.backgroundAlpha = saved.figure_background.alpha ?? 0;

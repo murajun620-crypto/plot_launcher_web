@@ -6,8 +6,8 @@
   <meta name="description" content="Excel・CSVの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=89b86f7c9f3a">
-  <script type="module" src="./app.js?v=89b86f7c9f3a"></script>
+  <link rel="stylesheet" href="./style.css?v=585395c92c5c">
+  <script type="module" src="./app.js?v=585395c92c5c"></script>
 </head>
 <body data-mobile-expanded="false">
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -127,7 +127,7 @@
         <div class="paper" id="figure-paper">
           <div id="figure-content">
           <img id="figure-image" alt="作成したグラフのプレビュー" hidden>
-          <div id="figure-interactions" aria-label="凡例と注釈の移動"></div>
+          <div id="figure-interactions" aria-label="軸ラベル・目盛りの編集、凡例と注釈の移動"></div>
           </div>
           <div id="initial-message" class="initial-message"><div class="spinner"></div><strong>描画機能を準備しています</strong><p>初回は読み込みに時間がかかることがあります。</p></div>
         </div>
@@ -140,6 +140,20 @@
       <footer class="preview-footer"><span>PlotLauncher Web · 一般グラフ</span><span>Excelで変更した内容は、保存してから読み込んでください。</span></footer>
     </main>
   </div>
+  <dialog id="color-panel" class="plot-dialog" aria-labelledby="color-panel-title">
+    <div class="dialog-heading"><strong id="color-panel-title">色を選ぶ</strong><button type="button" class="button quiet" id="close-color-panel" aria-label="色パネルを閉じる">閉じる</button></div>
+    <p>テーマの色</p><div id="color-swatches" class="color-swatches"></div>
+    <p>基本の色</p><div id="basic-colors" class="recent-colors"></div>
+    <p>最近使用した色</p><div id="recent-colors" class="recent-colors"></div>
+    <label>カラーピッカー<input id="custom-color" type="color" value="#000000"></label>
+    <div class="color-custom"><label>カラーコード<input id="color-code" maxlength="7" placeholder="#RRGGBB"></label><button type="button" class="button quiet" id="apply-color-code">適用</button></div>
+    <p id="color-error" class="field-hint" role="status"></p>
+  </dialog>
+  <dialog id="axis-editor" class="plot-dialog" aria-labelledby="axis-editor-title">
+    <div class="dialog-heading"><strong id="axis-editor-title"></strong><button type="button" class="button quiet" id="close-axis-editor">閉じる</button></div>
+    <form id="axis-editor-fields" onsubmit="return false"></form>
+    <p class="field-hint">変更はプレビューに反映されます。位置をドラッグした軸ラベルは「標準位置に戻す」で元の配置に戻せます。</p>
+  </dialog>
   <noscript>このアプリを使用するにはJavaScriptを有効にしてください。</noscript>
 </body>
 </html>

@@ -267,7 +267,7 @@ class PlotEngine:
             values[f"PLOT_{env}"] = str(number(axes.get(key, default), "マーカー・誤差棒のサイズ", minimum=0, maximum=20))
         for axis in ("x", "y"):
             for key, env in (("LabelPad", "LABEL_PAD"), ("TickPad", "TICK_PAD")):
-                values[f"PLOT_{axis.upper()}{env}"] = str(number(axes.get(f"{axis}{key}", 0), "軸の余白", minimum=-30, maximum=100))
+                values[f"PLOT_{axis.upper()}{env}"] = str(number(axes.get(f"{axis}{key}", 0), "軸の余白", minimum=-100, maximum=100))
             form = axes.get(f"{axis}LogFormat", "power")
             if form not in {"power", "decimal"}:
                 raise ValueError("対数目盛りの表記を確認してください。")
@@ -532,6 +532,24 @@ class PlotEngine:
                     annotation_axes = overlay
                 else:
                     annotation_axes = axes
+                editable_axes = [("x", axes.xaxis), ("y", axes.zaxis if preset == "Raman 3D" else axes.yaxis)]
+                for name, axis in editable_axes:
+                    axis.label.set_fontweight("normal")
+                    position = [number(config.get("axes", {}).get(f"{name}Label{coordinate}", ""), "軸ラベル位置", minimum=-10, maximum=10, optional=True) for coordinate in ("X", "Y")]
+                    if (position[0] is None) != (position[1] is None):
+                        raise ValueError("軸ラベルのX・Y位置を両方指定してください。")
+                    if position[0] is not None:
+                        if preset == "Raman 3D":
+                            # 3D Axis calculates its label position during draw.
+                            # Override immediately before Text.draw, in every output backend.
+                            original_draw = axis.label.draw
+                            def draw_positioned_label(renderer, text=axis.label, xy=position, draw=original_draw):
+                                text.set_transform(axes.transAxes)
+                                text.set_position(xy)
+                                return draw(renderer)
+                            axis.label.draw = draw_positioned_label
+                        else:
+                            axis.set_label_coords(*position)
                 annotations = config.get("annotations", [])
                 if not isinstance(annotations, list) or len(annotations) > 200:
                     raise ValueError("注釈は200個以内にしてください。")
@@ -578,7 +596,15 @@ class PlotEngine:
                 def svg_box(artist_box):
                     b = artist_box.transformed(figure.dpi_scale_trans.inverted())
                     return [(b.x0 - box.x0) / box.width, (box.y1 - b.y1) / box.height, b.width / box.width, b.height / box.height]
-                geometry = {"axes": svg_box(axes.get_window_extent(renderer)), "legend": svg_box(legend.get_window_extent(renderer)) if legend else None, "annotations": []}
+                geometry = {"axes": svg_box(axes.get_window_extent(renderer)), "legend": svg_box(legend.get_window_extent(renderer)) if legend else None, "annotations": [], "axisLabels": [], "tickLabels": []}
+                for name, axis in editable_axes:
+                    label = axis.label
+                    if label.get_visible() and label.get_text():
+                        anchor = axes.transAxes.inverted().transform(label.get_transform().transform(label.get_position()))
+                        geometry["axisLabels"].append({"id": f"axis-label-{name}", "axis": name, "kind": "label", "box": svg_box(label.get_window_extent(renderer)), "anchor": list(map(float, anchor))})
+                    for index, label in enumerate(axis.get_ticklabels()):
+                        if label.get_visible() and label.get_text():
+                            geometry["tickLabels"].append({"id": f"axis-ticks-{name}-{index}", "axis": name, "kind": "ticks", "box": svg_box(label.get_window_extent(renderer))})
                 for annotation in collection.items:
                     artist = manager.artist_by_id.get(annotation.id)
                     if isinstance(artist, list):

@@ -1,4 +1,4 @@
-import { COLORS, applyPreset, createSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=89b86f7c9f3a";
+import { COLORS, COLOR_PALETTE, applyPreset, createSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=585395c92c5c";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -9,6 +9,8 @@ let metadata = null, config = { axes: defaultAxes(), series: [] };
 let loading = false, exporting = false, sample = false, loadedHeader = 1;
 let revision = 0, renderedRevision = -1, renderRunning = false, renderWanted = false, renderTimer;
 let previewURL, figureResult, dragging;
+let colorTarget;
+const recentColors = [];
 let presets = [], selected = new Set(), clipboard = [], view = {zoom:1,x:0,y:0}, panning;
 let history = [], future = [], lastState, restoring = false;
 const compactLayout = window.matchMedia("(max-width:720px), (max-width:1100px) and (orientation:portrait), (max-width:1100px) and (max-height:500px)");
@@ -32,7 +34,7 @@ function desktopAppearance() {
     <div class="field-grid">${numeric("tickFontScale", "目盛り文字倍率", .2)}${numeric("labelFontScale", "軸ラベル倍率", .2)}${numeric("spineScale", "枠線倍率", .1, 5)}${numeric("dataLineScale", "データ線倍率", 0, 6)}${numeric("tickLength", "目盛り長さ倍率", 0, 5)}</div>
     <p class="field-hint">倍率1：目盛り7 pt、軸ラベル8 pt、枠線0.8 pt、主目盛り2.5 pt・副目盛り1.25 pt。</p>
     <details><summary>余白・軸の表示</summary>
-    <div class="field-grid">${numeric("xLabelPad", "Xラベル余白 (pt)", -30, 100)}${numeric("yLabelPad", "Yラベル余白 (pt)", -30, 100)}${numeric("xTickPad", "X目盛り追加余白 (pt)", -30, 100)}${numeric("yTickPad", "Y目盛り追加余白 (pt)", -30, 100)}</div>
+    <div class="field-grid">${numeric("xLabelPad", "Xラベル余白 (pt)", -100, 100)}${numeric("yLabelPad", "Yラベル余白 (pt)", -100, 100)}${numeric("xTickPad", "X目盛り追加余白 (pt)", -100, 100)}${numeric("yTickPad", "Y目盛り追加余白 (pt)", -100, 100)}</div>
     <div class="field-grid"><label>X対数表記<select data-axis="xLogFormat"><option value="power">累乗</option><option value="decimal">小数</option></select></label><label>Y対数表記<select data-axis="yLogFormat"><option value="power">累乗</option><option value="decimal">小数</option></select></label></div>
     <div class="check-options">${check("hideXLabel", "Xラベルを隠す")}${check("hideYLabel", "Yラベルを隠す")}${check("hideXTickLabels", "X目盛り文字を隠す")}${check("hideYTickLabels", "Y目盛り文字を隠す")}${check("hideXTicks", "X目盛り線を隠す")}${check("hideYTicks", "Y目盛り線を隠す")}${check("hideMinorTicks", "副目盛りを隠す")}${check("spineLeft", "左枠")}${check("spineRight", "右枠")}${check("spineTop", "上枠")}${check("spineBottom", "下枠")}${check("yAxisRight", "Y軸を右側")}${check("xAxisTop", "X軸を上側")}</div></details>
     <details><summary>背景・誤差棒</summary>
@@ -88,14 +90,18 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=89b86f7c9f3a", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=585395c92c5c", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
       await catalogReady;
       engineReady = true;
       updateButtons();
-      loadSample();
+      $("#initial-message .spinner").hidden = true;
+      $("#initial-message strong").textContent = "データを選んでください";
+      $("#initial-message p").textContent = "Excel / CSVを読み込むか、「サンプルデータを使う」を押してください。";
+      $("#preview-state").textContent = "データ未選択";
+      status("Excel / CSVファイルを選んでください。", "ready");
     } else if (data.type === "fatal") {
       console.error(data.detail);
       fatal(data.error);
@@ -118,6 +124,114 @@ function choiceOptions(choices, selected) {
   return choices.map(([value, label]) => `<option value="${escapeHTML(value)}"${value === selected ? " selected" : ""}>${escapeHTML(label)}</option>`).join("");
 }
 
+function enhanceColorInputs() {
+  for (const input of $$('input[type="color"],input[data-series-field$="Color"],input[data-option$="Color"]')) {
+    if (input.closest('#color-panel') || input.dataset.paletteEnhanced) continue;
+    input.dataset.paletteEnhanced = 'true';
+    const title = input.getAttribute('aria-label') || input.closest('label')?.childNodes[0]?.textContent?.trim() || '色';
+    const wrapper = document.createElement('span'); wrapper.className = 'color-control';
+    input.before(wrapper); wrapper.append(input);
+    if (input.type !== 'color') {
+      const picker = document.createElement('input'); picker.type = 'color';
+      picker.value = /^#[0-9a-f]{6}$/i.test(input.value) ? input.value : '#000000';
+      picker.setAttribute('aria-label', `${title}のカラーピッカー`);
+      picker.dataset.paletteEnhanced = 'true';
+      picker.addEventListener('input', event => {event.stopPropagation(); input.value = picker.value; applyControlInput({target: input});});
+      wrapper.append(picker);
+    }
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'button quiet palette-button';
+    button.textContent = '色パネル'; button.setAttribute('aria-label', `${title}の色パネル`);
+    button.addEventListener('click', () => openColorPanel(input, title)); wrapper.append(button);
+  }
+}
+
+function colorSwatch(hex, name = hex) {
+  const button = document.createElement('button'); button.type = 'button'; button.className = 'color-swatch';
+  button.style.backgroundColor = hex; button.title = name; button.setAttribute('aria-label', name);
+  button.setAttribute('aria-pressed', String(hex.toLowerCase() === colorTarget?.value.toLowerCase()));
+  button.addEventListener('click', () => chooseColor(hex)); return button;
+}
+function openColorPanel(input, title) {
+  if (loading || exporting || input.disabled) return;
+  colorTarget = input;
+  $('#color-panel-title').textContent = `${title}を選ぶ`;
+  const names = {black:'黒',gray:'灰',blue:'青',orange:'橙',red:'赤',green:'緑',purple:'紫'};
+  $('#color-swatches').replaceChildren(...Array.from({length:10},(_,shade) => Object.keys(names).map(base => colorSwatch(COLOR_PALETTE[base][shade], `${names[base]} ${shade} ${COLOR_PALETTE[base][shade]}`))).flat());
+  $('#basic-colors').replaceChildren(...['#000000','#ffffff'].map(hex => colorSwatch(hex)));
+  $('#recent-colors').replaceChildren(...recentColors.map(hex => colorSwatch(hex)));
+  $('#custom-color').value = /^#[0-9a-f]{6}$/i.test(input.value) ? input.value : '#000000';
+  $('#color-code').value = $('#custom-color').value; $('#color-error').textContent = '';
+  $('#color-panel').showModal();
+}
+function chooseColor(value) {
+  if (!/^#[0-9a-f]{6}$/i.test(value)) {$('#color-error').textContent = '#RRGGBB形式で入力してください。'; return;}
+  if (!colorTarget?.isConnected || loading || exporting) {$('#color-panel').close(); return;}
+  colorTarget.value = value;
+  recentColors.splice(0, recentColors.length, value, ...recentColors.filter(hex => hex.toLowerCase() !== value.toLowerCase()).slice(0,7));
+  applyControlInput({target:colorTarget});
+  colorTarget.closest('.color-control')?.querySelectorAll('input[type="color"]').forEach(input => input.value = value);
+  $('#color-panel').close();
+}
+$('#close-color-panel').addEventListener('click', () => $('#color-panel').close());
+$('#custom-color').addEventListener('change', event => chooseColor(event.target.value));
+$('#apply-color-code').addEventListener('click', () => chooseColor($('#color-code').value.trim()));
+$('#color-code').addEventListener('keydown', event => {if(event.key === 'Enter') {event.preventDefault(); chooseColor(event.target.value.trim());}});
+enhanceColorInputs();
+
+function openAxisEditor(axis, kind) {
+  if (!metadata || loading || exporting || renderRunning || renderedRevision !== revision) return;
+  const fields = $('#axis-editor-fields'); fields.dataset.axisName = axis;
+  const label = (key, text, type='text', extra='') => `<label>${text}<input data-axis="${key}" type="${type}" value="${escapeHTML(config.axes[key])}" ${extra}></label>`;
+  $('#axis-editor-title').textContent = `${axis.toUpperCase()}軸${kind === 'label' ? 'ラベル' : '目盛り'}の設定`;
+  if (kind === 'label') {
+    fields.innerHTML = label(`${axis}Label`,'ラベル（空欄で自動）','text','maxlength="500"') + label(`${axis}Unit`,'単位（autoで自動）') +
+      `<div class="field-grid">${label(`${axis}LabelPad`,'ラベル余白 (pt)','number','min="-100" max="100" step=".5"')}${label('labelFontScale','軸ラベル文字倍率','number','min=".2" max="3" step=".1"')}</div>` +
+      `<div class="field-grid">${label(`${axis}LabelX`,'ラベルX (軸比率)','number','step=".01" placeholder="標準"')}${label(`${axis}LabelY`,'ラベルY (軸比率)','number','step=".01" placeholder="標準"')}</div><button type="button" class="button quiet" data-reset-label>標準位置に戻す</button>`;
+  } else {
+    const automatic = config.axes[`${axis}Min`] === '' && config.axes[`${axis}Max`] === '';
+    fields.innerHTML = `<label><input type="checkbox" data-axis-auto="range" ${automatic?'checked':''}>範囲を自動設定</label><div class="field-grid">${label(`${axis}Min`,'最小','number','step="any" placeholder="自動"')}${label(`${axis}Max`,'最大','number','step="any" placeholder="自動"')}</div>` +
+      `<label><input type="checkbox" data-axis-auto="ticks" ${config.axes[`${axis}Step`]===''?'checked':''}>目盛り間隔を自動設定</label>` +
+      label(`${axis}Step`,'目盛り間隔','number','step="any" placeholder="自動"') + `<div class="field-grid">${label(`${axis}TickPad`,'目盛り追加余白 (pt)','number','min="-100" max="100" step=".5"')}${label('tickFontScale','目盛り文字倍率','number','min=".2" max="3" step=".1"')}</div>`;
+  }
+  fields.innerHTML += label('spineColor','枠線・文字色','color');
+  syncAxisEditor(); enhanceColorInputs(); $('#axis-editor').showModal();
+}
+function syncAxisEditor() {
+  const fields = $('#axis-editor-fields'), axis = fields.dataset.axisName;
+  for (const [mode,keys] of [['range',['Min','Max']],['ticks',['Step']]]) {
+    const checkbox = fields.querySelector(`[data-axis-auto="${mode}"]`); if (!checkbox) continue;
+    for (const key of keys) fields.querySelector(`[data-axis="${axis}${key}"]`).disabled = checkbox.checked;
+  }
+}
+$('#axis-editor-fields').addEventListener('input', event => {
+  const fields = $('#axis-editor-fields'), axis = fields.dataset.axisName, input = event.target;
+  if (input.dataset.axisAuto) {
+    const keys = input.dataset.axisAuto === 'range' ? ['Min','Max'] : ['Step'];
+    keys.forEach((key,i) => {
+      config.axes[`${axis}${key}`] = input.checked ? '' : String(key === 'Step' ? Math.abs(figureResult[`${axis}Range`][1]-figureResult[`${axis}Range`][0])/5 : figureResult[`${axis}Range`][i]);
+      $$(`[data-axis="${axis}${key}"]`).forEach(field => field.value = config.axes[`${axis}${key}`]);
+    }); syncAxisEditor(); changed();
+  } else if (input.dataset.axis) {
+    // A partial manual position must never make the plot disappear while typing.
+    if (/^[xy]Label[XY]$/.test(input.dataset.axis) && input.value !== '') {
+      const other = `${axis}Label${input.dataset.axis.endsWith('X')?'Y':'X'}`;
+      if(config.axes[other] === '') {config.axes[other] = String(figureResult.geometry.axisLabels?.find(label => label.axis === axis)?.anchor[other.endsWith('X')?0:1] ?? 0); fields.querySelector(`[data-axis="${other}"]`).value = config.axes[other];}
+    }
+    if (/^[xy]Label[XY]$/.test(input.dataset.axis) && input.value === '') config.axes[`${axis}LabelX`] = config.axes[`${axis}LabelY`] = '';
+    applyControlInput(event);
+    if (/^[xy]LabelPad$/.test(input.dataset.axis) || /^[xy]Label[XY]$/.test(input.dataset.axis)) {
+      for (const key of ['LabelX','LabelY']) fields.querySelector(`[data-axis="${axis}${key}"]`).value = config.axes[`${axis}${key}`];
+    }
+  }
+});
+$('#axis-editor-fields').addEventListener('click', event => {
+  if (!event.target.closest('[data-reset-label]')) return;
+  const axis = $('#axis-editor-fields').dataset.axisName;
+  for (const key of ['LabelX','LabelY','LabelPad']) {config.axes[`${axis}${key}`] = key === 'LabelPad' ? 0 : ''; $$(`[data-axis="${axis}${key}"]`).forEach(field => field.value = config.axes[`${axis}${key}`]);}
+  changed();
+});
+$('#close-axis-editor').addEventListener('click', () => $('#axis-editor').close());
+
 function drawPresetOptions() {
   const type=config.plotType || "General", options=config.options ||= {};
   const number=(key,label,def,min=0,max=100,step=.1)=>`<label>${label}<input data-option="${key}" type="number" value="${escapeHTML(options[key] ?? def)}" min="${min}" max="${max}" step="${step}"></label>`;
@@ -139,6 +253,7 @@ function drawPresetOptions() {
     if(!metadata.xpsCSV) html+='<button type="button" class="button quiet" id="add-fill">成分を追加</button>';
   }
   $("#preset-options").innerHTML=html;
+  enhanceColorInputs();
   document.querySelector('.preview-footer > span').textContent=`PlotLauncher Web · ${presets.find(preset=>preset.id===type)?.label || type}`;
   document.querySelector('#axes-title').textContent=presets.find(preset=>preset.id===type)?.label || type;
 }
@@ -211,6 +326,7 @@ function drawControls() {
   if(config.plotType==='Raman 3D')$$('[data-series-field="lineWidth"]').forEach(input=>input.closest('label').hidden=true);
   updateButtons();
   drawAnnotations();
+  enhanceColorInputs();
 }
 
 function drawAnnotations() {
@@ -226,6 +342,7 @@ function drawAnnotations() {
       <div class="check-options"><label><input type="checkbox" data-annotation-field="visible" ${item.visible?'checked':''}>表示</label><label><input type="checkbox" data-annotation-field="locked" ${item.locked?'checked':''}>位置を固定</label></div><button type="button" class="button quiet" data-remove-annotation="${index}">削除</button></details>`;
   }).join('');
   updateTouchSelection();
+  enhanceColorInputs();
 }
 
 function drawMetadata() {
@@ -447,9 +564,14 @@ $("#sample-data").addEventListener("click", loadSample);
 $("#sheet-select").addEventListener("change", () => loadFile(null, false, true));
 $("#header-row").addEventListener("change", () => loadFile(null, false, true));
 $("#plot-form").addEventListener("submit", event => event.preventDefault());
-$("#plot-form").addEventListener("input", event => {
+function applyControlInput(event) {
   const input = event.target;
-  if (input.dataset.axis) config.axes[input.dataset.axis] = input.type === "checkbox" ? input.checked : input.value;
+  if (input.dataset.axis) {
+    const key = input.dataset.axis;
+    config.axes[key] = input.type === "checkbox" ? input.checked : input.value;
+    if (/^[xy]LabelPad$/.test(key)) config.axes[`${key[0]}LabelX`] = config.axes[`${key[0]}LabelY`] = "";
+    $$(`#plot-form [data-axis="${key}"]`).forEach(field => {if(field !== input) {field.value = input.value; field.checked = input.checked;}});
+  }
   else if (input.dataset.seriesField) {
     const item = config.series[Number(input.closest("[data-series-index]").dataset.seriesIndex)];
     item[input.dataset.seriesField] = input.value;
@@ -463,7 +585,8 @@ $("#plot-form").addEventListener("input", event => {
     fill[input.dataset.fill]=input.type === "number" || input.tagName === "SELECT"?Number(input.value):input.value;
   } else return;
   changed();
-});
+}
+$("#plot-form").addEventListener("input", applyControlInput);
 $("#series-list").addEventListener("click", event => {
   const reorder=event.target.closest('[data-series-up],[data-series-down],[data-series-copy]');
   if(reorder){const kind=Object.keys(reorder.dataset)[0],index=Number(reorder.dataset[kind]);if(kind==='seriesCopy' && config.series.length<32)config.series.splice(index+1,0,structuredClone(config.series[index]));else if(kind!=='seriesCopy'){const other=index+(kind==='seriesUp'?-1:1);[config.series[index],config.series[other]]=[config.series[other],config.series[index]];}drawControls();changed();return;}
@@ -559,7 +682,7 @@ function positionInteractions() {
   const imageBox = image.getBoundingClientRect();
   const hitSize = touchFriendly() ? 44 : 24;
   Object.assign(overlay.style, {left:'0',top:'0',width:'100%',height:'100%'});
-  const targets = [...figureResult.geometry.annotations].sort((a,b)=>(config.annotations?.find(item=>item.id===a.id)?.zorder??20)-(config.annotations?.find(item=>item.id===b.id)?.zorder??20));
+  const targets = [...(figureResult.geometry.axisLabels || []), ...(figureResult.geometry.tickLabels || []), ...[...figureResult.geometry.annotations].sort((a,b)=>(config.annotations?.find(item=>item.id===a.id)?.zorder??20)-(config.annotations?.find(item=>item.id===b.id)?.zorder??20))];
   if (figureResult.geometry.legend) targets.unshift({id:"legend",box:figureResult.geometry.legend});
   for (const target of targets) {
     const item = config.annotations?.find(item => item.id === target.id);
@@ -576,8 +699,10 @@ function positionInteractions() {
       Object.assign(button.style,{left:`calc(${x*100}% - ${Math.max(0,hitSize-w*imageBox.width)/2/view.zoom}px)`,top:`calc(${y*100}% - ${Math.max(0,hitSize-h*imageBox.height)/2/view.zoom}px)`,width:`${width}px`,height:`${height}px`});
       overlay.append(button);
     }
-    button.classList.add("figure-drag-target");if(selected.has(target.id))button.classList.add('selected');button.dataset.dragId=target.id;
-    button.title=target.id==="legend"?"凡例をドラッグして移動":"注釈をドラッグして移動";
+    button.classList.add("figure-drag-target");if(selected.has(target.id))button.classList.add('selected');
+    if(target.kind !== 'ticks')button.dataset.dragId=target.id;
+    if(target.axis) {button.dataset.editAxis = target.axis; button.dataset.axisKind = target.kind; if(target.kind === 'ticks')button.classList.add('axis-tick-target');}
+    button.title=target.axis ? `${target.axis.toUpperCase()}軸${target.kind === 'label' ? 'ラベル：ドラッグで移動・ダブルクリックで設定' : '目盛り：ダブルクリックで設定'}` : target.id==="legend"?"凡例をドラッグして移動":"注釈をドラッグして移動";
     button.setAttribute('aria-label',button.title);
     if(item?.locked)button.title+='（位置固定）';
     if(item && selected.has(item.id) && !item.locked){
@@ -608,7 +733,7 @@ $("#figure-interactions").addEventListener("pointerdown", event => {
   }
   if(item?.locked || (item && !selected.has(id))){positionInteractions();return;}
   const imageBox=$("#figure-image").getBoundingClientRect();
-  dragging={pointerId:event.pointerId,id,item,start:item?structuredClone(item):null,items:(config.annotations||[]).filter(item=>selected.has(item.id)&&!item.locked).map(item=>({item,start:structuredClone(item)})),handle:target.dataset.handle,x:event.clientX,y:event.clientY,box:imageBox,axes:figureResult.geometry.axes,legend:figureResult.geometry.legend};
+  dragging={pointerId:event.pointerId,id,item,axis:target.dataset.editAxis,anchor:figureResult.geometry.axisLabels?.find(label=>label.id===id)?.anchor,start:item?structuredClone(item):null,items:(config.annotations||[]).filter(item=>selected.has(item.id)&&!item.locked).map(item=>({item,start:structuredClone(item)})),handle:target.dataset.handle,x:event.clientX,y:event.clientY,box:imageBox,axes:figureResult.geometry.axes,legend:figureResult.geometry.legend};
   target.setPointerCapture(event.pointerId); event.preventDefault();
 });
 $("#figure-interactions").addEventListener("pointermove", event => {
@@ -619,9 +744,17 @@ $("#figure-interactions").addEventListener("pointermove", event => {
 function finishDrag(event) {
   if(!dragging || dragging.pointerId !== event.pointerId || touchSuppressed) return;
   const d=dragging; dragging=null;
-  if(Math.hypot(event.clientX-d.x,event.clientY-d.y)<3){positionInteractions();return;}
+  if(Math.hypot(event.clientX-d.x,event.clientY-d.y)<3){
+    // Keep the label's DOM node between clicks so the browser emits dblclick.
+    if(d.axis)event.target.style.transform='';else positionInteractions();
+    return;
+  }
   const [ax,ay,aw,ah]=d.axes, dx=(event.clientX-d.x)/d.box.width/aw,dy=-(event.clientY-d.y)/d.box.height/ah;
-  if(d.id==="legend") {
+  if(d.axis && d.anchor) {
+    config.axes[`${d.axis}LabelX`] = Math.max(-10,Math.min(10,d.anchor[0]+dx)).toFixed(4);
+    config.axes[`${d.axis}LabelY`] = Math.max(-10,Math.min(10,d.anchor[1]+dy)).toFixed(4);
+    for(const key of ['LabelX','LabelY'])$$(`[data-axis="${d.axis}${key}"]`).forEach(input=>input.value=config.axes[`${d.axis}${key}`]);
+  } else if(d.id==="legend") {
     const [x,y,w,h]=d.legend;
     config.axes.legendX=((x+w/2-ax)/aw+dx).toFixed(4);
     config.axes.legendY=(1-(y+h/2-ay)/ah+dy).toFixed(4);
@@ -663,7 +796,7 @@ $("#delete-annotation").addEventListener('click',deleteAnnotations);
 $("#copy-annotation").addEventListener('click',()=>{copyAnnotations();pasteAnnotations();});
 $("#panel-label").addEventListener('click',()=>{
   config.annotations ||= [];let label=config.annotations.find(item=>['__panel_label__','panel-label'].includes(item.id));
-  if(!label){label={id:'__panel_label__',type:'text',axes_id:'primary',coordinate_system:'axes_fraction',x:-.15,y:1.08,text:'(a)',font_size:9,font_family:config.axes.fontFamily,rotation:0,color:'#222222',opacity:1,bold:true,italic:false,horizontal_alignment:'left',vertical_alignment:'baseline',visible:true,locked:false,zorder:20};config.annotations.push(label);}
+  if(!label){label={id:'__panel_label__',type:'text',axes_id:'primary',coordinate_system:'axes_fraction',x:0,y:1.02,text:'(a)',font_size:8,font_family:config.axes.fontFamily,rotation:0,color:'#000000',opacity:1,bold:false,italic:false,horizontal_alignment:'left',vertical_alignment:'bottom',visible:true,locked:false,zorder:30};config.annotations.push(label);}
   selected=new Set([label.id]);drawAnnotations();changed();
 });
 $$('[data-align]').forEach(button=>button.addEventListener('click',async()=>{
@@ -809,7 +942,7 @@ $("#figure-paper").addEventListener('wheel',event=>{
   const box=event.currentTarget.getBoundingClientRect();zoomPreview(event.deltaY<0?1.1:1/1.1,{x:event.clientX-box.left-box.width/2,y:event.clientY-box.top-box.height/2});
 },{passive:false});
 $("#figure-paper").addEventListener('pointerdown',event=>{
-  if(touchSuppressed || event.target.closest('[data-drag-id]') || event.button!==0)return;
+  if(touchSuppressed || event.target.closest('[data-drag-id],[data-edit-axis]') || event.button!==0)return;
   if(!event.shiftKey && !touchMultiSelect)selected.clear();drawAnnotations();positionInteractions();panning={pointerId:event.pointerId,x:event.clientX,y:event.clientY,start:{...view},select:event.shiftKey};event.currentTarget.setPointerCapture(event.pointerId);event.preventDefault();
 });
 $("#figure-paper").addEventListener('pointermove',event=>{
@@ -824,11 +957,18 @@ $("#figure-paper").addEventListener('pointerup',event=>{
 });
 $("#figure-paper").addEventListener('pointercancel',()=>{$('#selection-marquee')?.remove();panning=null;});
 $("#figure-interactions").addEventListener('dblclick',event=>{
+  const axis = event.target.closest('[data-edit-axis]');
+  if(axis) {event.preventDefault();openAxisEditor(axis.dataset.editAxis,axis.dataset.axisKind);return;}
   const target=event.target.closest('[data-drag-id]');if(!target || target.dataset.dragId==='legend')return;
   selectAnnotation(target.dataset.dragId);const index=(config.annotations||[]).findIndex(item=>item.id===target.dataset.dragId);
   const field=$(`[data-annotation-index="${index}"] input[data-annotation-field="text"]`);field?.focus();field?.select();
 });
+$("#figure-interactions").addEventListener('keydown',event=>{
+  const axis=event.target.closest('[data-edit-axis]');
+  if(axis && (event.key==='Enter' || event.key===' ')){event.preventDefault();openAxisEditor(axis.dataset.editAxis,axis.dataset.axisKind);}
+});
 window.addEventListener('keydown',event=>{
+  if($('#color-panel').open || $('#axis-editor').open)return;
   if(mobileExpanded && event.key==='Escape'){event.preventDefault();expandMobilePreview(false);return;}
   if(mobileExpanded && event.key==='Tab'){
     const buttons=$$('#preview-panel button,#preview-panel input,#preview-panel select,#preview-panel summary,#preview-panel [tabindex="0"]').filter(element=>!element.disabled && element.getClientRects().length);
