@@ -521,7 +521,7 @@ def apply_axis_overrides_from_env(ax: plt.Axes) -> None:
     if yscale in {"linear", "log"}:
         ax.set_yscale(yscale)
 
-    from matplotlib.ticker import FixedFormatter, FuncFormatter, LogFormatterMathtext, NullFormatter
+    from matplotlib.ticker import FixedFormatter, FuncFormatter, LogFormatterMathtext, NullFormatter, ScalarFormatter
 
     def zero_as_integer(value: float, _position, formatter) -> str:
         if not math.isfinite(value):
@@ -529,7 +529,11 @@ def apply_axis_overrides_from_env(ax: plt.Axes) -> None:
         if abs(value) <= 1.0e-12:
             return "0"
         try:
-            if hasattr(formatter, "format_data_short"):
+            if isinstance(formatter, ScalarFormatter):
+                # format_data_short uses canvas pixels, so SVG previews and
+                # high-DPI PNGs can show different numbers for the same ticks.
+                text = f"{value:.12g}"
+            elif hasattr(formatter, "format_data_short"):
                 text = formatter.format_data_short(value)
             else:
                 text = formatter(value, _position)

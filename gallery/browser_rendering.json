@@ -1,7 +1,7 @@
 {
   "renderer": "web application in browser",
   "exportRoute": "application UI save button",
-  "created": "2026-10-03T23:12:13.197335+00:00",
+  "created": "2026-10-03T23:32:06.597269+00:00",
   "projects": [
     {
       "slug": "cv",
@@ -158,13 +158,13 @@
         },
         {
           "path": "figures/cp.svg",
-          "bytes": 72264,
-          "sha256": "bb459b73895c31483dddeb3050143d9e6922ecf57cc76ca8274abc9643fe011d"
+          "bytes": 71064,
+          "sha256": "02da945a38d1fb06443580bde7302eac7d8250c94fa0e6f94af8168f76d3d75e"
         },
         {
           "path": "figures/cp.pdf",
-          "bytes": 30613,
-          "sha256": "2d0ec8e5c4dd49c34a9b86c67c17632da58314357327bda9bb4f4e4f6be95c7a"
+          "bytes": 30496,
+          "sha256": "9d602940c13241058af34ddc5fd30735f39259bf07b2395533072edd1f0c53c9"
         },
         {
           "path": "assets/cp.png",
@@ -450,13 +450,13 @@
         },
         {
           "path": "figures/raman.svg",
-          "bytes": 75597,
-          "sha256": "8105b76354eefc1b5f4d53f30a682d6a521f80bafabb1a7a12544f46d7058b75"
+          "bytes": 74150,
+          "sha256": "348663c1acef148f703fe05f0044c62d49b69db07f9e14f8059493f12d2541e8"
         },
         {
           "path": "figures/raman.pdf",
-          "bytes": 26913,
-          "sha256": "70244a3c2c42c29ba82741ba75e85bd09bfe80185cfb6c16cb30593503b9f406"
+          "bytes": 26779,
+          "sha256": "9d14991031761acaa413be76f2f3446e95a9963b719753fe78ec30a03a079de9"
         },
         {
           "path": "assets/raman.png",
@@ -789,13 +789,13 @@
         },
         {
           "path": "figures/raman-viridis.svg",
-          "bytes": 99154,
-          "sha256": "ddb8a607aa91593e9a9cfacdcb6940687ab1f0392378dfdca4bbe4ae3a5bc469"
+          "bytes": 97707,
+          "sha256": "18293b43cffeab036e12e66b820e18440f1099c54091427416c0a31c40d78cb5"
         },
         {
           "path": "figures/raman-viridis.pdf",
-          "bytes": 36114,
-          "sha256": "2f4c4ca2672a9a0136fc49bdd4e3d44faeae59f1a30f6a2c9eb5548a319a9392"
+          "bytes": 35991,
+          "sha256": "0e706b9e9ae3e20aaed02e14a8fa0f4185800508508fddd02457517d37b92ad3"
         },
         {
           "path": "assets/raman-viridis.png",
@@ -838,13 +838,13 @@
         },
         {
           "path": "figures/raman-spectrum.svg",
-          "bytes": 99154,
-          "sha256": "43b60ddddaf5d2ccdd6ee523f1e444aae80ced3a191f75d0915ac4efc8846bfe"
+          "bytes": 97707,
+          "sha256": "ef022e5a9a8e3e22691737c2b2d4a6ab790c62f2f9fb4f2983a32a8e9ad387c4"
         },
         {
           "path": "figures/raman-spectrum.pdf",
-          "bytes": 36026,
-          "sha256": "94d6b6c90216f6726a0cd9a9fb74f4cab5b871d1fccb754293040f775fa552ce"
+          "bytes": 35900,
+          "sha256": "6e9f7a174df58a8c8c280ba3eb24fb5de721eb38650e9eb9385f5d335278abfc"
         },
         {
           "path": "assets/raman-spectrum.png",

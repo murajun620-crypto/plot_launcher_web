@@ -4,7 +4,7 @@ PlotLauncherで作れる15種類のグラフを、18作例で紹介します。C
 
 **全データは人工的に生成した模擬データです。実験結果や論文掲載データではありません。** 図の見やすさ、単位、線幅、フォント、余白を論文図の体裁に合わせています。投稿時は各雑誌の規定と実測データに合わせて調整してください。
 
-[PlotLauncherを開く](https://murajun620-crypto.github.io/plot_launcher_web/) · [学生向けマニュアル](https://murajun620-crypto.github.io/plot_launcher_web/manual/) · [全プロジェクトを保存（ZIP）](projects.zip?v=8c134b79a624) · [esa掲載用一式](gallery.zip?v=8c134b79a624)
+[PlotLauncherを開く](https://murajun620-crypto.github.io/plot_launcher_web/) · [学生向けマニュアル](https://murajun620-crypto.github.io/plot_launcher_web/manual/) · [全プロジェクトを保存（ZIP）](projects.zip?v=a9be56002442) · [esa掲載用一式](gallery.zip?v=a9be56002442)
 
 ## 作例の一覧
 
@@ -31,28 +31,28 @@ PlotLauncherで作れる15種類のグラフを、18作例で紹介します。C
 
 ## 全作例のプロジェクト
 
-[全18プロジェクトを保存（ZIP）](projects.zip?v=8c134b79a624)
+[全18プロジェクトを保存（ZIP）](projects.zip?v=a9be56002442)
 
 |作例|プロジェクト|
 |---|---|
-|CV 掃引速度による酸化還元応答|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=cv) · [保存](projects/cv.plotproject?v=8c134b79a624)|
-|LSV 触媒の分極曲線|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=lsv) · [保存](projects/lsv.plotproject?v=8c134b79a624)|
-|CA 濃度による電流減衰|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=ca) · [保存](projects/ca.plotproject?v=8c134b79a624)|
-|CP 定電流保持時の電位推移|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=cp) · [保存](projects/cp.plotproject?v=8c134b79a624)|
-|EDX Au粒子とSiO₂基板のスペクトル|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=edx) · [保存](projects/edx.plotproject?v=8c134b79a624)|
-|XPS Survey 表面元素の全体像|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xps-survey) · [保存](projects/xps-survey.plotproject?v=8c134b79a624)|
-|XPS Core Au 4fダブレット|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xps-core) · [保存](projects/xps-core.plotproject?v=8c134b79a624)|
-|XPS Fit 成分と合成曲線を重ねる|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xps-fit) · [保存](projects/xps-fit.plotproject?v=8c134b79a624)|
-|XAFS 吸収端と吸収端後の構造|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xafs) · [保存](projects/xafs.plotproject?v=8c134b79a624)|
-|Raman Spectrum 炭素材料のバンド比較|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=raman) · [保存](projects/raman.plotproject?v=8c134b79a624)|
-|AFM Section 高さマップから取り出した断面|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=afm-section) · [保存](projects/afm-section.plotproject?v=8c134b79a624)|
-|粒径ヒストグラム 対数正規分布|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=particle-histogram) · [保存](projects/particle-histogram.plotproject?v=8c134b79a624)|
-|一般グラフ 飽和応答と反復データ|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=general) · [保存](projects/general.plotproject?v=8c134b79a624)|
-|Roughness 研磨時間と表面粗さ|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=roughness) · [保存](projects/roughness.plotproject?v=8c134b79a624)|
-|棒グラフ 反復試験の比較|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=bar) · [保存](projects/bar.plotproject?v=8c134b79a624)|
-|Raman 3D 時系列スペクトル|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=raman-3d) · [保存](projects/raman-3d.plotproject?v=8c134b79a624)|
-|Raman Viridis 10系列の連続配色|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=raman-viridis) · [保存](projects/raman-viridis.plotproject?v=8c134b79a624)|
-|Raman Spectrum 10系列の連続配色|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=raman-spectrum) · [保存](projects/raman-spectrum.plotproject?v=8c134b79a624)|
+|CV 掃引速度による酸化還元応答|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=cv) · [保存](projects/cv.plotproject?v=a9be56002442)|
+|LSV 触媒の分極曲線|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=lsv) · [保存](projects/lsv.plotproject?v=a9be56002442)|
+|CA 濃度による電流減衰|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=ca) · [保存](projects/ca.plotproject?v=a9be56002442)|
+|CP 定電流保持時の電位推移|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=cp) · [保存](projects/cp.plotproject?v=a9be56002442)|
+|EDX Au粒子とSiO₂基板のスペクトル|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=edx) · [保存](projects/edx.plotproject?v=a9be56002442)|
+|XPS Survey 表面元素の全体像|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xps-survey) · [保存](projects/xps-survey.plotproject?v=a9be56002442)|
+|XPS Core Au 4fダブレット|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xps-core) · [保存](projects/xps-core.plotproject?v=a9be56002442)|
+|XPS Fit 成分と合成曲線を重ねる|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xps-fit) · [保存](projects/xps-fit.plotproject?v=a9be56002442)|
+|XAFS 吸収端と吸収端後の構造|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xafs) · [保存](projects/xafs.plotproject?v=a9be56002442)|
+|Raman Spectrum 炭素材料のバンド比較|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=raman) · [保存](projects/raman.plotproject?v=a9be56002442)|
+|AFM Section 高さマップから取り出した断面|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=afm-section) · [保存](projects/afm-section.plotproject?v=a9be56002442)|
+|粒径ヒストグラム 対数正規分布|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=particle-histogram) · [保存](projects/particle-histogram.plotproject?v=a9be56002442)|
+|一般グラフ 飽和応答と反復データ|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=general) · [保存](projects/general.plotproject?v=a9be56002442)|
+|Roughness 研磨時間と表面粗さ|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=roughness) · [保存](projects/roughness.plotproject?v=a9be56002442)|
+|棒グラフ 反復試験の比較|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=bar) · [保存](projects/bar.plotproject?v=a9be56002442)|
+|Raman 3D 時系列スペクトル|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=raman-3d) · [保存](projects/raman-3d.plotproject?v=a9be56002442)|
+|Raman Viridis 10系列の連続配色|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=raman-viridis) · [保存](projects/raman-viridis.plotproject?v=a9be56002442)|
+|Raman Spectrum 10系列の連続配色|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=raman-spectrum) · [保存](projects/raman-spectrum.plotproject?v=a9be56002442)|
 
 ## プロジェクトで再現する
 
@@ -66,11 +66,11 @@ CSVから作る場合は、1行目を見出しにし、X列とY列を選びま�
 
 ## CV 掃引速度による酸化還元応答
 
-![CV 掃引速度による酸化還元応答 模擬データ](assets/cv.png?v=8c134b79a624)
+![CV 掃引速度による酸化還元応答 模擬データ](assets/cv.png?v=a9be56002442)
 
 酸化・還元ピークと、掃引速度による電流増加。Xの行順序を保ち、電位で並べ替えない。
 
-[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=cv) · [CSV](data/cv.csv?v=8c134b79a624) · [プロジェクトを保存](projects/cv.plotproject?v=8c134b79a624) · [PNG 1200 dpi](figures/cv.png?v=8c134b79a624) · [SVG](figures/cv.svg?v=8c134b79a624) · [PDF](figures/cv.pdf?v=8c134b79a624)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=cv) · [CSV](data/cv.csv?v=a9be56002442) · [プロジェクトを保存](projects/cv.plotproject?v=a9be56002442) · [PNG 1200 dpi](figures/cv.png?v=a9be56002442) · [SVG](figures/cv.svg?v=a9be56002442) · [PDF](figures/cv.pdf?v=a9be56002442)
 
 ### データの作り方
 
@@ -90,11 +90,11 @@ Fickの一次元拡散方程式を陰的差分で解き、電極表面はNernst�
 
 ## LSV 触媒の分極曲線
 
-![LSV 触媒の分極曲線 模擬データ](assets/lsv.png?v=8c134b79a624)
+![LSV 触媒の分極曲線 模擬データ](assets/lsv.png?v=a9be56002442)
 
 立ち上がりと高電流域の形。OERを想定した作例で、触媒性能を示す実測結果ではない。
 
-[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=lsv) · [CSV](data/lsv.csv?v=8c134b79a624) · [プロジェクトを保存](projects/lsv.plotproject?v=8c134b79a624) · [PNG 1200 dpi](figures/lsv.png?v=8c134b79a624) · [SVG](figures/lsv.svg?v=8c134b79a624) · [PDF](figures/lsv.pdf?v=8c134b79a624)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=lsv) · [CSV](data/lsv.csv?v=a9be56002442) · [プロジェクトを保存](projects/lsv.plotproject?v=a9be56002442) · [PNG 1200 dpi](figures/lsv.png?v=a9be56002442) · [SVG](figures/lsv.svg?v=a9be56002442) · [PDF](figures/lsv.pdf?v=a9be56002442)
 
 ### データの作り方
 
@@ -114,11 +114,11 @@ Tafel近似は[MITのButler–Volmer講義資料](https://ocw.mit.edu/courses/10
 
 ## CA 濃度による電流減衰
 
-![CA 濃度による電流減衰 模擬データ](assets/ca.png?v=8c134b79a624)
+![CA 濃度による電流減衰 模擬データ](assets/ca.png?v=a9be56002442)
 
 初期過渡応答の後にt⁻¹ᐟ²で減衰。濃度が2倍になると拡散電流も2倍になる。
 
-[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=ca) · [CSV](data/ca.csv?v=8c134b79a624) · [プロジェクトを保存](projects/ca.plotproject?v=8c134b79a624) · [PNG 1200 dpi](figures/ca.png?v=8c134b79a624) · [SVG](figures/ca.svg?v=8c134b79a624) · [PDF](figures/ca.pdf?v=8c134b79a624)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=ca) · [CSV](data/ca.csv?v=a9be56002442) · [プロジェクトを保存](projects/ca.plotproject?v=a9be56002442) · [PNG 1200 dpi](figures/ca.png?v=a9be56002442) · [SVG](figures/ca.svg?v=a9be56002442) · [PDF](figures/ca.pdf?v=a9be56002442)
 
 ### データの作り方
 
@@ -138,11 +138,11 @@ Cottrell式 j=nF√D C/√(πt)に、短時間の充電電流と計測ノイズ�
 
 ## CP 定電流保持時の電位推移
 
-![CP 定電流保持時の電位推移 模擬データ](assets/cp.png?v=8c134b79a624)
+![CP 定電流保持時の電位推移 模擬データ](assets/cp.png?v=a9be56002442)
 
 初期のなじみと長時間ドリフト。安定性の実証には実測・反復試験が必要。
 
-[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=cp) · [CSV](data/cp.csv?v=8c134b79a624) · [プロジェクトを保存](projects/cp.plotproject?v=8c134b79a624) · [PNG 1200 dpi](figures/cp.png?v=8c134b79a624) · [SVG](figures/cp.svg?v=8c134b79a624) · [PDF](figures/cp.pdf?v=8c134b79a624)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=cp) · [CSV](data/cp.csv?v=a9be56002442) · [プロジェクトを保存](projects/cp.plotproject?v=a9be56002442) · [PNG 1200 dpi](figures/cp.png?v=a9be56002442) · [SVG](figures/cp.svg?v=a9be56002442) · [PDF](figures/cp.pdf?v=a9be56002442)
 
 ### データの作り方
 
@@ -162,11 +162,11 @@ Cottrell式 j=nF√D C/√(πt)に、短時間の充電電流と計測ノイズ�
 
 ## EDX Au粒子とSiO₂基板のスペクトル
 
-![EDX Au粒子とSiO₂基板のスペクトル 模擬データ](assets/edx.png?v=8c134b79a624)
+![EDX Au粒子とSiO₂基板のスペクトル 模擬データ](assets/edx.png?v=a9be56002442)
 
 低エネルギー主ピークと弱い高エネルギーAu線。EDXマップと同じ元素を使う。
 
-[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=edx) · [CSV](data/edx.csv?v=8c134b79a624) · [プロジェクトを保存](projects/edx.plotproject?v=8c134b79a624) · [PNG 1200 dpi](figures/edx.png?v=8c134b79a624) · [SVG](figures/edx.svg?v=8c134b79a624) · [PDF](figures/edx.pdf?v=8c134b79a624)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=edx) · [CSV](data/edx.csv?v=a9be56002442) · [プロジェクトを保存](projects/edx.plotproject?v=a9be56002442) · [PNG 1200 dpi](figures/edx.png?v=a9be56002442) · [SVG](figures/edx.svg?v=a9be56002442) · [PDF](figures/edx.pdf?v=a9be56002442)
 
 ### データの作り方
 
@@ -186,11 +186,11 @@ O K、Si K、Au M/Lの近似ピーク位置に、エネルギー依存の検出�
 
 ## XPS Survey 表面元素の全体像
 
-![XPS Survey 表面元素の全体像 模擬データ](assets/xps-survey.png?v=8c134b79a624)
+![XPS Survey 表面元素の全体像 模擬データ](assets/xps-survey.png?v=a9be56002442)
 
 XPSの結合エネルギーは左が高く右が低い。Surveyで全体を確認し、CoreとFitで拡大する。
 
-[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xps-survey) · [CSV](data/xps-survey.csv?v=8c134b79a624) · [プロジェクトを保存](projects/xps-survey.plotproject?v=8c134b79a624) · [PNG 1200 dpi](figures/xps-survey.png?v=8c134b79a624) · [SVG](figures/xps-survey.svg?v=8c134b79a624) · [PDF](figures/xps-survey.pdf?v=8c134b79a624)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xps-survey) · [CSV](data/xps-survey.csv?v=a9be56002442) · [プロジェクトを保存](projects/xps-survey.plotproject?v=a9be56002442) · [PNG 1200 dpi](figures/xps-survey.png?v=a9be56002442) · [SVG](figures/xps-survey.svg?v=a9be56002442) · [PDF](figures/xps-survey.pdf?v=a9be56002442)
 
 ### データの作り方
 
@@ -210,11 +210,11 @@ Auの主要線は[HarwellXPSのAu解説](https://www.harwellxps.guru/xpskb/gold/
 
 ## XPS Core Au 4fダブレット
 
-![XPS Core Au 4fダブレット 模擬データ](assets/xps-core.png?v=8c134b79a624)
+![XPS Core Au 4fダブレット 模擬データ](assets/xps-core.png?v=a9be56002442)
 
 ピークの位置、幅、分裂。装置分解能や帯電条件は実測に合わせる。
 
-[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xps-core) · [CSV](data/xps-core.csv?v=8c134b79a624) · [プロジェクトを保存](projects/xps-core.plotproject?v=8c134b79a624) · [PNG 1200 dpi](figures/xps-core.png?v=8c134b79a624) · [SVG](figures/xps-core.svg?v=8c134b79a624) · [PDF](figures/xps-core.pdf?v=8c134b79a624)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xps-core) · [CSV](data/xps-core.csv?v=a9be56002442) · [プロジェクトを保存](projects/xps-core.plotproject?v=a9be56002442) · [PNG 1200 dpi](figures/xps-core.png?v=a9be56002442) · [SVG](figures/xps-core.svg?v=a9be56002442) · [PDF](figures/xps-core.pdf?v=a9be56002442)
 
 ### データの作り方
 
@@ -234,11 +234,11 @@ Au 4f₇ᐟ₂/4f₅ᐟ₂の二重線。分裂3.67 eV、同じ幅、面積比4:
 
 ## XPS Fit 成分と合成曲線を重ねる
 
-![XPS Fit 成分と合成曲線を重ねる 模擬データ](assets/xps-fit.png?v=8c134b79a624)
+![XPS Fit 成分と合成曲線を重ねる 模擬データ](assets/xps-fit.png?v=a9be56002442)
 
 観測点、合成線、背景、色分け成分を比較。専用CSVではアプリが各ピークに背景を足して塗りつぶす。
 
-[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xps-fit) · [CSV](data/xps-fit.csv?v=8c134b79a624) · [プロジェクトを保存](projects/xps-fit.plotproject?v=8c134b79a624) · [PNG 1200 dpi](figures/xps-fit.png?v=8c134b79a624) · [SVG](figures/xps-fit.svg?v=8c134b79a624) · [PDF](figures/xps-fit.pdf?v=8c134b79a624)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xps-fit) · [CSV](data/xps-fit.csv?v=a9be56002442) · [プロジェクトを保存](projects/xps-fit.plotproject?v=a9be56002442) · [PNG 1200 dpi](figures/xps-fit.png?v=a9be56002442) · [SVG](figures/xps-fit.svg?v=a9be56002442) · [PDF](figures/xps-fit.pdf?v=a9be56002442)
 
 ### データの作り方
 
@@ -260,11 +260,11 @@ Coreと同じ模擬観測値に生成モデル・背景・2成分を重ねた。
 
 ## XAFS 吸収端と吸収端後の構造
 
-![XAFS 吸収端と吸収端後の構造 模擬データ](assets/xafs.png?v=8c134b79a624)
+![XAFS 吸収端と吸収端後の構造 模擬データ](assets/xafs.png?v=a9be56002442)
 
 吸収端のシフト、白線、吸収端後の減衰振動。配位数や酸化数の推定に使える定量計算ではない。
 
-[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xafs) · [CSV](data/xafs.csv?v=8c134b79a624) · [プロジェクトを保存](projects/xafs.plotproject?v=8c134b79a624) · [PNG 1200 dpi](figures/xafs.png?v=8c134b79a624) · [SVG](figures/xafs.svg?v=8c134b79a624) · [PDF](figures/xafs.pdf?v=8c134b79a624)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xafs) · [CSV](data/xafs.csv?v=a9be56002442) · [プロジェクトを保存](projects/xafs.plotproject?v=a9be56002442) · [PNG 1200 dpi](figures/xafs.png?v=a9be56002442) · [SVG](figures/xafs.svg?v=a9be56002442) · [PDF](figures/xafs.pdf?v=a9be56002442)
 
 ### データの作り方
 
@@ -284,11 +284,11 @@ arctan型吸収端、白線ピーク、sin(2kR+φ)の減衰振動を重ねた概
 
 ## Raman Spectrum 炭素材料のバンド比較
 
-![Raman Spectrum 炭素材料のバンド比較 模擬データ](assets/raman.png?v=8c134b79a624)
+![Raman Spectrum 炭素材料のバンド比較 模擬データ](assets/raman.png?v=a9be56002442)
 
 ピークの強度比と幅を見比べる。縦オフセットしたスペクトルの絶対強度を相互比較しない。
 
-[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=raman) · [CSV](data/raman.csv?v=8c134b79a624) · [プロジェクトを保存](projects/raman.plotproject?v=8c134b79a624) · [PNG 1200 dpi](figures/raman.png?v=8c134b79a624) · [SVG](figures/raman.svg?v=8c134b79a624) · [PDF](figures/raman.pdf?v=8c134b79a624)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=raman) · [CSV](data/raman.csv?v=a9be56002442) · [プロジェクトを保存](projects/raman.plotproject?v=a9be56002442) · [PNG 1200 dpi](figures/raman.png?v=a9be56002442) · [SVG](figures/raman.svg?v=a9be56002442) · [PDF](figures/raman.pdf?v=a9be56002442)
 
 ### データの作り方
 
@@ -308,11 +308,11 @@ D、G、2Dバンドに幅を持たせ、弱い蛍光背景とPoissonノイズを
 
 ## AFM Section 高さマップから取り出した断面
 
-![AFM Section 高さマップから取り出した断面 模擬データ](assets/afm-section.png?v=8c134b79a624)
+![AFM Section 高さマップから取り出した断面 模擬データ](assets/afm-section.png?v=a9be56002442)
 
 高さマップと断面を同じデータで説明できる。断面の各山は探針の影響を含む見かけの形状。
 
-[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=afm-section) · [CSV](data/afm-section.csv?v=8c134b79a624) · [プロジェクトを保存](projects/afm-section.plotproject?v=8c134b79a624) · [PNG 1200 dpi](figures/afm-section.png?v=8c134b79a624) · [SVG](figures/afm-section.svg?v=8c134b79a624) · [PDF](figures/afm-section.pdf?v=8c134b79a624)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=afm-section) · [CSV](data/afm-section.csv?v=a9be56002442) · [プロジェクトを保存](projects/afm-section.plotproject?v=a9be56002442) · [PNG 1200 dpi](figures/afm-section.png?v=a9be56002442) · [SVG](figures/afm-section.svg?v=a9be56002442) · [PDF](figures/afm-section.pdf?v=a9be56002442)
 
 ### データの作り方
 
@@ -332,11 +332,11 @@ MiFiTo用AFMナノ粒状表面と同一の高さ配列から、2本の水平断�
 
 ## 粒径ヒストグラム 対数正規分布
 
-![粒径ヒストグラム 対数正規分布 模擬データ](assets/particle-histogram.png?v=8c134b79a624)
+![粒径ヒストグラム 対数正規分布 模擬データ](assets/particle-histogram.png?v=a9be56002442)
 
 生の粒径を1行1粒子で入れる。計算済みの頻度表は粒径入力にしない。
 
-[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=particle-histogram) · [CSV](data/particle-histogram.csv?v=8c134b79a624) · [プロジェクトを保存](projects/particle-histogram.plotproject?v=8c134b79a624) · [PNG 1200 dpi](figures/particle-histogram.png?v=8c134b79a624) · [SVG](figures/particle-histogram.svg?v=8c134b79a624) · [PDF](figures/particle-histogram.pdf?v=8c134b79a624)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=particle-histogram) · [CSV](data/particle-histogram.csv?v=a9be56002442) · [プロジェクトを保存](projects/particle-histogram.plotproject?v=a9be56002442) · [PNG 1200 dpi](figures/particle-histogram.png?v=a9be56002442) · [SVG](figures/particle-histogram.svg?v=a9be56002442) · [PDF](figures/particle-histogram.pdf?v=a9be56002442)
 
 ### データの作り方
 
@@ -358,11 +358,11 @@ SEM粒子モデルに与えた190個の投影径を、そのまま粒径入力�
 
 ## 一般グラフ 飽和応答と反復データ
 
-![一般グラフ 飽和応答と反復データ 模擬データ](assets/general.png?v=8c134b79a624)
+![一般グラフ 飽和応答と反復データ 模擬データ](assets/general.png?v=a9be56002442)
 
 散布点・対称誤差棒・生成モデルを併記。曲線と点はX列が別でもよい。
 
-[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=general) · [CSV](data/general.csv?v=8c134b79a624) · [プロジェクトを保存](projects/general.plotproject?v=8c134b79a624) · [PNG 1200 dpi](figures/general.png?v=8c134b79a624) · [SVG](figures/general.svg?v=8c134b79a624) · [PDF](figures/general.pdf?v=8c134b79a624)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=general) · [CSV](data/general.csv?v=a9be56002442) · [プロジェクトを保存](projects/general.plotproject?v=a9be56002442) · [PNG 1200 dpi](figures/general.png?v=a9be56002442) · [SVG](figures/general.svg?v=a9be56002442) · [PDF](figures/general.pdf?v=a9be56002442)
 
 ### データの作り方
 
@@ -382,11 +382,11 @@ Langmuir型q=qmax C/(K+C)から各濃度5回の独立模擬反復を作り、平
 
 ## Roughness 研磨時間と表面粗さ
 
-![Roughness 研磨時間と表面粗さ 模擬データ](assets/roughness.png?v=8c134b79a624)
+![Roughness 研磨時間と表面粗さ 模擬データ](assets/roughness.png?v=a9be56002442)
 
 対数Y軸で、初期改善と下限への収束を比較。AFM作例とは別の仮想研磨試験。
 
-[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=roughness) · [CSV](data/roughness.csv?v=8c134b79a624) · [プロジェクトを保存](projects/roughness.plotproject?v=8c134b79a624) · [PNG 1200 dpi](figures/roughness.png?v=8c134b79a624) · [SVG](figures/roughness.svg?v=8c134b79a624) · [PDF](figures/roughness.pdf?v=8c134b79a624)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=roughness) · [CSV](data/roughness.csv?v=a9be56002442) · [プロジェクトを保存](projects/roughness.plotproject?v=a9be56002442) · [PNG 1200 dpi](figures/roughness.png?v=a9be56002442) · [SVG](figures/roughness.svg?v=a9be56002442) · [PDF](figures/roughness.pdf?v=a9be56002442)
 
 ### データの作り方
 
@@ -406,11 +406,11 @@ Rq(t)=Rq∞+(Rq₀−Rq∞) exp(−t/τ)に乗法性のばらつきを加え、�
 
 ## 棒グラフ 反復試験の比較
 
-![棒グラフ 反復試験の比較 模擬データ](assets/bar.png?v=8c134b79a624)
+![棒グラフ 反復試験の比較 模擬データ](assets/bar.png?v=a9be56002442)
 
 10 mA cm⁻²での模擬過電圧を比較。カテゴリ名をX列に置く。Yは平均、3列目はSD。現在の棒グラフ描画は誤差列を自動描画しないため、この作例ではSDから算出した線の注釈で誤差棒を表示している。値を変更したら注釈も更新する。有意差やp値は作成していない。
 
-[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=bar) · [CSV](data/bar.csv?v=8c134b79a624) · [プロジェクトを保存](projects/bar.plotproject?v=8c134b79a624) · [PNG 1200 dpi](figures/bar.png?v=8c134b79a624) · [SVG](figures/bar.svg?v=8c134b79a624) · [PDF](figures/bar.pdf?v=8c134b79a624)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=bar) · [CSV](data/bar.csv?v=a9be56002442) · [プロジェクトを保存](projects/bar.plotproject?v=a9be56002442) · [PNG 1200 dpi](figures/bar.png?v=a9be56002442) · [SVG](figures/bar.svg?v=a9be56002442) · [PDF](figures/bar.pdf?v=a9be56002442)
 
 ### データの作り方
 
@@ -430,11 +430,11 @@ Rq(t)=Rq∞+(Rq₀−Rq∞) exp(−t/τ)に乗法性のばらつきを加え、�
 
 ## Raman 3D 時系列スペクトル
 
-![Raman 3D 時系列スペクトル 模擬データ](assets/raman-3d.png?v=8c134b79a624)
+![Raman 3D 時系列スペクトル 模擬データ](assets/raman-3d.png?v=a9be56002442)
 
 時系列のバンド形状変化を俯瞰。個別正規化しているため絶対強度の増減を示す図ではない。
 
-[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=raman-3d) · [CSV](data/raman-3d.csv?v=8c134b79a624) · [プロジェクトを保存](projects/raman-3d.plotproject?v=8c134b79a624) · [PNG 1200 dpi](figures/raman-3d.png?v=8c134b79a624) · [SVG](figures/raman-3d.svg?v=8c134b79a624) · [PDF](figures/raman-3d.pdf?v=8c134b79a624)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=raman-3d) · [CSV](data/raman-3d.csv?v=a9be56002442) · [プロジェクトを保存](projects/raman-3d.plotproject?v=a9be56002442) · [PNG 1200 dpi](figures/raman-3d.png?v=a9be56002442) · [SVG](figures/raman-3d.svg?v=a9be56002442) · [PDF](figures/raman-3d.pdf?v=a9be56002442)
 
 ### データの作り方
 
@@ -454,11 +454,11 @@ Rq(t)=Rq∞+(Rq₀−Rq∞) exp(−t/τ)に乗法性のばらつきを加え、�
 
 ## Raman Viridis 10系列の連続配色
 
-![Raman Viridis 10系列の連続配色 模擬データ](assets/raman-viridis.png?v=8c134b79a624)
+![Raman Viridis 10系列の連続配色 模擬データ](assets/raman-viridis.png?v=a9be56002442)
 
 同じ10系列データをViridis（紫→青→緑→黄）で配色。下から上へ0→45 min。重なりを避けるため系列ごとにYオフセット1150を加え、凡例を枠の右外に配置。生CSVにはオフセットを含めず、プロジェクトの系列設定に保存しています。絶対強度を比べるときはオフセットを外してください。色を変えるには「02 系列」の「連続配色」を選び「配色を適用」を押します。
 
-[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=raman-viridis) · [CSV](data/raman-viridis.csv?v=8c134b79a624) · [プロジェクトを保存](projects/raman-viridis.plotproject?v=8c134b79a624) · [PNG 1200 dpi](figures/raman-viridis.png?v=8c134b79a624) · [SVG](figures/raman-viridis.svg?v=8c134b79a624) · [PDF](figures/raman-viridis.pdf?v=8c134b79a624)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=raman-viridis) · [CSV](data/raman-viridis.csv?v=a9be56002442) · [プロジェクトを保存](projects/raman-viridis.plotproject?v=a9be56002442) · [PNG 1200 dpi](figures/raman-viridis.png?v=a9be56002442) · [SVG](figures/raman-viridis.svg?v=a9be56002442) · [PDF](figures/raman-viridis.pdf?v=a9be56002442)
 
 ### データの作り方
 
@@ -478,11 +478,11 @@ Rq(t)=Rq∞+(Rq₀−Rq∞) exp(−t/τ)に乗法性のばらつきを加え、�
 
 ## Raman Spectrum 10系列の連続配色
 
-![Raman Spectrum 10系列の連続配色 模擬データ](assets/raman-spectrum.png?v=8c134b79a624)
+![Raman Spectrum 10系列の連続配色 模擬データ](assets/raman-spectrum.png?v=a9be56002442)
 
 同じ10系列データをSpectrum（Web版のnipy_spectral）で配色。下から上へ0→45 min。重なりを避けるため系列ごとにYオフセット1150を加え、凡例を枠の右外に配置。生CSVにはオフセットを含めず、プロジェクトの系列設定に保存しています。絶対強度を比べるときはオフセットを外してください。色を変えるには「02 系列」の「連続配色」を選び「配色を適用」を押します。
 
-[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=raman-spectrum) · [CSV](data/raman-spectrum.csv?v=8c134b79a624) · [プロジェクトを保存](projects/raman-spectrum.plotproject?v=8c134b79a624) · [PNG 1200 dpi](figures/raman-spectrum.png?v=8c134b79a624) · [SVG](figures/raman-spectrum.svg?v=8c134b79a624) · [PDF](figures/raman-spectrum.pdf?v=8c134b79a624)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=raman-spectrum) · [CSV](data/raman-spectrum.csv?v=a9be56002442) · [プロジェクトを保存](projects/raman-spectrum.plotproject?v=a9be56002442) · [PNG 1200 dpi](figures/raman-spectrum.png?v=a9be56002442) · [SVG](figures/raman-spectrum.svg?v=a9be56002442) · [PDF](figures/raman-spectrum.pdf?v=a9be56002442)
 
 ### データの作り方
 
@@ -506,7 +506,7 @@ Rq(t)=Rq∞+(Rq₀−Rq∞) exp(−t/τ)に乗法性のばらつきを加え、�
 - General、Roughness、棒グラフの誤差棒は独立模擬反復5回の標本SD。元の反復データもCSVで添付。
 - XPS Fitの線は既知の生成モデルで、実測データへのフィッティングではありません。XAFSは形状を説明する概念モデルです。
 
-反復CSV：[一般グラフ](data/general_replicates.csv?v=8c134b79a624)、[粗さ](data/roughness_replicates.csv?v=8c134b79a624)、[棒グラフ](data/bar_replicates.csv?v=8c134b79a624)。
+反復CSV：[一般グラフ](data/general_replicates.csv?v=a9be56002442)、[粗さ](data/roughness_replicates.csv?v=a9be56002442)、[棒グラフ](data/bar_replicates.csv?v=a9be56002442)。
 
 サンセリフ書体、判読できる文字、適切な線幅、写真へのスケールバーという方針は、[Natureの最終図版ガイド](https://www.nature.com/documents/NRJs-guide-to-preparing-final-artwork.pdf)を参考にしました。特定誌の採択や科学的妥当性を保証する意味ではありません。
 
