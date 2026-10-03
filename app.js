@@ -1,5 +1,5 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=f930b32363e5";
-import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=f930b32363e5";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=d39ba3a431a1";
+import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=d39ba3a431a1";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -126,7 +126,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=f930b32363e5", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=d39ba3a431a1", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -138,6 +138,7 @@ function startWorker() {
       $("#initial-message p").textContent = "Excel / CSVを読み込むか、「サンプルデータを使う」を押してください。";
       $("#preview-state").textContent = "データ未選択";
       status("Excel / CSVファイルを選んでください。", "ready");
+      await openGalleryProject();
     } else if (data.type === "fatal") {
       console.error(data.detail);
       fatal(data.error);
@@ -820,6 +821,15 @@ async function readProject(file, saved) {
     renderWanted=true;
   } catch(error){status(`プロジェクトを開けませんでした: ${error.message}`,'error');}
   finally{loading=false;updateButtons();if(renderWanted)renderPreview();}
+}
+async function openGalleryProject() {
+  const slug = new URLSearchParams(location.search).get('gallery');
+  if (!slug || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return;
+  try {
+    const response = await fetch(new URL(`gallery/projects/${slug}.plotproject`, import.meta.url));
+    if (!response.ok) throw new Error('ギャラリーのプロジェクトを開けませんでした。');
+    await readProject(new File([await response.blob()], `${slug}.plotproject`, {type:'application/octet-stream'}));
+  } catch (error) { status(error.message, 'error'); }
 }
 async function openDroppedFile(file) {
   if(/\.plotproject$/i.test(file.name)){await readProject(file);return;}

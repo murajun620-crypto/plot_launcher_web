@@ -4,7 +4,7 @@ PlotLauncherで作れる15種類のグラフを、16作例で紹介します。C
 
 **全データは人工的に生成した模擬データです。実験結果や論文掲載データではありません。** 図の見やすさ、単位、線幅、フォント、余白を論文図の体裁に合わせています。投稿時は各雑誌の規定と実測データに合わせて調整してください。
 
-[PlotLauncherを開く](https://murajun620-crypto.github.io/plot_launcher_web/) · [学生向けマニュアル](https://murajun620-crypto.github.io/plot_launcher_web/manual/) · [esa掲載用一式](gallery.zip)
+[PlotLauncherを開く](https://murajun620-crypto.github.io/plot_launcher_web/) · [学生向けマニュアル](https://murajun620-crypto.github.io/plot_launcher_web/manual/) · [全プロジェクトを保存（ZIP）](projects.zip?v=27e45f64cf51) · [esa掲載用一式](gallery.zip?v=27e45f64cf51)
 
 ## 作例の一覧
 
@@ -27,9 +27,32 @@ PlotLauncherで作れる15種類のグラフを、16作例で紹介します。C
 |棒グラフ|[棒グラフ 反復試験の比較](#bar)|カテゴリ＋平均＋SD|
 |Raman 3D|[Raman 3D 時系列スペクトル](#raman-3d)|共通X＋各Y列|
 
+## 全作例のプロジェクト
+
+[全16プロジェクトを保存（ZIP）](projects.zip?v=27e45f64cf51)
+
+|作例|プロジェクト|
+|---|---|
+|CV 掃引速度による酸化還元応答|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=cv) · [保存](projects/cv.plotproject?v=27e45f64cf51)|
+|LSV 触媒の分極曲線|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=lsv) · [保存](projects/lsv.plotproject?v=27e45f64cf51)|
+|CA 濃度による電流減衰|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=ca) · [保存](projects/ca.plotproject?v=27e45f64cf51)|
+|CP 定電流保持時の電位推移|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=cp) · [保存](projects/cp.plotproject?v=27e45f64cf51)|
+|EDX Au粒子とSiO₂基板のスペクトル|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=edx) · [保存](projects/edx.plotproject?v=27e45f64cf51)|
+|XPS Survey 表面元素の全体像|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xps-survey) · [保存](projects/xps-survey.plotproject?v=27e45f64cf51)|
+|XPS Core Au 4fダブレット|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xps-core) · [保存](projects/xps-core.plotproject?v=27e45f64cf51)|
+|XPS Fit 成分と合成曲線を重ねる|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xps-fit) · [保存](projects/xps-fit.plotproject?v=27e45f64cf51)|
+|XAFS 吸収端と吸収端後の構造|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xafs) · [保存](projects/xafs.plotproject?v=27e45f64cf51)|
+|Raman Spectrum 炭素材料のバンド比較|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=raman) · [保存](projects/raman.plotproject?v=27e45f64cf51)|
+|AFM Section 高さマップから取り出した断面|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=afm-section) · [保存](projects/afm-section.plotproject?v=27e45f64cf51)|
+|粒径ヒストグラム 対数正規分布|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=particle-histogram) · [保存](projects/particle-histogram.plotproject?v=27e45f64cf51)|
+|一般グラフ 飽和応答と反復データ|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=general) · [保存](projects/general.plotproject?v=27e45f64cf51)|
+|Roughness 研磨時間と表面粗さ|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=roughness) · [保存](projects/roughness.plotproject?v=27e45f64cf51)|
+|棒グラフ 反復試験の比較|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=bar) · [保存](projects/bar.plotproject?v=27e45f64cf51)|
+|Raman 3D 時系列スペクトル|[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=raman-3d) · [保存](projects/raman-3d.plotproject?v=27e45f64cf51)|
+
 ## プロジェクトで再現する
 
-1. 作例の「プロジェクト」をダウンロードする。
+1. 作例の「プロジェクトを保存」を押す。まとめて保存する場合は「全プロジェクトを保存（ZIP）」を使い、ZIPを展開する。
 2. PlotLauncherの「プロジェクトを開く」で開く。データと設定が一緒に読み込まれる。
 3. 系列、軸、注釈を変更して保存する。元の設定を残す場合は別名で保存する。
 
@@ -39,11 +62,11 @@ CSVから作る場合は、1行目を見出しにし、X列とY列を選びま�
 
 ## CV 掃引速度による酸化還元応答
 
-![CV 掃引速度による酸化還元応答 模擬データ](assets/cv.png)
+![CV 掃引速度による酸化還元応答 模擬データ](assets/cv.png?v=27e45f64cf51)
 
 酸化・還元ピークと、掃引速度による電流増加。Xの行順序を保ち、電位で並べ替えない。
 
-[CSV](data/cv.csv) · [プロジェクト](projects/cv.plotproject) · [PNG 1200 dpi](figures/cv.png) · [SVG](figures/cv.svg) · [PDF](figures/cv.pdf)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=cv) · [CSV](data/cv.csv?v=27e45f64cf51) · [プロジェクトを保存](projects/cv.plotproject?v=27e45f64cf51) · [PNG 1200 dpi](figures/cv.png?v=27e45f64cf51) · [SVG](figures/cv.svg?v=27e45f64cf51) · [PDF](figures/cv.pdf?v=27e45f64cf51)
 
 ### データの作り方
 
@@ -63,11 +86,11 @@ Fickの一次元拡散方程式を陰的差分で解き、電極表面はNernst�
 
 ## LSV 触媒の分極曲線
 
-![LSV 触媒の分極曲線 模擬データ](assets/lsv.png)
+![LSV 触媒の分極曲線 模擬データ](assets/lsv.png?v=27e45f64cf51)
 
 立ち上がりと高電流域の形。OERを想定した作例で、触媒性能を示す実測結果ではない。
 
-[CSV](data/lsv.csv) · [プロジェクト](projects/lsv.plotproject) · [PNG 1200 dpi](figures/lsv.png) · [SVG](figures/lsv.svg) · [PDF](figures/lsv.pdf)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=lsv) · [CSV](data/lsv.csv?v=27e45f64cf51) · [プロジェクトを保存](projects/lsv.plotproject?v=27e45f64cf51) · [PNG 1200 dpi](figures/lsv.png?v=27e45f64cf51) · [SVG](figures/lsv.svg?v=27e45f64cf51) · [PDF](figures/lsv.pdf?v=27e45f64cf51)
 
 ### データの作り方
 
@@ -87,11 +110,11 @@ Tafel近似は[MITのButler–Volmer講義資料](https://ocw.mit.edu/courses/10
 
 ## CA 濃度による電流減衰
 
-![CA 濃度による電流減衰 模擬データ](assets/ca.png)
+![CA 濃度による電流減衰 模擬データ](assets/ca.png?v=27e45f64cf51)
 
 初期過渡応答の後にt⁻¹ᐟ²で減衰。濃度が2倍になると拡散電流も2倍になる。
 
-[CSV](data/ca.csv) · [プロジェクト](projects/ca.plotproject) · [PNG 1200 dpi](figures/ca.png) · [SVG](figures/ca.svg) · [PDF](figures/ca.pdf)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=ca) · [CSV](data/ca.csv?v=27e45f64cf51) · [プロジェクトを保存](projects/ca.plotproject?v=27e45f64cf51) · [PNG 1200 dpi](figures/ca.png?v=27e45f64cf51) · [SVG](figures/ca.svg?v=27e45f64cf51) · [PDF](figures/ca.pdf?v=27e45f64cf51)
 
 ### データの作り方
 
@@ -111,11 +134,11 @@ Cottrell式 j=nF√D C/√(πt)に、短時間の充電電流と計測ノイズ�
 
 ## CP 定電流保持時の電位推移
 
-![CP 定電流保持時の電位推移 模擬データ](assets/cp.png)
+![CP 定電流保持時の電位推移 模擬データ](assets/cp.png?v=27e45f64cf51)
 
 初期のなじみと長時間ドリフト。安定性の実証には実測・反復試験が必要。
 
-[CSV](data/cp.csv) · [プロジェクト](projects/cp.plotproject) · [PNG 1200 dpi](figures/cp.png) · [SVG](figures/cp.svg) · [PDF](figures/cp.pdf)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=cp) · [CSV](data/cp.csv?v=27e45f64cf51) · [プロジェクトを保存](projects/cp.plotproject?v=27e45f64cf51) · [PNG 1200 dpi](figures/cp.png?v=27e45f64cf51) · [SVG](figures/cp.svg?v=27e45f64cf51) · [PDF](figures/cp.pdf?v=27e45f64cf51)
 
 ### データの作り方
 
@@ -135,11 +158,11 @@ Cottrell式 j=nF√D C/√(πt)に、短時間の充電電流と計測ノイズ�
 
 ## EDX Au粒子とSiO₂基板のスペクトル
 
-![EDX Au粒子とSiO₂基板のスペクトル 模擬データ](assets/edx.png)
+![EDX Au粒子とSiO₂基板のスペクトル 模擬データ](assets/edx.png?v=27e45f64cf51)
 
 低エネルギー主ピークと弱い高エネルギーAu線。EDXマップと同じ元素を使う。
 
-[CSV](data/edx.csv) · [プロジェクト](projects/edx.plotproject) · [PNG 1200 dpi](figures/edx.png) · [SVG](figures/edx.svg) · [PDF](figures/edx.pdf)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=edx) · [CSV](data/edx.csv?v=27e45f64cf51) · [プロジェクトを保存](projects/edx.plotproject?v=27e45f64cf51) · [PNG 1200 dpi](figures/edx.png?v=27e45f64cf51) · [SVG](figures/edx.svg?v=27e45f64cf51) · [PDF](figures/edx.pdf?v=27e45f64cf51)
 
 ### データの作り方
 
@@ -159,11 +182,11 @@ O K、Si K、Au M/Lの近似ピーク位置に、エネルギー依存の検出�
 
 ## XPS Survey 表面元素の全体像
 
-![XPS Survey 表面元素の全体像 模擬データ](assets/xps-survey.png)
+![XPS Survey 表面元素の全体像 模擬データ](assets/xps-survey.png?v=27e45f64cf51)
 
 XPSの結合エネルギーは左が高く右が低い。Surveyで全体を確認し、CoreとFitで拡大する。
 
-[CSV](data/xps-survey.csv) · [プロジェクト](projects/xps-survey.plotproject) · [PNG 1200 dpi](figures/xps-survey.png) · [SVG](figures/xps-survey.svg) · [PDF](figures/xps-survey.pdf)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xps-survey) · [CSV](data/xps-survey.csv?v=27e45f64cf51) · [プロジェクトを保存](projects/xps-survey.plotproject?v=27e45f64cf51) · [PNG 1200 dpi](figures/xps-survey.png?v=27e45f64cf51) · [SVG](figures/xps-survey.svg?v=27e45f64cf51) · [PDF](figures/xps-survey.pdf?v=27e45f64cf51)
 
 ### データの作り方
 
@@ -183,11 +206,11 @@ Auの主要線は[HarwellXPSのAu解説](https://www.harwellxps.guru/xpskb/gold/
 
 ## XPS Core Au 4fダブレット
 
-![XPS Core Au 4fダブレット 模擬データ](assets/xps-core.png)
+![XPS Core Au 4fダブレット 模擬データ](assets/xps-core.png?v=27e45f64cf51)
 
 ピークの位置、幅、分裂。装置分解能や帯電条件は実測に合わせる。
 
-[CSV](data/xps-core.csv) · [プロジェクト](projects/xps-core.plotproject) · [PNG 1200 dpi](figures/xps-core.png) · [SVG](figures/xps-core.svg) · [PDF](figures/xps-core.pdf)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xps-core) · [CSV](data/xps-core.csv?v=27e45f64cf51) · [プロジェクトを保存](projects/xps-core.plotproject?v=27e45f64cf51) · [PNG 1200 dpi](figures/xps-core.png?v=27e45f64cf51) · [SVG](figures/xps-core.svg?v=27e45f64cf51) · [PDF](figures/xps-core.pdf?v=27e45f64cf51)
 
 ### データの作り方
 
@@ -207,11 +230,11 @@ Au 4f₇ᐟ₂/4f₅ᐟ₂の二重線。分裂3.67 eV、同じ幅、面積比4:
 
 ## XPS Fit 成分と合成曲線を重ねる
 
-![XPS Fit 成分と合成曲線を重ねる 模擬データ](assets/xps-fit.png)
+![XPS Fit 成分と合成曲線を重ねる 模擬データ](assets/xps-fit.png?v=27e45f64cf51)
 
 観測点、合成線、背景、色分け成分を比較。専用CSVではアプリが各ピークに背景を足して塗りつぶす。
 
-[CSV](data/xps-fit.csv) · [プロジェクト](projects/xps-fit.plotproject) · [PNG 1200 dpi](figures/xps-fit.png) · [SVG](figures/xps-fit.svg) · [PDF](figures/xps-fit.pdf)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xps-fit) · [CSV](data/xps-fit.csv?v=27e45f64cf51) · [プロジェクトを保存](projects/xps-fit.plotproject?v=27e45f64cf51) · [PNG 1200 dpi](figures/xps-fit.png?v=27e45f64cf51) · [SVG](figures/xps-fit.svg?v=27e45f64cf51) · [PDF](figures/xps-fit.pdf?v=27e45f64cf51)
 
 ### データの作り方
 
@@ -227,15 +250,17 @@ Coreと同じ模擬観測値に生成モデル・背景・2成分を重ねた。
 
 **系列設定：** Synthetic observation: X=列1、Y=列2。
 
+この作例では横軸範囲を79〜93 eV、目盛り間隔を4 eVに指定しています。結合エネルギーは左から右へ減少します。
+
 <a id="xafs"></a>
 
 ## XAFS 吸収端と吸収端後の構造
 
-![XAFS 吸収端と吸収端後の構造 模擬データ](assets/xafs.png)
+![XAFS 吸収端と吸収端後の構造 模擬データ](assets/xafs.png?v=27e45f64cf51)
 
 吸収端のシフト、白線、吸収端後の減衰振動。配位数や酸化数の推定に使える定量計算ではない。
 
-[CSV](data/xafs.csv) · [プロジェクト](projects/xafs.plotproject) · [PNG 1200 dpi](figures/xafs.png) · [SVG](figures/xafs.svg) · [PDF](figures/xafs.pdf)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=xafs) · [CSV](data/xafs.csv?v=27e45f64cf51) · [プロジェクトを保存](projects/xafs.plotproject?v=27e45f64cf51) · [PNG 1200 dpi](figures/xafs.png?v=27e45f64cf51) · [SVG](figures/xafs.svg?v=27e45f64cf51) · [PDF](figures/xafs.pdf?v=27e45f64cf51)
 
 ### データの作り方
 
@@ -255,11 +280,11 @@ arctan型吸収端、白線ピーク、sin(2kR+φ)の減衰振動を重ねた概
 
 ## Raman Spectrum 炭素材料のバンド比較
 
-![Raman Spectrum 炭素材料のバンド比較 模擬データ](assets/raman.png)
+![Raman Spectrum 炭素材料のバンド比較 模擬データ](assets/raman.png?v=27e45f64cf51)
 
 ピークの強度比と幅を見比べる。縦オフセットしたスペクトルの絶対強度を相互比較しない。
 
-[CSV](data/raman.csv) · [プロジェクト](projects/raman.plotproject) · [PNG 1200 dpi](figures/raman.png) · [SVG](figures/raman.svg) · [PDF](figures/raman.pdf)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=raman) · [CSV](data/raman.csv?v=27e45f64cf51) · [プロジェクトを保存](projects/raman.plotproject?v=27e45f64cf51) · [PNG 1200 dpi](figures/raman.png?v=27e45f64cf51) · [SVG](figures/raman.svg?v=27e45f64cf51) · [PDF](figures/raman.pdf?v=27e45f64cf51)
 
 ### データの作り方
 
@@ -279,11 +304,11 @@ D、G、2Dバンドに幅を持たせ、弱い蛍光背景とPoissonノイズを
 
 ## AFM Section 高さマップから取り出した断面
 
-![AFM Section 高さマップから取り出した断面 模擬データ](assets/afm-section.png)
+![AFM Section 高さマップから取り出した断面 模擬データ](assets/afm-section.png?v=27e45f64cf51)
 
 高さマップと断面を同じデータで説明できる。断面の各山は探針の影響を含む見かけの形状。
 
-[CSV](data/afm-section.csv) · [プロジェクト](projects/afm-section.plotproject) · [PNG 1200 dpi](figures/afm-section.png) · [SVG](figures/afm-section.svg) · [PDF](figures/afm-section.pdf)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=afm-section) · [CSV](data/afm-section.csv?v=27e45f64cf51) · [プロジェクトを保存](projects/afm-section.plotproject?v=27e45f64cf51) · [PNG 1200 dpi](figures/afm-section.png?v=27e45f64cf51) · [SVG](figures/afm-section.svg?v=27e45f64cf51) · [PDF](figures/afm-section.pdf?v=27e45f64cf51)
 
 ### データの作り方
 
@@ -303,11 +328,11 @@ MiFiTo用AFMナノ粒状表面と同一の高さ配列から、2本の水平断�
 
 ## 粒径ヒストグラム 対数正規分布
 
-![粒径ヒストグラム 対数正規分布 模擬データ](assets/particle-histogram.png)
+![粒径ヒストグラム 対数正規分布 模擬データ](assets/particle-histogram.png?v=27e45f64cf51)
 
 生の粒径を1行1粒子で入れる。計算済みの頻度表は粒径入力にしない。
 
-[CSV](data/particle-histogram.csv) · [プロジェクト](projects/particle-histogram.plotproject) · [PNG 1200 dpi](figures/particle-histogram.png) · [SVG](figures/particle-histogram.svg) · [PDF](figures/particle-histogram.pdf)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=particle-histogram) · [CSV](data/particle-histogram.csv?v=27e45f64cf51) · [プロジェクトを保存](projects/particle-histogram.plotproject?v=27e45f64cf51) · [PNG 1200 dpi](figures/particle-histogram.png?v=27e45f64cf51) · [SVG](figures/particle-histogram.svg?v=27e45f64cf51) · [PDF](figures/particle-histogram.pdf?v=27e45f64cf51)
 
 ### データの作り方
 
@@ -329,11 +354,11 @@ SEM粒子モデルに与えた190個の投影径を、そのまま粒径入力�
 
 ## 一般グラフ 飽和応答と反復データ
 
-![一般グラフ 飽和応答と反復データ 模擬データ](assets/general.png)
+![一般グラフ 飽和応答と反復データ 模擬データ](assets/general.png?v=27e45f64cf51)
 
 散布点・対称誤差棒・生成モデルを併記。曲線と点はX列が別でもよい。
 
-[CSV](data/general.csv) · [プロジェクト](projects/general.plotproject) · [PNG 1200 dpi](figures/general.png) · [SVG](figures/general.svg) · [PDF](figures/general.pdf)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=general) · [CSV](data/general.csv?v=27e45f64cf51) · [プロジェクトを保存](projects/general.plotproject?v=27e45f64cf51) · [PNG 1200 dpi](figures/general.png?v=27e45f64cf51) · [SVG](figures/general.svg?v=27e45f64cf51) · [PDF](figures/general.pdf?v=27e45f64cf51)
 
 ### データの作り方
 
@@ -353,11 +378,11 @@ Langmuir型q=qmax C/(K+C)から各濃度5回の独立模擬反復を作り、平
 
 ## Roughness 研磨時間と表面粗さ
 
-![Roughness 研磨時間と表面粗さ 模擬データ](assets/roughness.png)
+![Roughness 研磨時間と表面粗さ 模擬データ](assets/roughness.png?v=27e45f64cf51)
 
 対数Y軸で、初期改善と下限への収束を比較。AFM作例とは別の仮想研磨試験。
 
-[CSV](data/roughness.csv) · [プロジェクト](projects/roughness.plotproject) · [PNG 1200 dpi](figures/roughness.png) · [SVG](figures/roughness.svg) · [PDF](figures/roughness.pdf)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=roughness) · [CSV](data/roughness.csv?v=27e45f64cf51) · [プロジェクトを保存](projects/roughness.plotproject?v=27e45f64cf51) · [PNG 1200 dpi](figures/roughness.png?v=27e45f64cf51) · [SVG](figures/roughness.svg?v=27e45f64cf51) · [PDF](figures/roughness.pdf?v=27e45f64cf51)
 
 ### データの作り方
 
@@ -377,11 +402,11 @@ Rq(t)=Rq∞+(Rq₀−Rq∞) exp(−t/τ)に乗法性のばらつきを加え、�
 
 ## 棒グラフ 反復試験の比較
 
-![棒グラフ 反復試験の比較 模擬データ](assets/bar.png)
+![棒グラフ 反復試験の比較 模擬データ](assets/bar.png?v=27e45f64cf51)
 
 カテゴリ名をX列に置く。Yは平均、3列目はSD。現在の棒グラフ描画は誤差列を自動描画しないため、この作例ではSDから算出した線の注釈で誤差棒を表示している。値を変更したら注釈も更新する。有意差やp値は作成していない。
 
-[CSV](data/bar.csv) · [プロジェクト](projects/bar.plotproject) · [PNG 1200 dpi](figures/bar.png) · [SVG](figures/bar.svg) · [PDF](figures/bar.pdf)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=bar) · [CSV](data/bar.csv?v=27e45f64cf51) · [プロジェクトを保存](projects/bar.plotproject?v=27e45f64cf51) · [PNG 1200 dpi](figures/bar.png?v=27e45f64cf51) · [SVG](figures/bar.svg?v=27e45f64cf51) · [PDF](figures/bar.pdf?v=27e45f64cf51)
 
 ### データの作り方
 
@@ -401,11 +426,11 @@ Rq(t)=Rq∞+(Rq₀−Rq∞) exp(−t/τ)に乗法性のばらつきを加え、�
 
 ## Raman 3D 時系列スペクトル
 
-![Raman 3D 時系列スペクトル 模擬データ](assets/raman-3d.png)
+![Raman 3D 時系列スペクトル 模擬データ](assets/raman-3d.png?v=27e45f64cf51)
 
 時系列のバンド形状変化を俯瞰。個別正規化しているため絶対強度の増減を示す図ではない。
 
-[CSV](data/raman-3d.csv) · [プロジェクト](projects/raman-3d.plotproject) · [PNG 1200 dpi](figures/raman-3d.png) · [SVG](figures/raman-3d.svg) · [PDF](figures/raman-3d.pdf)
+[Web版で開く](https://murajun620-crypto.github.io/plot_launcher_web/?gallery=raman-3d) · [CSV](data/raman-3d.csv?v=27e45f64cf51) · [プロジェクトを保存](projects/raman-3d.plotproject?v=27e45f64cf51) · [PNG 1200 dpi](figures/raman-3d.png?v=27e45f64cf51) · [SVG](figures/raman-3d.svg?v=27e45f64cf51) · [PDF](figures/raman-3d.pdf?v=27e45f64cf51)
 
 ### データの作り方
 
@@ -429,8 +454,8 @@ Rq(t)=Rq∞+(Rq₀−Rq∞) exp(−t/τ)に乗法性のばらつきを加え、�
 - General、Roughness、棒グラフの誤差棒は独立模擬反復5回の標本SD。元の反復データもCSVで添付。
 - XPS Fitの線は既知の生成モデルで、実測データへのフィッティングではありません。XAFSは形状を説明する概念モデルです。
 
-反復CSV：[一般グラフ](data/general_replicates.csv)、[粗さ](data/roughness_replicates.csv)、[棒グラフ](data/bar_replicates.csv)。
+反復CSV：[一般グラフ](data/general_replicates.csv?v=27e45f64cf51)、[粗さ](data/roughness_replicates.csv?v=27e45f64cf51)、[棒グラフ](data/bar_replicates.csv?v=27e45f64cf51)。
 
 サンセリフ書体、判読できる文字、適切な線幅、写真へのスケールバーという方針は、[Natureの最終図版ガイド](https://www.nature.com/documents/NRJs-guide-to-preparing-final-artwork.pdf)を参考にしました。特定誌の採択や科学的妥当性を保証する意味ではありません。
 
-乱数の初期値は20261004。図はPlotLauncher Web v1.2.0の公開版と同じ描画コードを使用。ローカルのMatplotlib Aggで出力したため、ブラウザ実行時のライブラリ版によりごく小さな文字位置の差が生じる場合があります。
+乱数の初期値は20261004。掲載図のPNG・SVG・PDFは、全16プロジェクトをPlotLauncher Web v1.2.1のアプリ画面で開き、保存ボタンから出力しました。CSVと描画設定は各プロジェクトに同梱しています。

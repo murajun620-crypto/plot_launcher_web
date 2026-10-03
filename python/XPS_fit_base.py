@@ -210,6 +210,8 @@ for _, _, y2i in fill_rules:
 y_max = max([v for v in y_max_candidates if np.isfinite(v)] + [1.0])
 ax.set_ylim(-0.1 * y_max, 1.1 * y_max)
 apply_axis_overrides_from_env(ax)
+if not ax.xaxis_inverted():
+    ax.invert_xaxis()
 
 AXIS_OPTIONS = dict(
     hide_xticklabels=False,
