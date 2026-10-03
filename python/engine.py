@@ -533,6 +533,9 @@ class PlotEngine:
                 else:
                     annotation_axes = axes
                 editable_axes = [("x", axes.xaxis), ("y", axes.zaxis if preset == "Raman 3D" else axes.yaxis)]
+                positioned_labels = {}
+                if preset == "Raman 3D":
+                    figure.canvas.draw()  # Resolve the native projected label rotations first.
                 for name, axis in editable_axes:
                     axis.label.set_fontweight("normal")
                     position = [number(config.get("axes", {}).get(f"{name}Label{coordinate}", ""), "軸ラベル位置", minimum=-10, maximum=10, optional=True) for coordinate in ("X", "Y")]
@@ -540,14 +543,15 @@ class PlotEngine:
                         raise ValueError("軸ラベルのX・Y位置を両方指定してください。")
                     if position[0] is not None:
                         if preset == "Raman 3D":
-                            # 3D Axis calculates its label position during draw.
-                            # Override immediately before Text.draw, in every output backend.
-                            original_draw = axis.label.draw
-                            def draw_positioned_label(renderer, text=axis.label, xy=position, draw=original_draw):
-                                text.set_transform(axes.transAxes)
-                                text.set_position(xy)
-                                return draw(renderer)
-                            axis.label.draw = draw_positioned_label
+                            # 3D Axis overwrites its label transform, including after
+                            # Text.draw in newer Matplotlib. Keep the native typography
+                            # on a separate, stable 2D artist for manual placement.
+                            label = axis.label
+                            positioned_labels[name] = axes.text2D(*position, label.get_text(), transform=axes.transAxes,
+                                fontproperties=label.get_fontproperties(), color=label.get_color(),
+                                horizontalalignment=label.get_ha(), verticalalignment=label.get_va(),
+                                rotation=label.get_rotation(), visible=label.get_visible(), clip_on=False)
+                            label.set_visible(False)
                         else:
                             axis.set_label_coords(*position)
                 annotations = config.get("annotations", [])
@@ -582,7 +586,7 @@ class PlotEngine:
                 figure.canvas.draw()
                 plot_utils.expand_figure_to_include_artists(figure)
                 image = BytesIO()
-                extra_artists = [axes.xaxis.label, axes.yaxis.label, axes.zaxis.label] if preset == "Raman 3D" else None
+                extra_artists = [positioned_labels.get("x", axes.xaxis.label), axes.yaxis.label, positioned_labels.get("y", axes.zaxis.label)] if preset == "Raman 3D" else None
                 figure.savefig(image, format="svg", bbox_inches="tight", bbox_extra_artists=extra_artists, pad_inches=0.05, transparent=values["PLOT_FIGURE_BACKGROUND_ALPHA"] == "0")
                 # Hit areas must use SVG text metrics, exactly as the preview,
                 # rather than Agg bitmap metrics (noticeably different fonts).
@@ -598,7 +602,7 @@ class PlotEngine:
                     return [(b.x0 - box.x0) / box.width, (box.y1 - b.y1) / box.height, b.width / box.width, b.height / box.height]
                 geometry = {"axes": svg_box(axes.get_window_extent(renderer)), "legend": svg_box(legend.get_window_extent(renderer)) if legend else None, "annotations": [], "axisLabels": [], "tickLabels": []}
                 for name, axis in editable_axes:
-                    label = axis.label
+                    label = positioned_labels.get(name, axis.label)
                     if label.get_visible() and label.get_text():
                         anchor = axes.transAxes.inverted().transform(label.get_transform().transform(label.get_position()))
                         geometry["axisLabels"].append({"id": f"axis-label-{name}", "axis": name, "kind": "label", "box": svg_box(label.get_window_extent(renderer)), "anchor": list(map(float, anchor))})
