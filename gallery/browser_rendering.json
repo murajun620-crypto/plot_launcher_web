@@ -1,7 +1,7 @@
 {
   "renderer": "web application in browser",
   "exportRoute": "application UI save button",
-  "created": "2026-10-03T23:04:08.474683+00:00",
+  "created": "2026-10-03T23:12:13.197335+00:00",
   "projects": [
     {
       "slug": "cv",
@@ -776,6 +776,104 @@
       "yRange": [
         0.0,
         1.08
+      ]
+    },
+    {
+      "slug": "raman-viridis",
+      "projectSha256": "ffcc9633f08ff3568c757f906c4cf6440056db7addb38b1ac2b87cb7566cbf1d",
+      "files": [
+        {
+          "path": "figures/raman-viridis.png",
+          "bytes": 550696,
+          "sha256": "341cb11269cd8a1c40c0bf49d88f25fa70ff45652a5a377e2b786db1403192a8"
+        },
+        {
+          "path": "figures/raman-viridis.svg",
+          "bytes": 99154,
+          "sha256": "ddb8a607aa91593e9a9cfacdcb6940687ab1f0392378dfdca4bbe4ae3a5bc469"
+        },
+        {
+          "path": "figures/raman-viridis.pdf",
+          "bytes": 36114,
+          "sha256": "2f4c4ca2672a9a0136fc49bdd4e3d44faeae59f1a30f6a2c9eb5548a319a9392"
+        },
+        {
+          "path": "assets/raman-viridis.png",
+          "bytes": 182693,
+          "sha256": "425daf6b5d4e212d2f8d404eb9f482def76003bea6e8aa15258752e1484f51c2"
+        }
+      ],
+      "uiVerified": true,
+      "typography": {
+        "width": 6.0,
+        "height": 6.0,
+        "fontScale": 1.0,
+        "tickFontScale": 1.0,
+        "labelFontScale": 1.0,
+        "legendScale": 1.0,
+        "legendFontScale": 1.0
+      },
+      "svgTextSizesPt": [
+        6.0,
+        7.0,
+        8.0
+      ],
+      "xRange": [
+        1000.0,
+        3000.0
+      ],
+      "yRange": [
+        0.0,
+        12500.0
+      ]
+    },
+    {
+      "slug": "raman-spectrum",
+      "projectSha256": "a221c26324b0b05c833d7dd7735f7e9053b5d5999b29e0d36cdb45c69ced9be8",
+      "files": [
+        {
+          "path": "figures/raman-spectrum.png",
+          "bytes": 534406,
+          "sha256": "eb6277a4dfda51c0d5ea161b7721c7870e30329f1bc57a8611352cae5dc47616"
+        },
+        {
+          "path": "figures/raman-spectrum.svg",
+          "bytes": 99154,
+          "sha256": "43b60ddddaf5d2ccdd6ee523f1e444aae80ced3a191f75d0915ac4efc8846bfe"
+        },
+        {
+          "path": "figures/raman-spectrum.pdf",
+          "bytes": 36026,
+          "sha256": "94d6b6c90216f6726a0cd9a9fb74f4cab5b871d1fccb754293040f775fa552ce"
+        },
+        {
+          "path": "assets/raman-spectrum.png",
+          "bytes": 169138,
+          "sha256": "adf638c639e6ffbbe6c505b41a144b0e55a32bfd7b636e01597c613312fc0b26"
+        }
+      ],
+      "uiVerified": true,
+      "typography": {
+        "width": 6.0,
+        "height": 6.0,
+        "fontScale": 1.0,
+        "tickFontScale": 1.0,
+        "labelFontScale": 1.0,
+        "legendScale": 1.0,
+        "legendFontScale": 1.0
+      },
+      "svgTextSizesPt": [
+        6.0,
+        7.0,
+        8.0
+      ],
+      "xRange": [
+        1000.0,
+        3000.0
+      ],
+      "yRange": [
+        0.0,
+        12500.0
       ]
     }
   ]
