@@ -223,13 +223,15 @@ button:focus-visible,summary:focus-visible,a:focus-visible{outline:2px solid #ab
 .color-icon:disabled{cursor:default;opacity:.5}
 
 
-.series-visibility{display:flex;align-items:center;gap:7px;font-size:11px;margin-bottom:9px}
+.series-card .series-visibility{display:flex;flex-direction:row;align-items:center;gap:7px;font-size:11px;margin-bottom:9px}
 .background-hit-target{position:absolute;pointer-events:auto;border:0;background:transparent;padding:0;cursor:pointer}
 .background-hit-target:focus-visible{outline:1px dashed #205eb0;outline-offset:-2px}
 .data-hit-target{cursor:pointer;touch-action:none}
 .data-hit-target:hover,.data-hit-target:focus-visible{stroke:#205eb045}
 .data-hit-target[fill="transparent"]:hover,.data-hit-target[fill="transparent"]:focus-visible{fill:#205eb025;stroke:none}
 .axis-tick-target:hover{background:transparent;border-color:transparent}
+#figure-interactions:has([data-axis-kind="ticks"][data-edit-axis="x"]:hover) [data-axis-kind="ticks"][data-edit-axis="x"],
+#figure-interactions:has([data-axis-kind="ticks"][data-edit-axis="y"]:hover) [data-axis-kind="ticks"][data-edit-axis="y"],
 .axis-tick-target.highlighted{background:#205eb018;border:1px dashed #205eb0}
 #element-editor{width:min(430px,calc(100vw - 24px))}
 #element-editor .series-card{border:0;padding:0}
