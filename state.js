@@ -78,6 +78,48 @@ export function makeSettings(config, metadata, headerRow) {
   };
 }
 
+const MB = 1024 * 1024;
+export const PROJECT_MAX_SIZE = 130 * MB;
+
+function projectBytes(value, limit) {
+  if (typeof value !== 'string' || !value.length || value.length > Math.ceil(limit / 3) * 4 || value.length % 4 || !/^[A-Za-z0-9+/]*={0,2}$/.test(value)) throw new Error('プロジェクトのデータが壊れています。');
+  const binary = atob(value);
+  if (binary.length > limit) throw new Error('プロジェクトのデータが大きすぎます。');
+  return Uint8Array.from(binary, char => char.charCodeAt(0)).buffer;
+}
+
+function projectBase64(bytes) {
+  const array = new Uint8Array(bytes);
+  let binary = '';
+  for (let i = 0; i < array.length; i += 32768) binary += String.fromCharCode(...array.subarray(i, i + 32768));
+  return btoa(binary);
+}
+
+export function makeProject(settings, data, fonts = [], workspace = {}) {
+  const saved = {format:'plotlauncher-project', version:1, settings:structuredClone(settings),
+    data:{filename:data.filename, base64:projectBase64(data.bytes), sheetIndex:data.sheetIndex, headerRow:data.headerRow, sample:!!data.sample},
+    fonts:fonts.map(font => ({name:font.name, family:font.family, base64:projectBase64(font.bytes)})), workspace:structuredClone(workspace)};
+  parseProject(saved);
+  return saved;
+}
+
+export function parseProject(saved) {
+  if (saved?.format !== 'plotlauncher-project' || saved.version !== 1) throw new Error('PlotLauncher Webのプロジェクトファイルを選んでください。');
+  const data = saved.data, settings = saved.settings, workspace = saved.workspace || {};
+  if (!data || typeof data.filename !== 'string' || data.filename.length > 255 || !/\.(xlsx|xlsm|xls|csv)$/i.test(data.filename) || !Number.isInteger(data.sheetIndex) || data.sheetIndex < 0 || data.sheetIndex > 1000 || !Number.isInteger(data.headerRow) || data.headerRow < 1 || data.headerRow > 1000 || typeof data.sample !== 'boolean') throw new Error('プロジェクトのデータ・シート・ヘッダー行を確認してください。');
+  if (settings?.format !== 'plotlauncher-web' || settings.version !== 1 || settings.data?.filename !== data.filename || settings.data?.headerRow !== data.headerRow || !Array.isArray(settings.series) || !settings.series.length || !settings.axes) throw new Error('プロジェクトのグラフ設定を確認してください。');
+  if (!Array.isArray(saved.fonts) || saved.fonts.length > 32) throw new Error('プロジェクトのフォントを確認してください。');
+  let total = 0;
+  const fonts = saved.fonts.map(font => {
+    if (typeof font?.name !== 'string' || font.name.length > 255 || typeof font.family !== 'string' || !font.family || font.family.length > 200) throw new Error('プロジェクトのフォントを確認してください。');
+    const bytes = projectBytes(font.base64, 20 * MB); total += bytes.byteLength;
+    if (total > 60 * MB) throw new Error('プロジェクトのフォントは合計60 MB以内にしてください。');
+    return {name:font.name, family:font.family, bytes};
+  });
+  if (typeof workspace.saveName !== 'string' || workspace.saveName.length > 120 || ![150,300,600,1200].includes(workspace.pngDpi) || !workspace.view || !Number.isFinite(workspace.view.zoom) || workspace.view.zoom < .25 || workspace.view.zoom > 4 || !Number.isFinite(workspace.view.x) || !Number.isFinite(workspace.view.y) || !Array.isArray(workspace.sections) || workspace.sections.length > 20 || workspace.sections.some(open => typeof open !== 'boolean')) throw new Error('プロジェクトの画面・保存設定を確認してください。');
+  return {settings:structuredClone(settings), data:{...data, bytes:projectBytes(data.base64,30 * MB)}, fonts, workspace:structuredClone(workspace)};
+}
+
 export function restoreSettings(document, metadata) {
   if (document?.plot_type && !document.format) return restoreSettings(fromDesktopSettings(document, metadata), metadata);
   if (document?.format !== "plotlauncher-web" || document.version !== 1 || !Array.isArray(document.series) || document.series.length < 1 || document.series.length > 32 || !document.axes || typeof document.axes !== "object") {

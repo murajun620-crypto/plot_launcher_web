@@ -6,8 +6,8 @@
   <meta name="description" content="Excel・CSVの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=bb53cfb5d60e">
-  <script type="module" src="./app.js?v=a011d08a6752"></script>
+  <link rel="stylesheet" href="./style.css?v=655dedd8f2dd">
+  <script type="module" src="./app.js?v=655dedd8f2dd"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -28,8 +28,11 @@
     </a>
     <div class="header-actions">
       <span class="privacy-note"><span class="privacy-dot"></span>データはブラウザ内で処理</span>
-      <button id="open-settings" class="button quiet" aria-label="設定を開く" title="設定を開く" disabled><svg><use href="#i-upload"/></svg><span>設定を開く</span></button>
-      <button id="save-settings" class="button quiet" aria-label="設定を保存" title="設定を保存" disabled><svg><use href="#i-download"/></svg><span>設定を保存</span></button>
+      <button id="open-project" class="button quiet" title="データと設定をまとめて開きます（Ctrl/Command＋O）" disabled><svg><use href="#i-upload"/></svg><span>プロジェクトを開く</span></button>
+      <button id="save-project" class="button primary" title="データと設定をまとめて保存します（Ctrl/Command＋S）" disabled><svg><use href="#i-download"/></svg><span>プロジェクトを保存</span></button>
+      <input id="project-file" type="file" accept=".plotproject,.json,application/json" hidden>
+      <button id="open-settings" class="button quiet" aria-label="設定を開く" title="設定のみを開きます。先にデータを選んでください（Ctrl/Command＋Shift＋O）" disabled><svg><use href="#i-upload"/></svg><span>設定を開く</span></button>
+      <button id="save-settings" class="button quiet" aria-label="設定を保存" title="設定のみを保存します。データは含みません（Ctrl/Command＋Shift＋S）" disabled><svg><use href="#i-download"/></svg><span>設定を保存</span></button>
       <input id="settings-file" type="file" accept=".json,application/json" hidden>
     </div>
   </header>

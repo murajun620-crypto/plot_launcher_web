@@ -1,4 +1,4 @@
-import { COLORS, COLOR_PALETTE, applyPreset, createSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=218d4aa777cf";
+import { COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=655dedd8f2dd";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -11,6 +11,8 @@ let revision = 0, renderedRevision = -1, renderRunning = false, renderWanted = f
 let previewURL, figureResult, dragging;
 let colorTarget;
 const recentColors = [];
+let sourceData = null;
+const importedFonts = new Map();
 let presets = [], selected = new Set(), clipboard = [], view = {zoom:1,x:0,y:0}, panning;
 let history = [], future = [], lastState, restoring = false;
 const catalogReady = fetch(new URL("./presets.json" + new URL(import.meta.url).search, import.meta.url)).then(response => {if(!response.ok) throw new Error("プリセットの読み込みに失敗しました"); return response.json();}).then(items => {
@@ -46,6 +48,8 @@ function status(text, kind = "working") {
 
 function updateButtons() {
   const busy = loading || exporting;
+  $("#open-project").disabled = !engineReady || busy;
+  $("#save-project").disabled = !engineReady || busy || !sourceData || !metadata || !config.series.length;
   $("#drop-zone").disabled = !engineReady || busy;
   $("#sample-data").disabled = !engineReady || busy;
   $("#plot-fields").disabled = !engineReady || !metadata || busy;
@@ -66,7 +70,7 @@ function request(operation, args) {
   return new Promise((resolve, reject) => {
     const id = ++requestID;
     requests.set(id, { resolve, reject });
-    worker.postMessage({ id, operation, args }, args.bytes ? [args.bytes] : []);
+    worker.postMessage({ id, operation, args }, [args.bytes, ...(args.fonts || []).map(font => font.bytes)].filter(Boolean));
   });
 }
 
@@ -84,7 +88,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=218d4aa777cf", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=655dedd8f2dd", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -396,9 +400,11 @@ async function loadFile(file, isSample = false, reload = false) {
     const filename = reload ? metadata.filename : file.name;
     const args = { filename, headerRow, sheetIndex: reload ? Number($("#sheet-select").value) : 0 };
     if (!reload) args.bytes = await file.arrayBuffer();
+    const originalBytes = args.bytes?.slice(0);
     const previous = metadata;
     metadata = await request("load", args);
     loadedHeader = metadata.headerRow || headerRow;
+    if (!reload) sourceData = {filename, bytes:originalBytes};
     sample = reload ? sample : isSample;
     // Retain settings if the same columns are still present after a sheet/header change.
     let retained;
@@ -556,10 +562,10 @@ $("#data-file").addEventListener("change", event => { const file = event.target.
 $("#drop-zone").addEventListener("click", () => $("#data-file").click());
 for (const type of ["dragenter", "dragover"]) $("#drop-zone").addEventListener(type, event => { event.preventDefault(); if (!event.currentTarget.disabled) event.currentTarget.classList.add("drag-over"); });
 $("#drop-zone").addEventListener("dragleave", event => event.currentTarget.classList.remove("drag-over"));
-$("#drop-zone").addEventListener("drop", event => { event.preventDefault();event.stopPropagation();event.currentTarget.classList.remove("drag-over"); const file=event.dataTransfer.files[0];if(!event.currentTarget.disabled && file){if(/\.json$/i.test(file.name))readSettings(file);else loadFile(file);} });
+$("#drop-zone").addEventListener("drop", event => { event.preventDefault();event.stopPropagation();event.currentTarget.classList.remove("drag-over"); const file=event.dataTransfer.files[0];if(!event.currentTarget.disabled && file){openDroppedFile(file);} });
 // Dropping a file elsewhere must not navigate away and discard the settings.
 window.addEventListener("dragover", event => event.preventDefault());
-window.addEventListener("drop", event => {event.preventDefault();const file=event.dataTransfer.files[0];if(file && /\.json$/i.test(file.name))readSettings(file);});
+window.addEventListener("drop", event => {event.preventDefault();const file=event.dataTransfer.files[0];if(file && /\.(json|plotproject)$/i.test(file.name))openDroppedFile(file);});
 $("#sample-data").addEventListener("click", loadSample);
 $("#sheet-select").addEventListener("change", () => loadFile(null, false, true));
 $("#header-row").addEventListener("change", () => loadFile(null, false, true));
@@ -607,6 +613,57 @@ $("#add-series").addEventListener("click", () => {
 $("#refresh-preview").addEventListener("click", () => { clearTimeout(renderTimer); renderWanted = true; renderPreview(); });
 $$('[data-export]').forEach(button => button.addEventListener("click", () => exportFigure(button.dataset.export)));
 $("#copy-image").addEventListener("click", copyFigureImage);
+$("#open-project").addEventListener("click", () => $("#project-file").click());
+$("#project-file").addEventListener("change", event => {
+  const file=event.target.files[0]; event.target.value=""; if(file) readProject(file);
+});
+function saveProject() {
+  if(!engineReady || loading || exporting || !sourceData || !metadata || !config.series.length)return;
+  try {
+    const project=makeProject(makeSettings(config,metadata,loadedHeader), {...sourceData,sheetIndex:metadata.sheetIndex,headerRow:loadedHeader,sample}, [...importedFonts.values()], {
+      saveName:$("#save-name").value,pngDpi:Number($("#png-dpi").value),view:{...view},sections:$$('#controls-panel .control-section').map(section=>section.open)
+    });
+    const blob=new Blob([JSON.stringify(project)],{type:'application/json'});
+    if(blob.size>PROJECT_MAX_SIZE)throw new Error('プロジェクトは130 MB以内にしてください。');
+    const filename=`${safeStem($("#save-name").value)}.plotproject`;
+    download(blob,filename); status(`${filename} を保存しました。データと設定をまとめて再開できます。`,'ready');
+  } catch(error){status(`プロジェクトを保存できませんでした: ${error.message}`,'error');}
+}
+$("#save-project").addEventListener("click",saveProject);
+async function readProject(file, saved) {
+  if(!engineReady || loading || exporting)return;
+  loading=true; updateButtons(); status('プロジェクトを開いています…');
+  try {
+    if(file.size>PROJECT_MAX_SIZE)throw new Error('プロジェクトは130 MB以内のファイルを選んでください。');
+    const project=parseProject(saved || JSON.parse(await file.text()));
+    const retainedData={filename:project.data.filename,bytes:project.data.bytes.slice(0)};
+    const retainedFonts=project.fonts.map(font=>({...font,bytes:font.bytes.slice(0)}));
+    const result=await request('project',{filename:project.data.filename,bytes:project.data.bytes,sheetIndex:project.data.sheetIndex,headerRow:project.data.headerRow,settings:project.settings,fonts:project.fonts});
+    metadata=result.metadata; config=result.config; sourceData=retainedData; sample=project.data.sample; loadedHeader=metadata.headerRow;
+    importedFonts.clear(); retainedFonts.forEach(font=>importedFonts.set(font.name,font));
+    loadedFonts.clear(); ['Liberation Sans','Noto Sans JP','DejaVu Sans',...result.families].forEach(family=>loadedFonts.add(family));
+    for(const selector of ['#font-family','#japanese-font-family'])$(selector).replaceChildren(...[...loadedFonts].map(family=>new Option(family,family)));
+    clearTimeout(renderTimer); ++revision; selected.clear(); history=[]; future=[]; lastState=structuredClone(config);
+    $("#undo").disabled=$("#redo").disabled=true;
+    view={...project.workspace.view}; $("#save-name").value=project.workspace.saveName; $("#png-dpi").value=String(project.workspace.pngDpi);
+    $$('dialog[open]').forEach(dialog=>dialog.close());
+    resetPreview(); drawMetadata(); drawControls();
+    $$('#controls-panel .control-section').forEach((section,index)=>{section.open=project.workspace.sections[index] ?? true;});
+    renderWanted=true;
+  } catch(error){status(`プロジェクトを開けませんでした: ${error.message}`,'error');}
+  finally{loading=false;updateButtons();if(renderWanted)renderPreview();}
+}
+async function openDroppedFile(file) {
+  if(/\.plotproject$/i.test(file.name)){await readProject(file);return;}
+  if(/\.json$/i.test(file.name)){
+    if(file.size>PROJECT_MAX_SIZE){status('ファイルが大きすぎます。','error');return;}
+    try {const saved=JSON.parse(await file.text());if(saved?.format==='plotlauncher-project'){await readProject(file,saved);return;}}
+    catch{status('JSONファイルを読み込めません。','error');return;}
+    await readSettings(file);return;
+  }
+  await loadFile(file);
+}
+
 $("#save-settings").addEventListener("click", () => {
   download(new Blob([JSON.stringify(makeSettings(config, metadata, loadedHeader), null, 2)], { type: "application/json" }), `${safeStem($("#save-name").value)}.plot.json`);
   status("設定JSONを保存しました。データ自体は含まれていません。", "ready");
@@ -643,7 +700,9 @@ $("#font-file").addEventListener("change", async event => {
   try {
     for (const file of files) {
       if (file.size > 20 * 1024 * 1024) throw new Error("フォントは20 MB以内にしてください。");
-      const result = await request("font", { bytes: await file.arrayBuffer() });
+      const bytes=await file.arrayBuffer(), originalBytes=bytes.slice(0);
+      const result = await request("font", { bytes });
+      importedFonts.set(file.name,{name:file.name,family:result.family,bytes:originalBytes});
       for (const selector of ["#font-family", "#japanese-font-family"]) {
         const field=$(selector), option=[...field.options].find(option=>option.value===result.family);
         if(option) option.textContent=result.family;
@@ -866,8 +925,8 @@ window.addEventListener('keydown',event=>{
   else if(control&&key==='z'){event.preventDefault();restoreHistory(event.shiftKey);}
   else if(control&&key==='y'){event.preventDefault();restoreHistory(true);}
   else if(control&&['+','=','-','0'].includes(key)){event.preventDefault();if(key==='0')$('#zoom-reset').click();else zoomPreview(key==='-'?1/1.1:1.1);}
-  else if(control&&key==='s'){event.preventDefault();$('#save-settings').click();}
-  else if(control&&key==='o'){event.preventDefault();$('#open-settings').click();}
+  else if(control&&key==='s'){event.preventDefault();$(event.shiftKey?'#save-settings':'#save-project').click();}
+  else if(control&&key==='o'){event.preventDefault();$(event.shiftKey?'#open-settings':'#open-project').click();}
 });
 try { startWorker(); }
 catch (error) { fatal(`描画機能を開始できませんでした。ブラウザを更新してください。${error.message}`); }

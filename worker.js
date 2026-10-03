@@ -1,3 +1,4 @@
+import { restoreSettings } from "./state.js?v=655dedd8f2dd";
 // All user data stays in this worker's in-memory filesystem.
 const PYODIDE_VERSION = "0.29.3";
 const INDEX_URL = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
@@ -53,11 +54,16 @@ let queue = Promise.resolve();
 self.onmessage = ({ data }) => {
   queue = queue.catch(() => {}).then(async () => {
     const { id, operation, args } = data;
-    let uploadPath;
+    let uploadPath, projectSnapshot = false;
+    const projectFonts = [];
     try {
       await ready;
       let payload = args;
-      if (operation === "load") {
+      if (operation === "project") {
+        pyodide.runPython("from matplotlib import font_manager\n_project_previous = dict(_engine.__dict__)\n_project_previous['font_families'] = set(_engine.font_families)\n_project_fonts = list(font_manager.fontManager.ttflist)");
+        projectSnapshot = true;
+      }
+      if (operation === "load" || operation === "project") {
         const extension = args.filename.split(".").pop().toLowerCase();
         if (!["xlsx", "xlsm", "xls", "csv"].includes(extension)) throw new Error("ExcelまたはCSVファイルを選んでください。");
         if (args.bytes) {
@@ -71,17 +77,33 @@ self.onmessage = ({ data }) => {
         pyodide.FS.writeFile(path, new Uint8Array(args.bytes));
         payload = { path };
       }
-      const result = JSON.parse(dispatch(operation, JSON.stringify(payload)));
+      let result = JSON.parse(dispatch(operation === "project" ? "load" : operation, JSON.stringify(payload)));
+      if (operation === "project") {
+        if (result.sheets[result.sheetIndex] !== args.settings.data.sheet) throw new Error("プロジェクトのシートが設定と一致しません。");
+        const config = restoreSettings(args.settings, result), families = [];
+        for (const font of args.fonts) {
+          const path = `/app/user-font-${++uploadNumber}.ttf`;
+          projectFonts.push(path); pyodide.FS.writeFile(path, new Uint8Array(font.bytes));
+          const registered = JSON.parse(dispatch("font", JSON.stringify({path})));
+          if (registered.family !== font.family) throw new Error("プロジェクトのフォントが設定と一致しません。");
+          families.push(registered.family);
+        }
+        result = {metadata:result, config, families};
+      }
       if (uploadPath) {
         if (currentPath) pyodide.FS.unlink(currentPath);
         currentPath = uploadPath;
       }
       self.postMessage({ type: "result", id, result });
     } catch (error) {
+      if (projectSnapshot) pyodide.runPython("_engine.__dict__.clear()\n_engine.__dict__.update(_project_previous)\nfont_manager.fontManager.ttflist = _project_fonts\nfont_manager.fontManager._findfont_cached.cache_clear()");
+      for (const path of projectFonts) { try { pyodide.FS.unlink(path); } catch {} }
       if (uploadPath) { try { pyodide.FS.unlink(uploadPath); } catch {} }
       const text = String(error);
       const message = text.split("\n").filter(Boolean).pop().replace(/^(ValueError|RuntimeError|IndexError|EmptyDataError|ParserError):\s*/, "");
       self.postMessage({ type: "error", id, error: message, detail: text });
+    } finally {
+      if (projectSnapshot) pyodide.runPython("del _project_previous, _project_fonts");
     }
   });
 };
