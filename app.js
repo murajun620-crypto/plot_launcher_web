@@ -1,4 +1,4 @@
-import { COLORS, applyPreset, createSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=f4fb366b367d";
+import { COLORS, applyPreset, createSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=89b86f7c9f3a";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -12,7 +12,7 @@ let previewURL, figureResult, dragging;
 let presets = [], selected = new Set(), clipboard = [], view = {zoom:1,x:0,y:0}, panning;
 let history = [], future = [], lastState, restoring = false;
 const compactLayout = window.matchMedia("(max-width:720px), (max-width:1100px) and (orientation:portrait), (max-width:1100px) and (max-height:500px)");
-let mobilePane = "settings", touchMultiSelect = false, touchGesture = null, touchSuppressed = false;
+let mobileExpanded = false, mobileScrollTop = 0, touchMultiSelect = false, touchGesture = null, touchSuppressed = false;
 const touchPoints = new Map();
 const touchFriendly = () => window.matchMedia("(pointer: coarse)").matches || compactLayout.matches;
 const catalogReady = fetch(new URL("./presets.json" + new URL(import.meta.url).search, import.meta.url)).then(response => {if(!response.ok) throw new Error("プリセットの読み込みに失敗しました"); return response.json();}).then(items => {
@@ -88,7 +88,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=f4fb366b367d", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=89b86f7c9f3a", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -695,37 +695,52 @@ function clearTouchGesture() {
 
 function updateMobileLayout() {
   clearTouchGesture();
-  document.body.dataset.mobilePane = mobilePane;
-  for (const [pane, panelID, tabID] of [["settings", "controls-panel", "settings-tab"], ["preview", "preview-panel", "preview-tab"]]) {
-    const panel = $("#" + panelID), tab = $("#" + tabID), active = pane === mobilePane;
-    panel.inert = compactLayout.matches && !active;
-    if (compactLayout.matches) { panel.setAttribute("role", "tabpanel"); panel.setAttribute("aria-labelledby", tabID); }
-    else { panel.removeAttribute("role"); panel.removeAttribute("aria-labelledby"); }
-    tab.setAttribute("aria-selected", String(active)); tab.tabIndex = active ? 0 : -1;
-  }
+  if (!compactLayout.matches) mobileExpanded = false;
+  document.body.dataset.mobileExpanded = String(mobileExpanded);
+  $("#controls-panel").inert = mobileExpanded;
+  $(".app-header").inert = mobileExpanded;
+  const panel = $("#preview-panel"), button = $("#mobile-expand");
+  if (mobileExpanded) { panel.setAttribute("role", "dialog"); panel.setAttribute("aria-modal", "true"); panel.setAttribute("aria-label", "グラフプレビュー"); }
+  else { for (const attribute of ["role", "aria-modal", "aria-label"]) panel.removeAttribute(attribute); }
+  button.textContent = mobileExpanded ? "設定に戻る" : "大きく見る";
+  button.setAttribute("aria-expanded", String(mobileExpanded));
+  updateMobileOffset();
   layoutPreview();
 }
 
-function selectMobilePane(pane) {
-  if (!["settings", "preview"].includes(pane)) return;
-  mobilePane = pane; updateMobileLayout();
-  if (compactLayout.matches) window.scrollTo({top:0,behavior:"instant"});
+function updateMobileOffset() {
+  const offset = $(".app-header").getBoundingClientRect().height + $("#preview-panel").getBoundingClientRect().height + 12;
+  document.body.style.setProperty("--mobile-preview-offset", `${offset}px`);
+  const field = document.activeElement;
+  if (compactLayout.matches && !mobileExpanded && field?.closest("#controls-panel") && field.matches("input,textarea,select")) {
+    const bounds = field.getBoundingClientRect(), height = window.visualViewport?.height || window.innerHeight;
+    if (bounds.top < offset || bounds.bottom > height - 16) field.scrollIntoView({block:"nearest"});
+  }
 }
-for (const [id, pane] of [["settings-tab", "settings"], ["preview-tab", "preview"]]) {
-  $("#" + id).addEventListener("click", () => selectMobilePane(pane));
-  $("#" + id).addEventListener("keydown", event => {
-    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-    event.preventDefault();
-    const next = event.key === "Home" ? "settings" : event.key === "End" ? "preview" : pane === "settings" ? "preview" : "settings";
-    selectMobilePane(next); $("#" + next + "-tab").focus();
-  });
+
+function expandMobilePreview(expanded) {
+  const wasExpanded = mobileExpanded;
+  if (!wasExpanded && expanded) mobileScrollTop = window.scrollY || 0;
+  mobileExpanded = compactLayout.matches && expanded;
+  updateMobileLayout();
+  if (wasExpanded && !mobileExpanded) window.scrollTo({top:mobileScrollTop,behavior:"instant"});
+  $("#mobile-expand").focus({preventScroll:true});
 }
+$("#mobile-expand").addEventListener("click", () => expandMobilePreview(!mobileExpanded));
+$("#mobile-save").addEventListener("click", () => { expandMobilePreview(true); $("#preview-panel").scrollTop = 0; $("#copy-image").focus({preventScroll:true}); });
+new ResizeObserver(updateMobileOffset).observe($("#preview-panel"));
+window.visualViewport?.addEventListener("resize", updateMobileOffset);
+$("#controls-panel").addEventListener("focusin", event => {
+  if (compactLayout.matches && !mobileExpanded && event.target.matches("input,textarea,select")) {
+    updateMobileOffset(); event.target.scrollIntoView({block:"nearest"});
+  }
+});
 $("#touch-multiselect").addEventListener("click", () => { touchMultiSelect = !touchMultiSelect; updateTouchSelection(); });
 $("#touch-delete").addEventListener("click", deleteAnnotations);
 $("#touch-copy").addEventListener("click", () => { if(loading || exporting)return; copyAnnotations(); pasteAnnotations(); });
 $("#touch-edit").addEventListener("click", () => {
   if (!selected.size || loading || exporting) return;
-  selectMobilePane("settings");
+  expandMobilePreview(false);
   const section = $("#annotations-section"); section.open = true;
   section.scrollIntoView({block:"start"});
   const index = (config.annotations || []).findIndex(item => selected.has(item.id));
@@ -779,7 +794,8 @@ $("#figure-paper").addEventListener("pointercancel", endTouch, {capture:true});
 
 function layoutPreview(){
   const paper=$("#figure-paper"),image=$("#figure-image"),content=$("#figure-content");if(image.hidden||!image.naturalWidth||!paper.clientWidth||!paper.clientHeight)return;
-  const availableWidth=Math.max(100,paper.clientWidth-40),availableHeight=Math.max(200,paper.clientHeight-40);
+  const padding=compactLayout.matches&&!mobileExpanded?16:40;
+  const availableWidth=Math.max(40,paper.clientWidth-padding),availableHeight=Math.max(40,paper.clientHeight-padding);
   const scale=Math.min(availableWidth/image.naturalWidth,availableHeight/image.naturalHeight);
   content.style.width=`${image.naturalWidth*scale}px`;content.style.height=`${image.naturalHeight*scale}px`;
   content.style.transform=`translate(${view.x}px,${view.y}px) scale(${view.zoom})`;$("#zoom-level").textContent=`${Math.round(view.zoom*100)}%`;
@@ -813,6 +829,13 @@ $("#figure-interactions").addEventListener('dblclick',event=>{
   const field=$(`[data-annotation-index="${index}"] input[data-annotation-field="text"]`);field?.focus();field?.select();
 });
 window.addEventListener('keydown',event=>{
+  if(mobileExpanded && event.key==='Escape'){event.preventDefault();expandMobilePreview(false);return;}
+  if(mobileExpanded && event.key==='Tab'){
+    const buttons=$$('#preview-panel button,#preview-panel input,#preview-panel select,#preview-panel summary,#preview-panel [tabindex="0"]').filter(element=>!element.disabled && element.getClientRects().length);
+    const first=buttons[0],last=buttons.at(-1);
+    if(event.shiftKey && event.target===first){event.preventDefault();last?.focus();return;}
+    if(!event.shiftKey && event.target===last){event.preventDefault();first?.focus();return;}
+  }
   if(event.target.matches('input,textarea,select') || event.target.isContentEditable)return;
   const control=event.ctrlKey||event.metaKey,key=event.key.toLowerCase();
   if(key==='delete'||key==='backspace'){if(selected.size){event.preventDefault();deleteAnnotations();}}
