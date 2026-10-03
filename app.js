@@ -1,4 +1,4 @@
-import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=514cd64f227e";
+import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=0cc132bfdf16";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -65,6 +65,7 @@ function desktopAppearance() {
     <div class="field-grid"><label>X対数表記<select data-axis="xLogFormat"><option value="power">累乗</option><option value="decimal">小数</option></select></label><label>Y対数表記<select data-axis="yLogFormat"><option value="power">累乗</option><option value="decimal">小数</option></select></label></div>
     <div class="check-options">${check("hideXLabel", "Xラベルを隠す")}${check("hideYLabel", "Yラベルを隠す")}${check("hideXTickLabels", "X目盛り文字を隠す")}${check("hideYTickLabels", "Y目盛り文字を隠す")}${check("hideXTicks", "X目盛り線を隠す")}${check("hideYTicks", "Y目盛り線を隠す")}${check("hideMinorTicks", "副目盛りを隠す")}${check("spineLeft", "左枠")}${check("spineRight", "右枠")}${check("spineTop", "上枠")}${check("spineBottom", "下枠")}${check("yAxisRight", "Y軸を右側")}${check("xAxisTop", "X軸を上側")}</div></details>
     <details><summary>背景・誤差棒</summary>
+    <div class="check-options"><label><input id="background-enabled" data-axis="transparent" data-invert="true" type="checkbox">背景色を使用</label></div>
     <div class="field-grid"><label>枠線色<input data-axis="spineColor" type="color"></label><label>背景色<input data-axis="backgroundColor" type="color"></label>${numeric("backgroundAlpha", "背景不透明度", 0, 1)}${numeric("markerEdgeWidth", "マーカー縁幅 (pt)", 0, 20)}${numeric("errorLineWidth", "誤差棒幅 (pt)", 0, 20)}${numeric("errorCapSize", "誤差キャップ (pt)", 0, 20)}${numeric("errorCapThick", "キャップ幅 (pt)", 0, 20)}</div></details>`;
   $("#legend-appearance").innerHTML = `${numeric("legendScale", "凡例サイズ倍率", .2)}${numeric("legendFontScale", "凡例文字倍率", .2)}${numeric("legendX", "凡例X (軸比率)", -10, 10, .01)}${numeric("legendY", "凡例Y (軸比率)", -10, 10, .01)}`;
 }
@@ -118,7 +119,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=514cd64f227e", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=0cc132bfdf16", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -347,7 +348,7 @@ function drawControls() {
   }).join("") || '<p class="empty-series">「系列を追加」でX列とY列を選んでください。</p>';
   $$('[data-axis]').forEach(input => {
     const value = config.axes[input.dataset.axis];
-    if (input.type === "checkbox") input.checked = Boolean(value);
+    if (input.type === "checkbox") input.checked = input.dataset.invert === 'true' ? !value : Boolean(value);
     else input.value = value;
   });
   const generic=['General','Roughness'].includes(config.plotType || 'General');
@@ -680,7 +681,7 @@ function applyControlInput(event) {
   const input = event.target;
   if (input.dataset.axis) {
     const key = input.dataset.axis;
-    config.axes[key] = input.type === "checkbox" ? input.checked : input.value;
+    config.axes[key] = input.type === "checkbox" ? (input.dataset.invert === "true" ? !input.checked : input.checked) : input.value;
     if (['backgroundColor','backgroundAlpha','transparent'].includes(key)) {
       if (key === 'backgroundColor') {
         config.axes.transparent = false;
@@ -690,13 +691,13 @@ function applyControlInput(event) {
       } else if (!config.axes.transparent && Number(config.axes.backgroundAlpha) === 0) config.axes.backgroundAlpha = 1;
       for (const related of ['backgroundColor','backgroundAlpha','transparent']) {
         $$(`[data-axis="${related}"]`).forEach(field => {
-          if (field.type === 'checkbox') field.checked = config.axes[related];
+          if (field.type === 'checkbox') field.checked = field.dataset.invert === 'true' ? !config.axes[related] : config.axes[related];
           else field.value = config.axes[related];
         });
       }
     }
     if (/^[xy]LabelPad$/.test(key)) config.axes[`${key[0]}LabelX`] = config.axes[`${key[0]}LabelY`] = "";
-    $$(`#plot-form [data-axis="${key}"]`).forEach(field => {if(field !== input) {field.value = input.value; field.checked = input.checked;}});
+    $$(`#plot-form [data-axis="${key}"]`).forEach(field => {if(field !== input) {field.value = input.value; field.checked = field.dataset.invert === "true" ? !config.axes[key] : config.axes[key];}});
   }
   else if (input.dataset.seriesField) {
     const item = config.series[Number(input.closest("[data-series-index]").dataset.seriesIndex)];
