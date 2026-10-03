@@ -6,10 +6,10 @@
   <meta name="description" content="Excel・CSVの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=1ba2283717fe">
-  <script type="module" src="./app.js?v=1ba2283717fe"></script>
+  <link rel="stylesheet" href="./style.css?v=218d4aa777cf">
+  <script type="module" src="./app.js?v=218d4aa777cf"></script>
 </head>
-<body data-mobile-expanded="false">
+<body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
     <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 3v17h17M7 15l4-6 4 3 5-7"/></symbol>
     <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V3m-5 5 5-5 5 5M4 15v5h16v-5"/></symbol>
@@ -109,7 +109,6 @@
     </aside>
 
     <main id="preview-panel" class="preview-area">
-      <div class="mobile-preview-actions"><strong>プレビュー</strong><button type="button" id="mobile-expand" class="button quiet" aria-controls="preview-panel" aria-expanded="false">大きく見る</button><button type="button" id="mobile-save" class="button quiet">保存</button></div>
       <div class="preview-toolbar">
         <div><span class="eyebrow">FIGURE</span><h1>グラフプレビュー</h1></div>
         <div class="export-buttons" role="group" aria-label="グラフを保存">
@@ -122,8 +121,7 @@
       </div>
       <div class="figure-options"><span id="preview-state" class="preview-state">準備中</span><span class="toolbar-divider"></span><span id="figure-size">軸領域 4 × 3 cm</span><div class="save-options"><label>保存名<input id="save-name" value="graph" aria-label="保存するファイルの名前" maxlength="120"></label><label>PNG<select id="png-dpi" aria-label="PNGの解像度"><option value="150">150 dpi</option><option value="300">300 dpi</option><option value="600">600 dpi</option><option value="1200" selected>1200 dpi（Python版）</option></select></label></div></div>
       <div id="figure-stage" class="figure-stage" aria-busy="true">
-        <div class="preview-tools"><button type="button" class="button quiet" id="undo">元に戻す</button><button type="button" class="button quiet" id="redo">やり直す</button><button type="button" class="button quiet" id="zoom-out" aria-label="プレビューを縮小">−</button><output id="zoom-level">100%</output><button type="button" class="button quiet" id="zoom-in" aria-label="プレビューを拡大">＋</button><button type="button" class="button quiet" id="zoom-reset">画面に合わせる</button><span class="mouse-hint">Ctrl＋ホイールで拡大・縮小／余白をドラッグで移動</span><span class="touch-hint">図内：1本指で移動／2本指で拡大・縮小</span></div>
-        <div class="touch-annotation-tools" role="group" aria-label="選択した注釈の操作"><button type="button" id="touch-multiselect" class="button quiet" aria-pressed="false">複数選択</button><span id="touch-selection-count">選択なし</span><button type="button" id="touch-edit" class="button quiet" disabled>編集</button><button type="button" id="touch-copy" class="button quiet" disabled>複製</button><button type="button" id="touch-delete" class="button quiet" disabled>削除</button></div>
+        <div class="preview-tools"><button type="button" class="button quiet" id="undo">元に戻す</button><button type="button" class="button quiet" id="redo">やり直す</button><button type="button" class="button quiet" id="zoom-out" aria-label="プレビューを縮小">−</button><output id="zoom-level">100%</output><button type="button" class="button quiet" id="zoom-in" aria-label="プレビューを拡大">＋</button><button type="button" class="button quiet" id="zoom-reset">画面に合わせる</button><span class="mouse-hint">Ctrl＋ホイールで拡大・縮小／余白をドラッグで移動</span></div>
         <div class="paper" id="figure-paper">
           <div id="figure-content">
           <img id="figure-image" alt="作成したグラフのプレビュー" hidden>
@@ -133,7 +131,6 @@
         </div>
         <div class="stage-caption"><span>プレビューは画面に合わせて拡大表示しています</span><button id="refresh-preview" class="button quiet" disabled><svg><use href="#i-refresh"/></svg>更新</button></div>
       </div>
-      <div class="mobile-status" role="status" aria-live="polite"><span id="mobile-status-text">描画機能を準備しています…</span><button id="retry-engine-mobile" class="button quiet" hidden>再読み込み</button></div>
       <div id="status" class="status" role="status" aria-live="polite"><span class="status-dot"></span><span id="status-text">描画機能を読み込んでいます…</span><button id="retry-engine" class="button quiet" hidden>再読み込み</button></div>
       <details id="plot-warnings" class="plot-warnings" hidden><summary>描画データの確認</summary><ul id="warning-list"></ul></details>
       <details id="data-preview" class="data-preview" hidden><summary><span>読み込んだデータ</span><span id="table-caption"></span></summary><div class="table-scroll"><table id="data-table"><thead></thead><tbody></tbody></table></div><p>先頭8行を表示。グラフには読み込んだ全行を使用します。</p></details>
