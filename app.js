@@ -1,4 +1,4 @@
-import { COLORS, COLOR_PALETTE, applyPreset, createSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=585395c92c5c";
+import { COLORS, COLOR_PALETTE, applyPreset, createSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=f0e0bfb44bb7";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -90,7 +90,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=585395c92c5c", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=f0e0bfb44bb7", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -695,8 +695,10 @@ function positionInteractions() {
       button.setAttribute('stroke','transparent');button.setAttribute('stroke-width',touchFriendly() ? '32' : '20');button.setAttribute('tabindex','0');svg.append(button);overlay.append(svg);
     } else {
       button=document.createElement('button');button.type="button";
-      const width=Math.max(w*imageBox.width,hitSize)/view.zoom,height=Math.max(h*imageBox.height,hitSize)/view.zoom;
-      Object.assign(button.style,{left:`calc(${x*100}% - ${Math.max(0,hitSize-w*imageBox.width)/2/view.zoom}px)`,top:`calc(${y*100}% - ${Math.max(0,hitSize-h*imageBox.height)/2/view.zoom}px)`,width:`${width}px`,height:`${height}px`});
+      // Adjacent X/Y ticks must not cover each other's glyphs on a small plot.
+      const minimum = target.axis ? target.kind === 'ticks' ? 16 : 24 : hitSize;
+      const width=Math.max(w*imageBox.width,minimum)/view.zoom,height=Math.max(h*imageBox.height,minimum)/view.zoom;
+      Object.assign(button.style,{left:`calc(${x*100}% - ${Math.max(0,minimum-w*imageBox.width)/2/view.zoom}px)`,top:`calc(${y*100}% - ${Math.max(0,minimum-h*imageBox.height)/2/view.zoom}px)`,width:`${width}px`,height:`${height}px`});
       overlay.append(button);
     }
     button.classList.add("figure-drag-target");if(selected.has(target.id))button.classList.add('selected');
