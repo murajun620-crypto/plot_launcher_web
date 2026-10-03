@@ -6,8 +6,8 @@
   <meta name="description" content="Excel・CSVの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=655dedd8f2dd">
-  <script type="module" src="./app.js?v=655dedd8f2dd"></script>
+  <link rel="stylesheet" href="./style.css?v=3025bf57cbc7">
+  <script type="module" src="./app.js?v=3025bf57cbc7"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -123,6 +123,7 @@
         </div>
       </div>
       <div class="figure-options"><span id="preview-state" class="preview-state">準備中</span><span class="toolbar-divider"></span><span id="figure-size">軸領域 4 × 3 cm</span><div class="save-options"><label>保存名<input id="save-name" value="graph" aria-label="保存するファイルの名前" maxlength="120"></label><label>PNG<select id="png-dpi" aria-label="PNGの解像度"><option value="150">150 dpi</option><option value="300">300 dpi</option><option value="600">600 dpi</option><option value="1200" selected>1200 dpi（標準）</option></select></label></div></div>
+      <div class="figure-options"><label>保存先<select id="save-destination" aria-label="保存先"><option value="source">元ファイルと同じフォルダ</option><option value="folder">指定フォルダ</option><option value="download">ダウンロード</option></select></label><button type="button" class="button quiet" id="choose-save-folder">保存先を選ぶ</button><span id="save-folder-info"></span></div>
       <div id="figure-stage" class="figure-stage" aria-busy="true">
         <div class="preview-tools"><button type="button" class="button quiet" id="undo">元に戻す</button><button type="button" class="button quiet" id="redo">やり直す</button><button type="button" class="button quiet" id="zoom-out" aria-label="プレビューを縮小">−</button><output id="zoom-level">100%</output><button type="button" class="button quiet" id="zoom-in" aria-label="プレビューを拡大">＋</button><button type="button" class="button quiet" id="zoom-reset">画面に合わせる</button><span class="mouse-hint">Ctrl＋ホイールで拡大・縮小／余白をドラッグで移動</span></div>
         <div class="paper" id="figure-paper">

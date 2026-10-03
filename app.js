@@ -1,4 +1,4 @@
-import { COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=655dedd8f2dd";
+import { COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=3025bf57cbc7";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -12,6 +12,9 @@ let previewURL, figureResult, dragging;
 let colorTarget;
 const recentColors = [];
 let sourceData = null;
+let sourceHandle = null, sourceDirectory = null, saveDirectory = null;
+const sourceHandles = new WeakMap();
+const folderSupported = typeof window.showDirectoryPicker === 'function';
 const importedFonts = new Map();
 let presets = [], selected = new Set(), clipboard = [], view = {zoom:1,x:0,y:0}, panning;
 let history = [], future = [], lastState, restoring = false;
@@ -32,7 +35,7 @@ function desktopAppearance() {
     <div class="field-grid">${numeric("tickFontScale", "目盛り文字倍率", .2)}${numeric("labelFontScale", "軸ラベル倍率", .2)}${numeric("spineScale", "枠線倍率", .1, 5)}${numeric("dataLineScale", "データ線倍率", 0, 6)}${numeric("tickLength", "目盛り長さ倍率", 0, 5)}</div>
     <p class="field-hint">倍率1：目盛り7 pt、軸ラベル8 pt、枠線0.8 pt、主目盛り2.5 pt・副目盛り1.25 pt。</p>
     <details><summary>余白・軸の表示</summary>
-    <div class="field-grid">${numeric("xLabelPad", "Xラベル余白 (pt)", -100, 100)}${numeric("yLabelPad", "Yラベル余白 (pt)", -100, 100)}${numeric("xTickPad", "X目盛り追加余白 (pt)", -100, 100)}${numeric("yTickPad", "Y目盛り追加余白 (pt)", -100, 100)}</div>
+    <div class="field-grid">${numeric("xLabelPad", "Xラベル追加余白 (pt)", -100, 100)}${numeric("yLabelPad", "Yラベル追加余白 (pt)", -100, 100)}${numeric("xTickPad", "X目盛り追加余白 (pt)", -100, 100)}${numeric("yTickPad", "Y目盛り追加余白 (pt)", -100, 100)}</div>
     <div class="field-grid"><label>X対数表記<select data-axis="xLogFormat"><option value="power">累乗</option><option value="decimal">小数</option></select></label><label>Y対数表記<select data-axis="yLogFormat"><option value="power">累乗</option><option value="decimal">小数</option></select></label></div>
     <div class="check-options">${check("hideXLabel", "Xラベルを隠す")}${check("hideYLabel", "Yラベルを隠す")}${check("hideXTickLabels", "X目盛り文字を隠す")}${check("hideYTickLabels", "Y目盛り文字を隠す")}${check("hideXTicks", "X目盛り線を隠す")}${check("hideYTicks", "Y目盛り線を隠す")}${check("hideMinorTicks", "副目盛りを隠す")}${check("spineLeft", "左枠")}${check("spineRight", "右枠")}${check("spineTop", "上枠")}${check("spineBottom", "下枠")}${check("yAxisRight", "Y軸を右側")}${check("xAxisTop", "X軸を上側")}</div></details>
     <details><summary>背景・誤差棒</summary>
@@ -63,6 +66,7 @@ function updateButtons() {
   $$('[data-export]').forEach(button => { button.disabled = !engineReady || busy || renderedRevision !== revision || renderRunning; });
   $("#copy-image").disabled = !engineReady || busy || renderedRevision !== revision || renderRunning;
   $("#figure-stage").setAttribute("aria-busy", String(loading || exporting || renderRunning || !engineReady));
+  $('#save-destination').disabled = $('#choose-save-folder').disabled = busy;
   syncColorIcons();
 }
 
@@ -88,7 +92,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=655dedd8f2dd", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=3025bf57cbc7", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -190,7 +194,7 @@ function openAxisEditor(axis, kind) {
   $('#axis-editor-title').textContent = `${axis.toUpperCase()}軸${kind === 'label' ? 'ラベル' : '目盛り'}の設定`;
   if (kind === 'label') {
     fields.innerHTML = label(`${axis}Label`,'ラベル（空欄で自動）','text','maxlength="500"') + label(`${axis}Unit`,'単位（autoで自動）') +
-      `<div class="field-grid">${label(`${axis}LabelPad`,'ラベル余白 (pt)','number','min="-100" max="100" step=".5"')}${label('labelFontScale','軸ラベル文字倍率','number','min=".2" max="3" step=".1"')}</div>` +
+      `<div class="field-grid">${label(`${axis}LabelPad`,'ラベル追加余白 (pt)','number','min="-100" max="100" step=".5"')}${label('labelFontScale','軸ラベル文字倍率','number','min=".2" max="3" step=".1"')}</div>` +
       `<div class="field-grid">${label(`${axis}LabelX`,'ラベルX (軸比率)','number','step=".01" placeholder="標準"')}${label(`${axis}LabelY`,'ラベルY (軸比率)','number','step=".01" placeholder="標準"')}</div><button type="button" class="button quiet" data-reset-label>標準位置に戻す</button>`;
   } else {
     const automatic = config.axes[`${axis}Min`] === '' && config.axes[`${axis}Max`] === '';
@@ -404,7 +408,12 @@ async function loadFile(file, isSample = false, reload = false) {
     const previous = metadata;
     metadata = await request("load", args);
     loadedHeader = metadata.headerRow || headerRow;
-    if (!reload) sourceData = {filename, bytes:originalBytes};
+    if (!reload) {
+      sourceData = {filename, bytes:originalBytes};
+      sourceHandle = sourceHandles.get(file) || null; sourceDirectory = null;
+      $('#save-destination').value = folderSupported ? (isSample ? 'folder' : 'source') : 'download';
+      refreshSaveDestination();
+    }
     sample = reload ? sample : isSample;
     // Retain settings if the same columns are still present after a sheet/header change.
     let retained;
@@ -519,6 +528,76 @@ function download(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
+// A shared picker ID remembers the opened data folder, as in MiFiTo.
+function refreshSaveDestination() {
+  const mode=$('#save-destination').value;
+  $('#choose-save-folder').hidden=mode!=='folder';
+  $('#save-folder-info').textContent=mode==='source'
+    ? sourceDirectory ? `保存先：${sourceDirectory.name}` : sourceHandle ? '初回保存時に元ファイルのフォルダを開きます。保存先を確認してください。' : '初回保存時に保存先フォルダを確認してください。'
+    : mode==='folder' ? saveDirectory ? `保存先：${saveDirectory.name}` : '初回保存時に保存先フォルダを選べます。'
+    : folderSupported ? 'ブラウザの保存先へダウンロードします。' : 'このブラウザではフォルダを指定できないため、ブラウザの保存先へダウンロードします。';
+}
+function directoryOptions(startIn) {
+  return {id:'plotlauncher-files',mode:'readwrite',...(startIn?{startIn}:{})};
+}
+async function identifySourceDirectory(directory) {
+  if(!sourceHandle || sourceDirectory)return;
+  try {
+    const candidate=await directory.getFileHandle(sourceHandle.name);
+    if(await candidate.isSameEntry(sourceHandle))sourceDirectory=directory;
+  } catch(error) {if(error.name!=='NotFoundError')throw error;}
+}
+async function prepareSaver() {
+  let mode=$('#save-destination').value;
+  if(!folderSupported || mode==='download')return async(blob,name)=>{download(blob,name);return name;};
+  let directory=mode==='source'?sourceDirectory:saveDirectory;
+  if(!directory) {
+    directory=await window.showDirectoryPicker(directoryOptions(mode==='source'?sourceHandle:saveDirectory||sourceDirectory||sourceHandle));
+    saveDirectory=directory; await identifySourceDirectory(directory);
+    if(mode==='source' && !sourceDirectory){mode='folder';$('#save-destination').value=mode;}
+    refreshSaveDestination();
+  }
+  const permission={mode:'readwrite'};
+  if(await directory.queryPermission(permission)!=='granted' && await directory.requestPermission(permission)!=='granted')
+    throw new Error('このフォルダへの保存が許可されていません。保存先を選び直してください。');
+  return async(blob,requestedName)=>{
+    const dot=requestedName.lastIndexOf('.'), stem=requestedName.slice(0,dot), extension=requestedName.slice(dot);
+    let name=requestedName;
+    for(let number=1;;number++) {
+      try {await directory.getFileHandle(name);}
+      catch(error) {if(error.name==='NotFoundError')break;throw error;}
+      if(number>=10000)throw new Error('同名のファイルが多すぎます。保存先を変更してください。');
+      name=`${stem}_${number+1}${extension}`;
+    }
+    const handle=await directory.getFileHandle(name,{create:true}), writer=await handle.createWritable();
+    try {await writer.write(blob);await writer.close();}
+    catch(error) {try{await writer.abort();}catch{}throw error;}
+    return name;
+  };
+}
+$('#save-destination').value=folderSupported?'folder':'download';
+for(const option of $('#save-destination').options)if(option.value!=='download')option.disabled=!folderSupported;
+$('#save-destination').addEventListener('change',refreshSaveDestination);
+$('#choose-save-folder').addEventListener('click',async()=>{
+  if(loading||exporting)return;
+  exporting=true;updateButtons();
+  try {saveDirectory=await window.showDirectoryPicker(directoryOptions(saveDirectory||sourceDirectory||sourceHandle));await identifySourceDirectory(saveDirectory);refreshSaveDestination();}
+  catch(error){status(error.name==='AbortError'?'保存先の選択をキャンセルしました。':error.message,error.name==='AbortError'?'ready':'error');}
+  finally{exporting=false;updateButtons();}
+});
+for(const [selector,description,accept,open] of [
+  ['#data-file','Excel / CSV',{'application/octet-stream':['.xlsx','.xlsm','.xls','.csv']},loadFile],
+  ['#project-file','PlotLauncherプロジェクト',{'application/json':['.plotproject','.json']},readProject]
+]) $(selector).addEventListener('click',async event=>{
+  if(typeof window.showOpenFilePicker!=='function')return;
+  event.preventDefault();if(loading||exporting||!engineReady)return;
+  try {
+    const [handle]=await window.showOpenFilePicker({id:'plotlauncher-files',multiple:false,types:[{description,accept}]});
+    const file=await handle.getFile();sourceHandles.set(file,handle);await open(file);
+  } catch(error){if(error.name!=='AbortError')status(error.message,'error');}
+});
+refreshSaveDestination();
+
 async function copyFigureImage() {
   if (exporting || loading || renderRunning || renderedRevision !== revision || !engineReady) return;
   if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") {
@@ -550,11 +629,12 @@ async function exportFigure(format) {
   updateButtons();
   status(`${format.toUpperCase()}ファイルを作成しています…`);
   try {
+    const saveFile = await prepareSaver();
     const result = await request("export", { config: structuredClone(config), format, dpi: Number($("#png-dpi").value) });
     const bytes = Uint8Array.from(atob(result.base64), character => character.charCodeAt(0));
-    download(new Blob([bytes], { type: { svg: "image/svg+xml", png: "image/png", pdf: "application/pdf", pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation" }[format] }), filename);
-    status(`${filename} を保存しました`, "ready");
-  } catch (error) { status(error.message, "error"); }
+    const savedName = await saveFile(new Blob([bytes], { type: { svg: "image/svg+xml", png: "image/png", pdf: "application/pdf", pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation" }[format] }), filename);
+    status(`${savedName} を保存しました`, "ready");
+  } catch (error) { status(error.name==='AbortError'?'保存をキャンセルしました。':error.message, error.name==='AbortError'?'ready':'error'); }
   finally { exporting = false; updateButtons(); }
 }
 
@@ -617,17 +697,20 @@ $("#open-project").addEventListener("click", () => $("#project-file").click());
 $("#project-file").addEventListener("change", event => {
   const file=event.target.files[0]; event.target.value=""; if(file) readProject(file);
 });
-function saveProject() {
+async function saveProject() {
   if(!engineReady || loading || exporting || !sourceData || !metadata || !config.series.length)return;
+  exporting=true;updateButtons();
   try {
+    const saveFile=await prepareSaver();
     const project=makeProject(makeSettings(config,metadata,loadedHeader), {...sourceData,sheetIndex:metadata.sheetIndex,headerRow:loadedHeader,sample}, [...importedFonts.values()], {
       saveName:$("#save-name").value,pngDpi:Number($("#png-dpi").value),view:{...view},sections:$$('#controls-panel .control-section').map(section=>section.open)
     });
     const blob=new Blob([JSON.stringify(project)],{type:'application/json'});
     if(blob.size>PROJECT_MAX_SIZE)throw new Error('プロジェクトは130 MB以内にしてください。');
     const filename=`${safeStem($("#save-name").value)}.plotproject`;
-    download(blob,filename); status(`${filename} を保存しました。データと設定をまとめて再開できます。`,'ready');
-  } catch(error){status(`プロジェクトを保存できませんでした: ${error.message}`,'error');}
+    const savedName=await saveFile(blob,filename); status(`${savedName} を保存しました。データと設定をまとめて再開できます。`,'ready');
+  } catch(error){status(error.name==='AbortError'?'保存をキャンセルしました。':`プロジェクトを保存できませんでした: ${error.message}`,error.name==='AbortError'?'ready':'error');}
+  finally{exporting=false;updateButtons();if(renderWanted)renderPreview();}
 }
 $("#save-project").addEventListener("click",saveProject);
 async function readProject(file, saved) {
@@ -639,7 +722,9 @@ async function readProject(file, saved) {
     const retainedData={filename:project.data.filename,bytes:project.data.bytes.slice(0)};
     const retainedFonts=project.fonts.map(font=>({...font,bytes:font.bytes.slice(0)}));
     const result=await request('project',{filename:project.data.filename,bytes:project.data.bytes,sheetIndex:project.data.sheetIndex,headerRow:project.data.headerRow,settings:project.settings,fonts:project.fonts});
-    metadata=result.metadata; config=result.config; sourceData=retainedData; sample=project.data.sample; loadedHeader=metadata.headerRow;
+    metadata=result.metadata; config=result.config; sourceData=retainedData; sample=project.data.sample;
+    sourceHandle=sourceHandles.get(file) || null; sourceDirectory=null;
+    $('#save-destination').value=folderSupported?'source':'download'; refreshSaveDestination(); loadedHeader=metadata.headerRow;
     importedFonts.clear(); retainedFonts.forEach(font=>importedFonts.set(font.name,font));
     loadedFonts.clear(); ['Liberation Sans','Noto Sans JP','DejaVu Sans',...result.families].forEach(family=>loadedFonts.add(family));
     for(const selector of ['#font-family','#japanese-font-family'])$(selector).replaceChildren(...[...loadedFonts].map(family=>new Option(family,family)));
@@ -664,9 +749,15 @@ async function openDroppedFile(file) {
   await loadFile(file);
 }
 
-$("#save-settings").addEventListener("click", () => {
-  download(new Blob([JSON.stringify(makeSettings(config, metadata, loadedHeader), null, 2)], { type: "application/json" }), `${safeStem($("#save-name").value)}.plot.json`);
-  status("設定JSONを保存しました。データ自体は含まれていません。", "ready");
+$('#save-settings').addEventListener('click', async()=>{
+  if(loading||exporting||!metadata||!config.series.length)return;
+  exporting=true;updateButtons();
+  try {
+    const saveFile=await prepareSaver();
+    const filename=await saveFile(new Blob([JSON.stringify(makeSettings(config,metadata,loadedHeader),null,2)],{type:'application/json'}),`${safeStem($('#save-name').value)}.plot.json`);
+    status(`${filename} を保存しました。データ自体は含まれていません。`,'ready');
+  } catch(error){status(error.name==='AbortError'?'保存をキャンセルしました。':error.message,error.name==='AbortError'?'ready':'error');}
+  finally{exporting=false;updateButtons();if(renderWanted)renderPreview();}
 });
 $("#open-settings").addEventListener("click", () => $("#settings-file").click());
 async function readSettings(file) {

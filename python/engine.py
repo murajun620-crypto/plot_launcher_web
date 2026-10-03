@@ -268,6 +268,12 @@ class PlotEngine:
         for axis in ("x", "y"):
             for key, env in (("LabelPad", "LABEL_PAD"), ("TickPad", "TICK_PAD")):
                 values[f"PLOT_{axis.upper()}{env}"] = str(number(axes.get(f"{axis}{key}", 0), "軸の余白", minimum=-100, maximum=100))
+            # Without tick numbers the native label falls against the spine.
+            # Keep a 6 pt base gap (at the standard 8 pt label size); the UI
+            # padding remains an extra offset and manual coordinates win later.
+            if axis == "y" and preset in {"EDX", "XPS Survey", "XPS Core", "XPS Fit", "XAFS", "Raman Spectrum"} and axes.get("hideYTickLabels", False):
+                base_gap = 6 * font_scale * number(axes.get("labelFontScale", 1), "軸ラベル倍率", minimum=0.2, maximum=3)
+                values["PLOT_YLABEL_PAD"] = str(float(values["PLOT_YLABEL_PAD"]) + base_gap)
             form = axes.get(f"{axis}LogFormat", "power")
             if form not in {"power", "decimal"}:
                 raise ValueError("対数目盛りの表記を確認してください。")
