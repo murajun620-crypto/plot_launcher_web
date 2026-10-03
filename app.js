@@ -1,4 +1,4 @@
-import { COLORS, applyPreset, createSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=025012cc799a";
+import { COLORS, applyPreset, createSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=c5809e1851a3";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -11,6 +11,10 @@ let revision = 0, renderedRevision = -1, renderRunning = false, renderWanted = f
 let previewURL, figureResult, dragging;
 let presets = [], selected = new Set(), clipboard = [], view = {zoom:1,x:0,y:0}, panning;
 let history = [], future = [], lastState, restoring = false;
+const compactLayout = window.matchMedia("(max-width:720px), (max-width:1100px) and (orientation:portrait), (max-width:1100px) and (max-height:500px)");
+let mobilePane = "settings", touchMultiSelect = false, touchGesture = null, touchSuppressed = false;
+const touchPoints = new Map();
+const touchFriendly = () => window.matchMedia("(pointer: coarse)").matches || compactLayout.matches;
 const catalogReady = fetch(new URL("./presets.json" + new URL(import.meta.url).search, import.meta.url)).then(response => {if(!response.ok) throw new Error("プリセットの読み込みに失敗しました"); return response.json();}).then(items => {
   presets = items; $("#plot-type").replaceChildren(...items.map(item => new Option(item.label,item.id)));
 });
@@ -39,6 +43,7 @@ desktopAppearance();
 
 function status(text, kind = "working") {
   $("#status-text").textContent = text;
+  $("#mobile-status-text").textContent = text;
   $("#status").dataset.kind = kind;
 }
 
@@ -56,6 +61,7 @@ function updateButtons() {
   $("#load-font").disabled = !engineReady || busy;
   $$('[data-export]').forEach(button => { button.disabled = !engineReady || busy || renderedRevision !== revision || renderRunning; });
   $("#copy-image").disabled = !engineReady || busy || renderedRevision !== revision || renderRunning;
+  updateTouchSelection();
   $("#figure-stage").setAttribute("aria-busy", String(loading || exporting || renderRunning || !engineReady));
 }
 
@@ -74,6 +80,7 @@ function fatal(message) {
   requests.clear();
   status(message, "error");
   $("#retry-engine").hidden = false;
+  $("#retry-engine-mobile").hidden = false;
   $("#initial-message .spinner").hidden = true;
   $("#initial-message strong").textContent = "描画機能を読み込めませんでした";
   $("#initial-message p").textContent = "接続を確認して「再読み込み」を押してください。";
@@ -81,7 +88,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=025012cc799a", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=c5809e1851a3", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -218,6 +225,7 @@ function drawAnnotations() {
       ${item.type === "text" ? `<label>フォント<select data-annotation-field="font_family">${choiceOptions([...loadedFonts].map(name=>[name,escapeHTML(name)]),item.font_family)}</select></label><div class="field-grid"><label>横揃え<select data-annotation-field="horizontal_alignment">${choiceOptions([["left","左"],["center","中央"],["right","右"]],item.horizontal_alignment)}</select></label><label>縦揃え<select data-annotation-field="vertical_alignment">${choiceOptions([["baseline","基準線"],["center","中央"],["top","上"],["bottom","下"]],item.vertical_alignment)}</select></label></div><div class="check-options"><label><input type="checkbox" data-annotation-field="bold" ${item.bold?'checked':''}>太字</label><label><input type="checkbox" data-annotation-field="italic" ${item.italic?'checked':''}>斜体</label></div>` : ''}
       <div class="check-options"><label><input type="checkbox" data-annotation-field="visible" ${item.visible?'checked':''}>表示</label><label><input type="checkbox" data-annotation-field="locked" ${item.locked?'checked':''}>位置を固定</label></div><button type="button" class="button quiet" data-remove-annotation="${index}">削除</button></details>`;
   }).join('');
+  updateTouchSelection();
 }
 
 function drawMetadata() {
@@ -504,6 +512,7 @@ $("#settings-file").addEventListener("change", async event => {
   if (file) await readSettings(file);
 });
 $("#retry-engine").addEventListener("click", () => location.reload());
+$("#retry-engine-mobile").addEventListener("click", () => location.reload());
 $("#load-font").addEventListener("click", () => $("#font-file").click());
 $("#font-file").addEventListener("change", async event => {
   const files = [...event.target.files]; event.target.value = "";
@@ -537,7 +546,7 @@ $$('[data-add-annotation]').forEach(button => button.addEventListener("click", (
 }));
 $("#annotation-list").addEventListener("click", event => {
   const select=event.target.closest('[data-select-annotation]');
-  if(select){selectAnnotation(select.dataset.selectAnnotation,event.shiftKey);return;}
+  if(select){selectAnnotation(select.dataset.selectAnnotation,event.shiftKey || touchMultiSelect);return;}
   const button = event.target.closest('[data-remove-annotation]');
   if (!button) return;
   const removed=config.annotations.splice(Number(button.dataset.removeAnnotation), 1); selected.delete(removed[0].id); drawAnnotations(); changed();
@@ -548,6 +557,7 @@ function positionInteractions() {
   overlay.replaceChildren();
   if (!figureResult || image.hidden || !image.naturalWidth) return;
   const imageBox = image.getBoundingClientRect();
+  const hitSize = touchFriendly() ? 44 : 24;
   Object.assign(overlay.style, {left:'0',top:'0',width:'100%',height:'100%'});
   const targets = [...figureResult.geometry.annotations].sort((a,b)=>(config.annotations?.find(item=>item.id===a.id)?.zorder??20)-(config.annotations?.find(item=>item.id===b.id)?.zorder??20));
   if (figureResult.geometry.legend) targets.unshift({id:"legend",box:figureResult.geometry.legend});
@@ -559,11 +569,11 @@ function positionInteractions() {
       const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.classList.add('line-hit-area');svg.setAttribute('viewBox',`0 0 ${imageBox.width} ${imageBox.height}`);
       button=document.createElementNS(svg.namespaceURI,'line');
       for(const [i,[px,py]] of target.points.entries()){button.setAttribute(`x${i+1}`,px*imageBox.width);button.setAttribute(`y${i+1}`,py*imageBox.height);}
-      button.setAttribute('stroke','transparent');button.setAttribute('stroke-width','20');button.setAttribute('tabindex','0');svg.append(button);overlay.append(svg);
+      button.setAttribute('stroke','transparent');button.setAttribute('stroke-width',touchFriendly() ? '32' : '20');button.setAttribute('tabindex','0');svg.append(button);overlay.append(svg);
     } else {
       button=document.createElement('button');button.type="button";
-      const width=Math.max(w*imageBox.width,24)/view.zoom,height=Math.max(h*imageBox.height,24)/view.zoom;
-      Object.assign(button.style,{left:`calc(${x*100}% - ${Math.max(0,24-w*imageBox.width)/2/view.zoom}px)`,top:`calc(${y*100}% - ${Math.max(0,24-h*imageBox.height)/2/view.zoom}px)`,width:`${width}px`,height:`${height}px`});
+      const width=Math.max(w*imageBox.width,hitSize)/view.zoom,height=Math.max(h*imageBox.height,hitSize)/view.zoom;
+      Object.assign(button.style,{left:`calc(${x*100}% - ${Math.max(0,hitSize-w*imageBox.width)/2/view.zoom}px)`,top:`calc(${y*100}% - ${Math.max(0,hitSize-h*imageBox.height)/2/view.zoom}px)`,width:`${width}px`,height:`${height}px`});
       overlay.append(button);
     }
     button.classList.add("figure-drag-target");if(selected.has(target.id))button.classList.add('selected');button.dataset.dragId=target.id;
@@ -576,7 +586,8 @@ function positionInteractions() {
         const handle=document.createElement('button');handle.type='button';handle.className='annotation-handle';handle.dataset.dragId=item.id;
         handle.dataset.handle=target.points?String(i+1):i===0?'resize':'rotate';
         handle.setAttribute('aria-label',target.points?`注釈の${i===0?'始点':'終点'}を移動`:i===0?'文字サイズを変更':'文字を回転');
-        Object.assign(handle.style,{left:`${px*100}%`,top:`${py*100}%`,width:`${14/view.zoom}px`,height:`${14/view.zoom}px`});overlay.append(handle);
+        const handleSize = touchFriendly() ? 32 : 14;
+        Object.assign(handle.style,{left:`${px*100}%`,top:`${py*100}%`,width:`${handleSize/view.zoom}px`,height:`${handleSize/view.zoom}px`});overlay.append(handle);
       });
     }
   }
@@ -584,26 +595,27 @@ function positionInteractions() {
 $("#figure-image").addEventListener("load", layoutPreview);
 new ResizeObserver(layoutPreview).observe($("#figure-paper"));
 $("#figure-interactions").addEventListener("pointerdown", event => {
+  if(touchSuppressed || event.button !== 0)return;
   const target=event.target.closest('[data-drag-id]');
   if(!target || renderedRevision !== revision || loading || exporting || renderRunning) return;
   const id=target.dataset.dragId, item=config.annotations?.find(item=>item.id===id);
   target.focus({preventScroll:true});
   if(item){
-    if(event.shiftKey){if(selected.has(id))selected.delete(id);else selected.add(id);}else if(!selected.has(id))selected=new Set([id]);
+    if(event.shiftKey || touchMultiSelect){if(selected.has(id))selected.delete(id);else selected.add(id);}else if(!selected.has(id))selected=new Set([id]);
     drawAnnotations();
   }
-  if(item?.locked){positionInteractions();return;}
+  if(item?.locked || (item && !selected.has(id))){positionInteractions();return;}
   const imageBox=$("#figure-image").getBoundingClientRect();
-  dragging={id,item,start:item?structuredClone(item):null,items:(config.annotations||[]).filter(item=>selected.has(item.id)&&!item.locked).map(item=>({item,start:structuredClone(item)})),handle:target.dataset.handle,x:event.clientX,y:event.clientY,box:imageBox,axes:figureResult.geometry.axes,legend:figureResult.geometry.legend};
+  dragging={pointerId:event.pointerId,id,item,start:item?structuredClone(item):null,items:(config.annotations||[]).filter(item=>selected.has(item.id)&&!item.locked).map(item=>({item,start:structuredClone(item)})),handle:target.dataset.handle,x:event.clientX,y:event.clientY,box:imageBox,axes:figureResult.geometry.axes,legend:figureResult.geometry.legend};
   target.setPointerCapture(event.pointerId); event.preventDefault();
 });
 $("#figure-interactions").addEventListener("pointermove", event => {
-  if(!dragging) return;
+  if(!dragging || dragging.pointerId !== event.pointerId || touchSuppressed) return;
   const dx=event.clientX-dragging.x,dy=event.clientY-dragging.y;
   if(!dragging.handle)event.target.style.transform=`translate(${dx/view.zoom}px,${dy/view.zoom}px)`;
 });
 function finishDrag(event) {
-  if(!dragging) return;
+  if(!dragging || dragging.pointerId !== event.pointerId || touchSuppressed) return;
   const d=dragging; dragging=null;
   if(Math.hypot(event.clientX-d.x,event.clientY-d.y)<3){positionInteractions();return;}
   const [ax,ay,aw,ah]=d.axes, dx=(event.clientX-d.x)/d.box.width/aw,dy=-(event.clientY-d.y)/d.box.height/ah;
@@ -666,8 +678,105 @@ function restoreHistory(redo=false){
 }
 $("#undo").addEventListener('click',()=>restoreHistory());$("#redo").addEventListener('click',()=>restoreHistory(true));
 
+function updateTouchSelection() {
+  const busy = loading || exporting || !engineReady;
+  $("#touch-selection-count").textContent = selected.size ? `${selected.size} 件選択` : "選択なし";
+  for (const id of ["touch-edit", "touch-copy", "touch-delete"]) $("#" + id).disabled = busy || !selected.size;
+  $("#touch-multiselect").disabled = busy || !metadata;
+  $("#touch-multiselect").setAttribute("aria-pressed", String(touchMultiSelect));
+}
+
+function clearTouchGesture() {
+  touchPoints.clear(); touchGesture = null; touchSuppressed = false;
+  dragging = null; panning = null; $("#selection-marquee")?.remove();
+}
+
+function updateMobileLayout() {
+  clearTouchGesture();
+  document.body.dataset.mobilePane = mobilePane;
+  for (const [pane, panelID, tabID] of [["settings", "controls-panel", "settings-tab"], ["preview", "preview-panel", "preview-tab"]]) {
+    const panel = $("#" + panelID), tab = $("#" + tabID), active = pane === mobilePane;
+    panel.inert = compactLayout.matches && !active;
+    if (compactLayout.matches) { panel.setAttribute("role", "tabpanel"); panel.setAttribute("aria-labelledby", tabID); }
+    else { panel.removeAttribute("role"); panel.removeAttribute("aria-labelledby"); }
+    tab.setAttribute("aria-selected", String(active)); tab.tabIndex = active ? 0 : -1;
+  }
+  layoutPreview();
+}
+
+function selectMobilePane(pane) {
+  if (!["settings", "preview"].includes(pane)) return;
+  mobilePane = pane; updateMobileLayout();
+  if (compactLayout.matches) window.scrollTo({top:0,behavior:"instant"});
+}
+for (const [id, pane] of [["settings-tab", "settings"], ["preview-tab", "preview"]]) {
+  $("#" + id).addEventListener("click", () => selectMobilePane(pane));
+  $("#" + id).addEventListener("keydown", event => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const next = event.key === "Home" ? "settings" : event.key === "End" ? "preview" : pane === "settings" ? "preview" : "settings";
+    selectMobilePane(next); $("#" + next + "-tab").focus();
+  });
+}
+$("#touch-multiselect").addEventListener("click", () => { touchMultiSelect = !touchMultiSelect; updateTouchSelection(); });
+$("#touch-delete").addEventListener("click", deleteAnnotations);
+$("#touch-copy").addEventListener("click", () => { if(loading || exporting)return; copyAnnotations(); pasteAnnotations(); });
+$("#touch-edit").addEventListener("click", () => {
+  if (!selected.size || loading || exporting) return;
+  selectMobilePane("settings");
+  const section = $("#annotations-section"); section.open = true;
+  section.scrollIntoView({block:"start"});
+  const index = (config.annotations || []).findIndex(item => selected.has(item.id));
+  $(`[data-annotation-index="${index}"] input`)?.focus({preventScroll:true});
+});
+
+function touchPair() {
+  const [a, b] = [...touchPoints.values()], box = $("#figure-paper").getBoundingClientRect();
+  return {distance:Math.hypot(b.x-a.x,b.y-a.y),center:{x:(a.x+b.x)/2-box.left-box.width/2,y:(a.y+b.y)/2-box.top-box.height/2}};
+}
+// Capture the second touch before an annotation's drag handler runs. Once a
+// pinch begins, ignore single-finger editing until both fingers are lifted.
+$("#figure-paper").addEventListener("pointerdown", event => {
+  if (event.pointerType !== "touch" || !figureResult || $("#figure-image").hidden) return;
+  touchPoints.set(event.pointerId, {x:event.clientX,y:event.clientY});
+  if (touchPoints.size < 2) return;
+  if (!touchSuppressed) {
+    touchSuppressed = true; dragging = null; panning = null;
+    $("#selection-marquee")?.remove();
+    touchGesture = {...touchPair(),start:{...view}};
+    positionInteractions();
+  }
+  if (touchPoints.size > 2) touchGesture = null;
+  for (const id of touchPoints.keys()) event.currentTarget.setPointerCapture(id);
+  event.preventDefault(); event.stopPropagation();
+}, {capture:true});
+$("#figure-paper").addEventListener("pointermove", event => {
+  if (!touchPoints.has(event.pointerId)) return;
+  touchPoints.set(event.pointerId, {x:event.clientX,y:event.clientY});
+  if (!touchSuppressed) return;
+  if (touchPoints.size === 2 && touchGesture?.distance > 0) {
+    const current = touchPair();
+    view = zoomAt(touchGesture.start, current.distance/touchGesture.distance, touchGesture.center);
+    view.x += current.center.x - touchGesture.center.x;
+    view.y += current.center.y - touchGesture.center.y;
+    layoutPreview();
+  }
+  event.preventDefault(); event.stopPropagation();
+}, {capture:true});
+function endTouch(event) {
+  if (!touchPoints.has(event.pointerId)) return;
+  touchPoints.delete(event.pointerId);
+  if (!touchSuppressed) return;
+  event.preventDefault(); event.stopPropagation();
+  if (touchPoints.size < 2) touchGesture = null;
+  else if (touchPoints.size === 2) touchGesture = {...touchPair(),start:{...view}};
+  if (!touchPoints.size) { touchSuppressed = false; dragging = null; panning = null; }
+}
+$("#figure-paper").addEventListener("pointerup", endTouch, {capture:true});
+$("#figure-paper").addEventListener("pointercancel", endTouch, {capture:true});
+
 function layoutPreview(){
-  const paper=$("#figure-paper"),image=$("#figure-image"),content=$("#figure-content");if(image.hidden||!image.naturalWidth)return;
+  const paper=$("#figure-paper"),image=$("#figure-image"),content=$("#figure-content");if(image.hidden||!image.naturalWidth||!paper.clientWidth||!paper.clientHeight)return;
   const availableWidth=Math.max(100,paper.clientWidth-40),availableHeight=Math.max(200,paper.clientHeight-40);
   const scale=Math.min(availableWidth/image.naturalWidth,availableHeight/image.naturalHeight);
   content.style.width=`${image.naturalWidth*scale}px`;content.style.height=`${image.naturalHeight*scale}px`;
@@ -682,15 +791,16 @@ $("#figure-paper").addEventListener('wheel',event=>{
   const box=event.currentTarget.getBoundingClientRect();zoomPreview(event.deltaY<0?1.1:1/1.1,{x:event.clientX-box.left-box.width/2,y:event.clientY-box.top-box.height/2});
 },{passive:false});
 $("#figure-paper").addEventListener('pointerdown',event=>{
-  if(event.target.closest('[data-drag-id]') || event.button!==0)return;
-  if(!event.shiftKey)selected.clear();drawAnnotations();positionInteractions();panning={x:event.clientX,y:event.clientY,start:{...view},select:event.shiftKey};event.currentTarget.setPointerCapture(event.pointerId);event.preventDefault();
+  if(touchSuppressed || event.target.closest('[data-drag-id]') || event.button!==0)return;
+  if(!event.shiftKey && !touchMultiSelect)selected.clear();drawAnnotations();positionInteractions();panning={pointerId:event.pointerId,x:event.clientX,y:event.clientY,start:{...view},select:event.shiftKey};event.currentTarget.setPointerCapture(event.pointerId);event.preventDefault();
 });
 $("#figure-paper").addEventListener('pointermove',event=>{
-  if(!panning)return;
+  if(!panning || panning.pointerId !== event.pointerId || touchSuppressed)return;
   if(panning.select){const box=event.currentTarget.getBoundingClientRect();let marquee=$('#selection-marquee');if(!marquee){marquee=document.createElement('div');marquee.id='selection-marquee';event.currentTarget.append(marquee);}Object.assign(marquee.style,{left:`${Math.min(event.clientX,panning.x)-box.left}px`,top:`${Math.min(event.clientY,panning.y)-box.top}px`,width:`${Math.abs(event.clientX-panning.x)}px`,height:`${Math.abs(event.clientY-panning.y)}px`});return;}
   view={...panning.start,x:panning.start.x+event.clientX-panning.x,y:panning.start.y+event.clientY-panning.y};layoutPreview();
 });
 $("#figure-paper").addEventListener('pointerup',event=>{
+  if(touchSuppressed || (panning && panning.pointerId !== event.pointerId))return;
   if(panning?.select && figureResult){const box=$('#figure-image').getBoundingClientRect(),left=Math.min(event.clientX,panning.x),right=Math.max(event.clientX,panning.x),top=Math.min(event.clientY,panning.y),bottom=Math.max(event.clientY,panning.y);for(const item of figureResult.geometry.annotations){const [x,y,w,h]=item.box;if(box.left+x*box.width>=left && box.left+(x+w)*box.width<=right && box.top+y*box.height>=top && box.top+(y+h)*box.height<=bottom)selected.add(item.id);}drawAnnotations();positionInteractions();}
   $('#selection-marquee')?.remove();panning=null;
 });
@@ -714,5 +824,7 @@ window.addEventListener('keydown',event=>{
   else if(control&&key==='s'){event.preventDefault();$('#save-settings').click();}
   else if(control&&key==='o'){event.preventDefault();$('#open-settings').click();}
 });
+compactLayout.addEventListener("change", updateMobileLayout);
+updateMobileLayout();
 try { startWorker(); }
 catch (error) { fatal(`描画機能を開始できませんでした。ブラウザを更新してください。${error.message}`); }

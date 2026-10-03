@@ -6,10 +6,10 @@
   <meta name="description" content="Excel・CSVの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=025012cc799a">
-  <script type="module" src="./app.js?v=025012cc799a"></script>
+  <link rel="stylesheet" href="./style.css?v=c5809e1851a3">
+  <script type="module" src="./app.js?v=c5809e1851a3"></script>
 </head>
-<body>
+<body data-mobile-pane="settings">
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
     <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 3v17h17M7 15l4-6 4 3 5-7"/></symbol>
     <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V3m-5 5 5-5 5 5M4 15v5h16v-5"/></symbol>
@@ -28,14 +28,20 @@
     </a>
     <div class="header-actions">
       <span class="privacy-note"><span class="privacy-dot"></span>データはブラウザ内で処理</span>
-      <button id="open-settings" class="button quiet" disabled><svg><use href="#i-upload"/></svg><span>設定を開く</span></button>
-      <button id="save-settings" class="button quiet" disabled><svg><use href="#i-download"/></svg><span>設定を保存</span></button>
+      <button id="open-settings" class="button quiet" aria-label="設定を開く" title="設定を開く" disabled><svg><use href="#i-upload"/></svg><span>設定を開く</span></button>
+      <button id="save-settings" class="button quiet" aria-label="設定を保存" title="設定を保存" disabled><svg><use href="#i-download"/></svg><span>設定を保存</span></button>
       <input id="settings-file" type="file" accept=".json,application/json" hidden>
     </div>
   </header>
 
+  <nav class="mobile-tabs" role="tablist" aria-label="表示する画面">
+    <button type="button" id="settings-tab" role="tab" aria-controls="controls-panel" aria-selected="true">設定</button>
+    <button type="button" id="preview-tab" role="tab" aria-controls="preview-panel" aria-selected="false" tabindex="-1">プレビュー</button>
+  </nav>
+  <div class="mobile-status" role="status" aria-live="polite"><span id="mobile-status-text">描画機能を準備しています…</span><button id="retry-engine-mobile" class="button quiet" hidden>再読み込み</button></div>
+
   <div class="workspace">
-    <aside class="controls" aria-label="グラフの設定">
+    <aside id="controls-panel" class="controls" aria-label="グラフの設定">
       <details class="control-section data-section" open>
         <summary class="section-heading"><h2><span class="step">01</span>データ</h2><span class="section-note">Excel / CSV</span></summary>
         <button id="drop-zone" class="drop-zone" disabled>
@@ -108,7 +114,7 @@
       <div class="controls-footer"><span class="auto-dot"></span>変更するとプレビューを更新します</div>
     </aside>
 
-    <main class="preview-area">
+    <main id="preview-panel" class="preview-area">
       <div class="preview-toolbar">
         <div><span class="eyebrow">FIGURE</span><h1>グラフプレビュー</h1></div>
         <div class="export-buttons" role="group" aria-label="グラフを保存">
@@ -121,7 +127,8 @@
       </div>
       <div class="figure-options"><span id="preview-state" class="preview-state">準備中</span><span class="toolbar-divider"></span><span id="figure-size">軸領域 4 × 3 cm</span><div class="save-options"><label>保存名<input id="save-name" value="graph" aria-label="保存するファイルの名前" maxlength="120"></label><label>PNG<select id="png-dpi" aria-label="PNGの解像度"><option value="150">150 dpi</option><option value="300">300 dpi</option><option value="600">600 dpi</option><option value="1200" selected>1200 dpi（Python版）</option></select></label></div></div>
       <div id="figure-stage" class="figure-stage" aria-busy="true">
-        <div class="preview-tools"><button type="button" class="button quiet" id="undo">元に戻す</button><button type="button" class="button quiet" id="redo">やり直す</button><button type="button" class="button quiet" id="zoom-out" aria-label="プレビューを縮小">−</button><output id="zoom-level">100%</output><button type="button" class="button quiet" id="zoom-in" aria-label="プレビューを拡大">＋</button><button type="button" class="button quiet" id="zoom-reset">画面に合わせる</button><span>Ctrl＋ホイールで拡大・縮小／余白をドラッグで移動</span></div>
+        <div class="preview-tools"><button type="button" class="button quiet" id="undo">元に戻す</button><button type="button" class="button quiet" id="redo">やり直す</button><button type="button" class="button quiet" id="zoom-out" aria-label="プレビューを縮小">−</button><output id="zoom-level">100%</output><button type="button" class="button quiet" id="zoom-in" aria-label="プレビューを拡大">＋</button><button type="button" class="button quiet" id="zoom-reset">画面に合わせる</button><span class="mouse-hint">Ctrl＋ホイールで拡大・縮小／余白をドラッグで移動</span><span class="touch-hint">図内：1本指で移動／2本指で拡大・縮小</span></div>
+        <div class="touch-annotation-tools" role="group" aria-label="選択した注釈の操作"><button type="button" id="touch-multiselect" class="button quiet" aria-pressed="false">複数選択</button><span id="touch-selection-count">選択なし</span><button type="button" id="touch-edit" class="button quiet" disabled>編集</button><button type="button" id="touch-copy" class="button quiet" disabled>複製</button><button type="button" id="touch-delete" class="button quiet" disabled>削除</button></div>
         <div class="paper" id="figure-paper">
           <div id="figure-content">
           <img id="figure-image" alt="作成したグラフのプレビュー" hidden>
