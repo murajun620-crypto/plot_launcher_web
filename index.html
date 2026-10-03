@@ -6,8 +6,8 @@
   <meta name="description" content="Excel・CSVの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=0cc132bfdf16">
-  <script type="module" src="./app.js?v=0cc132bfdf16"></script>
+  <link rel="stylesheet" href="./style.css?v=d9aa31940aa1">
+  <script type="module" src="./app.js?v=d9aa31940aa1"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -155,6 +155,10 @@
     <div class="dialog-heading"><strong id="axis-editor-title"></strong><button type="button" class="button quiet" id="close-axis-editor">閉じる</button></div>
     <form id="axis-editor-fields" onsubmit="return false"></form>
     <p class="field-hint">変更はプレビューに反映されます。位置をドラッグした軸ラベルは「標準位置に戻す」で元の配置に戻せます。</p>
+  </dialog>
+  <dialog id="element-editor" class="plot-dialog" aria-labelledby="element-editor-title">
+    <div class="dialog-heading"><strong id="element-editor-title"></strong><button type="button" class="button quiet" id="close-element-editor">閉じる</button></div>
+    <div id="element-editor-fields"></div>
   </dialog>
   <noscript>このアプリを使用するにはJavaScriptを有効にしてください。</noscript>
 </body>

@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.0.1";
+export const APP_VERSION = "1.1.0";
 
 // src/plot_settings.py: default_auto_series_colors(), same order and shades.
 export const COLORS = ["#1F8FE0", "#D4291E", "#2BA84D", "#D77207", "#7D3EDD", "#787878", "#666666", "#0052A8", "#A10000", "#009F22"];
@@ -55,12 +55,13 @@ export function defaultAxes() {
     yAxisRight: false, xAxisTop: false, spineColor: "#000000",
     legend: true, legendPosition: "best", legendX: "", legendY: "", legendScale: 1, legendFontScale: 1,
     transparent: true, backgroundColor: "#ffffff", backgroundAlpha: 1, grid: false,
+    plotBackgroundEnabled: false, plotBackgroundColor: "#ffffff", plotBackgroundAlpha: 1,
     markerEdgeWidth: 0.6, errorLineWidth: 0.8, errorCapSize: 3, errorCapThick: 0.8,
   };
 }
 
 export function createSeries(x, y, name, index = 0) {
-  return { x, y, name, color: COLORS[index % COLORS.length], scatterColor: "auto", mode: "line", lineWidth: 1, lineStyle: "-", lineAlpha: 1, marker: "o", markerSize: 18, markerEdgeColor: "auto", markerFaceColor: "auto", markerEdgeAlpha: 0.8, markerFaceAlpha: 0.8, xOffset: 0, yOffset: 0, error: "", errorMode: "auto", errorMin: "", errorMax: "" };
+  return { x, y, name, visible: true, color: COLORS[index % COLORS.length], scatterColor: "auto", mode: "line", lineWidth: 1, lineStyle: "-", lineAlpha: 1, marker: "o", markerSize: 18, markerEdgeColor: "auto", markerFaceColor: "auto", markerEdgeAlpha: 0.8, markerFaceAlpha: 0.8, xOffset: 0, yOffset: 0, error: "", errorMode: "auto", errorMin: "", errorMax: "" };
 }
 
 export function safeStem(name) {
@@ -150,6 +151,10 @@ export function restoreSettings(document, metadata) {
     for (const key of Object.keys(result)) {
       if (["x", "y", "error", "errorMin", "errorMax"].includes(key)) continue;
       if (Object.hasOwn(item, key)) {
+        if (key === 'visible') {
+          if (typeof item[key] !== 'boolean') throw new Error("設定JSONの系列表示を確認してください。");
+          result[key] = item[key]; continue;
+        }
         if (!["string", "number"].includes(typeof item[key])) throw new Error("設定JSONの系列設定を確認してください。");
         result[key] = item[key];
       }

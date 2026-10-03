@@ -221,3 +221,15 @@ button:focus-visible,summary:focus-visible,a:focus-visible{outline:2px solid #ab
 .color-icon{flex:0 0 34px;width:34px;height:30px;border:1px solid #98a3b3;border-radius:5px;padding:0;cursor:pointer;box-shadow:inset 0 0 0 3px #fff;color:var(--muted);font-size:12px}
 .color-icon:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 .color-icon:disabled{cursor:default;opacity:.5}
+
+
+.series-visibility{display:flex;align-items:center;gap:7px;font-size:11px;margin-bottom:9px}
+.background-hit-target{position:absolute;pointer-events:auto;border:0;background:transparent;padding:0;cursor:pointer}
+.background-hit-target:focus-visible{outline:1px dashed #205eb0;outline-offset:-2px}
+.data-hit-target{cursor:pointer;touch-action:none}
+.data-hit-target:hover,.data-hit-target:focus-visible{stroke:#205eb045}
+.data-hit-target[fill="transparent"]:hover,.data-hit-target[fill="transparent"]:focus-visible{fill:#205eb025;stroke:none}
+.axis-tick-target:hover{background:transparent;border-color:transparent}
+.axis-tick-target.highlighted{background:#205eb018;border:1px dashed #205eb0}
+#element-editor{width:min(430px,calc(100vw - 24px))}
+#element-editor .series-card{border:0;padding:0}

@@ -27,6 +27,9 @@ matplotlib.use("Agg")
 from matplotlib import font_manager, pyplot as plt
 from matplotlib.colors import is_color_like
 from matplotlib.backends.backend_svg import RendererSVG
+from matplotlib.lines import Line2D
+from matplotlib.collections import PathCollection, PolyCollection, LineCollection
+from matplotlib.patches import Rectangle
 import numpy as np
 import pandas as pd
 
@@ -215,7 +218,7 @@ class PlotEngine:
         if preset in {"XPS Fit", "Particle Histogram"} and series:
             first = series[0]
             diameter = options.get("diameterColumn", min(2, len(self.frame.columns) - 1)) if self.frame is not None else 0
-            series = [{"x": first.get("x", 0) if preset == "XPS Fit" else diameter, "y": first.get("y", 1) if preset == "XPS Fit" else diameter, "name": first.get("name", "Raw")}]
+            series = [{"x": first.get("x", 0) if preset == "XPS Fit" else diameter, "y": first.get("y", 1) if preset == "XPS Fit" else diameter, "name": first.get("name", "Raw"), "visible": first.get("visible", True)}]
         if not 1 <= len(series) <= MAX_SERIES:
             raise ValueError(f"系列を1〜{MAX_SERIES}個追加してください。")
         count = len(self.frame.columns)
@@ -246,8 +249,10 @@ class PlotEngine:
             "PLOT_PREVIEW_LEGEND": "1" if axes.get("legend", True) else "0",
             "PLOT_FIGURE_BACKGROUND_ALPHA": "0" if axes.get("transparent", True) else str(number(axes.get("backgroundAlpha", 1), "背景不透明度", minimum=0, maximum=1)),
             "PLOT_FIGURE_BACKGROUND_COLOR": str(axes.get("backgroundColor", "#ffffff")),
+            "PLOT_AXES_BACKGROUND_COLOR": str(axes.get("plotBackgroundColor", "#ffffff")),
+            "PLOT_AXES_BACKGROUND_ALPHA": str(number(axes.get("plotBackgroundAlpha", 1), "枠内背景不透明度", minimum=0, maximum=1)) if axes.get("plotBackgroundEnabled", False) else "0",
         }
-        for key in ("PLOT_SPINE_COLOR", "PLOT_FIGURE_BACKGROUND_COLOR"):
+        for key in ("PLOT_SPINE_COLOR", "PLOT_FIGURE_BACKGROUND_COLOR", "PLOT_AXES_BACKGROUND_COLOR"):
             if not is_color_like(values[key]):
                 raise ValueError("枠線・背景色を確認してください。")
         for key, env in {
@@ -312,6 +317,8 @@ class PlotEngine:
         diagnostics, warnings = [], []
         extents = {"x": [], "y": []}
         for index, item in enumerate(series):
+            if not isinstance(item.get("visible", True), bool):
+                raise ValueError("系列の描画オン・オフを確認してください。")
             xi = column_index(item.get("x"), count, f"系列{index + 1}のX")
             yi = column_index(item.get("y"), count, f"系列{index + 1}のY")
             error = item.get("error", "")
@@ -360,7 +367,7 @@ class PlotEngine:
                 warnings.append(f"{name}: 空欄・非数値・対数軸の0以下の値を含む{excluded:,}点を除外")
             extents["x"].extend((float(x[valid].min()), float(x[valid].max())))
             extents["y"].extend((float(y[valid].min()), float(y[valid].max())))
-            diagnostics.append({"name": name, "points": int(valid.sum())})
+            diagnostics.append({"name": name, "points": int(valid.sum()), "visible": item.get("visible", True)})
             color = str(item.get("color", plot_utils.COLORS["blue"][7]))
             if not is_color_like(color):
                 raise ValueError("系列の色を選び直してください。")
@@ -465,7 +472,7 @@ class PlotEngine:
                 raise ValueError("粒径には正の数値が必要です。")
             if data.max() / 20 > 10000:
                 raise ValueError("粒径の単位・列を確認してください。Web版では幅20 nmのビンを1万個以内にしてください。")
-            diagnostics = [{"name": str(self.frame.columns[diameter]), "points": int((np.isfinite(data) & (data > 0)).sum())}]
+            diagnostics = [{"name": str(self.frame.columns[diameter]), "points": int((np.isfinite(data) & (data > 0)).sum()), "visible": series[0].get("visible", True)}]
             return pd.DataFrame({"_index": np.arange(len(data)), "_unused": data, str(self.frame.columns[diameter]): data}), values, diagnostics, warnings
         if preset == "XPS Fit":
             if count < 8:
@@ -495,6 +502,102 @@ class PlotEngine:
             return pd.DataFrame({"_x": first_x, **{f"_y_{i}": draw_columns[f"_y_{i}"] for i in range(len(series))}}), values, diagnostics, warnings
         return pd.DataFrame(draw_columns), values, diagnostics, warnings
 
+    def _series_artists(self, axes, namespace, preset, config):
+        """Keep series indices and limits stable when temporarily hiding data."""
+        extra = []
+        if preset in {"General", "Roughness"}:
+            handles = namespace["legend_handles"]
+            children = [artist for artist in axes.get_children() if isinstance(artist, (Line2D, PathCollection, LineCollection, PolyCollection))]
+            starts = [children.index(handle) for handle in handles]
+            groups = [children[start:(starts[i + 1] if i + 1 < len(starts) else len(children))] for i, start in enumerate(starts)]
+        elif preset == "bar_graph_general":
+            groups = [list(container.patches) for container in axes.containers if hasattr(container, "patches")]
+        elif preset == "Particle Histogram":
+            groups = [list(axes.patches) + list(axes.lines)]
+            options = config.get("options", {})
+            for patch in axes.patches:
+                if "histogramColor" in options:
+                    patch.set_facecolor(options["histogramColor"])
+                    patch.set_edgecolor(options["histogramColor"])
+                if "histogramAlpha" in options:
+                    patch.set_alpha(number(options["histogramAlpha"], "分布の不透明度", minimum=0, maximum=1))
+            for line in axes.lines:
+                if "histogramFitColor" in options:
+                    line.set_color(options["histogramFitColor"])
+                if "histogramFitWidth" in options:
+                    line.set_linewidth(number(options["histogramFitWidth"], "分布曲線の線幅", minimum=0, maximum=20))
+        elif preset == "XPS Fit":
+            groups = [[artist for artist in axes.collections if isinstance(artist, PathCollection)]]
+            extra = [{"part": "preset", "artists": list(axes.lines) + [artist for artist in axes.collections if isinstance(artist, PolyCollection)]}]
+        else:
+            groups = [[line] for line in axes.lines]
+        result = []
+        for index, artists in enumerate(groups):
+            visible = config.get("series", [])[index].get("visible", True)
+            for artist in artists:
+                artist.set_visible(visible)
+            result.append({"index": index, "artists": artists})
+        return result + extra
+
+    @staticmethod
+    def _data_geometry(groups, axes, box, renderer):
+        """Normalize visible artist paths to the exported SVG, rather than data bounds."""
+        def point(xy):
+            x, y = xy / 72
+            return [round(float((x - box.x0) / box.width), 7), round(float((box.y1 - y) / box.height), 7)]
+
+        result = []
+        for group in groups:
+            entry = {key: group[key] for key in ("index", "part") if key in group}
+            entry.update(paths=[], points=[], boxes=[], polygons=[])
+            for artist in group["artists"]:
+                if not artist.get_visible() or artist.get_alpha() == 0:
+                    continue
+                if isinstance(artist, Line2D) and artist.get_linewidth() <= 0 and artist.get_marker() in (None, "None", "", " "):
+                    continue
+                if isinstance(artist, PathCollection):
+                    colors = [*artist.get_facecolors(), *artist.get_edgecolors()]
+                    if not any(color[3] > 0 for color in colors):
+                        continue
+                    sizes = artist.get_sizes()
+                    entry["pointRadius"] = float(np.sqrt(max(sizes, default=0)) / (2 * 72 * box.width))
+                    offsets = artist.get_offset_transform().transform(artist.get_offsets())
+                    seen = set()
+                    for xy in offsets:
+                        if np.ma.is_masked(xy) or not np.isfinite(xy).all() or not axes.bbox.contains(*xy):
+                            continue
+                        key = tuple(np.round(xy, 1))
+                        if key not in seen:
+                            seen.add(key)
+                            entry["points"].append(point(xy))
+                    continue
+                if isinstance(artist, Rectangle):
+                    b = artist.get_window_extent(renderer)
+                    x0, y0 = max(b.x0, axes.bbox.x0), max(b.y0, axes.bbox.y0)
+                    x1, y1 = min(b.x1, axes.bbox.x1), min(b.y1, axes.bbox.y1)
+                    if x1 > x0 and y1 > y0:
+                        p0, p1 = point(np.array([x0, y1])), point(np.array([x1, y0]))
+                        entry["boxes"].append([*p0, p1[0] - p0[0], p1[1] - p0[1]])
+                    continue
+                paths = artist.get_paths() if hasattr(artist, "get_paths") else [artist.get_path()]
+                for path in paths:
+                    path = path.transformed(artist.get_transform())
+                    if len(path.vertices) == 1 and not axes.bbox.padded(12).contains(*path.vertices[0]):
+                        continue
+                    path = path.cleaned(remove_nans=True, simplify=True, clip=axes.bbox.extents)
+                    segment = []
+                    for xy, code in zip(path.vertices, path.codes):
+                        if code in (0, 1, 79):
+                            if segment:
+                                entry["polygons" if isinstance(artist, PolyCollection) else "paths"].append(segment)
+                            segment = []
+                        if code in (1, 2) and np.isfinite(xy).all():
+                            segment.append(point(xy))
+                    if segment:
+                        entry["polygons" if isinstance(artist, PolyCollection) else "paths"].append(segment)
+            result.append(entry)
+        return result
+
     def render(self, config):
         frame, values, diagnostics, warnings = self._prepare(config)
         previous_figures = set(plt.get_fignums())
@@ -504,6 +607,7 @@ class PlotEngine:
                 preset = config.get("plotType", "General")
                 namespace = runpy.run_path(str(self.source_dir / self.presets[preset]["script"]), run_name="__main__")
                 figure, axes = namespace["fig"], namespace["ax"]
+                series_groups = self._series_artists(axes, namespace, preset, config)
                 statistics = None
                 if preset == "Particle Histogram":
                     statistics = {"median": float(namespace["median"]), "mean": float(namespace["mean"])}
@@ -515,12 +619,19 @@ class PlotEngine:
                 if position not in {"best", "upper right", "upper left", "lower right", "lower left"}:
                     raise ValueError("凡例の位置を選び直してください。")
                 legend = axes.get_legend()
+                if legend and any(not item["visible"] for item in diagnostics):
+                    handles, labels = axes.get_legend_handles_labels()
+                    visible = [i for i, item in enumerate(diagnostics) if item["visible"]]
+                    legend.remove()
+                    if visible and preset not in {"XPS Fit", "Particle Histogram"}:
+                        plot_utils.apply_preview_legend(axes, handles=[handles[i] for i in visible], labels=[diagnostics[i]["name"] for i in visible])
+                    legend = axes.get_legend()
                 if legend:
                     # Preserve apply_preview_legend()'s spacing and handle sizes.
                     if values["PLOT_LEGEND_X"] == "":
                         legend.set_loc(position)
                     if preset not in {"XPS Fit", "Particle Histogram"}:
-                        for text, series in zip(legend.get_texts(), diagnostics):
+                        for text, series in zip(legend.get_texts(), [item for item in diagnostics if item["visible"]]):
                             text.set_text(series["name"])
                 if config.get("axes", {}).get("grid", False):
                     axes.grid(True, alpha=0.15, linewidth=0.5)
@@ -531,14 +642,14 @@ class PlotEngine:
                 if preset == "Raman 3D":
                     options = config.get("options", {})
                     axes.view_init(elev=number(options.get("elevation", 24), "仰角", minimum=-180, maximum=180), azim=number(options.get("azimuth", -66), "方位角", minimum=-360, maximum=360))
+                    axes.set_ylabel(str(options.get("depthLabel", "Series")))
                     overlay = figure.add_axes(axes.get_position(), frameon=False)
                     overlay.set_xlim(axes.get_xlim()); overlay.set_ylim(axes.get_zlim())
                     overlay.set_axis_off()
                     annotation_axes = overlay
                 else:
                     annotation_axes = axes
-                # Paint the background once, including the margins. Transparent
-                # axes avoid doubling the opacity of a translucent figure.
+                # Figure and plot-area backgrounds each have their own fill.
                 plot_utils.apply_plot_background_from_env(figure, [])
                 for target in figure.axes:
                     target.patch.set_facecolor("none")
@@ -546,6 +657,8 @@ class PlotEngine:
                     if target.name == "3d":
                         for axis in (target.xaxis, target.yaxis, target.zaxis):
                             axis.pane.set_fill(False)
+                axes.patch.set_facecolor(values["PLOT_AXES_BACKGROUND_COLOR"])
+                axes.patch.set_alpha(float(values["PLOT_AXES_BACKGROUND_ALPHA"]))
                 editable_axes = [("x", axes.xaxis), ("y", axes.zaxis if preset == "Raman 3D" else axes.yaxis)]
                 positioned_labels = {}
                 if preset == "Raman 3D":
@@ -601,7 +714,7 @@ class PlotEngine:
                 plot_utils.expand_figure_to_include_artists(figure)
                 image = BytesIO()
                 extra_artists = [positioned_labels.get("x", axes.xaxis.label), axes.yaxis.label, positioned_labels.get("y", axes.zaxis.label)] if preset == "Raman 3D" else None
-                figure.savefig(image, format="svg", bbox_inches="tight", bbox_extra_artists=extra_artists, pad_inches=0.05, transparent=values["PLOT_FIGURE_BACKGROUND_ALPHA"] == "0")
+                figure.savefig(image, format="svg", bbox_inches="tight", bbox_extra_artists=extra_artists, pad_inches=0.05, transparent=False)
                 # Hit areas must use SVG text metrics, exactly as the preview,
                 # rather than Agg bitmap metrics (noticeably different fonts).
                 original_dpi = figure.dpi
@@ -615,6 +728,12 @@ class PlotEngine:
                     b = artist_box.transformed(figure.dpi_scale_trans.inverted())
                     return [(b.x0 - box.x0) / box.width, (box.y1 - b.y1) / box.height, b.width / box.width, b.height / box.height]
                 geometry = {"axes": svg_box(axes.get_window_extent(renderer)), "legend": svg_box(legend.get_window_extent(renderer)) if legend else None, "annotations": [], "axisLabels": [], "tickLabels": []}
+                geometry["series"] = self._data_geometry(series_groups, axes, box, renderer)
+                geometry["spines"] = [{"id": side, "paths": self._data_geometry([{"artists": [spine]}], axes, box, renderer)[0]["paths"]} for side, spine in axes.spines.items() if spine.get_visible() and preset != "Raman 3D"]
+                geometry["grid"] = self._data_geometry([{"part": "grid", "artists": [line for line in axes.get_xgridlines() + axes.get_ygridlines() if line.get_visible()]}], axes, box, renderer)
+                geometry["grid"] += self._data_geometry([{"part": "grid", "artists": [line for axis in (axes.xaxis, axes.yaxis) for tick in [*axis.get_major_ticks(), *axis.get_minor_ticks()] for line in (tick.tick1line, tick.tick2line) if line.get_visible()]}], axes, box, renderer)
+                if preset == "Raman 3D":
+                    geometry["depth"] = [svg_box(label.get_window_extent(renderer)) for label in [axes.yaxis.label, *axes.yaxis.get_ticklabels()] if label.get_visible() and label.get_text()]
                 for name, axis in editable_axes:
                     label = positioned_labels.get(name, axis.label)
                     if label.get_visible() and label.get_text():
@@ -637,10 +756,12 @@ class PlotEngine:
             if self.figure is not None:
                 plt.close(self.figure)
             self.figure = figure
-            self.transparent = values["PLOT_FIGURE_BACKGROUND_ALPHA"] == "0"
+            # Patches already hold their alpha; transparent=True would erase
+            # a separately enabled axes fill when the figure is transparent.
+            self.transparent = False
             self.annotation_manager = manager
             self.export_extra_artists = extra_artists
-            return {"svg": image.getvalue().decode("utf-8"), "series": diagnostics, "warnings": warnings, "statistics": statistics, "xRange": list(annotation_axes.get_xlim()), "yRange": list(annotation_axes.get_ylim()), "geometry": geometry, "fontFamily": family if (family := config.get("axes", {}).get("fontFamily")) else self.font_family}
+            return {"svg": image.getvalue().decode("utf-8"), "series": [item for item in diagnostics if item["visible"]], "warnings": warnings, "statistics": statistics, "xRange": list(annotation_axes.get_xlim()), "yRange": list(annotation_axes.get_ylim()), "geometry": geometry, "fontFamily": family if (family := config.get("axes", {}).get("fontFamily")) else self.font_family}
         except Exception:
             for figure_number in set(plt.get_fignums()) - previous_figures:
                 plt.close(figure_number)
