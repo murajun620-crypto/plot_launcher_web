@@ -1,4 +1,4 @@
-import { COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=95b301358e0d";
+import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=514cd64f227e";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -16,6 +16,32 @@ let sourceHandle = null, sourceDirectory = null, saveDirectory = null;
 const sourceHandles = new WeakMap();
 const folderSupported = typeof window.showDirectoryPicker === 'function';
 const importedFonts = new Map();
+let savedProjectState = null;
+$('#app-version').textContent = `v${APP_VERSION}`;
+
+function projectEditState() {
+  // Retained data/font objects are immutable; compare references rather than
+  // encoding large files each time the browser asks whether it may leave.
+  // Zoom, pan, selection and expanded sections only change the viewing state.
+  return {source:sourceData, fonts:[...importedFonts.values()], content:JSON.stringify({
+    settings:metadata ? makeSettings(config,metadata,loadedHeader) : config,
+    sheetIndex:metadata?.sheetIndex, sample,
+    saveName:$('#save-name').value, pngDpi:Number($('#png-dpi').value)
+  })};
+}
+
+function hasUnsavedChanges() {
+  if (!sourceData && !importedFonts.size) return false;
+  const current = projectEditState(), saved = savedProjectState;
+  return !saved || current.source !== saved.source || current.content !== saved.content ||
+    current.fonts.length !== saved.fonts.length || current.fonts.some((font,index)=>font !== saved.fonts[index]);
+}
+
+window.addEventListener('beforeunload', event => {
+  if (!hasUnsavedChanges()) return;
+  event.preventDefault();
+  event.returnValue = '';
+});
 let presets = [], selected = new Set(), clipboard = [], view = {zoom:1,x:0,y:0}, panning;
 let history = [], future = [], lastState, restoring = false;
 const catalogReady = fetch(new URL("./presets.json" + new URL(import.meta.url).search, import.meta.url)).then(response => {if(!response.ok) throw new Error("プリセットの読み込みに失敗しました"); return response.json();}).then(items => {
@@ -92,7 +118,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=95b301358e0d", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=514cd64f227e", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -716,13 +742,14 @@ async function saveProject() {
   exporting=true;updateButtons();
   try {
     const saveFile=await prepareSaver();
+    const savedState=projectEditState();
     const project=makeProject(makeSettings(config,metadata,loadedHeader), {...sourceData,sheetIndex:metadata.sheetIndex,headerRow:loadedHeader,sample}, [...importedFonts.values()], {
       saveName:$("#save-name").value,pngDpi:Number($("#png-dpi").value),view:{...view},sections:$$('#controls-panel .control-section').map(section=>section.open)
     });
     const blob=new Blob([JSON.stringify(project)],{type:'application/json'});
     if(blob.size>PROJECT_MAX_SIZE)throw new Error('プロジェクトは130 MB以内にしてください。');
     const filename=`${safeStem($("#save-name").value)}.plotproject`;
-    const savedName=await saveFile(blob,filename); status(`${savedName} を保存しました。データと設定をまとめて再開できます。`,'ready');
+    const savedName=await saveFile(blob,filename); savedProjectState=savedState; status(`${savedName} を保存しました。データと設定をまとめて再開できます。`,'ready');
   } catch(error){status(error.name==='AbortError'?'保存をキャンセルしました。':`プロジェクトを保存できませんでした: ${error.message}`,error.name==='AbortError'?'ready':'error');}
   finally{exporting=false;updateButtons();if(renderWanted)renderPreview();}
 }
@@ -748,6 +775,7 @@ async function readProject(file, saved) {
     $$('dialog[open]').forEach(dialog=>dialog.close());
     resetPreview(); drawMetadata(); drawControls();
     $$('#controls-panel .control-section').forEach((section,index)=>{section.open=project.workspace.sections[index] ?? true;});
+    savedProjectState=projectEditState();
     renderWanted=true;
   } catch(error){status(`プロジェクトを開けませんでした: ${error.message}`,'error');}
   finally{loading=false;updateButtons();if(renderWanted)renderPreview();}

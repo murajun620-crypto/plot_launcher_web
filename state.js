@@ -1,3 +1,5 @@
+export const APP_VERSION = "1.0.0";
+
 // src/plot_settings.py: default_auto_series_colors(), same order and shades.
 export const COLORS = ["#1F8FE0", "#D4291E", "#2BA84D", "#D77207", "#7D3EDD", "#787878", "#666666", "#0052A8", "#A10000", "#009F22"];
 export const COLOR_PALETTE = {

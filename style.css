@@ -13,6 +13,7 @@ svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke
 .brand-mark{display:grid;place-items:center;background:var(--blue);color:#fff;border-radius:10px;width:36px;height:36px}
 .brand-mark svg{width:25px;height:25px}
 .brand-web{margin-left:5px;font-size:11px;letter-spacing:.8px;text-transform:uppercase;background:var(--blue-light);color:var(--blue);padding:4px 6px;border-radius:4px;vertical-align:middle;font-weight:600}
+.brand-version{font-size:11px;font-weight:400;letter-spacing:0;color:var(--muted);white-space:nowrap;margin-left:-4px}
 .header-actions{display:flex;align-items:center;gap:12px}
 .privacy-note{display:flex;align-items:center;gap:7px;font-size:11px;color:#66758b;margin-right:10px}
 .privacy-dot,.auto-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0}
