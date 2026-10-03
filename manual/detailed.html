@@ -1,0 +1,478 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PlotLauncher 詳細マニュアル</title><link rel="stylesheet" href="manual.css"></head><body class="plotlauncher"><header class="top"><a class="brand" href="index.html">PlotLauncher マニュアル</a><div class="top-links"><nav class="editions" aria-label="マニュアルの種類"><a href="quick.html" >簡易版</a><a href="detailed.html" aria-current="page">詳細版</a></nav><a href="https://murajun620-crypto.github.io/plot_launcher_web/" target="_blank" rel="noopener">アプリを開く ↗</a><a data-package href="manual.zip" download>esa投稿用一式</a></div></header><div class="layout"><aside class="toc"><h2>詳細版の目次</h2><nav class="toc-links" aria-label="目次"><a href="#1-画面とファイルを開く操作">1. 画面とファイルを開く操作</a><a href="#2-データの構成">2. データの構成</a><a href="#3-プリセットを選ぶ">3. プリセットを選ぶ</a><a href="#4-系列の表示と見た目">4. 系列の表示と見た目</a><a href="#5-軸ラベルと目盛り">5. 軸ラベルと目盛り</a><a href="#6-図の寸法と表示倍率">6. 図の寸法と表示倍率</a><a href="#7-注釈と凡例">7. 注釈と凡例</a><a href="#8-背景と透明部分">8. 背景と透明部分</a><a href="#9-完成図を保存する">9. 完成図を保存する</a><a href="#10-画像をコピーする">10. 画像をコピーする</a><a href="#11-プロジェクトと設定を保存して再開する">11. プロジェクトと設定を保存して再開する</a><a href="#12-うまく表示されないとき">12. うまく表示されないとき</a><a href="#練習の確認">練習の確認</a></nav><p class="tip">画像はクリックで拡大。<br>拡大画面の＋・−で調整できます。<br>GIFは再生ボタンで開始。<br>赤い輪はクリック、破線はドラッグです。</p></aside><main class="article"><h1>PlotLauncher 詳細マニュアル</h1>
+<p>測定データの準備から、系列・軸・注釈の調整、完成図の保存、プロジェクトの再開までを説明します。</p>
+<p><a href="https://murajun620-crypto.github.io/plot_launcher_web/">PlotLauncherを開く</a> ｜ <a href="quick.html">最初の操作だけを見る</a></p>
+<h2 id="1-画面とファイルを開く操作">1. 画面とファイルを開く操作</h2>
+<p>PCのブラウザでアプリを開き、描画機能の準備が終わるまで待ちます。左が設定、右がプレビューです。左の各見出しはクリックで開閉できます。</p>
+<figure class="media "><button class="image-open" type="button" aria-label="PlotLauncherの全体画面。左にデータと設定、右にグラフのプレビューを拡大"><img src="assets/overview.jpg" alt="PlotLauncherの全体画面。左にデータと設定、右にグラフのプレビュー" width="1265" height="712" loading="lazy"></button><figcaption>PlotLauncherの全体画面。左にデータと設定、右にグラフのプレビュー</figcaption></figure>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>やりたいこと</th>
+<th>操作</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>新しい測定データで図を作る</td>
+<td>「＋ データを開く」でExcel / CSVを選ぶ</td>
+</tr>
+<tr>
+<td>操作を練習する</td>
+<td>「サンプルを使う」を押す</td>
+</tr>
+<tr>
+<td>前回の編集を再開する</td>
+<td>上部の「プロジェクトを開く」で <code>.plotproject</code> を選ぶ</td>
+</tr>
+<tr>
+<td>別のデータに保存済みの見た目を適用する</td>
+<td>データを開いた後、「設定を開く」で設定JSONを選ぶ</td>
+</tr>
+</tbody></table></div>
+<figure class="media focus"><button class="image-open" type="button" aria-label="ファイルを開くボタンと、シート・ヘッダー行の指定部分の拡大を拡大"><img src="assets/file-controls.jpg" alt="ファイルを開くボタンと、シート・ヘッダー行の指定部分の拡大" width="362" height="316" loading="lazy"></button><figcaption>ファイルを開くボタンと、シート・ヘッダー行の指定部分の拡大</figcaption></figure>
+<p>Excelは <code>.xlsx</code>・<code>.xlsm</code>・<code>.xls</code>、CSVは <code>.csv</code> に対応しています。ファイルは30 MB以内、表は20万行・256列以内です。サンプルは練習用の人工データです。</p>
+<h2 id="2-データの構成">2. データの構成</h2>
+<h3>基本は列に項目、行に測定点</h3>
+<p>一つの表に、見出し行と、その下の測定値を並べます。XとYを横に並べ、<strong>同じ行のXとYを一つの測定点</strong> として扱います。</p>
+<ul>
+<li>見出しは <code>Potential/V</code>・<code>Sample A</code> など、区別できる名前にします。</li>
+<li>数値のセルは <code>0.25</code> のように数値だけにします。<code>0.25 V</code>・<code>未測定</code> などの文字は、そのままでは数値として描画されません。</li>
+<li>単位は見出しや軸設定に記入します。</li>
+<li>表の途中に説明文・合計行・別の表を入れないようにします。セルの結合も避けます。</li>
+<li>Excelの列幅やセルの色は、グラフの線の色や図の寸法には引き継がれません。</li>
+</ul>
+<h3>A. 複数の系列でXが共通の場合</h3>
+<p>最初の列をX、その右に各系列のYを並べます。</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>行</th>
+<th>A列：Potential/V</th>
+<th>B列：Sample A</th>
+<th>C列：Sample B</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><strong>Potential/V</strong></td>
+<td><strong>Sample A</strong></td>
+<td><strong>Sample B</strong></td>
+</tr>
+<tr>
+<td>2</td>
+<td>-0.50</td>
+<td>0.001</td>
+<td>0.003</td>
+</tr>
+<tr>
+<td>3</td>
+<td>-0.25</td>
+<td>0.050</td>
+<td>0.080</td>
+</tr>
+<tr>
+<td>4</td>
+<td>0.00</td>
+<td>0.200</td>
+<td>0.250</td>
+</tr>
+<tr>
+<td>5</td>
+<td>0.25</td>
+<td>0.120</td>
+<td>0.180</td>
+</tr>
+</tbody></table></div>
+<p>この表では、ヘッダー行を <strong>1</strong> に指定し、次のように系列を作ります。</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>系列</th>
+<th>X列</th>
+<th>Y列</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Sample A</td>
+<td>Potential/V（A列）</td>
+<td>Sample A（B列）</td>
+</tr>
+<tr>
+<td>Sample B</td>
+<td>Potential/V（A列）</td>
+<td>Sample B（C列）</td>
+</tr>
+</tbody></table></div>
+<p>「02 系列」→「系列の一括操作」→ <strong>「共通X・全Y」</strong> を押すと、最初の列を共通Xとして、右側の列をそれぞれYに設定できます。追加した系列の列と名前を確認してください。</p>
+<figure class="media focus"><button class="image-open" type="button" aria-label="共通X・全YとXYペアを選ぶ一括操作の拡大を拡大"><img src="assets/column-layout-controls.jpg" alt="共通X・全YとXYペアを選ぶ一括操作の拡大" width="314" height="159" loading="lazy"></button><figcaption>共通X・全YとXYペアを選ぶ一括操作の拡大</figcaption></figure>
+<p><a href="examples/shared_x.csv">この並びを練習するCSV</a> をダウンロードして、「＋ データを開く」から開けます。ファイルの数値は人工データです。</p>
+<h3>B. 系列ごとにXが違う場合</h3>
+<p><code>X1, Y1, X2, Y2</code> の順に、XとYを組にして並べます。</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>行</th>
+<th>A列</th>
+<th>B列</th>
+<th>C列</th>
+<th>D列</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><strong>Potential A/V</strong></td>
+<td><strong>Current A</strong></td>
+<td><strong>Potential B/V</strong></td>
+<td><strong>Current B</strong></td>
+</tr>
+<tr>
+<td>2</td>
+<td>-0.50</td>
+<td>0.001</td>
+<td>-0.45</td>
+<td>0.003</td>
+</tr>
+<tr>
+<td>3</td>
+<td>-0.25</td>
+<td>0.050</td>
+<td>-0.20</td>
+<td>0.080</td>
+</tr>
+<tr>
+<td>4</td>
+<td>0.00</td>
+<td>0.200</td>
+<td>0.05</td>
+<td>0.250</td>
+</tr>
+</tbody></table></div>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>系列</th>
+<th>X列</th>
+<th>Y列</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Current A</td>
+<td>Potential A/V（A列）</td>
+<td>Current A（B列）</td>
+</tr>
+<tr>
+<td>Current B</td>
+<td>Potential B/V（C列）</td>
+<td>Current B（D列）</td>
+</tr>
+</tbody></table></div>
+<p>「系列の一括操作」→ <strong>「XYペア」</strong> を使います。系列ごとに点数が違う場合は、短い系列の末尾を空欄にします。各系列のX・Yの対応を崩さないでください。</p>
+<p><a href="examples/xy_pairs.csv">X・Yの組を練習するCSV</a></p>
+<h3>C. 見出しが1行目ではない場合</h3>
+<p>測定装置の情報などが先頭にあるときは、<strong>列名が並んでいる行の番号</strong> を「ヘッダー行」に入力します。</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>行</th>
+<th>A列</th>
+<th>B列</th>
+<th>C列</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>Practice data</td>
+<td>Artificial values</td>
+<td></td>
+</tr>
+<tr>
+<td>2</td>
+<td>Header is row 3</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>Potential/V</strong></td>
+<td><strong>Sample A</strong></td>
+<td><strong>Sample B</strong></td>
+</tr>
+<tr>
+<td>4</td>
+<td>-0.50</td>
+<td>0.001</td>
+<td>0.003</td>
+</tr>
+<tr>
+<td>5</td>
+<td>-0.25</td>
+<td>0.050</td>
+<td>0.080</td>
+</tr>
+</tbody></table></div>
+<p>この場合は <strong>ヘッダー行＝3</strong> です。1のままだと、説明文が列名になり、正しい列を選べません。</p>
+<p><a href="examples/header_row_3.csv">ヘッダー行3を練習するCSV</a></p>
+<p>見出しがない表は、先頭に見出しを追加して保存すると扱いやすくなります。Excelに複数のシートがある場合は、表の入ったシートも選びます。CSVはコンマ区切りで保存します。通常はExcelの「CSV UTF-8」を選ぶと扱いやすくなります。</p>
+<h3>D. 読み込んだ表を確認する</h3>
+<p>プレビュー下の <strong>「読み込んだデータ」</strong> を開きます。表示されるのは先頭8行ですが、グラフには全行を使います。</p>
+<figure class="media "><button class="image-open" type="button" aria-label="読み込んだサンプルの列名と先頭行を確認するデータ表の拡大を拡大"><img src="assets/data-table.jpg" alt="読み込んだサンプルの列名と先頭行を確認するデータ表の拡大" width="846" height="327" loading="lazy"></button><figcaption>読み込んだサンプルの列名と先頭行を確認するデータ表の拡大</figcaption></figure>
+<p>列名がおかしい場合は、シート・ヘッダー行・元ファイルを確認します。空欄の見出しは「列 1」などの名前になり、同名の列は番号が付くことがあります。元の表で名前を付けておくと選びやすくなります。Excelで修正した後は保存し、アプリで開き直します。</p>
+<p>通常の数値グラフでは、XまたはYが空欄・数値でない行は、その系列の描画から除かれます。「描画データの確認」が出たら内容を確認し、欠損がある場合は元のデータも点検してください。棒グラフのカテゴリ名は、下の専用プリセットの説明を参照してください。</p>
+<p>線は表の行の順につながります。<strong>CVの往復掃引など、測定順に意味があるデータを、電位の昇順だけで並べ替えないでください。</strong></p>
+<h3>E. 誤差や専用プリセットで使う列</h3>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>作る図</th>
+<th>表と設定の考え方</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>誤差付きの一般グラフ</td>
+<td>X・Yのほかに誤差の列を用意し、系列の「線・マーカー・誤差」で指定する</td>
+</tr>
+<tr>
+<td>対称なY誤差</td>
+<td>±の大きさを別の列に入れ、「Y誤差（±）の列」に指定する</td>
+</tr>
+<tr>
+<td>下限・上限を別に指定するY誤差</td>
+<td>下限値・上限値の列を用意し、「Y誤差最小値」「Y誤差最大値」に指定する。±の幅とは区別する</td>
+</tr>
+<tr>
+<td>Raman Spectrum・Raman 3D</td>
+<td>共通の波数X列と、各スペクトルの強度Y列を並べる。Raman 3Dでは各系列の正規化設定も確認する</td>
+</tr>
+<tr>
+<td>棒グラフ</td>
+<td>カテゴリ名または数値のX列と、数値のY列を用意する</td>
+</tr>
+<tr>
+<td>粒径ヒストグラム</td>
+<td>No列＋粒径列のように少なくとも2列を用意し、粒径の実測値の列を選ぶ。集計済みの頻度表と区別する</td>
+</tr>
+<tr>
+<td>XPS Fit</td>
+<td>専用の書き出し形式を保つ。成分Yと背景Yの列を確認する。Abscissa・Ordinateで始まる見出しを含むCSVは自動判定される</td>
+</tr>
+</tbody></table></div>
+<p>誤差の列などを含む表では、「共通X・全Y」で不要な列まで曲線にしないようにします。必要な系列だけを手動で追加し、X・Y・誤差の列をそれぞれ指定できます。</p>
+<h2 id="3-プリセットを選ぶ">3. プリセットを選ぶ</h2>
+<p>「グラフのプリセット」から測定に合うものを選びます。プリセットを変えると軸の表示や描画設定が変わるので、<strong>X列・Y列、ラベル、単位を再確認</strong> します。</p>
+<figure class="media focus"><button class="image-open" type="button" aria-label="グラフのプリセット選択部分の拡大を拡大"><img src="assets/preset-controls.jpg" alt="グラフのプリセット選択部分の拡大" width="310" height="120" loading="lazy"></button><figcaption>グラフのプリセット選択部分の拡大</figcaption></figure>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>分類</th>
+<th>プリセット</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>電気化学</td>
+<td>CV/LSV、CA、CP</td>
+</tr>
+<tr>
+<td>分光など</td>
+<td>EDX、XPS Survey、XPS Core、XPS Fit、XAFS</td>
+</tr>
+<tr>
+<td>Raman</td>
+<td>Raman Spectrum、Raman 3D</td>
+</tr>
+<tr>
+<td>表面形状</td>
+<td>AFM Section、Roughness</td>
+</tr>
+<tr>
+<td>その他</td>
+<td>ヒストグラム、棒グラフ、一般</td>
+</tr>
+</tbody></table></div>
+<figure class="media animation"><div class="media-head"><span>マウス操作ガイド · 6.1秒</span><button class="play" type="button" data-gif="assets/preset-guide.gif" data-poster="assets/preset-guide.jpg" aria-pressed="false">▶ 操作を再生</button></div><button class="image-open" type="button" aria-label="プリセットの選択位置と、切り替え後のグラフが分かる操作ガイドGIFを拡大"><img src="assets/preset-guide.jpg" alt="プリセットの選択位置と、切り替え後のグラフが分かる操作ガイドGIF" width="1000" height="700" loading="lazy"></button><figcaption>プリセットの選択位置と、切り替え後のグラフが分かる操作ガイドGIF</figcaption></figure>
+<p>このGIFは操作練習のため同じ人工データで切り替えています。実際の図には、測定方法に合うデータと単位を使ってください。Roughnessでは対数軸の初期設定、Raman 3Dでは正規化、ヒストグラムでは粒径列など、プリセット独自の設定も確認します。</p>
+<h2 id="4-系列の表示と見た目">4. 系列の表示と見た目</h2>
+<p>「系列を描画」のチェックで一時的に隠せます。再びチェックすると表示されます。系列は最大32個です。X列・Y列・凡例に使う名前を、系列ごとに確認します。</p>
+<figure class="media focus"><button class="image-open" type="button" aria-label="系列の描画チェック、色、名前、X・Y列を拡大を拡大"><img src="assets/series-controls.jpg" alt="系列の描画チェック、色、名前、X・Y列を拡大" width="310" height="250" loading="lazy"></button><figcaption>系列の描画チェック、色、名前、X・Y列を拡大</figcaption></figure>
+<p>色の四角を押すと、色パネルが開きます。パネルの色、カラーピッカー、カラーコードから選べます。</p>
+<figure class="media focus"><button class="image-open" type="button" aria-label="テーマの色・基本の色・最近の色を選ぶ色パネルの拡大を拡大"><img src="assets/color-popup.jpg" alt="テーマの色・基本の色・最近の色を選ぶ色パネルの拡大" width="364" height="615" loading="lazy"></button><figcaption>テーマの色・基本の色・最近の色を選ぶ色パネルの拡大</figcaption></figure>
+<figure class="media focus"><button class="image-open" type="button" aria-label="色パネル下部のカラーピッカーとカラーコードを拡大を拡大"><img src="assets/color-custom.jpg" alt="色パネル下部のカラーピッカーとカラーコードを拡大" width="349" height="314" loading="lazy"></button><figcaption>色パネル下部のカラーピッカーとカラーコードを拡大</figcaption></figure>
+<figure class="media animation"><div class="media-head"><span>マウス操作ガイド · 12.2秒</span><button class="play" type="button" data-gif="assets/color-guide.gif" data-poster="assets/color-guide.jpg" aria-pressed="false">▶ 操作を再生</button></div><button class="image-open" type="button" aria-label="系列の表示チェックと色の選択位置が分かる操作ガイドGIFを拡大"><img src="assets/color-guide.jpg" alt="系列の表示チェックと色の選択位置が分かる操作ガイドGIF" width="1000" height="700" loading="lazy"></button><figcaption>系列の表示チェックと色の選択位置が分かる操作ガイドGIF</figcaption></figure>
+<p>「線・マーカー・誤差」を開くと、線や点の描き方、太さ、誤差の列などを設定できます。プレビューの線やプロットをダブルクリックしても、その系列の設定が開きます。</p>
+<figure class="media focus"><button class="image-open" type="button" aria-label="グラフの線をダブルクリックして開いた系列設定の拡大を拡大"><img src="assets/series-popup.jpg" alt="グラフの線をダブルクリックして開いた系列設定の拡大" width="434" height="472" loading="lazy"></button><figcaption>グラフの線をダブルクリックして開いた系列設定の拡大</figcaption></figure>
+<p>Yオフセットで系列を上下にずらす場合は、「系列の一括操作」の開始値・間隔を設定します。比較図では、位置をずらしたことが読み手に分かるように記載してください。</p>
+<h2 id="5-軸ラベルと目盛り">5. 軸ラベルと目盛り</h2>
+<p>軸ラベルをダブルクリックすると、ラベル・単位・位置などの設定が開きます。変更して「閉じる」を押します。ラベルはドラッグで動かせます。戻したいときは <strong>「標準位置に戻す」</strong> を使います。</p>
+<figure class="media focus"><button class="image-open" type="button" aria-label="X軸ラベルの設定ダイアログの拡大を拡大"><img src="assets/axis-popup.jpg" alt="X軸ラベルの設定ダイアログの拡大" width="365" height="473" loading="lazy"></button><figcaption>X軸ラベルの設定ダイアログの拡大</figcaption></figure>
+<figure class="media animation"><div class="media-head"><span>マウス操作ガイド · 12.7秒</span><button class="play" type="button" data-gif="assets/axis-guide.gif" data-poster="assets/axis-guide.jpg" aria-pressed="false">▶ 操作を再生</button></div><button class="image-open" type="button" aria-label="軸ラベルのダブルクリック、文字の入力、ドラッグを示す操作ガイドGIFを拡大"><img src="assets/axis-guide.jpg" alt="軸ラベルのダブルクリック、文字の入力、ドラッグを示す操作ガイドGIF" width="1000" height="700" loading="lazy"></button><figcaption>軸ラベルのダブルクリック、文字の入力、ドラッグを示す操作ガイドGIF</figcaption></figure>
+<p>軸の数値をダブルクリックすると、範囲・目盛り間隔の設定が開きます。「範囲を自動設定」「目盛り間隔を自動設定」のチェックを外すと、値を指定できます。自動に戻すときはチェックを入れます。</p>
+<figure class="media focus"><button class="image-open" type="button" aria-label="目盛りの自動設定・範囲・間隔のダイアログの拡大を拡大"><img src="assets/ticks-popup.jpg" alt="目盛りの自動設定・範囲・間隔のダイアログの拡大" width="365" height="434" loading="lazy"></button><figcaption>目盛りの自動設定・範囲・間隔のダイアログの拡大</figcaption></figure>
+<p>数値にマウスを合わせると、その軸の目盛り全体がハイライトされます。設定画面の「X軸」「Y軸」を確認してください。対数軸には正の値を使います。</p>
+<h2 id="6-図の寸法と表示倍率">6. 図の寸法と表示倍率</h2>
+<p>「03 軸とサイズ」の幅・高さは、<strong>グラフの枠内の寸法（cm）</strong> です。保存した図には、ラベルなどの周囲の余白も加わります。</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>操作</th>
+<th>変わるもの</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>幅・高さ（cm）</td>
+<td>保存する図の軸領域の寸法</td>
+</tr>
+<tr>
+<td>解像度（dpi）</td>
+<td>PNG保存・画像コピーの画素数</td>
+</tr>
+<tr>
+<td>＋・−・Ctrl＋ホイール（MacはCmd＋ホイール）</td>
+<td>画面で見る大きさ</td>
+</tr>
+<tr>
+<td>「画面に合わせる」</td>
+<td>プレビューの表示倍率を戻す</td>
+</tr>
+</tbody></table></div>
+<p>初期の解像度は1200 dpiです。提出先の指定があれば合わせます。表示倍率を変えても、保存する図の寸法は変わりません。高いdpiはファイルが大きくなりますが、測定点は増えません。</p>
+<h2 id="7-注釈と凡例">7. 注釈と凡例</h2>
+<p>「注釈」の <strong>「テキストを追加」「線を追加」「矢印を追加」</strong> を押すと追加されます。テキストは一覧の「文字」に入力し、図上でドラッグして位置を整えます。</p>
+<figure class="media focus"><button class="image-open" type="button" aria-label="注釈の追加ボタンと文字・位置の設定部分の拡大を拡大"><img src="assets/annotation-controls.jpg" alt="注釈の追加ボタンと文字・位置の設定部分の拡大" width="311" height="424" loading="lazy"></button><figcaption>注釈の追加ボタンと文字・位置の設定部分の拡大</figcaption></figure>
+<figure class="media focus"><button class="image-open" type="button" aria-label="移動後の注釈と選択ハンドルの拡大を拡大"><img src="assets/annotation-on-graph.jpg" alt="移動後の注釈と選択ハンドルの拡大" width="423" height="180" loading="lazy"></button><figcaption>移動後の注釈と選択ハンドルの拡大</figcaption></figure>
+<figure class="media animation"><div class="media-head"><span>マウス操作ガイド · 9.2秒</span><button class="play" type="button" data-gif="assets/annotation-guide.gif" data-poster="assets/annotation-guide.jpg" aria-pressed="false">▶ 操作を再生</button></div><button class="image-open" type="button" aria-label="注釈を追加し、文字を入力してドラッグする操作ガイドGIFを拡大"><img src="assets/annotation-guide.jpg" alt="注釈を追加し、文字を入力してドラッグする操作ガイドGIF" width="1000" height="700" loading="lazy"></button><figcaption>注釈を追加し、文字を入力してドラッグする操作ガイドGIF</figcaption></figure>
+<p>消すときは、図上または一覧で選び、<strong>「選択を削除」</strong> を押します。図上で選択した後のDeleteキーでも削除できます。間違えたときは「元に戻す」を使います。図上で狙いにくいときは左の一覧から選んでください。</p>
+<figure class="media focus"><button class="image-open" type="button" aria-label="注釈の複製・選択を削除ボタンの拡大を拡大"><img src="assets/annotation-delete-controls.jpg" alt="注釈の複製・選択を削除ボタンの拡大" width="313" height="136" loading="lazy"></button><figcaption>注釈の複製・選択を削除ボタンの拡大</figcaption></figure>
+<p>凡例は「凡例を表示」のチェックで切り替えます。図上でドラッグして移動できます。「凡例の位置・サイズ」からも調整できます。</p>
+<h2 id="8-背景と透明部分">8. 背景と透明部分</h2>
+<p>図全体の余白と、グラフの枠内の背景は別々に設定できます。枠内の空いている場所、または枠外の余白をダブルクリックして設定を開き、「背景色を使用」で切り替えます。</p>
+<figure class="media focus"><button class="image-open" type="button" aria-label="枠内の背景を有効にするチェックと色の設定の拡大を拡大"><img src="assets/background-popup.jpg" alt="枠内の背景を有効にするチェックと色の設定の拡大" width="432" height="231" loading="lazy"></button><figcaption>枠内の背景を有効にするチェックと色の設定の拡大</figcaption></figure>
+<p>灰色のチェッカーボードは透明部分を示します。模様そのものが保存画像に入ることはありません。貼り付け先で白を使いたいときは背景色を有効にして白を選びます。</p>
+<h2 id="9-完成図を保存する">9. 完成図を保存する</h2>
+<p>「グラフを保存」で、ファイル名・形式・保存先を選び、下の「保存」を押します。形式は複数選べます。</p>
+<figure class="media focus"><button class="image-open" type="button" aria-label="保存形式・保存先・ファイル名の保存ダイアログの拡大を拡大"><img src="assets/save-popup.jpg" alt="保存形式・保存先・ファイル名の保存ダイアログの拡大" width="538" height="490" loading="lazy"></button><figcaption>保存形式・保存先・ファイル名の保存ダイアログの拡大</figcaption></figure>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>形式</th>
+<th>使い方</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>PNG</td>
+<td>レポートやスライドへの貼り付け</td>
+</tr>
+<tr>
+<td>SVG・PDF</td>
+<td>拡大しても線や文字が鮮明な図</td>
+</tr>
+<tr>
+<td>PowerPoint（PPTX）</td>
+<td>図を含む新しいPowerPointファイルとして保存し、保存後に開く</td>
+</tr>
+</tbody></table></div>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>保存先</th>
+<th>初回の操作</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>元ファイルと同じフォルダ</td>
+<td>フォルダ選択が出たら、元データの入ったフォルダを選ぶ</td>
+</tr>
+<tr>
+<td>指定フォルダ</td>
+<td>「保存先を選ぶ」で出力先を選ぶ</td>
+</tr>
+<tr>
+<td>ダウンロード</td>
+<td>ブラウザの保存先へ保存する</td>
+</tr>
+</tbody></table></div>
+<p>ブラウザから元ファイルの親フォルダを取得できない場合は、最初に確認が必要です。フォルダ選択に対応しないブラウザではダウンロードを使います。保存後は、選んだフォルダやブラウザのダウンロード一覧で確認します。</p>
+<h2 id="10-画像をコピーする">10. 画像をコピーする</h2>
+<p>「画像をコピー」を押し、コピー完了を確認して、Word・PowerPointなどで <strong>Ctrl＋V</strong>（Macは <strong>Cmd＋V</strong>）を押します。右上の解像度がコピーにも使われます。クリップボードの許可を求められたら許可します。使えない場合はPNGを保存して挿入します。</p>
+<p>開いているPowerPointへの直接送信は行いません。PPTXを保存するか、画像コピーを使います。</p>
+<h2 id="11-プロジェクトと設定を保存して再開する">11. プロジェクトと設定を保存して再開する</h2>
+<figure class="media focus"><button class="image-open" type="button" aria-label="プロジェクトと設定の開く・保存ボタンの拡大を拡大"><img src="assets/project-controls.jpg" alt="プロジェクトと設定の開く・保存ボタンの拡大" width="596" height="54" loading="lazy"></button><figcaption>プロジェクトと設定の開く・保存ボタンの拡大</figcaption></figure>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>保存するもの</th>
+<th>中身</th>
+<th>開き直す操作</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>.plotproject</code></td>
+<td>元データ、編集設定、読み込んだフォントなど</td>
+<td>「プロジェクトを開く」</td>
+</tr>
+<tr>
+<td>設定JSON</td>
+<td>図の設定。元データは含まない</td>
+<td>元データを開いてから「設定を開く」</td>
+</tr>
+<tr>
+<td>PNGなど</td>
+<td>完成図</td>
+<td>提出や貼り付けに使う</td>
+</tr>
+</tbody></table></div>
+<p>後で編集するためには <strong>「プロジェクトを保存」</strong> を押します。プロジェクトは自動保存ではありません。更新や終了時に未保存の確認が出たら、キャンセルして保存します。完成図の保存や画像コピーだけでは、プロジェクト保存済みにはなりません。</p>
+<p>フォントを変更する場合は、表示オプションからフォントを選ぶか、手元のフォントファイルを読み込みます。図に使うフォントをそろえ、保存した図でも表示を確認します。</p>
+<h2 id="12-うまく表示されないとき">12. うまく表示されないとき</h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>症状</th>
+<th>確認すること</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>列名が説明文になった</td>
+<td>シートとヘッダー行</td>
+</tr>
+<tr>
+<td>一部の点や曲線がない</td>
+<td>X・Y列の空欄や文字、系列の描画チェック</td>
+</tr>
+<tr>
+<td>同じ列が何本も描かれた</td>
+<td>共通XとXYペアの使い分け、系列ごとの列</td>
+</tr>
+<tr>
+<td>余分な誤差の曲線ができた</td>
+<td>一括選択で誤差列もYにした可能性。不要な系列を削除する</td>
+</tr>
+<tr>
+<td>ラベルや単位が違う</td>
+<td>プリセットと軸ラベルの設定</td>
+</tr>
+<tr>
+<td>変更前の図が表示される</td>
+<td>「更新済み」になるまで待ち、必要なら「更新」を押す</td>
+</tr>
+<tr>
+<td>注釈が消せない</td>
+<td>図上か左の一覧で選択してから削除</td>
+</tr>
+<tr>
+<td>図が大きすぎる</td>
+<td>「画面に合わせる」</td>
+</tr>
+<tr>
+<td>貼り付け先で背景が変わる</td>
+<td>背景の透明設定と、貼り付け先の背景色</td>
+</tr>
+</tbody></table></div>
+<h2 id="練習の確認">練習の確認</h2>
+<ul>
+<li><input disabled="" type="checkbox"> XとYの列を説明できる</li>
+<li><input disabled="" type="checkbox"> 共通X・XYペア・ヘッダー行3の例を開いて設定できる</li>
+<li><input disabled="" type="checkbox"> 系列の色と表示を変更できる</li>
+<li><input disabled="" type="checkbox"> 軸ラベルを編集・移動できる</li>
+<li><input disabled="" type="checkbox"> 注釈を追加・移動・削除できる</li>
+<li><input disabled="" type="checkbox"> 完成図とプロジェクトを保存できる</li>
+</ul>
+<p>画面はPlotLauncher Web v1.2.0です。2026年10月4日更新。</p>
+<p class="back-link"><a href="quick.html">簡易版で操作の流れを確認 →</a></p></main></div><dialog id="viewer"><div class="viewer-toolbar"><span id="viewer-title"></span><div class="viewer-controls"><button type="button" id="viewer-zoom-out" aria-label="画像を縮小">−</button><button type="button" id="viewer-zoom-in" aria-label="画像を拡大">＋</button><button type="button" id="viewer-fit">画面に合わせる</button><button type="button" id="viewer-close">閉じる</button></div></div><img id="viewer-image" alt=""></dialog><footer class="footer">PlotLauncher Web v1.2.0 · 2026年10月4日更新</footer><script src="manual.js" defer></script></body></html>

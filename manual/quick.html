@@ -1,0 +1,62 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PlotLauncher 簡易マニュアル</title><link rel="stylesheet" href="manual.css"></head><body class="plotlauncher"><header class="top"><a class="brand" href="index.html">PlotLauncher マニュアル</a><div class="top-links"><nav class="editions" aria-label="マニュアルの種類"><a href="quick.html" aria-current="page">簡易版</a><a href="detailed.html" >詳細版</a></nav><a href="https://murajun620-crypto.github.io/plot_launcher_web/" target="_blank" rel="noopener">アプリを開く ↗</a><a data-package href="manual.zip" download>esa投稿用一式</a></div></header><div class="layout"><aside class="toc"><h2>簡易版の目次</h2><nav class="toc-links" aria-label="目次"><a href="#1-データを開く">1. データを開く</a><a href="#2-プリセットと系列を選ぶ">2. プリセットと系列を選ぶ</a><a href="#3-ラベルと注釈を整える">3. ラベルと注釈を整える</a><a href="#4-完成図を保存する">4. 完成図を保存する</a><a href="#5-プロジェクトも保存する">5. プロジェクトも保存する</a></nav><p class="tip">画像はクリックで拡大。<br>拡大画面の＋・−で調整できます。<br>GIFは再生ボタンで開始。<br>赤い輪はクリック、破線はドラッグです。</p></aside><main class="article"><h1>PlotLauncher 簡易マニュアル</h1>
+<p>ExcelやCSVの測定データから、レポートに貼るグラフを作ります。初めての方は、このページの順番で操作してください。</p>
+<p><a href="https://murajun620-crypto.github.io/plot_launcher_web/">PlotLauncherを開く</a> ｜ <a href="detailed.html">詳しい操作を見る</a></p>
+<h2 id="1-データを開く">1. データを開く</h2>
+<p>描画機能の準備が終わったら、左の「＋ データを開く」でExcelまたはCSVを選びます。練習には「サンプルを使う」を押してください。</p>
+<figure class="media focus"><button class="image-open" type="button" aria-label="データを開くボタンと、シート・ヘッダー行の指定部分を拡大"><img src="assets/file-controls.jpg" alt="データを開くボタンと、シート・ヘッダー行の指定部分" width="362" height="316" loading="lazy"></button><figcaption>データを開くボタンと、シート・ヘッダー行の指定部分</figcaption></figure>
+<p><strong>表は、列に項目、行に測定点を並べます。</strong> 最初の行を見出しにすると、次のようになります。</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Potential/V</th>
+<th>Sample A</th>
+<th>Sample B</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>-0.50</td>
+<td>0.001</td>
+<td>0.003</td>
+</tr>
+<tr>
+<td>-0.25</td>
+<td>0.050</td>
+<td>0.080</td>
+</tr>
+<tr>
+<td>0.00</td>
+<td>0.200</td>
+<td>0.250</td>
+</tr>
+</tbody></table></div>
+<p>この例では、1列目が共通のX、2・3列目がそれぞれのYです。数値のセルには単位を付けず、単位は見出しや軸設定に書きます。</p>
+<p><a href="examples/shared_x.csv">練習用CSVをダウンロード</a> ｜ <a href="detailed.html#2-%E3%83%87%E3%83%BC%E3%82%BF%E3%81%AE%E6%A7%8B%E6%88%90">X・Yの組や見出し行の説明</a></p>
+<h2 id="2-プリセットと系列を選ぶ">2. プリセットと系列を選ぶ</h2>
+<ol>
+<li>「グラフのプリセット」で、CV/LSV・Raman Spectrumなど、測定に合うものを選びます。</li>
+<li>「02 系列」の <strong>X列・Y列</strong> が正しいか確認します。</li>
+<li>曲線を増やすときは「系列を追加」を押します。</li>
+</ol>
+<figure class="media focus"><button class="image-open" type="button" aria-label="系列1の表示チェック、色、名前、X列・Y列の設定部分を拡大"><img src="assets/series-controls.jpg" alt="系列1の表示チェック、色、名前、X列・Y列の設定部分" width="310" height="250" loading="lazy"></button><figcaption>系列1の表示チェック、色、名前、X列・Y列の設定部分</figcaption></figure>
+<p>色の四角を押すと色パネルが開きます。「系列を描画」のチェックで、その曲線を表示・非表示にできます。凡例に表示する名前もここで入力します。</p>
+<h2 id="3-ラベルと注釈を整える">3. ラベルと注釈を整える</h2>
+<p>軸ラベルを <strong>ダブルクリック</strong> すると、ラベル・単位を編集できます。目盛りの数値やグラフの線も、ダブルクリックで設定が開きます。</p>
+<figure class="media focus"><button class="image-open" type="button" aria-label="軸ラベルの設定ダイアログを拡大した画像を拡大"><img src="assets/axis-popup.jpg" alt="軸ラベルの設定ダイアログを拡大した画像" width="365" height="473" loading="lazy"></button><figcaption>軸ラベルの設定ダイアログを拡大した画像</figcaption></figure>
+<p>軸ラベルと注釈はドラッグで移動できます。注釈は左の「テキストを追加」などで追加し、選択して「選択を削除」で消します。凡例のオン・オフは「注釈」の「凡例を表示」です。</p>
+<figure class="media animation"><div class="media-head"><span>マウス操作ガイド · 12.7秒</span><button class="play" type="button" data-gif="assets/axis-guide.gif" data-poster="assets/axis-guide.jpg" aria-pressed="false">▶ 操作を再生</button></div><button class="image-open" type="button" aria-label="軸ラベルのダブルクリックとドラッグ位置が分かる操作ガイドGIFを拡大"><img src="assets/axis-guide.jpg" alt="軸ラベルのダブルクリックとドラッグ位置が分かる操作ガイドGIF" width="1000" height="700" loading="lazy"></button><figcaption>軸ラベルのダブルクリックとドラッグ位置が分かる操作ガイドGIF</figcaption></figure>
+<p>GIFの赤い輪はクリック、2回の輪はダブルクリック、破線はドラッグを示します。画像とGIFはクリックすると拡大できます。</p>
+<h2 id="4-完成図を保存する">4. 完成図を保存する</h2>
+<ol>
+<li>曲線・凡例・軸の単位を確認します。</li>
+<li>右上の「グラフを保存」を押します。</li>
+<li>ファイル名・形式・保存先を選び、下の「保存」を押します。初めは <strong>PNG</strong> で大丈夫です。</li>
+</ol>
+<figure class="media focus"><button class="image-open" type="button" aria-label="グラフの保存画面を拡大した画像を拡大"><img src="assets/save-popup.jpg" alt="グラフの保存画面を拡大した画像" width="538" height="490" loading="lazy"></button><figcaption>グラフの保存画面を拡大した画像</figcaption></figure>
+<p>「元ファイルと同じフォルダ」を使うとき、初回にフォルダ選択が出たら、元データの入ったフォルダを選びます。フォルダ選択に対応しないブラウザでは「ダウンロード」を使います。</p>
+<p>貼り付けるだけなら「画像をコピー」→ WordやPowerPointで <strong>Ctrl＋V</strong>（Macは <strong>Cmd＋V</strong>）でも使えます。</p>
+<h2 id="5-プロジェクトも保存する">5. プロジェクトも保存する</h2>
+<p>上部の <strong>「プロジェクトを保存」</strong> で、データと設定を <code>.plotproject</code> にまとめて保存します。次回は「プロジェクトを開く」で再開できます。</p>
+<figure class="media focus"><button class="image-open" type="button" aria-label="データと設定をまとめて保存・再開する上部のボタンを拡大"><img src="assets/project-controls.jpg" alt="データと設定をまとめて保存・再開する上部のボタン" width="596" height="54" loading="lazy"></button><figcaption>データと設定をまとめて保存・再開する上部のボタン</figcaption></figure>
+<p>PNGを保存しても、編集を再開するためのプロジェクトは保存されません。<strong>作業を終える前に、完成図とプロジェクトの両方を保存しましょう。</strong></p>
+<p>詳しい設定や、表示がおかしいときの対処は <a href="detailed.html">詳細マニュアル</a> を参照してください。</p>
+<p class="back-link"><a href="detailed.html">詳細版で設定と対処方法を見る →</a></p></main></div><dialog id="viewer"><div class="viewer-toolbar"><span id="viewer-title"></span><div class="viewer-controls"><button type="button" id="viewer-zoom-out" aria-label="画像を縮小">−</button><button type="button" id="viewer-zoom-in" aria-label="画像を拡大">＋</button><button type="button" id="viewer-fit">画面に合わせる</button><button type="button" id="viewer-close">閉じる</button></div></div><img id="viewer-image" alt=""></dialog><footer class="footer">PlotLauncher Web v1.2.0 · 2026年10月4日更新</footer><script src="manual.js" defer></script></body></html>

@@ -4,7 +4,7 @@ Excel / CSVの測定データをブラウザ内で処理し、15種類のプリ�
 
 [Webアプリを開く](https://murajun620-crypto.github.io/plot_launcher_web/)
 
-[学生向けマニュアル（PlotLauncher / MiFiTo）](https://murajun620-crypto.github.io/plot_launcher_web/manual/) — スクショ23枚と操作GIF8本で、共通操作・グラフ作成・画像の校正と一括保存を説明します。[esa投稿用一式を保存](https://murajun620-crypto.github.io/plot_launcher_web/manual/student_manual.zip)
+[学生向けマニュアル](https://murajun620-crypto.github.io/plot_launcher_web/manual/) — [簡易版](https://murajun620-crypto.github.io/plot_launcher_web/manual/quick.html)と[詳細版](https://murajun620-crypto.github.io/plot_launcher_web/manual/detailed.html)があります。操作部・ダイアログの拡大画像、マウス操作を示すGIF、データの並べ方と練習用CSVを用意しています。[esa投稿用一式を保存](https://murajun620-crypto.github.io/plot_launcher_web/manual/manual.zip)
 
 アプリのインストールは不要です。ファイルを選び、X列とY列を指定してください。
 初期表示はデータ未選択です。サンプルは「サンプルデータを使う」を押した場合だけ表示します。設定JSONはデータを含みません。
