@@ -1,4 +1,4 @@
-import { COLORS, applyPreset, createSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=c5809e1851a3";
+import { COLORS, applyPreset, createSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=f4fb366b367d";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -88,7 +88,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=c5809e1851a3", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=f4fb366b367d", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -581,12 +581,14 @@ function positionInteractions() {
     button.setAttribute('aria-label',button.title);
     if(item?.locked)button.title+='（位置固定）';
     if(item && selected.has(item.id) && !item.locked){
-      const handles=target.points || [[x+w,y+h],[x+w/2,y-18/imageBox.height]];
+      const handleSize = touchFriendly() ? 32 : 14;
+      const paddingX = touchFriendly() ? Math.max(0,hitSize-w*imageBox.width)/2/imageBox.width : 0;
+      const paddingY = touchFriendly() ? Math.max(0,hitSize-h*imageBox.height)/2/imageBox.height : 0;
+      const handles=target.points || [[x+w+paddingX,y+h+paddingY],[x+w/2,y-paddingY-(touchFriendly()?24:18)/imageBox.height]];
       handles.forEach(([px,py],i)=>{
         const handle=document.createElement('button');handle.type='button';handle.className='annotation-handle';handle.dataset.dragId=item.id;
         handle.dataset.handle=target.points?String(i+1):i===0?'resize':'rotate';
         handle.setAttribute('aria-label',target.points?`注釈の${i===0?'始点':'終点'}を移動`:i===0?'文字サイズを変更':'文字を回転');
-        const handleSize = touchFriendly() ? 32 : 14;
         Object.assign(handle.style,{left:`${px*100}%`,top:`${py*100}%`,width:`${handleSize/view.zoom}px`,height:`${handleSize/view.zoom}px`});overlay.append(handle);
       });
     }
