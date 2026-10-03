@@ -59,6 +59,7 @@ function updateButtons() {
   $$('[data-export]').forEach(button => { button.disabled = !engineReady || busy || renderedRevision !== revision || renderRunning; });
   $("#copy-image").disabled = !engineReady || busy || renderedRevision !== revision || renderRunning;
   $("#figure-stage").setAttribute("aria-busy", String(loading || exporting || renderRunning || !engineReady));
+  syncColorIcons();
 }
 
 function request(operation, args) {
@@ -124,17 +125,24 @@ function enhanceColorInputs() {
     const title = input.getAttribute('aria-label') || input.closest('label')?.childNodes[0]?.textContent?.trim() || '色';
     const wrapper = document.createElement('span'); wrapper.className = 'color-control';
     input.before(wrapper); wrapper.append(input);
-    if (input.type !== 'color') {
-      const picker = document.createElement('input'); picker.type = 'color';
-      picker.value = /^#[0-9a-f]{6}$/i.test(input.value) ? input.value : '#000000';
-      picker.setAttribute('aria-label', `${title}のカラーピッカー`);
-      picker.dataset.paletteEnhanced = 'true';
-      picker.addEventListener('input', event => {event.stopPropagation(); input.value = picker.value; applyControlInput({target: input});});
-      wrapper.append(picker);
-    }
-    const button = document.createElement('button'); button.type = 'button'; button.className = 'button quiet palette-button';
-    button.textContent = '色パネル'; button.setAttribute('aria-label', `${title}の色パネル`);
+    if (input.type === 'color') input.hidden = true;
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'color-icon';
+    button.setAttribute('aria-label', `${title}を選ぶ`); button.setAttribute('aria-haspopup','dialog');
     button.addEventListener('click', () => openColorPanel(input, title)); wrapper.append(button);
+    input.addEventListener('input',syncColorIcons);
+    input.addEventListener('change',syncColorIcons);
+  }
+  syncColorIcons();
+}
+function syncColorIcons() {
+  for (const wrapper of $$('.color-control')) {
+    const input=wrapper.querySelector('input'), button=wrapper.querySelector('.color-icon');
+    if (!input || !button) continue;
+    const hex=/^#[0-9a-f]{6}$/i.test(input.value);
+    button.style.backgroundColor=hex ? input.value : '#ffffff';
+    button.textContent=hex ? '' : input.value.toLowerCase()==='none' ? '∅' : 'A';
+    button.title=`${button.getAttribute('aria-label')}：${input.value}`;
+    button.disabled=input.matches(':disabled') || loading || exporting;
   }
 }
 
@@ -145,7 +153,7 @@ function colorSwatch(hex, name = hex) {
   button.addEventListener('click', () => chooseColor(hex)); return button;
 }
 function openColorPanel(input, title) {
-  if (loading || exporting || input.disabled) return;
+  if (loading || exporting || input.matches(':disabled')) return;
   colorTarget = input;
   $('#color-panel-title').textContent = `${title}を選ぶ`;
   const names = {black:'黒',gray:'灰',blue:'青',orange:'橙',red:'赤',green:'緑',purple:'紫'};
@@ -158,11 +166,11 @@ function openColorPanel(input, title) {
 }
 function chooseColor(value) {
   if (!/^#[0-9a-f]{6}$/i.test(value)) {$('#color-error').textContent = '#RRGGBB形式で入力してください。'; return;}
-  if (!colorTarget?.isConnected || loading || exporting) {$('#color-panel').close(); return;}
+  if (!colorTarget?.isConnected || colorTarget.matches(':disabled') || loading || exporting) {$('#color-panel').close(); return;}
   colorTarget.value = value;
   recentColors.splice(0, recentColors.length, value, ...recentColors.filter(hex => hex.toLowerCase() !== value.toLowerCase()).slice(0,7));
   applyControlInput({target:colorTarget});
-  colorTarget.closest('.color-control')?.querySelectorAll('input[type="color"]').forEach(input => input.value = value);
+  syncColorIcons();
   $('#color-panel').close();
 }
 $('#close-color-panel').addEventListener('click', () => $('#color-panel').close());
