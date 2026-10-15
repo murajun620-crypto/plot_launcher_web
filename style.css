@@ -42,6 +42,9 @@ fieldset{margin:0;padding:0;border:0;min-width:0}
 .section-note{color:var(--muted);font-size:10px}
 .drop-zone{width:100%;min-height:36px;padding:9px 12px;border-radius:6px}
 .drop-zone.drag-over{outline:3px solid #78a8e4;outline-offset:2px}
+.data-drop-area{margin-top:10px;padding:16px 12px;border:1px dashed #a3b3c7;border-radius:6px;background:#f5f8fc;color:#34506f;font-size:12px;text-align:center}
+.data-drop-area.drag-over{border-color:var(--blue);background:#e7f0ff;outline:2px solid #78a8e4;outline-offset:2px}
+.data-drop-area[aria-disabled="true"]{opacity:.55}
 .drop-zone strong{font-size:13px;font-weight:600;color:var(--blue)}
 .drop-zone>span:not(.upload-mark){font-size:10px}
 .drop-zone small{color:#94a2b5;font-size:10px;margin-top:4px}

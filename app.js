@@ -1,6 +1,6 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=077bd893d62c";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=077bd893d62c";
-import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=077bd893d62c";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=f1b9b0de8ce3";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=f1b9b0de8ce3";
+import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=f1b9b0de8ce3";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -86,6 +86,7 @@ function updateButtons() {
   $("#open-project").disabled = !engineReady || busy;
   $("#save-project").disabled = !engineReady || busy || !sourceData || !metadata || !config.series.length;
   $("#drop-zone").disabled = !engineReady || busy;
+  $("#data-drop-area").setAttribute("aria-disabled", String(!engineReady || busy));
   $("#sample-data").disabled = !engineReady || busy;
   $("#paste-data").disabled = !engineReady || busy;
   $("#plot-fields").disabled = !engineReady || !metadata || busy;
@@ -128,7 +129,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=077bd893d62c", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=f1b9b0de8ce3", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -774,9 +775,11 @@ async function prepareDocumentSaver(name, description, extension) {
 
 $("#data-file").addEventListener("change", event => { const file = event.target.files[0]; event.target.value = ""; if (file) loadFile(file); });
 $("#drop-zone").addEventListener("click", () => $("#data-file").click());
-for (const type of ["dragenter", "dragover"]) $("#drop-zone").addEventListener(type, event => { event.preventDefault(); if (!event.currentTarget.disabled) event.currentTarget.classList.add("drag-over"); });
-$("#drop-zone").addEventListener("dragleave", event => event.currentTarget.classList.remove("drag-over"));
-$("#drop-zone").addEventListener("drop", event => { event.preventDefault();event.stopPropagation();event.currentTarget.classList.remove("drag-over"); const file=event.dataTransfer.files[0];if(!event.currentTarget.disabled && file){openDroppedFile(file);} });
+for (const zone of [$("#drop-zone"), $("#data-drop-area")]) {
+  for (const type of ["dragenter", "dragover"]) zone.addEventListener(type, event => { event.preventDefault(); if (engineReady && !loading && !exporting) event.currentTarget.classList.add("drag-over"); });
+  zone.addEventListener("dragleave", event => event.currentTarget.classList.remove("drag-over"));
+  zone.addEventListener("drop", event => { event.preventDefault();event.stopPropagation();event.currentTarget.classList.remove("drag-over"); const file=event.dataTransfer.files[0];if(engineReady && !loading && !exporting && file){openDroppedFile(file);} });
+}
 // Dropping a file elsewhere must not navigate away and discard the settings.
 window.addEventListener("dragover", event => event.preventDefault());
 window.addEventListener("drop", event => {event.preventDefault();const file=event.dataTransfer.files[0];if(file && /\.(json|plotproject)$/i.test(file.name))openDroppedFile(file);});

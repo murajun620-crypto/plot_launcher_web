@@ -6,8 +6,8 @@
   <meta name="description" content="Excel・CSVの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=077bd893d62c">
-  <script type="module" src="./app.js?v=077bd893d62c"></script>
+  <link rel="stylesheet" href="./style.css?v=f1b9b0de8ce3">
+  <script type="module" src="./app.js?v=f1b9b0de8ce3"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -45,6 +45,7 @@
         <button id="drop-zone" class="button primary drop-zone" disabled title="Excel / CSVを開きます。ドラッグ＆ドロップでも開けます（Ctrl/Cmd＋Alt＋O）">＋ データを開く</button>
         <input id="data-file" type="file" accept=".xlsx,.xlsm,.xls,.csv" hidden>
         <button id="paste-data" class="button paste-data" disabled title="Excelでセル範囲をコピーし、Ctrl/Command＋Vで貼り付けます（Ctrl/Command＋Alt＋Vでこの画面を開く）">データを貼り付け</button>
+        <div id="data-drop-area" class="data-drop-area" role="region" aria-label="データファイルのドロップ先" aria-disabled="true">ここにデータをドロップ</div>
         <button id="sample-data" class="sample-button" disabled>サンプルを使う</button>
         <div id="file-summary" class="file-summary" hidden>
           <svg><use href="#i-file"/></svg><div><strong id="file-name"></strong><span id="file-stats"></span></div><span id="sample-badge" class="badge" hidden>サンプル</span>
