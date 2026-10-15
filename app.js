@@ -1,6 +1,6 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=8074e8cc8da6";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=8074e8cc8da6";
-import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=8074e8cc8da6";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=bcf69c5adf11";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=bcf69c5adf11";
+import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=bcf69c5adf11";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -64,7 +64,6 @@ function desktopAppearance() {
     <p class="field-hint">倍率1：目盛り7 pt、軸ラベル8 pt、枠線0.8 pt、主目盛り2.5 pt・副目盛り1.25 pt。</p>
     <details><summary>余白・軸の表示</summary>
     <div class="field-grid">${numeric("xLabelPad", "Xラベル追加余白 (pt)", -100, 100)}${numeric("yLabelPad", "Yラベル追加余白 (pt)", -100, 100)}${numeric("xTickPad", "X目盛り追加余白 (pt)", -100, 100)}${numeric("yTickPad", "Y目盛り追加余白 (pt)", -100, 100)}</div>
-    <div class="field-grid"><label>X対数表記<select data-axis="xLogFormat"><option value="power">累乗</option><option value="decimal">小数</option></select></label><label>Y対数表記<select data-axis="yLogFormat"><option value="power">累乗</option><option value="decimal">小数</option></select></label></div>
     <div class="check-options">${check("hideXLabel", "Xラベルを隠す")}${check("hideYLabel", "Yラベルを隠す")}${check("hideXTickLabels", "X目盛り文字を隠す")}${check("hideYTickLabels", "Y目盛り文字を隠す")}${check("hideXTicks", "X目盛り線を隠す")}${check("hideYTicks", "Y目盛り線を隠す")}${check("spineLeft", "左枠")}${check("spineRight", "右枠")}${check("spineTop", "上枠")}${check("spineBottom", "下枠")}${check("yAxisRight", "Y軸を右側")}${check("xAxisTop", "X軸を上側")}</div></details>
     <details><summary>背景・誤差棒</summary>
     <div class="check-options"><label><input id="background-enabled" data-axis="transparent" data-invert="true" type="checkbox">図全体の背景色を使用</label></div>
@@ -130,7 +129,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=8074e8cc8da6", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=bcf69c5adf11", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -237,7 +236,8 @@ function openAxisEditor(axis, kind) {
       `<div class="field-grid">${label(`${axis}LabelX`,'ラベルX (軸比率)','number','step="any" placeholder="標準"')}${label(`${axis}LabelY`,'ラベルY (軸比率)','number','step="any" placeholder="標準"')}</div><button type="button" class="button quiet" data-reset-label>標準位置に戻す</button>`;
   } else {
     const automatic = config.axes[`${axis}Min`] === '' && config.axes[`${axis}Max`] === '';
-    fields.innerHTML = `<label><input type="checkbox" data-axis-auto="range" ${automatic?'checked':''}>範囲を自動設定</label><div class="field-grid">${label(`${axis}Min`,'最小','number','step="any" placeholder="自動"')}${label(`${axis}Max`,'最大','number','step="any" placeholder="自動"')}</div>` +
+    fields.innerHTML = `<label class="log-format-field" data-log-format-for="${axis}">目盛りの表記<select data-axis="${axis}LogFormat" aria-label="${axis.toUpperCase()}軸の対数目盛り表記">${choiceOptions([['power','累乗（10ⁿ）'],['decimal','数値（0.1、1、10）']],config.axes[`${axis}LogFormat`])}</select></label>` +
+      `<label><input type="checkbox" data-axis-auto="range" ${automatic?'checked':''}>範囲を自動設定</label><div class="field-grid">${label(`${axis}Min`,'最小','number','step="any" placeholder="自動"')}${label(`${axis}Max`,'最大','number','step="any" placeholder="自動"')}</div>` +
       `<label><input type="checkbox" data-axis-auto="ticks" data-axis-name="${axis}">主目盛りを自動設定</label>` +
       label(`${axis}Step`,'主目盛り間隔','number','step="any" placeholder="自動"') +
       `<label><input type="checkbox" data-axis-auto="minor" data-axis-name="${axis}">副目盛りを自動設定</label>` +
@@ -260,6 +260,7 @@ function syncAxisEditor() {
   syncAxisAutomaticControls();
 }
 function syncAxisAutomaticControls() {
+  for (const field of $$('[data-log-format-for]')) field.hidden = config.axes[`${field.dataset.logFormatFor}Scale`] !== 'log';
   for (const input of $$('[data-axis-auto]')) {
     const axis = input.dataset.axisName || (input.closest('#axis-editor-fields') ? $('#axis-editor-fields').dataset.axisName : null);
     if (!axis) continue;

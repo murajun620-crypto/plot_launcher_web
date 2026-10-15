@@ -561,7 +561,7 @@ def apply_axis_overrides_from_env(ax: plt.Axes) -> None:
     def decimal_log_label(value: float, _position=None) -> str:
         if not math.isfinite(value) or value <= 0:
             return ""
-        return unicode_leading_minus(f"{value:.12f}".rstrip("0").rstrip("."))
+        return unicode_leading_minus(np.format_float_positional(value, precision=12, unique=False, fractional=False, trim="-"))
 
     if xmin is not None or xmax is not None:
         current_xmin, current_xmax = ax.get_xlim()

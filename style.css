@@ -278,3 +278,4 @@ button.drop-zone:not(:disabled):hover{background:#164c92;border-color:var(--blue
 .axis-tick-auto{margin:10px 0 8px;gap:8px 14px}
 .axis-tick-auto label{font-size:10px}
 .minor-step-field{margin-top:8px}
+.log-format-field{margin-bottom:10px}
