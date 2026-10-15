@@ -6,8 +6,8 @@
   <meta name="description" content="Excel・CSVの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=f1b9b0de8ce3">
-  <script type="module" src="./app.js?v=f1b9b0de8ce3"></script>
+  <link rel="stylesheet" href="./style.css?v=8074e8cc8da6">
+  <script type="module" src="./app.js?v=8074e8cc8da6"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -29,6 +29,7 @@
     </a>
     <div class="header-actions" role="group" aria-label="プロジェクトと設定">
       <span class="privacy-note" title="データはブラウザ内で処理します。外部には送信しません。" aria-label="データはブラウザ内で処理"><span class="privacy-dot"></span>データはブラウザ内で処理</span>
+      <button id="new-project" class="button quiet" title="現在の内容を閉じて、新しいプロジェクトを開始します。未保存の場合は確認します。"><svg><use href="#i-plus"/></svg><span>新規プロジェクト</span></button>
       <button id="open-project" class="button quiet" title="データと設定をまとめて開きます（Ctrl/Command＋O）" disabled><svg><use href="#i-upload"/></svg><span>プロジェクトを開く</span></button>
       <button id="save-project" class="button primary" title="データと設定をまとめて保存します（Ctrl/Command＋S）" disabled><svg><use href="#i-download"/></svg><span>プロジェクトを保存</span></button>
       <input id="project-file" type="file" accept=".plotproject,.json,application/json" hidden>

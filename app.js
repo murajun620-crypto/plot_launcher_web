@@ -1,6 +1,6 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=f1b9b0de8ce3";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=f1b9b0de8ce3";
-import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=f1b9b0de8ce3";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=8074e8cc8da6";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=8074e8cc8da6";
+import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=8074e8cc8da6";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -83,6 +83,7 @@ function status(text, kind = "working") {
 function updateButtons() {
   compactHelp();
   const busy = loading || exporting;
+  $("#new-project").disabled = busy;
   $("#open-project").disabled = !engineReady || busy;
   $("#save-project").disabled = !engineReady || busy || !sourceData || !metadata || !config.series.length;
   $("#drop-zone").disabled = !engineReady || busy;
@@ -129,7 +130,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=f1b9b0de8ce3", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=8074e8cc8da6", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -892,6 +893,12 @@ async function saveProject() {
   finally{exporting=false;updateButtons();if(renderWanted)renderPreview();}
 }
 $("#save-project").addEventListener("click",saveProject);
+$('#new-project').addEventListener('click', () => {
+  if (loading || exporting) return;
+  // A fresh page clears data, settings, undo history and the worker together.
+  // The existing beforeunload handler protects unsaved work on cancellation.
+  window.location.assign(new URL('./', window.location.href).href);
+});
 async function readProject(file, saved) {
   if(!engineReady || loading || exporting)return;
   loading=true; updateButtons(); status('プロジェクトを開いています…');
