@@ -1,6 +1,6 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=48f906a9b386";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=48f906a9b386";
-import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=48f906a9b386";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=a660752b52eb";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=a660752b52eb";
+import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=a660752b52eb";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -130,7 +130,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=48f906a9b386", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=a660752b52eb", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {

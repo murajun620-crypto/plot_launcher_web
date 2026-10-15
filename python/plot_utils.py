@@ -542,7 +542,7 @@ def apply_axis_overrides_from_env(ax: plt.Axes) -> None:
                 precision = max(len(label.lower().split("e")[0].partition(".")[2]) for label in labels)
                 value = 0.0 if abs(value) <= tolerance else value
                 text = format(value, f".{precision}{'e' if scientific else 'f'}")
-                if scientific and value == 0:
+                if value == 0:
                     text = "0"
                 return unicode_leading_minus(text)
             elif hasattr(formatter, "format_data_short"):
