@@ -507,6 +507,8 @@ def plot_pair_column_indices(plot_pairs: list[tuple], column_names: list) -> lis
 
 
 def apply_axis_overrides_from_env(ax: plt.Axes) -> None:
+    is_3d = hasattr(ax, "zaxis")
+    yaxis = ax.zaxis if is_3d else ax.yaxis
     xmin = _env_float("PLOT_XMIN")
     xmax = _env_float("PLOT_XMAX")
     ymin = _env_float("PLOT_YMIN")
@@ -519,20 +521,30 @@ def apply_axis_overrides_from_env(ax: plt.Axes) -> None:
     if xscale in {"linear", "log"}:
         ax.set_xscale(xscale)
     if yscale in {"linear", "log"}:
-        ax.set_yscale(yscale)
+        (ax.set_zscale if is_3d else ax.set_yscale)(yscale)
 
-    from matplotlib.ticker import FixedFormatter, FuncFormatter, LogFormatterMathtext, NullFormatter, ScalarFormatter
+    from matplotlib.ticker import AutoMinorLocator, FixedFormatter, FuncFormatter, LogFormatterMathtext, LogLocator, MultipleLocator, NullFormatter, NullLocator, ScalarFormatter
 
-    def zero_as_integer(value: float, _position, formatter) -> str:
+    def zero_as_integer(value: float, _position, formatter, axis) -> str:
         if not math.isfinite(value):
             return ""
-        if abs(value) <= 1.0e-12:
-            return "0"
         try:
             if isinstance(formatter, ScalarFormatter):
-                # format_data_short uses canvas pixels, so SVG previews and
-                # high-DPI PNGs can show different numbers for the same ticks.
-                text = f"{value:.12g}"
+                # Use one decimal precision for all visible ticks on this axis.
+                # This also stays independent of SVG/PNG canvas resolution.
+                lo, hi = sorted(axis.get_view_interval())
+                tolerance = max(abs(hi - lo), 1e-300) * 1e-12
+                locations = [0.0 if abs(tick) <= tolerance else tick
+                             for tick in axis.get_majorticklocs()
+                             if math.isfinite(tick) and lo - tolerance <= tick <= hi + tolerance]
+                labels = [f"{tick:.12g}" for tick in locations] or [f"{value:.12g}"]
+                scientific = any("e" in label.lower() for label in labels)
+                precision = max(len(label.lower().split("e")[0].partition(".")[2]) for label in labels)
+                value = 0.0 if abs(value) <= tolerance else value
+                text = format(value, f".{precision}{'e' if scientific else 'f'}")
+                if scientific and value == 0:
+                    text = "0"
+                return unicode_leading_minus(text)
             elif hasattr(formatter, "format_data_short"):
                 text = formatter.format_data_short(value)
             else:
@@ -558,8 +570,8 @@ def apply_axis_overrides_from_env(ax: plt.Axes) -> None:
             xmax if xmax is not None else current_xmax,
         )
     if ymin is not None or ymax is not None:
-        current_ymin, current_ymax = ax.get_ylim()
-        ax.set_ylim(
+        current_ymin, current_ymax = (ax.get_zlim if is_3d else ax.get_ylim)()
+        (ax.set_zlim if is_3d else ax.set_ylim)(
             ymin if ymin is not None else current_ymin,
             ymax if ymax is not None else current_ymax,
         )
@@ -572,11 +584,11 @@ def apply_axis_overrides_from_env(ax: plt.Axes) -> None:
     if ytick_step is not None and ytick_step > 0 and yscale != "log":
         from matplotlib.ticker import MultipleLocator
 
-        ax.yaxis.set_major_locator(MultipleLocator(ytick_step))
+        yaxis.set_major_locator(MultipleLocator(ytick_step))
 
     for axis, scale, format_name in (
         (ax.xaxis, ax.get_xscale(), os.getenv("PLOT_XLOG_FORMAT", "power").strip().lower()),
-        (ax.yaxis, ax.get_yscale(), os.getenv("PLOT_YLOG_FORMAT", "power").strip().lower()),
+        (yaxis, (ax.get_zscale if is_3d else ax.get_yscale)(), os.getenv("PLOT_YLOG_FORMAT", "power").strip().lower()),
     ):
         if scale == "log":
             if format_name == "decimal":
@@ -589,8 +601,21 @@ def apply_axis_overrides_from_env(ax: plt.Axes) -> None:
         if isinstance(base_formatter, FixedFormatter):
             continue
         axis.set_major_formatter(
-            FuncFormatter(lambda value, pos, formatter=base_formatter: zero_as_integer(value, pos, formatter))
+            FuncFormatter(lambda value, pos, formatter=base_formatter, tick_axis=axis: zero_as_integer(value, pos, formatter, tick_axis))
         )
+
+    # set_xscale/set_yscale reset minor locators, even when setting linear again.
+    # Restore them after scale and major-step settings, including 3D intensity.
+    hide_minor = _env_bool("PLOT_HIDE_MINORTICKS")
+    for axis, scale, name in ((ax.xaxis, ax.get_xscale(), "X"), (yaxis, (ax.get_zscale if is_3d else ax.get_yscale)(), "Y")):
+        minor_step = _env_float(f"PLOT_{name}MINOR_TICK_STEP")
+        if hide_minor:
+            axis.set_minor_locator(NullLocator())
+        elif scale == "log":
+            axis.set_minor_locator(LogLocator(base=10, subs=range(2, 10)))
+        else:
+            axis.set_minor_locator(MultipleLocator(minor_step) if minor_step is not None and minor_step > 0 else AutoMinorLocator())
+        axis.set_minor_formatter(NullFormatter())
 
 
 def apply_axis_labels_from_env(ax: plt.Axes) -> None:

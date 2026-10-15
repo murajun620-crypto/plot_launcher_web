@@ -350,10 +350,9 @@ for i, (xcol, ycol, xoff, yoff, color) in enumerate(plot_pairs):
 
 apply_axis_overrides_from_env(ax)
 
-# Axis scale updates can reset minor tick locators; re-enable for General by default.
+# Axis overrides restore minor locators; retain the native minor tick styling.
 hide_minorticks_env = os.getenv("PLOT_HIDE_MINORTICKS", "").strip().lower() in {"1", "true", "yes", "on"}
 if not hide_minorticks_env:
-    ax.minorticks_on()
     ax.tick_params(
         axis="both",
         which="minor",
@@ -361,6 +360,9 @@ if not hide_minorticks_env:
         width=used["spine_linewidth"],
         length=used["minor_tick_length"],
     )
+    for name in ("x", "y"):
+        if os.getenv(f"PLOT_HIDE_{name.upper()}TICKS", "").strip().lower() in {"1", "true", "yes", "on"}:
+            ax.tick_params(axis=name, which="minor", length=0)
 
 apply_preview_legend(ax, handles=legend_handles, labels=legend_labels, fontsize=7)
 if preview_only:

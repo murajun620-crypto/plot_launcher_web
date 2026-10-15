@@ -310,6 +310,12 @@ class PlotEngine:
             if scale == "log" and step is not None:
                 raise ValueError("対数軸では目盛り間隔を空欄（自動）にしてください。")
             values[f"PLOT_{axis.upper()}TICK_STEP"] = "" if step is None else str(step)
+            minor_step = number(axes.get(f"{axis}MinorStep"), "副目盛り間隔", optional=True)
+            if minor_step is not None and minor_step <= 0:
+                raise ValueError("副目盛り間隔は0より大きい値にしてください。")
+            if scale == "log" and minor_step is not None:
+                raise ValueError("対数軸の副目盛りは自動にしてください。")
+            values[f"PLOT_{axis.upper()}MINOR_TICK_STEP"] = "" if minor_step is None else str(minor_step)
 
         frame = self.frame
         draw_columns = {}
@@ -436,6 +442,9 @@ class PlotEngine:
                 raise ValueError("指定した軸範囲にデータが入りません。範囲を確認してください。")
             if step and abs(hi - lo) / float(step) > 200:
                 raise ValueError("目盛りが多すぎます。目盛り間隔を広げてください。")
+            minor_step = values[f"PLOT_{axis.upper()}MINOR_TICK_STEP"]
+            if minor_step and abs(hi - lo) / float(minor_step) > 1000:
+                raise ValueError("副目盛りが多すぎます。副目盛り間隔を広げてください。")
         mappings = {
             "columns": "PLOT_COLUMN_MAP", "colors": "PLOT_SERIES_COLORS",
             "modes": "PLOT_GENERIC_DRAW_MODES", "widths": "PLOT_GENERIC_LINE_WIDTHS",
@@ -761,7 +770,14 @@ class PlotEngine:
             self.transparent = False
             self.annotation_manager = manager
             self.export_extra_artists = extra_artists
-            return {"svg": image.getvalue().decode("utf-8"), "series": [item for item in diagnostics if item["visible"]], "warnings": warnings, "statistics": statistics, "xRange": list(annotation_axes.get_xlim()), "yRange": list(annotation_axes.get_ylim()), "geometry": geometry, "fontFamily": family if (family := config.get("axes", {}).get("fontFamily")) else self.font_family}
+            def tick_step(locations):
+                locations = np.sort(np.asarray(locations, dtype=float))
+                differences = np.diff(locations[np.isfinite(locations)])
+                positive = differences[differences > 0]
+                return float(np.min(positive)) if len(positive) else None
+            tick_steps = {name: {"major": tick_step(axis.get_majorticklocs()), "minor": tick_step(axis.get_minorticklocs())}
+                          for name, axis in editable_axes}
+            return {"svg": image.getvalue().decode("utf-8"), "series": [item for item in diagnostics if item["visible"]], "warnings": warnings, "statistics": statistics, "xRange": list(annotation_axes.get_xlim()), "yRange": list(annotation_axes.get_ylim()), "tickSteps": tick_steps, "geometry": geometry, "fontFamily": family if (family := config.get("axes", {}).get("fontFamily")) else self.font_family}
         except Exception:
             for figure_number in set(plt.get_fignums()) - previous_figures:
                 plt.close(figure_number)

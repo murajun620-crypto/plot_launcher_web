@@ -1,6 +1,6 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=65f2313d3cb3";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=65f2313d3cb3";
-import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=65f2313d3cb3";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=077bd893d62c";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=077bd893d62c";
+import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=077bd893d62c";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -65,7 +65,7 @@ function desktopAppearance() {
     <details><summary>余白・軸の表示</summary>
     <div class="field-grid">${numeric("xLabelPad", "Xラベル追加余白 (pt)", -100, 100)}${numeric("yLabelPad", "Yラベル追加余白 (pt)", -100, 100)}${numeric("xTickPad", "X目盛り追加余白 (pt)", -100, 100)}${numeric("yTickPad", "Y目盛り追加余白 (pt)", -100, 100)}</div>
     <div class="field-grid"><label>X対数表記<select data-axis="xLogFormat"><option value="power">累乗</option><option value="decimal">小数</option></select></label><label>Y対数表記<select data-axis="yLogFormat"><option value="power">累乗</option><option value="decimal">小数</option></select></label></div>
-    <div class="check-options">${check("hideXLabel", "Xラベルを隠す")}${check("hideYLabel", "Yラベルを隠す")}${check("hideXTickLabels", "X目盛り文字を隠す")}${check("hideYTickLabels", "Y目盛り文字を隠す")}${check("hideXTicks", "X目盛り線を隠す")}${check("hideYTicks", "Y目盛り線を隠す")}${check("hideMinorTicks", "副目盛りを隠す")}${check("spineLeft", "左枠")}${check("spineRight", "右枠")}${check("spineTop", "上枠")}${check("spineBottom", "下枠")}${check("yAxisRight", "Y軸を右側")}${check("xAxisTop", "X軸を上側")}</div></details>
+    <div class="check-options">${check("hideXLabel", "Xラベルを隠す")}${check("hideYLabel", "Yラベルを隠す")}${check("hideXTickLabels", "X目盛り文字を隠す")}${check("hideYTickLabels", "Y目盛り文字を隠す")}${check("hideXTicks", "X目盛り線を隠す")}${check("hideYTicks", "Y目盛り線を隠す")}${check("spineLeft", "左枠")}${check("spineRight", "右枠")}${check("spineTop", "上枠")}${check("spineBottom", "下枠")}${check("yAxisRight", "Y軸を右側")}${check("xAxisTop", "X軸を上側")}</div></details>
     <details><summary>背景・誤差棒</summary>
     <div class="check-options"><label><input id="background-enabled" data-axis="transparent" data-invert="true" type="checkbox">図全体の背景色を使用</label></div>
     <div class="field-grid"><label>枠線色<input data-axis="spineColor" type="color"></label><label>図全体の背景色<input data-axis="backgroundColor" type="color"></label>${numeric("backgroundAlpha", "図全体の背景不透明度", 0, 1)}</div><div class="check-options">${check("plotBackgroundEnabled", "枠内の背景色を使用")}</div><div class="field-grid"><label>枠内の背景色<input data-axis="plotBackgroundColor" type="color"></label>${numeric("plotBackgroundAlpha", "枠内の背景不透明度", 0, 1)}</div><div class="field-grid">${numeric("markerEdgeWidth", "マーカー縁幅 (pt)", 0, 20)}${numeric("errorLineWidth", "誤差棒幅 (pt)", 0, 20)}${numeric("errorCapSize", "誤差キャップ (pt)", 0, 20)}${numeric("errorCapThick", "キャップ幅 (pt)", 0, 20)}</div></details>`;
@@ -128,7 +128,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=65f2313d3cb3", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=077bd893d62c", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -236,28 +236,58 @@ function openAxisEditor(axis, kind) {
   } else {
     const automatic = config.axes[`${axis}Min`] === '' && config.axes[`${axis}Max`] === '';
     fields.innerHTML = `<label><input type="checkbox" data-axis-auto="range" ${automatic?'checked':''}>範囲を自動設定</label><div class="field-grid">${label(`${axis}Min`,'最小','number','step="any" placeholder="自動"')}${label(`${axis}Max`,'最大','number','step="any" placeholder="自動"')}</div>` +
-      `<label><input type="checkbox" data-axis-auto="ticks" ${config.axes[`${axis}Step`]===''?'checked':''}>目盛り間隔を自動設定</label>` +
-      label(`${axis}Step`,'目盛り間隔','number','step="any" placeholder="自動"') + `<div class="field-grid">${label(`${axis}TickPad`,'目盛り追加余白 (pt)','number','min="-100" max="100" step="any"')}${label('tickFontScale','目盛り文字倍率','number','min=".2" max="3" step="any"')}</div>`;
+      `<label><input type="checkbox" data-axis-auto="ticks" data-axis-name="${axis}">主目盛りを自動設定</label>` +
+      label(`${axis}Step`,'主目盛り間隔','number','step="any" placeholder="自動"') +
+      `<label><input type="checkbox" data-axis-auto="minor" data-axis-name="${axis}">副目盛りを自動設定</label>` +
+      label(`${axis}MinorStep`,'副目盛り間隔','number','step="any" placeholder="自動"') +
+      `<label><input type="checkbox" data-axis="hideMinorTicks" data-invert="true" ${config.axes.hideMinorTicks?'':'checked'}>副目盛りを表示</label>` +
+      `<div class="field-grid">${label(`${axis}TickPad`,'目盛り追加余白 (pt)','number','min="-100" max="100" step="any"')}${label('tickFontScale','目盛り文字倍率','number','min=".2" max="3" step="any"')}</div>`;
   }
   fields.innerHTML += label('spineColor','枠線・文字色','color');
   syncAxisEditor(); enhanceColorInputs(); $('#axis-editor').showModal();
 }
 function syncAxisEditor() {
   const fields = $('#axis-editor-fields'), axis = fields.dataset.axisName;
-  for (const [mode,keys] of [['range',['Min','Max']],['ticks',['Step']]]) {
+  for (const [mode,keys] of [['range',['Min','Max']],['ticks',['Step']],['minor',['MinorStep']]]) {
     const checkbox = fields.querySelector(`[data-axis-auto="${mode}"]`); if (!checkbox) continue;
-    for (const key of keys) fields.querySelector(`[data-axis="${axis}${key}"]`).disabled = checkbox.checked;
+    for (const key of keys) {
+      const field = fields.querySelector(`[data-axis="${axis}${key}"]`);
+      field.disabled = (checkbox.checked && field !== document.activeElement) || (mode !== 'range' && config.axes[`${axis}Scale`] === 'log');
+    }
   }
+  syncAxisAutomaticControls();
+}
+function syncAxisAutomaticControls() {
+  for (const input of $$('[data-axis-auto]')) {
+    const axis = input.dataset.axisName || (input.closest('#axis-editor-fields') ? $('#axis-editor-fields').dataset.axisName : null);
+    if (!axis) continue;
+    const mode = input.dataset.axisAuto, keys = mode === 'range' ? ['Min','Max'] : mode === 'minor' ? ['MinorStep'] : ['Step'];
+    input.checked = keys.every(key => config.axes[`${axis}${key}`] === '');
+    input.disabled = mode !== 'range' && config.axes[`${axis}Scale`] === 'log';
+  }
+  for (const axis of ['x','y']) for (const key of ['Step','MinorStep']) {
+    $$(`[data-axis="${axis}${key}"]`).forEach(input => {
+      input.disabled = config.axes[`${axis}Scale`] === 'log' || (!!input.closest('#axis-editor-fields') && config.axes[`${axis}${key}`] === '' && input !== document.activeElement);
+    });
+  }
+}
+function setAxisAutomatic(input, axis = input.dataset.axisName || $('#axis-editor-fields').dataset.axisName) {
+  const mode = input.dataset.axisAuto, keys = mode === 'range' ? ['Min','Max'] : mode === 'minor' ? ['MinorStep'] : ['Step'];
+  const range = figureResult?.[`${axis}Range`] || [0,1];
+  const spacing = figureResult?.tickSteps?.[axis];
+  keys.forEach((key,index) => {
+    let value = key === 'Step' ? spacing?.major || Math.abs(range[1]-range[0])/5 :
+      key === 'MinorStep' ? spacing?.minor || (spacing?.major || Math.abs(range[1]-range[0])/5)/5 : range[index];
+    config.axes[`${axis}${key}`] = input.checked ? '' : String(Number(value.toPrecision(12)));
+    $$(`[data-axis="${axis}${key}"]`).forEach(field => field.value = config.axes[`${axis}${key}`]);
+  });
+  syncAxisEditor(); changed();
 }
 $('#axis-editor-fields').addEventListener('input', event => {
   const fields = $('#axis-editor-fields'), axis = fields.dataset.axisName, input = event.target;
   if (incompleteNumberInput(input)) return;
   if (input.dataset.axisAuto) {
-    const keys = input.dataset.axisAuto === 'range' ? ['Min','Max'] : ['Step'];
-    keys.forEach((key,i) => {
-      config.axes[`${axis}${key}`] = input.checked ? '' : String(key === 'Step' ? Math.abs(figureResult[`${axis}Range`][1]-figureResult[`${axis}Range`][0])/5 : figureResult[`${axis}Range`][i]);
-      $$(`[data-axis="${axis}${key}"]`).forEach(field => field.value = config.axes[`${axis}${key}`]);
-    }); syncAxisEditor(); changed();
+    setAxisAutomatic(input, axis);
   } else if (input.dataset.axis) {
     // A partial manual position must never make the plot disappear while typing.
     if (/^[xy]Label[XY]$/.test(input.dataset.axis) && input.value !== '') {
@@ -281,6 +311,7 @@ $('#axis-editor-fields').addEventListener('click', event => {
   changed();
 });
 $('#close-axis-editor').addEventListener('click', () => $('#axis-editor').close());
+$('#axis-editor-fields').addEventListener('focusout', syncAxisEditor);
 
 function drawPresetOptions() {
   const type=config.plotType || "General", options=config.options ||= {};
@@ -381,6 +412,7 @@ function drawControls() {
   if(config.plotType==='XPS Fit')$$('.series-advanced,.series-card .annotation-buttons').forEach(element=>element.hidden=true);
   if(config.plotType==='Raman 3D')$$('[data-series-field="lineWidth"]').forEach(input=>input.closest('label').hidden=true);
   updateButtons();
+  syncAxisAutomaticControls();
   drawAnnotations();
   enhanceColorInputs();
 }
@@ -756,7 +788,7 @@ function incompleteNumberInput(input) {
   if (input.type !== 'number') return false;
   if (input.validity?.badInput) return true;
   if (input.value !== '') return !Number.isFinite(Number(input.value));
-  return !['xMin','xMax','yMin','yMax','xStep','yStep','legendX','legendY','xLabelX','xLabelY','yLabelX','yLabelY'].includes(input.dataset.axis);
+  return !['xMin','xMax','yMin','yMax','xStep','yStep','xMinorStep','yMinorStep','legendX','legendY','xLabelX','xLabelY','yLabelX','yLabelY'].includes(input.dataset.axis);
 }
 
 function applyControlInput(event) {
@@ -764,9 +796,14 @@ function applyControlInput(event) {
   // Native number inputs keep an internal editing buffer for "0.", "-", "1e-".
   // Do not commit incomplete values or assign back to the field being edited.
   if (incompleteNumberInput(input)) return;
+  if (input.dataset.axisAuto) {setAxisAutomatic(input);return;}
   if (input.dataset.axis) {
     const key = input.dataset.axis;
     config.axes[key] = input.type === "checkbox" ? (input.dataset.invert === "true" ? !input.checked : input.checked) : input.value;
+    if (/^[xy]Scale$/.test(key) && input.value === 'log') {
+      config.axes[`${key[0]}Step`] = config.axes[`${key[0]}MinorStep`] = '';
+      for (const suffix of ['Step','MinorStep']) $$(`[data-axis="${key[0]}${suffix}"]`).forEach(field=>field.value='');
+    }
     if (['backgroundColor','backgroundAlpha','transparent'].includes(key)) {
       if (key === 'backgroundColor') {
         config.axes.transparent = false;
@@ -807,7 +844,7 @@ function applyControlInput(event) {
     const fill=config.options.fills[Number(input.closest('[data-fill-index]').dataset.fillIndex)];
     fill[input.dataset.fill]=input.type === "number" || input.tagName === "SELECT"?Number(input.value):input.value;
   } else return;
-  changed();
+  syncAxisAutomaticControls(); changed();
 }
 $("#plot-form").addEventListener("input", applyControlInput);
 $("#series-list").addEventListener("click", event => {
@@ -993,11 +1030,12 @@ function openElementEditor(part,index=0) {
   else {
     const keys=part==='figureBackground'?['transparent','backgroundColor','backgroundAlpha']:
       part==='plotBackground'?['plotBackgroundEnabled','plotBackgroundColor','plotBackgroundAlpha']:
-      part==='grid'?['grid','tickLength','hideXTicks','hideYTicks','hideMinorTicks']:
+      part==='grid'?['grid','tickLength','hideXTicks','hideYTicks','hideMinorTicks','xMinorStep','yMinorStep']:
       ['spineColor','spineScale','spineLeft','spineRight','spineTop','spineBottom','yAxisRight','xAxisTop'];
     title=({figureBackground:'図全体の背景',plotBackground:'枠内の背景',grid:'目盛り線・グリッド',frame:'枠線'})[part]+'の設定';
     sources=keys.map(key=>$(`#plot-form [data-axis="${key}"]`)?.closest('label'));
   }
+  if(part==='grid')sources.push(...$$('#plot-form [data-axis-auto="minor"]').map(input=>input.closest('label')));
   fields.innerHTML=sources.filter(Boolean).map(source=>source.outerHTML).join('');
   // Reuse the sidebar controls, restoring live values and color-picker handlers.
   fields.querySelectorAll('.color-control').forEach(wrapper=>{const input=wrapper.querySelector('input');if(input){input.hidden=false;delete input.dataset.paletteEnhanced;wrapper.replaceWith(input);}});
@@ -1012,7 +1050,7 @@ function openElementEditor(part,index=0) {
     if(input.type==='checkbox')input.checked=data.invert==='true'?!value:Boolean(value);else input.value=value;
   });
   $('#element-editor-title').textContent=title;
-  $('#element-editor').showModal();enhanceColorInputs();
+  $('#element-editor').showModal();enhanceColorInputs();syncAxisAutomaticControls();
 }
 $('#element-editor-fields').addEventListener('input',applyControlInput);
 $('#close-element-editor').addEventListener('click',()=>$('#element-editor').close());

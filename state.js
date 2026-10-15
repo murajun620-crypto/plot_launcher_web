@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.3.1";
+export const APP_VERSION = "1.4.0";
 
 // src/plot_settings.py: default_auto_series_colors(), same order and shades.
 export const COLORS = ["#1F8FE0", "#D4291E", "#2BA84D", "#D77207", "#7D3EDD", "#787878", "#666666", "#0052A8", "#A10000", "#009F22"];
@@ -47,6 +47,7 @@ export function defaultAxes() {
     xLabelX: "", xLabelY: "", yLabelX: "", yLabelY: "",
     xLabel: "", yLabel: "", xUnit: "auto", yUnit: "auto", xScale: "linear", yScale: "linear",
     xMin: "", xMax: "", yMin: "", yMax: "", xStep: "", yStep: "", width: 4, height: 3,
+    xMinorStep: "", yMinorStep: "",
     fontFamily: "Liberation Sans", japaneseFontFamily: "Noto Sans JP", fontScale: 1, tickFontScale: 1, labelFontScale: 1,
     spineScale: 1, dataLineScale: 1, tickLength: 1, xLabelPad: 0, yLabelPad: 0, xTickPad: 0, yTickPad: 0,
     xLogFormat: "power", yLogFormat: "power", hideXLabel: false, hideYLabel: false,

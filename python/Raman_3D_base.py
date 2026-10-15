@@ -7,6 +7,7 @@ import pandas as pd
 from df_utils import load_df_xlwings_with_dialog_and_names
 from plot_utils import (
     COLORS,
+    apply_axis_overrides_from_env,
     apply_series_colors_from_env,
     env_axes_size_cm,
     env_style_options,
@@ -140,6 +141,8 @@ if os.getenv("PLOT_XSCALE", "").strip().lower() == "log":
     ax.set_xscale("log")
 if os.getenv("PLOT_YSCALE", "").strip().lower() == "log":
     ax.set_zscale("log")
+
+apply_axis_overrides_from_env(ax)
 
 preview_only = os.getenv("PLOT_PREVIEW_ONLY", "0") == "1"
 skip_show = os.getenv("PLOT_SKIP_SHOW", "0") == "1"
