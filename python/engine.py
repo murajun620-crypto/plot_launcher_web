@@ -13,6 +13,7 @@ from io import BytesIO, StringIO
 import json
 import math
 import os
+import re
 from pathlib import Path
 import runpy
 import sys
@@ -41,6 +42,39 @@ from annotation_manager import AnnotationManager
 MAX_ROWS = 200_000
 MAX_COLUMNS = 256
 MAX_SERIES = 32
+
+
+def expand_micro(text, *, plain=False):
+    """Expand the upright-micro shorthand without changing saved input text."""
+    if not isinstance(text, str) or r"\micro" not in text:
+        return text
+    parts = re.split(r"(?<!\\)(\$)", text)
+    count = (len(parts) - 1) // 2
+    math_text = count > 0 and count % 2 == 0
+    in_math = False
+    for index, part in enumerate(parts):
+        if part == "$" and math_text:
+            in_math = not in_math
+        else:
+            replacement = r"\mathrm{\mu}" if in_math else "μ" if plain else r"$\mathrm{\mu}$"
+            parts[index] = re.sub(r"(?<!\\)\\micro", lambda _match: replacement, part)
+    return "".join(parts)
+
+
+@contextmanager
+def micro_text_rendering():
+    # All presets create Matplotlib text through this method, including auto
+    # column labels, category ticks, legends and annotations. Scope the alias
+    # to rendering/export so library behavior outside the app stays intact.
+    from matplotlib.text import Text
+    original = Text.set_text
+    def set_text(artist, text):
+        return original(artist, expand_micro(text))
+    Text.set_text = set_text
+    try:
+        yield
+    finally:
+        Text.set_text = original
 
 
 def number(value, label, *, minimum=None, maximum=None, optional=False):
@@ -433,7 +467,7 @@ class PlotEngine:
                     manual_text = str(axes.get(f"{axis.lower()}Label", "")).strip()
                     manual_unit = str(axes.get(f"{axis.lower()}Unit", "auto")).strip()
                     values[f"PLOT_{axis}LABEL_TEXT"] = manual_text or text.strip()
-                    values[f"PLOT_{axis}UNIT"] = unit.strip() if manual_unit.lower() == "auto" else manual_unit
+                    values[f"PLOT_{axis}UNIT"] = expand_micro(unit.strip() if manual_unit.lower() == "auto" else manual_unit, plain=True)
         for axis in ("x", "y"):
             step = values[f"PLOT_{axis.upper()}TICK_STEP"]
             lo = limits[f"{axis}Min"] if limits[f"{axis}Min"] is not None else min(extents[axis])
@@ -607,6 +641,7 @@ class PlotEngine:
             result.append(entry)
         return result
 
+    @micro_text_rendering()
     def render(self, config):
         frame, values, diagnostics, warnings = self._prepare(config)
         previous_figures = set(plt.get_fignums())
@@ -783,6 +818,7 @@ class PlotEngine:
                 plt.close(figure_number)
             raise
 
+    @micro_text_rendering()
     def export(self, config, format_name, dpi=1200):
         if format_name not in {"svg", "png", "pdf", "pptx"}:
             raise ValueError("SVG・PNG・PDF・PowerPointのいずれかを選んでください。")
@@ -853,7 +889,7 @@ class PlotEngine:
         if caption_bbox is not None:
             color = matplotlib.colors.to_hex(caption.color).lstrip("#").upper()
             font = caption.font_family[0] if isinstance(caption.font_family, list) else caption.font_family
-            shape = ET.fromstring(f'''<p:sp xmlns:p="{p}" xmlns:a="{a}"><p:nvSpPr><p:cNvPr id="3" name="Panel label"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm rot="{round(-caption.rotation*60000)}"><a:off x="{emu(x+caption_bbox.x0-bbox.x0)}" y="{emu(y+bbox.y1-caption_bbox.y1)}"/><a:ext cx="{emu(caption_bbox.width+.02)}" cy="{emu(caption_bbox.height+.02)}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/></p:spPr><p:txBody><a:bodyPr lIns="0" rIns="0" tIns="0" bIns="0" anchor="ctr"/><a:lstStyle/><a:p><a:pPr/><a:r><a:rPr sz="{round(caption.font_size*100)}" b="{int(caption.bold)}" i="{int(caption.italic)}"><a:solidFill><a:srgbClr val="{color}"><a:alpha val="{round(caption.opacity*100000)}"/></a:srgbClr></a:solidFill><a:latin typeface="{escape(str(font), {'"': '&quot;'})}"/></a:rPr><a:t>{escape(caption.text)}</a:t></a:r><a:endParaRPr/></a:p></p:txBody></p:sp>''')
+            shape = ET.fromstring(f'''<p:sp xmlns:p="{p}" xmlns:a="{a}"><p:nvSpPr><p:cNvPr id="3" name="Panel label"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm rot="{round(-caption.rotation*60000)}"><a:off x="{emu(x+caption_bbox.x0-bbox.x0)}" y="{emu(y+bbox.y1-caption_bbox.y1)}"/><a:ext cx="{emu(caption_bbox.width+.02)}" cy="{emu(caption_bbox.height+.02)}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/></p:spPr><p:txBody><a:bodyPr lIns="0" rIns="0" tIns="0" bIns="0" anchor="ctr"/><a:lstStyle/><a:p><a:pPr/><a:r><a:rPr sz="{round(caption.font_size*100)}" b="{int(caption.bold)}" i="{int(caption.italic)}"><a:solidFill><a:srgbClr val="{color}"><a:alpha val="{round(caption.opacity*100000)}"/></a:srgbClr></a:solidFill><a:latin typeface="{escape(str(font), {'"': '&quot;'})}"/></a:rPr><a:t>{escape(expand_micro(caption.text, plain=True))}</a:t></a:r><a:endParaRPr/></a:p></p:txBody></p:sp>''')
             slide.find(f".//{{{p}}}spTree").append(shape)
         content_types = ET.fromstring(parts["[Content_Types].xml"])
         ET.SubElement(content_types, "{http://schemas.openxmlformats.org/package/2006/content-types}Default", {"Extension": "svg", "ContentType": "image/svg+xml"})
@@ -866,6 +902,7 @@ class PlotEngine:
                 destination.writestr(name, data)
         return output.getvalue()
 
+    @micro_text_rendering()
     def align_annotations(self, config, ids, operation):
         self.render(config)
         manager = self.annotation_manager

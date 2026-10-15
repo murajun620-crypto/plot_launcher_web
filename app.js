@@ -1,10 +1,11 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=bcf69c5adf11";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=bcf69c5adf11";
-import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=bcf69c5adf11";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=48f906a9b386";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=48f906a9b386";
+import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=48f906a9b386";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 const escapeHTML = text => String(text).replace(/[&<>"']/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character]));
+const MICRO_HINT = 'μは \\micro と入力できます（例：\\microm、\\microA）。';
 let worker, engineReady = false, requestID = 0;
 const requests = new Map();
 let metadata = null, config = { axes: defaultAxes(), series: [] };
@@ -129,7 +130,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=bcf69c5adf11", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=48f906a9b386", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -228,7 +229,7 @@ enhanceColorInputs();
 function openAxisEditor(axis, kind) {
   if (!metadata || loading || exporting || renderRunning || renderedRevision !== revision) return;
   const fields = $('#axis-editor-fields'); fields.dataset.axisName = axis;
-  const label = (key, text, type='text', extra='') => `<label>${text}<input data-axis="${key}" type="${type}" value="${escapeHTML(config.axes[key])}" ${extra}></label>`;
+  const label = (key, text, type='text', extra='') => `<label>${text}<input data-axis="${key}" type="${type}" value="${escapeHTML(config.axes[key])}" ${type==='text'?`title="${MICRO_HINT}"`:''} ${extra}></label>`;
   $('#axis-editor-title').textContent = `${axis.toUpperCase()}軸${kind === 'label' ? 'ラベル' : '目盛り'}の設定`;
   if (kind === 'label') {
     fields.innerHTML = label(`${axis}Label`,'ラベル（空欄で自動）','text','maxlength="500"') + label(`${axis}Unit`,'単位（autoで自動）') +
@@ -417,6 +418,7 @@ function drawControls() {
   updateButtons();
   syncAxisAutomaticControls();
   drawAnnotations();
+  $$('[data-axis="xLabel"],[data-axis="yLabel"],[data-axis="xUnit"],[data-axis="yUnit"],.series-label').forEach(input=>input.title=MICRO_HINT);
   enhanceColorInputs();
 }
 
@@ -432,6 +434,7 @@ function drawAnnotations() {
       ${item.type === "text" ? `<label>フォント<select data-annotation-field="font_family">${choiceOptions([...loadedFonts].map(name=>[name,escapeHTML(name)]),item.font_family)}</select></label><div class="field-grid"><label>横揃え<select data-annotation-field="horizontal_alignment">${choiceOptions([["left","左"],["center","中央"],["right","右"]],item.horizontal_alignment)}</select></label><label>縦揃え<select data-annotation-field="vertical_alignment">${choiceOptions([["baseline","基準線"],["center","中央"],["top","上"],["bottom","下"]],item.vertical_alignment)}</select></label></div><div class="check-options"><label><input type="checkbox" data-annotation-field="bold" ${item.bold?'checked':''}>太字</label><label><input type="checkbox" data-annotation-field="italic" ${item.italic?'checked':''}>斜体</label></div>` : ''}
       <div class="check-options"><label><input type="checkbox" data-annotation-field="visible" ${item.visible?'checked':''}>表示</label><label><input type="checkbox" data-annotation-field="locked" ${item.locked?'checked':''}>位置を固定</label></div><button type="button" class="button quiet" data-remove-annotation="${index}">削除</button></details>`;
   }).join('');
+  $$('[data-annotation-field="text"]').forEach(input=>input.title=MICRO_HINT);
   enhanceColorInputs();
 }
 
