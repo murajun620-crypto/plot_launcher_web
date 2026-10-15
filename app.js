@@ -1,5 +1,6 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=e5ba3c08fbd8";
-import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=e5ba3c08fbd8";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=a2a0c386fd53";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=a2a0c386fd53";
+import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=a2a0c386fd53";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -86,6 +87,7 @@ function updateButtons() {
   $("#save-project").disabled = !engineReady || busy || !sourceData || !metadata || !config.series.length;
   $("#drop-zone").disabled = !engineReady || busy;
   $("#sample-data").disabled = !engineReady || busy;
+  $("#paste-data").disabled = !engineReady || busy;
   $("#plot-fields").disabled = !engineReady || !metadata || busy;
   $("#header-row").disabled = !engineReady || !metadata || busy;
   $("#sheet-select").disabled = !engineReady || !metadata || busy || metadata.sheets.length < 2;
@@ -126,7 +128,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=e5ba3c08fbd8", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=a2a0c386fd53", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -422,7 +424,7 @@ function resetPreview() {
   renderedRevision = -1;
 }
 
-async function loadFile(file, isSample = false, reload = false) {
+async function loadFile(file, isSample = false, reload = false, fromClipboard = false) {
   if (loading || exporting || !engineReady) return;
   if (!reload && (!/\.(xlsx|xlsm|xls|csv)$/i.test(file.name) || file.size > 30 * 1024 * 1024)) {
     status("30 MB以内のExcel（.xlsx / .xlsm / .xls）またはCSVを選んでください。", "error");
@@ -449,7 +451,7 @@ async function loadFile(file, isSample = false, reload = false) {
     if (!reload) {
       sourceData = {filename, bytes:originalBytes};
       sourceHandle = sourceHandles.get(file) || null; sourceDirectory = null;
-      $('#save-destination').value = folderSupported ? (isSample ? 'folder' : 'source') : 'download';
+      $('#save-destination').value = folderSupported ? (isSample || fromClipboard ? 'folder' : 'source') : 'download';
       refreshSaveDestination();
     }
     sample = reload ? sample : isSample;
@@ -488,10 +490,12 @@ async function loadFile(file, isSample = false, reload = false) {
       $("#preview-state").textContent = "データを確認";
       status(message, "error");
     }
+    return true;
   } catch (error) {
     status(`読み込みに失敗しました: ${error.message}`, "error");
     // The worker retains the previous data when a load fails.
     if (metadata) drawMetadata();
+    return false;
   } finally {
     loading = false;
     updateButtons();
@@ -502,6 +506,44 @@ async function loadFile(file, isSample = false, reload = false) {
 function loadSample() {
   return loadFile(new File([sampleCSV()], "sample.csv", { type: "text/csv" }), true);
 }
+
+let pastedTable = null, pasteHeaderAutomatic = true;
+function updatePastePreview() {
+  pastedTable = null;
+  $('#paste-preview').replaceChildren();
+  $('#paste-error').textContent = '';
+  $('#import-paste').disabled = true;
+  if (!$('#paste-text').value.trim()) { $('#paste-summary').textContent = ''; return; }
+  try {
+    pastedTable = parsePastedTable($('#paste-text').value);
+    if (pasteHeaderAutomatic) $('#paste-header').checked = pastedTable.hasHeader;
+    const data = pastedTableCSV(pastedTable, $('#paste-header').checked);
+    $('#paste-summary').textContent = `${data.rowCount.toLocaleString()} 行 · ${data.columnCount} 列`;
+    $('#paste-preview').innerHTML = `<table><tbody>${pastedTable.rows.slice(0, 6).map(row => `<tr>${Array.from({length:pastedTable.columnCount}, (_, index) => `<td>${escapeHTML(row[index] ?? '')}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+    $('#import-paste').disabled = false;
+  } catch (error) { pastedTable = null; $('#paste-error').textContent = error.message; $('#paste-summary').textContent = ''; }
+}
+function openPasteDialog(text = '') {
+  if (!engineReady || loading || exporting) return;
+  $('#paste-text').value = text; pasteHeaderAutomatic = true;
+  $('#paste-header').checked = true;
+  updatePastePreview();
+  $('#paste-dialog').showModal(); $('#paste-text').focus();
+}
+$('#paste-data').addEventListener('click', () => openPasteDialog());
+$('#close-paste').addEventListener('click', () => $('#paste-dialog').close());
+$('#paste-text').addEventListener('input', updatePastePreview);
+$('#paste-header').addEventListener('change', () => { pasteHeaderAutomatic = false; updatePastePreview(); });
+$('#import-paste').addEventListener('click', async () => {
+  if (!pastedTable || loading || exporting) return;
+  try {
+    const {csv} = pastedTableCSV(pastedTable, $('#paste-header').checked);
+    $('#import-paste').disabled = true;
+    if (await loadFile(new File([csv], 'pasted-data.csv', {type:'text/csv'}), false, false, true)) $('#paste-dialog').close();
+    else $('#paste-error').textContent = $('#status-text').textContent;
+  } catch (error) { $('#paste-error').textContent = error.message; }
+  finally { $('#import-paste').disabled = !pastedTable; }
+});
 
 function changed() {
   if (!restoring && lastState && JSON.stringify(lastState)!==JSON.stringify(config)) {
@@ -1230,14 +1272,14 @@ function highlightTicks(event,active){
 for(const name of ['pointerover','focusin'])$('#figure-interactions').addEventListener(name,event=>highlightTicks(event,true));
 for(const name of ['pointerout','focusout'])$('#figure-interactions').addEventListener(name,event=>highlightTicks(event,false));
 window.addEventListener('keydown',event=>{
-  if($('#color-panel').open || $('#axis-editor').open || $('#element-editor').open || $('#save-dialog').open)return;
+  if($('#color-panel').open || $('#axis-editor').open || $('#element-editor').open || $('#save-dialog').open || $('#paste-dialog').open)return;
   if(event.target.matches('input,textarea,select') || event.target.isContentEditable)return;
   const control=event.ctrlKey||event.metaKey,key=event.key.toLowerCase();
   if(key==='delete'||key==='backspace'){if(selected.size){event.preventDefault();deleteAnnotations();}}
   else if(key==='escape'){selected.clear();drawAnnotations();positionInteractions();}
   else if(control&&key==='c'){if(selected.size){event.preventDefault();copyAnnotations();}}
   else if(control&&key==='a'){event.preventDefault();selected=new Set((config.annotations||[]).filter(item=>item.visible).map(item=>item.id));drawAnnotations();positionInteractions();}
-  else if(control&&key==='v'){if(clipboard.length){event.preventDefault();pasteAnnotations();}}
+  else if(control&&key==='v'){if(event.altKey){event.preventDefault();openPasteDialog();}else if(clipboard.length){event.preventDefault();pasteAnnotations();}}
   else if(control&&key==='z'){event.preventDefault();restoreHistory(event.shiftKey);}
   else if(control&&key==='y'){event.preventDefault();restoreHistory(true);}
   else if(control&&['+','=','-','0'].includes(key)){event.preventDefault();if(key==='0')$('#zoom-reset').click();else zoomPreview(key==='-'?1/1.1:1.1);}

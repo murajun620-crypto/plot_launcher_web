@@ -265,3 +265,10 @@ button:focus-visible,summary:focus-visible,a:focus-visible{outline:2px solid #ab
 .preview-file-actions>.primary{min-width:140px}
 
 button.drop-zone:not(:disabled):hover{background:#164c92;border-color:var(--blue);color:#fff}
+.paste-data{width:100%;margin-top:8px}
+.paste-dialog{width:min(620px,calc(100vw - 24px))}
+.paste-dialog textarea{width:100%;resize:vertical;min-height:120px;padding:10px;border:1px solid var(--border);border-radius:6px;font:12px/1.5 monospace;white-space:pre;tab-size:4}
+.paste-dialog label{font-size:12px}
+.paste-summary{font-size:12px;color:var(--muted);min-height:18px}
+.paste-error{font-size:12px;color:var(--danger)}
+.paste-dialog>#import-paste{width:100%;margin-top:10px}

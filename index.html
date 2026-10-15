@@ -6,8 +6,8 @@
   <meta name="description" content="Excel・CSVの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=e5ba3c08fbd8">
-  <script type="module" src="./app.js?v=e5ba3c08fbd8"></script>
+  <link rel="stylesheet" href="./style.css?v=a2a0c386fd53">
+  <script type="module" src="./app.js?v=a2a0c386fd53"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -44,6 +44,7 @@
         <summary class="section-heading"><h2><span class="step">01</span>データ</h2><span class="section-note">Excel / CSV</span></summary>
         <button id="drop-zone" class="button primary drop-zone" disabled title="Excel / CSVを開きます。ドラッグ＆ドロップでも開けます（Ctrl/Cmd＋Alt＋O）">＋ データを開く</button>
         <input id="data-file" type="file" accept=".xlsx,.xlsm,.xls,.csv" hidden>
+        <button id="paste-data" class="button paste-data" disabled title="Excelでセル範囲をコピーし、Ctrl/Command＋Vで貼り付けます（Ctrl/Command＋Alt＋Vでこの画面を開く）">データを貼り付け</button>
         <button id="sample-data" class="sample-button" disabled>サンプルを使う</button>
         <div id="file-summary" class="file-summary" hidden>
           <svg><use href="#i-file"/></svg><div><strong id="file-name"></strong><span id="file-stats"></span></div><span id="sample-badge" class="badge" hidden>サンプル</span>
@@ -129,10 +130,19 @@
       </div>
       <div id="status" class="status" role="status" aria-live="polite"><span class="status-dot"></span><span id="status-text">描画機能を読み込んでいます…</span><button id="retry-engine" class="button quiet" hidden>再読み込み</button></div>
       <details id="plot-warnings" class="plot-warnings" hidden><summary>描画データの確認</summary><ul id="warning-list"></ul></details>
-      <details id="data-preview" class="data-preview" title="先頭8行を表示します。グラフには全行を使用します。Excelで編集した場合は保存してから読み込み直してください。" hidden><summary><span>読み込んだデータ</span><span id="table-caption"></span></summary><div class="table-scroll"><table id="data-table"><thead></thead><tbody></tbody></table></div></details>
+      <details id="data-preview" class="data-preview" title="先頭8行を表示します。グラフには全行を使用します。Excelで編集した場合はファイルを読み込み直すか、セル範囲を貼り付け直してください。" hidden><summary><span>読み込んだデータ</span><span id="table-caption"></span></summary><div class="table-scroll"><table id="data-table"><thead></thead><tbody></tbody></table></div></details>
       <footer class="preview-footer"><span>PlotLauncher Web · 一般グラフ</span></footer>
     </main>
   </div>
+  <dialog id="paste-dialog" class="plot-dialog paste-dialog" aria-labelledby="paste-dialog-title">
+    <div class="dialog-heading"><strong id="paste-dialog-title">データを貼り付け</strong><button type="button" id="close-paste" class="button quiet">閉じる</button></div>
+    <label for="paste-text">Excelでコピーしたセル範囲<textarea id="paste-text" rows="6" placeholder="ここに Ctrl/Command＋V で貼り付け" spellcheck="false" title="X列とY列を含む範囲をコピーします。タブ区切り・CSVに対応。貼り付けたデータは、現在のデータと入れ替わります。"></textarea></label>
+    <label title="列名なしの数値だけのデータでは外してください。列名を自動で付け、先頭行もデータとして読み込みます。"><input type="checkbox" id="paste-header" checked>先頭行を列名として使う</label>
+    <p id="paste-summary" class="paste-summary" role="status" aria-live="polite"></p>
+    <div id="paste-preview" class="table-scroll" aria-label="貼り付けたデータの先頭6行"></div>
+    <p id="paste-error" class="paste-error" role="alert"></p>
+    <button type="button" id="import-paste" class="button primary" disabled>読み込む</button>
+  </dialog>
   <dialog id="save-dialog" class="save-dialog" aria-labelledby="save-dialog-title">
     <div class="dialog-heading"><h2 id="save-dialog-title">グラフを保存</h2><button id="close-save" class="button quiet" aria-label="保存画面を閉じる">閉じる</button></div>
     <section class="save-panel" aria-label="グラフの保存">

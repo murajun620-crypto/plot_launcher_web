@@ -9,6 +9,8 @@ Excel / CSVの測定データをブラウザ内で処理し、15種類のプリ�
 [学生向けマニュアル](https://murajun620-crypto.github.io/plot_launcher_web/manual/) — [簡易版](https://murajun620-crypto.github.io/plot_launcher_web/manual/quick.html)と[詳細版](https://murajun620-crypto.github.io/plot_launcher_web/manual/detailed.html)があります。操作部・ダイアログの拡大画像、マウス操作を示すGIF、データの並べ方と練習用CSVを用意しています。[esa投稿用一式を保存](https://murajun620-crypto.github.io/plot_launcher_web/manual/manual.zip)
 
 アプリのインストールは不要です。ファイルを選び、X列とY列を指定してください。
+Excelのセル範囲をコピーし、「01 データ」→「データを貼り付け」→入力欄にCtrl/Command＋V→「読み込む」でも利用できます。
+列名の有無を自動判定し、チェックで変更できます。貼り付けたデータもプロジェクトに保存されます。
 初期表示はデータ未選択です。サンプルは「サンプルデータを使う」を押した場合だけ表示します。設定JSONはデータを含みません。
 
 左上にバージョンを表示します。未保存のデータや設定があると、タブやウィンドウを閉じたりページを更新する際にブラウザ標準の確認を表示します。
