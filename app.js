@@ -1,6 +1,6 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=a2a0c386fd53";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=a2a0c386fd53";
-import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=a2a0c386fd53";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=65f2313d3cb3";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=65f2313d3cb3";
+import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=65f2313d3cb3";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -53,7 +53,7 @@ catalogReady.catch(error => fatal(error.message));
 const loadedFonts = new Set(["Liberation Sans", "Noto Sans JP", "DejaVu Sans"]);
 
 function desktopAppearance() {
-  const numeric = (key, label, min = 0, max = 3, step = 0.1) => `<label>${label}<input data-axis="${key}" type="number" min="${min}" max="${max}" step="${step}"></label>`;
+  const numeric = (key, label, min = 0, max = 3, step = 0.1) => `<label>${label}<input data-axis="${key}" type="number" min="${min}" max="${max}" step="any"></label>`;
   const check = (key, label) => `<label><input data-axis="${key}" type="checkbox">${label}</label>`;
   $("#desktop-appearance").innerHTML = `
     <label class="full-field">図のフォント<select id="font-family" data-axis="fontFamily"><option>Liberation Sans</option><option>Noto Sans JP</option><option>DejaVu Sans</option></select></label>
@@ -128,7 +128,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=a2a0c386fd53", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=65f2313d3cb3", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -231,13 +231,13 @@ function openAxisEditor(axis, kind) {
   $('#axis-editor-title').textContent = `${axis.toUpperCase()}軸${kind === 'label' ? 'ラベル' : '目盛り'}の設定`;
   if (kind === 'label') {
     fields.innerHTML = label(`${axis}Label`,'ラベル（空欄で自動）','text','maxlength="500"') + label(`${axis}Unit`,'単位（autoで自動）') +
-      `<div class="field-grid">${label(`${axis}LabelPad`,'ラベル追加余白 (pt)','number','min="-100" max="100" step=".5"')}${label('labelFontScale','軸ラベル文字倍率','number','min=".2" max="3" step=".1"')}</div>` +
-      `<div class="field-grid">${label(`${axis}LabelX`,'ラベルX (軸比率)','number','step=".01" placeholder="標準"')}${label(`${axis}LabelY`,'ラベルY (軸比率)','number','step=".01" placeholder="標準"')}</div><button type="button" class="button quiet" data-reset-label>標準位置に戻す</button>`;
+      `<div class="field-grid">${label(`${axis}LabelPad`,'ラベル追加余白 (pt)','number','min="-100" max="100" step="any"')}${label('labelFontScale','軸ラベル文字倍率','number','min=".2" max="3" step="any"')}</div>` +
+      `<div class="field-grid">${label(`${axis}LabelX`,'ラベルX (軸比率)','number','step="any" placeholder="標準"')}${label(`${axis}LabelY`,'ラベルY (軸比率)','number','step="any" placeholder="標準"')}</div><button type="button" class="button quiet" data-reset-label>標準位置に戻す</button>`;
   } else {
     const automatic = config.axes[`${axis}Min`] === '' && config.axes[`${axis}Max`] === '';
     fields.innerHTML = `<label><input type="checkbox" data-axis-auto="range" ${automatic?'checked':''}>範囲を自動設定</label><div class="field-grid">${label(`${axis}Min`,'最小','number','step="any" placeholder="自動"')}${label(`${axis}Max`,'最大','number','step="any" placeholder="自動"')}</div>` +
       `<label><input type="checkbox" data-axis-auto="ticks" ${config.axes[`${axis}Step`]===''?'checked':''}>目盛り間隔を自動設定</label>` +
-      label(`${axis}Step`,'目盛り間隔','number','step="any" placeholder="自動"') + `<div class="field-grid">${label(`${axis}TickPad`,'目盛り追加余白 (pt)','number','min="-100" max="100" step=".5"')}${label('tickFontScale','目盛り文字倍率','number','min=".2" max="3" step=".1"')}</div>`;
+      label(`${axis}Step`,'目盛り間隔','number','step="any" placeholder="自動"') + `<div class="field-grid">${label(`${axis}TickPad`,'目盛り追加余白 (pt)','number','min="-100" max="100" step="any"')}${label('tickFontScale','目盛り文字倍率','number','min=".2" max="3" step="any"')}</div>`;
   }
   fields.innerHTML += label('spineColor','枠線・文字色','color');
   syncAxisEditor(); enhanceColorInputs(); $('#axis-editor').showModal();
@@ -251,6 +251,7 @@ function syncAxisEditor() {
 }
 $('#axis-editor-fields').addEventListener('input', event => {
   const fields = $('#axis-editor-fields'), axis = fields.dataset.axisName, input = event.target;
+  if (incompleteNumberInput(input)) return;
   if (input.dataset.axisAuto) {
     const keys = input.dataset.axisAuto === 'range' ? ['Min','Max'] : ['Step'];
     keys.forEach((key,i) => {
@@ -266,7 +267,10 @@ $('#axis-editor-fields').addEventListener('input', event => {
     if (/^[xy]Label[XY]$/.test(input.dataset.axis) && input.value === '') config.axes[`${axis}LabelX`] = config.axes[`${axis}LabelY`] = '';
     applyControlInput(event);
     if (/^[xy]LabelPad$/.test(input.dataset.axis) || /^[xy]Label[XY]$/.test(input.dataset.axis)) {
-      for (const key of ['LabelX','LabelY']) fields.querySelector(`[data-axis="${axis}${key}"]`).value = config.axes[`${axis}${key}`];
+      for (const key of ['LabelX','LabelY']) {
+        const field = fields.querySelector(`[data-axis="${axis}${key}"]`);
+        if (field !== input) field.value = config.axes[`${axis}${key}`];
+      }
     }
   }
 });
@@ -280,7 +284,7 @@ $('#close-axis-editor').addEventListener('click', () => $('#axis-editor').close(
 
 function drawPresetOptions() {
   const type=config.plotType || "General", options=config.options ||= {};
-  const number=(key,label,def,min=0,max=100,step=.1)=>`<label>${label}<input data-option="${key}" type="number" value="${escapeHTML(options[key] ?? def)}" min="${min}" max="${max}" step="${step}"></label>`;
+  const number=(key,label,def,min=0,max=100,step=.1)=>`<label>${label}<input data-option="${key}" type="number" value="${escapeHTML(options[key] ?? def)}" min="${min}" max="${max}" step="any"></label>`;
   const color=(key,label,def)=>`<label>${label}<input data-option="${key}" value="${escapeHTML(options[key] ?? def)}"></label>`;
   let html='';
   const notes={"XPS Fit":"CSV/Au 10列/Ag 8列の配置を自動判定。成分の塗りつぶしは背景との差で描画します。", "Particle Histogram":"選択した粒径列から頻度%と対数正規分布を描画します。ビン幅は20 nmです。", "Raman 3D":"共通のX列と各Y列からウォーターフォールを作成します。Y軸設定は強度（Z軸）に適用します。", "bar_graph_general":"数値X・カテゴリXに対応した集合棒グラフです。", "Roughness":"線＋マーカー、Y対数軸が初期設定です。"};
@@ -296,7 +300,7 @@ function drawPresetOptions() {
       options.fills=indices.map((upper,i)=>({x:csv||!large?0:3,upper,lower:csv?3:large?5:2,color:['#F7574A','#56B2FF','#FF9822','#5BCC77'][i%4],alpha:.3}));
     }
     html=`<div class="field-grid">${number('scatterSize','散布面積 (pt²)',18,0,500,1)}${number('scatterEdgeWidth','散布縁幅 (pt)',.6,0,20)}${color('scatterEdgeColor','散布縁色','#2A2A2A')}${color('scatterFaceColor','散布塗り色','#ffffff')}${number('scatterAlpha','散布不透明度',.8,0,1)}${color('fitLineColor','fit線色','#2A2A2A')}${number('fitLineWidth','fit線幅 (0=非表示)',0,0,20)}${color('bgLineColor','背景線色','#8A8A8A')}${number('bgLineWidth','背景線幅 (0=非表示)',0,0,20)}</div>`;
-    html+=(options.fills || []).map((fill,index)=>`<details data-fill-index="${index}"><summary>成分 ${index+1}</summary><div class="field-grid">${[['x','X'],['upper','成分Y'],['lower','背景Y']].map(([key,label])=>`<label>${label}<select data-fill="${key}" ${metadata.xpsCSV?'disabled':''}>${columnOptions(fill[key])}</select></label>`).join('')}<label>色<input type="color" data-fill="color" value="${escapeHTML(fill.color)}"></label><label>不透明度<input type="number" data-fill="alpha" min="0" max="1" step=".05" value="${fill.alpha}"></label></div><button type="button" class="button quiet" data-remove-fill="${index}" ${metadata.xpsCSV?'disabled':''}>成分を削除</button></details>`).join('');
+    html+=(options.fills || []).map((fill,index)=>`<details data-fill-index="${index}"><summary>成分 ${index+1}</summary><div class="field-grid">${[['x','X'],['upper','成分Y'],['lower','背景Y']].map(([key,label])=>`<label>${label}<select data-fill="${key}" ${metadata.xpsCSV?'disabled':''}>${columnOptions(fill[key])}</select></label>`).join('')}<label>色<input type="color" data-fill="color" value="${escapeHTML(fill.color)}"></label><label>不透明度<input type="number" data-fill="alpha" min="0" max="1" step="any" value="${fill.alpha}"></label></div><button type="button" class="button quiet" data-remove-fill="${index}" ${metadata.xpsCSV?'disabled':''}>成分を削除</button></details>`).join('');
     if(!metadata.xpsCSV) html+='<button type="button" class="button quiet" id="add-fill">成分を追加</button>';
   }
   $("#preset-options").innerHTML=html;
@@ -308,7 +312,7 @@ function drawPresetOptions() {
 $("#plot-type").addEventListener("change",event=>{
   applyPreset(config,presets.find(item=>item.id===event.target.value));
   if(!['General','Roughness'].includes(config.plotType))config.series.forEach(item=>{item.mode='line';item.errorMode='none';});
-  if(config.plotType==='Raman 3D') config.series=metadata.columns.slice(1,33).map((col,i)=>createSeries(0,col.index,col.name,i));
+  if(config.plotType==='Raman 3D') config.series=initialSeries(metadata.columns, config.plotType);
   if(config.plotType==='Particle Histogram')config.options.diameterColumn=Math.min(2,metadata.columns.length-1);
   drawControls();changed();
 });
@@ -327,6 +331,9 @@ $("#apply-colormap").addEventListener('click',async()=>{
   try{const result=await request('colors',{name:$('#color-map').value,count:config.series.length}),target=$('#colormap-target').value;config.series.forEach((item,i)=>{if(target!=='scatter')item.color=result.colors[i];if(target!=='line')item.scatterColor=result.colors[i];});drawControls();changed();}catch(error){status(error.message,'error');}
 });
 $("#apply-offsets").addEventListener('click',()=>{
+  if (['#offset-start','#offset-step'].some(selector => incompleteNumberInput($(selector)))) {
+    status('オフセット開始と間隔に数値を入力してください。', 'error'); return;
+  }
   const start=Number($("#offset-start").value), step=Number($("#offset-step").value);
   config.series.forEach((item,i)=>item.yOffset=start+i*step);drawControls();changed();
 });
@@ -350,10 +357,10 @@ function drawControls() {
       <div class="field-grid"><label>X列<select data-series-field="x">${columnOptions(series.x)}</select></label><label>Y列<select data-series-field="y">${columnOptions(series.y)}</select></label></div>
       <div class="annotation-buttons"><button type="button" class="button quiet" data-series-up="${index}" ${index===0?'disabled':''}>↑</button><button type="button" class="button quiet" data-series-down="${index}" ${index===config.series.length-1?'disabled':''}>↓</button><button type="button" class="button quiet" data-series-copy="${index}">複製</button></div><details class="series-advanced"><summary>線・マーカー・誤差</summary>
         <label class="draw-mode">描画方法<select data-series-field="mode">${choiceOptions([["line", "線"], ["scatter", "マーカー"], ["line+scatter", "線とマーカー"]], series.mode)}</select></label>
-        <div class="field-grid">${input("lineWidth", "線幅 (pt)", 'min="0" max="6" step="0.1"')}<label>線種<select data-series-field="lineStyle">${choiceOptions([["-", "実線"], ["--", "破線"], ["-.", "一点鎖線"], [":", "点線"]], series.lineStyle)}</select></label></div>
-        <div class="field-grid"><label>マーカー<select data-series-field="marker">${choiceOptions([["o", "丸"], ["s", "四角"], ["^", "三角 ▲"], ["v", "三角 ▼"], ["D", "ひし形"], ["+", "+"], ["x", "×"], ["*", "星"], ["p", "五角形"], ["h", "六角形"]], series.marker)}</select></label>${input("markerSize", "マーカー面積 (pt²)", 'min="1" max="200" step="1"')}</div>
+        <div class="field-grid">${input("lineWidth", "線幅 (pt)", 'min="0" max="6" step="any"')}<label>線種<select data-series-field="lineStyle">${choiceOptions([["-", "実線"], ["--", "破線"], ["-.", "一点鎖線"], [":", "点線"]], series.lineStyle)}</select></label></div>
+        <div class="field-grid"><label>マーカー<select data-series-field="marker">${choiceOptions([["o", "丸"], ["s", "四角"], ["^", "三角 ▲"], ["v", "三角 ▼"], ["D", "ひし形"], ["+", "+"], ["x", "×"], ["*", "星"], ["p", "五角形"], ["h", "六角形"]], series.marker)}</select></label>${input("markerSize", "マーカー面積 (pt²)", 'min="1" max="200" step="any"')}</div>
         <div class="field-grid">${input("xOffset", "Xオフセット", 'step="any"')}${input("yOffset", "Yオフセット", 'step="any"')}</div>
-        <div class="field-grid"><label>マーカー色<input data-series-field="scatterColor" value="${escapeHTML(series.scatterColor)}" placeholder="auto / #色"></label>${input("lineAlpha", "線の不透明度", 'min="0" max="1" step="0.1"')}<label>マーカー縁色<input data-series-field="markerEdgeColor" value="${escapeHTML(series.markerEdgeColor)}" placeholder="auto / none / #色"></label><label>マーカー塗り色<input data-series-field="markerFaceColor" value="${escapeHTML(series.markerFaceColor)}" placeholder="auto / none / #色"></label>${input("markerEdgeAlpha", "縁の不透明度", 'min="0" max="1" step="0.1"')}${input("markerFaceAlpha", "塗りの不透明度", 'min="0" max="1" step="0.1"')}</div>
+        <div class="field-grid"><label>マーカー色<input data-series-field="scatterColor" value="${escapeHTML(series.scatterColor)}" placeholder="auto / #色"></label>${input("lineAlpha", "線の不透明度", 'min="0" max="1" step="any"')}<label>マーカー縁色<input data-series-field="markerEdgeColor" value="${escapeHTML(series.markerEdgeColor)}" placeholder="auto / none / #色"></label><label>マーカー塗り色<input data-series-field="markerFaceColor" value="${escapeHTML(series.markerFaceColor)}" placeholder="auto / none / #色"></label>${input("markerEdgeAlpha", "縁の不透明度", 'min="0" max="1" step="any"')}${input("markerFaceAlpha", "塗りの不透明度", 'min="0" max="1" step="any"')}</div>
         <label class="draw-mode">誤差の種類<select data-series-field="errorMode">${choiceOptions([["auto", "±列から自動"], ["none", "なし"], ["symmetric", "±値"], ["minmax", "最小・最大値"]], series.errorMode)}</select></label>
         <label class="draw-mode">Y誤差（±）の列<select data-series-field="error">${columnOptions(series.error, true)}</select></label>
         <div class="field-grid"><label>Y誤差最小値<select data-series-field="errorMin">${columnOptions(series.errorMin, true)}</select></label><label>Y誤差最大値<select data-series-field="errorMax">${columnOptions(series.errorMax, true)}</select></label></div>
@@ -460,15 +467,11 @@ async function loadFile(file, isSample = false, reload = false, fromClipboard = 
     if (reload && previous && config.series.length) {
       try { retained = restoreSettings(makeSettings(config, previous, headerRow), metadata); } catch {}
     }
-    const numeric = metadata.columns.filter(column => column.numeric > 0);
     const inferred=metadata.plotType || 'General';
-    const x = inferred==='bar_graph_general'?0:numeric[0]?.index ?? 0, y = (inferred==='bar_graph_general'?numeric[0]:numeric[1])?.index ?? Math.min(1, metadata.columns.length - 1);
-    config = retained || { axes: defaultAxes(), plotType: inferred, options: {}, series: metadata.columns.length >= 2 ? [createSeries(x, y, metadata.columns[y].name)] : [] };
+    config = retained || { axes: defaultAxes(), plotType: inferred, options: {}, series: initialSeries(metadata.columns, inferred) };
     if(!retained){
       applyPreset(config,presets.find(item=>item.id===inferred));
       if(inferred==='XPS Fit')config.series=[createSeries(0,1,metadata.columns[1]?.name || 'Raw')];
-      if(['Raman 3D','Raman Spectrum','EDX','XPS Survey','XPS Core','Roughness'].includes(inferred))config.series=metadata.columns.slice(1,33).map((col,i)=>createSeries(0,col.index,col.name,i));
-      if(['CV/LSV','CA','CP'].includes(inferred))config.series=metadata.columns.filter((col,i)=>i%2===1).slice(0,32).map((col,i)=>createSeries(col.index-1,col.index,col.name,i));
       if(inferred==='Roughness')config.series.forEach(item=>item.mode='line+scatter');
       if(inferred==='Particle Histogram')config.options.diameterColumn=Math.min(2,metadata.columns.length-1);
     }
@@ -749,8 +752,18 @@ $("#sample-data").addEventListener("click", loadSample);
 $("#sheet-select").addEventListener("change", () => loadFile(null, false, true));
 $("#header-row").addEventListener("change", () => loadFile(null, false, true));
 $("#plot-form").addEventListener("submit", event => event.preventDefault());
+function incompleteNumberInput(input) {
+  if (input.type !== 'number') return false;
+  if (input.validity?.badInput) return true;
+  if (input.value !== '') return !Number.isFinite(Number(input.value));
+  return !['xMin','xMax','yMin','yMax','xStep','yStep','legendX','legendY','xLabelX','xLabelY','yLabelX','yLabelY'].includes(input.dataset.axis);
+}
+
 function applyControlInput(event) {
   const input = event.target;
+  // Native number inputs keep an internal editing buffer for "0.", "-", "1e-".
+  // Do not commit incomplete values or assign back to the field being edited.
+  if (incompleteNumberInput(input)) return;
   if (input.dataset.axis) {
     const key = input.dataset.axis;
     config.axes[key] = input.type === "checkbox" ? (input.dataset.invert === "true" ? !input.checked : input.checked) : input.value;
@@ -763,6 +776,7 @@ function applyControlInput(event) {
       } else if (!config.axes.transparent && Number(config.axes.backgroundAlpha) === 0) config.axes.backgroundAlpha = 1;
       for (const related of ['backgroundColor','backgroundAlpha','transparent']) {
         $$(`[data-axis="${related}"]`).forEach(field => {
+          if (field === input) return;
           if (field.type === 'checkbox') field.checked = field.dataset.invert === 'true' ? !config.axes[related] : config.axes[related];
           else field.value = config.axes[related];
         });
@@ -773,7 +787,7 @@ function applyControlInput(event) {
       if(key==='plotBackgroundAlpha')config.axes.plotBackgroundEnabled=Number(config.axes.plotBackgroundAlpha)>0;
       if(config.axes.plotBackgroundEnabled && Number(config.axes.plotBackgroundAlpha)===0)config.axes.plotBackgroundAlpha=1;
       for(const related of ['plotBackgroundColor','plotBackgroundAlpha','plotBackgroundEnabled']) {
-        $$(`[data-axis="${related}"]`).forEach(field=>{if(field.type==='checkbox')field.checked=config.axes[related];else field.value=config.axes[related];});
+        $$(`[data-axis="${related}"]`).forEach(field=>{if(field===input)return;if(field.type==='checkbox')field.checked=config.axes[related];else field.value=config.axes[related];});
       }
     }
     if (/^[xy]LabelPad$/.test(key)) config.axes[`${key[0]}LabelX`] = config.axes[`${key[0]}LabelY`] = "";

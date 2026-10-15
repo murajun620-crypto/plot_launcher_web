@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.3.0";
+export const APP_VERSION = "1.3.1";
 
 // src/plot_settings.py: default_auto_series_colors(), same order and shades.
 export const COLORS = ["#1F8FE0", "#D4291E", "#2BA84D", "#D77207", "#7D3EDD", "#787878", "#666666", "#0052A8", "#A10000", "#009F22"];
@@ -62,6 +62,22 @@ export function defaultAxes() {
 
 export function createSeries(x, y, name, index = 0) {
   return { x, y, name, visible: true, color: COLORS[index % COLORS.length], scatterColor: "auto", mode: "line", lineWidth: 1, lineStyle: "-", lineAlpha: 1, marker: "o", markerSize: 18, markerEdgeColor: "auto", markerFaceColor: "auto", markerEdgeAlpha: 0.8, markerFaceAlpha: 0.8, xOffset: 0, yOffset: 0, error: "", errorMode: "auto", errorMin: "", errorMax: "" };
+}
+
+export function initialSeries(columns, plotType = 'General') {
+  // Repeated X headers identify the existing electrochemistry XY-pair layout.
+  // Other multi-column tables use one X followed by all numeric Y columns.
+  const xName = name => String(name).trim().toLowerCase().replace(/(?:\s*\[\d+\]|\.\d+)$/, '').replace(/\d+/g, '');
+  if (['CV/LSV','CA','CP'].includes(plotType) && columns.length >= 4 && columns.length % 2 === 0 &&
+      xName(columns[0].name) && columns.every((column, index) => column.numeric > 0 && (index % 2 === 1 || xName(column.name) === xName(columns[0].name)))) {
+    return columns.filter((_, index) => index % 2 === 1).slice(0, 32)
+      .map((column, index) => createSeries(columns[index * 2].index, column.index, column.name, index));
+  }
+  const numeric = columns.filter(column => column.numeric > 0);
+  const x = plotType === 'bar_graph_general' ? 0 : numeric[0]?.index;
+  if (x === undefined) return [];
+  return numeric.filter(column => column.index !== x).slice(0, 32)
+    .map((column, index) => createSeries(x, column.index, column.name, index));
 }
 
 export function safeStem(name) {

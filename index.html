@@ -6,8 +6,8 @@
   <meta name="description" content="Excel・CSVの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=a2a0c386fd53">
-  <script type="module" src="./app.js?v=a2a0c386fd53"></script>
+  <link rel="stylesheet" href="./style.css?v=65f2313d3cb3">
+  <script type="module" src="./app.js?v=65f2313d3cb3"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -80,11 +80,11 @@
               <div class="axis-group-title">Y軸<select id="y-scale" data-axis="yScale" aria-label="Y軸の種類"><option value="linear">線形</option><option value="log">対数</option></select></div>
               <div class="field-grid three"><label>最小<input id="y-min" data-axis="yMin" type="number" step="any" placeholder="自動"></label><label>最大<input id="y-max" data-axis="yMax" type="number" step="any" placeholder="自動"></label><label>目盛り<input id="y-step" data-axis="yStep" type="number" step="any" placeholder="自動"></label></div>
             </div>
-            <div class="field-grid size-fields"><label>軸領域の幅 <span>cm</span><input id="axes-width" data-axis="width" type="number" min="0.5" max="24" step="0.1" value="4" required></label><label>軸領域の高さ <span>cm</span><input id="axes-height" data-axis="height" type="number" min="0.5" max="24" step="0.1" value="3" required></label></div>
+            <div class="field-grid size-fields"><label>軸領域の幅 <span>cm</span><input id="axes-width" data-axis="width" type="number" min="0.5" max="24" step="any" value="4" required></label><label>軸領域の高さ <span>cm</span><input id="axes-height" data-axis="height" type="number" min="0.5" max="24" step="any" value="3" required></label></div>
             <p class="field-hint">保存した図には、軸ラベルなどの余白が加わります。</p>
             <details class="appearance-options">
               <summary>表示オプション</summary>
-              <label>文字サイズ倍率<input id="font-scale" data-axis="fontScale" type="number" min="0.5" max="3" step="0.1" value="1" required></label>
+              <label>文字サイズ倍率<input id="font-scale" data-axis="fontScale" type="number" min="0.5" max="3" step="any" value="1" required></label>
               <div class="check-options"><label><input id="show-grid" data-axis="grid" type="checkbox">グリッド</label></div>
               <div id="desktop-appearance"></div>
             </details>
