@@ -1,7 +1,7 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=32cac0cc1114";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=32cac0cc1114";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=32cac0cc1114";
-import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=32cac0cc1114";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=e51daecc14b3";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=e51daecc14b3";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=e51daecc14b3";
+import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=e51daecc14b3";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -186,7 +186,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=32cac0cc1114", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=e51daecc14b3", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -303,7 +303,7 @@ function openAxisEditor(axis, kind) {
       `<label><input type="checkbox" data-axis="hideMinorTicks" data-invert="true" ${config.axes.hideMinorTicks?'':'checked'}>副目盛りを表示</label>` +
       `<div class="field-grid">${label(`${axis}TickPad`,'目盛り追加余白 (pt)','number','min="-100" max="100" step="any"')}${label('tickFontScale','目盛り文字倍率','number','min=".2" max="3" step="any"')}</div>`;
   }
-  fields.innerHTML += axis === 'x' ? label('spineColor','枠線・文字色','color') : label(`${axis}Color`,'軸の文字色（autoで自動）','text','title="autoでは、左右別の軸を使う場合に各軸の最初の系列と同じ色にします。"');
+  fields.innerHTML += axis === 'x' ? label('spineColor','枠線・文字色','color') : label(`${axis}Color`,'軸の色（autoで自動）','text','title="軸線・目盛線・目盛数値・ラベルに適用します。autoでは、左右別の軸を使う場合に各軸の最初の系列と同じ色にします。"');
   syncAxisEditor(); enhanceColorInputs(); $('#axis-editor').showModal();
 }
 function syncAxisEditor() {

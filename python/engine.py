@@ -834,6 +834,8 @@ class PlotEngine:
                         raise ValueError("Y軸の色はautoまたは色を指定してください。")
                     axis.axes.tick_params(axis="y", which="both", colors=color)
                     axis.label.set_color(color)
+                    if axis is axis.axes.yaxis:
+                        axis.axes.spines[axis.get_label_position()].set_color(color)
                 positioned_labels = {}
                 if preset == "Raman 3D":
                     figure.canvas.draw()  # Resolve the native projected label rotations first.
