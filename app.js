@@ -1,7 +1,7 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=1fec4d441866";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=1fec4d441866";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=1fec4d441866";
-import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=1fec4d441866";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=5e921a497d84";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=5e921a497d84";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=5e921a497d84";
+import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=5e921a497d84";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -26,7 +26,15 @@ $('#app-version').textContent = `v${APP_VERSION}`;
 
 function projectSheetSettings() {
   const sheets = new Map(sheetSettings);
-  if (metadata && config.series.length) sheets.set(metadata.sheetIndex, makeSettings(config, metadata, loadedHeader));
+  if (metadata && config.series.length) {
+    const current = makeSettings(config, metadata, loadedHeader);
+    // A new edit on the first sheet supersedes earlier inherited/individual
+    // graph settings. Keep each target's header row for reading its own data.
+    if (metadata.sheetIndex === 0 && JSON.stringify(sheets.get(0)) !== JSON.stringify(current)) {
+      for (const [index, settings] of sheets) if (index !== 0) sheets.set(index, {...settings, inheritFirstSheet:true});
+    }
+    sheets.set(metadata.sheetIndex, current);
+  }
   return [...sheets].sort(([a],[b])=>a-b).map(([sheetIndex,settings])=>({sheetIndex,settings}));
 }
 
@@ -150,7 +158,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=1fec4d441866", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=5e921a497d84", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -507,7 +515,9 @@ async function loadFile(file, isSample = false, reload = false, fromClipboard = 
   }
   const sheetIndex = reload ? Number($('#sheet-select').value) : 0;
   const switchingSheet = reload && sheetIndex !== metadata.sheetIndex;
-  const stored = switchingSheet ? sheetSettings.get(sheetIndex) : null;
+  const nextSheets = reload ? new Map(projectSheetSettings().map(item=>[item.sheetIndex,item.settings])) : new Map();
+  const firstSettings = nextSheets.get(0);
+  const stored = switchingSheet ? nextSheets.get(sheetIndex) : null;
   const headerRow = reload ? (stored?.data.headerRow ?? Number($("#header-row").value)) : 1;
   if (!Number.isInteger(headerRow) || headerRow < 1 || headerRow > 1000) {
     status("ヘッダー行は1〜1000の整数で指定してください。", "error");
@@ -527,6 +537,7 @@ async function loadFile(file, isSample = false, reload = false, fromClipboard = 
     const previousSettings = previous && config.series.length ? makeSettings(config, previous, loadedHeader) : null;
     metadata = await request("load", args);
     loadedHeader = metadata.headerRow || headerRow;
+    sheetSettings = nextSheets;
     if (!reload) {
       sheetSettings.clear();
       sourceData = {filename, bytes:originalBytes};
@@ -538,12 +549,15 @@ async function loadFile(file, isSample = false, reload = false, fromClipboard = 
     // Retain settings if the same columns are still present after a sheet/header change.
     let retained;
     if (reload && previousSettings) sheetSettings.set(previous.sheetIndex, previousSettings);
-    if (stored) {
+    if (stored && !stored.inheritFirstSheet) {
       try { retained = restoreSettings(stored, metadata); } catch {}
+    } else if (switchingSheet && sheetIndex !== 0 && firstSettings) {
+      try { retained = configForSheet(firstSettings, metadata); } catch {}
     } else if (reload && previousSettings) {
       try { retained = configForSheet(previousSettings, metadata); } catch {}
     }
     config = retained || initialSheetConfig(metadata);
+    if (reload && config.series.length) sheetSettings.set(sheetIndex, makeSettings(config, metadata, loadedHeader));
     if (sample && !reload) {
       config.series = metadata.columns.slice(1).map((column, index) => createSeries(0, column.index, column.name, index));
       config.axes.xLabel = "Potential"; config.axes.xUnit = "V";
@@ -812,10 +826,9 @@ async function exportFigure(formats, allSheets = false) {
 async function exportSheets(formats) {
   exporting = true; cancelBatch = false;
   $('#cancel-batch').hidden = false; $('#cancel-batch').disabled = false; updateButtons();
-  const filename = metadata.filename, names = [...metadata.sheets], active = metadata.sheetIndex;
-  const template = config.series.length ? makeSettings(config, metadata, loadedHeader) : null;
-  const snapshots = new Map(sheetSettings);
-  if (template) snapshots.set(active, template);
+  const filename = metadata.filename, names = [...metadata.sheets];
+  const snapshots = new Map(projectSheetSettings().map(item=>[item.sheetIndex,item.settings]));
+  const template = snapshots.get(0) || (config.series.length ? makeSettings(config, metadata, loadedHeader) : null);
   const stem = safeStem($('#save-name').value), dpi = Number($('#png-dpi').value);
   const asZip = !folderSupported || $('#save-destination').value === 'download';
   const files = [], saved = [], errors = [];
@@ -823,6 +836,7 @@ async function exportSheets(formats) {
   try {
     // Ask for a destination while this action still has the click gesture.
     const saveFile = await prepareSaver();
+    sheetSettings = new Map(snapshots);
     for (let index=0;index<names.length && !cancelBatch;index++) {
       const setting = snapshots.get(index), headerRow = setting?.data.headerRow ?? loadedHeader;
       const prefix = `${index + 1} / ${names.length} · ${names[index]}`;
@@ -831,7 +845,7 @@ async function exportSheets(formats) {
       try {
         const data = await request('sheet-info', {filename, sheetIndex:index, headerRow});
         if (!data.rowCount || data.columns.length < 2) throw new Error('描画するデータがありません。');
-        sheetConfig = setting ? restoreSettings(setting, data) : template ? configForSheet(template, data) : initialSheetConfig(data);
+        sheetConfig = setting && !setting.inheritFirstSheet ? restoreSettings(setting, data) : template ? configForSheet(template, data) : initialSheetConfig(data);
         if (!sheetConfig.series.length) throw new Error('X列とY列を設定してください。');
         sheetSettings.set(index, makeSettings(sheetConfig, data, headerRow));
       } catch (error) {errors.push(`${names[index]}：${error.message}`);continue;}

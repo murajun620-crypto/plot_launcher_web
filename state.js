@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.5.0";
+export const APP_VERSION = "1.5.1";
 
 // src/plot_settings.py: default_auto_series_colors(), same order and shades.
 export const COLORS = ["#1F8FE0", "#D4291E", "#2BA84D", "#D77207", "#7D3EDD", "#787878", "#666666", "#0052A8", "#A10000", "#009F22"];
@@ -144,7 +144,9 @@ export function parseProject(saved) {
       const setting = item?.settings;
       if (!Number.isInteger(item?.sheetIndex) || item.sheetIndex < 0 || item.sheetIndex > 1000 || indexes.has(item.sheetIndex) || setting?.format !== 'plotlauncher-web' || setting.version !== 1 || setting.data?.filename !== data.filename || typeof setting.data.sheet !== 'string' || !Number.isInteger(setting.data.headerRow) || setting.data.headerRow < 1 || setting.data.headerRow > 1000 || !Array.isArray(setting.series) || setting.series.length < 1 || setting.series.length > 32 || !setting.axes || typeof setting.axes !== 'object') throw new Error('プロジェクトのシート設定を確認してください。');
       indexes.add(item.sheetIndex);
+      if (setting.inheritFirstSheet !== undefined && (typeof setting.inheritFirstSheet !== 'boolean' || setting.inheritFirstSheet && item.sheetIndex === 0)) throw new Error('プロジェクトのシート設定を確認してください。');
     }
+    if (workspace.sheetSettings.some(item=>item.settings.inheritFirstSheet) && !indexes.has(0)) throw new Error('プロジェクトの先頭シート設定を確認してください。');
   }
   return {settings:structuredClone(settings), data:{...data, bytes:projectBytes(data.base64,30 * MB)}, fonts, workspace:structuredClone(workspace)};
 }

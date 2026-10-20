@@ -6,8 +6,8 @@
   <meta name="description" content="Excel・CSVの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=1fec4d441866">
-  <script type="module" src="./app.js?v=1fec4d441866"></script>
+  <link rel="stylesheet" href="./style.css?v=5e921a497d84">
+  <script type="module" src="./app.js?v=5e921a497d84"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -122,7 +122,7 @@
         <div><span class="eyebrow">FIGURE</span><h1>グラフプレビュー</h1></div>
                 <div class="export-buttons preview-file-actions">
           <button id="open-save" class="button primary" disabled title="形式と保存先を選んでグラフを保存します">グラフを保存</button>
-          <button id="open-save-all" class="button" disabled hidden title="シートごとの設定で全シートを保存します。未調整のシートには現在の設定を引き継ぎます。">全シートを一括保存</button>
+          <button id="open-save-all" class="button" disabled hidden title="1枚目のグラフ設定をほかのシートにも引き継いで保存します。各シートで後から行った個別調整も反映します。">全シートを一括保存</button>
           <button id="copy-image" class="button" disabled title="選択した解像度でPNGをクリップボードにコピーします">画像をコピー</button>
         </div>
       </div>
@@ -161,7 +161,7 @@
   <dialog id="save-dialog" class="save-dialog" aria-labelledby="save-dialog-title">
     <div class="dialog-heading"><h2 id="save-dialog-title">グラフを保存</h2><button id="close-save" class="button quiet" aria-label="保存画面を閉じる">閉じる</button></div>
     <section class="save-panel" aria-label="グラフの保存">
-      <label id="save-all-sheets-field" class="check" hidden title="調整済みシートは個別の設定を使います。未調整のシートには現在の設定を引き継ぎ、列名が異なる場合は同じ位置の列を使います。ダウンロードの場合はZIPにまとめます。"><input type="checkbox" id="save-all-sheets">全シートを一括保存</label>
+      <label id="save-all-sheets-field" class="check" hidden title="1枚目を変更すると表示済みのシートにも設定を引き継ぎます。列名が異なる場合は同じ位置の列を使用。ヘッダー行はシート別に保持します。ダウンロードはZIPにまとめます。"><input type="checkbox" id="save-all-sheets">全シートを一括保存</label>
       <label>ファイル名<input id="save-name" value="graph" maxlength="120" aria-label="保存するファイルの名前" title="拡張子は選択した形式に合わせて自動で付けます。同名ファイルは採番します。"></label>
       <fieldset class="save-formats"><legend title="複数の形式を同時に保存できます">保存形式</legend><div class="save-format-grid">
         <label class="check" title="画像として保存します"><input type="checkbox" data-export="png" checked>PNG</label>
