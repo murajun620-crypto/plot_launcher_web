@@ -1,4 +1,4 @@
-import { restoreSettings, safeStem } from "./state.js?v=6f17791d01cb";
+import { restoreSettings, safeStem } from "./state.js?v=5cc2c5d47a78";
 
 // An unedited sheet inherits appearance and column choices from the preview.
 // Prefer matching headers; use the same column position when headers differ.
@@ -12,7 +12,7 @@ export function configForSheet(settings, metadata) {
   document.data = {filename:metadata.filename, sheet:metadata.sheets[metadata.sheetIndex], headerRow:metadata.headerRow};
   for (const series of document.series) {
     const oldName = series.yColumn;
-    for (const key of ['x','y','error','errorMin','errorMax']) {
+    for (const key of ['x','y','error','errorMin','errorMax','errorPlus','errorMinus']) {
       if (['x','y'].includes(key) || series[`${key}Column`]) series[`${key}Column`] = column(series[`${key}Column`], series[key]);
     }
     if (series.name === oldName) series.name = series.yColumn;

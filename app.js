@@ -1,7 +1,7 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=6f17791d01cb";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=6f17791d01cb";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=6f17791d01cb";
-import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=6f17791d01cb";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=5cc2c5d47a78";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=5cc2c5d47a78";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=5cc2c5d47a78";
+import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=5cc2c5d47a78";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -186,7 +186,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=6f17791d01cb", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=5cc2c5d47a78", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -452,9 +452,10 @@ function drawControls() {
         <div class="field-grid"><label>マーカー<select data-series-field="marker">${choiceOptions([["o", "丸"], ["s", "四角"], ["^", "三角 ▲"], ["v", "三角 ▼"], ["D", "ひし形"], ["+", "+"], ["x", "×"], ["*", "星"], ["p", "五角形"], ["h", "六角形"]], series.marker)}</select></label>${input("markerSize", "マーカー面積 (pt²)", 'min="1" max="200" step="any"')}</div>
         <div class="field-grid">${input("xOffset", "Xオフセット", 'step="any"')}${input("yOffset", "Yオフセット", 'step="any"')}</div>
         <div class="field-grid"><label>マーカー色<input data-series-field="scatterColor" value="${escapeHTML(series.scatterColor)}" placeholder="auto / #色"></label>${input("lineAlpha", "線の不透明度", 'min="0" max="1" step="any"')}<label>マーカー縁色<input data-series-field="markerEdgeColor" value="${escapeHTML(series.markerEdgeColor)}" placeholder="auto / none / #色"></label><label>マーカー塗り色<input data-series-field="markerFaceColor" value="${escapeHTML(series.markerFaceColor)}" placeholder="auto / none / #色"></label>${input("markerEdgeAlpha", "縁の不透明度", 'min="0" max="1" step="any"')}${input("markerFaceAlpha", "塗りの不透明度", 'min="0" max="1" step="any"')}</div>
-        <label class="draw-mode">誤差の種類<select data-series-field="errorMode">${choiceOptions([["auto", "±列から自動"], ["none", "なし"], ["symmetric", "±値"], ["minmax", "最小・最大値"]], series.errorMode)}</select></label>
+        <label class="draw-mode">誤差の種類<select data-series-field="errorMode">${choiceOptions([["auto", "±列から自動"], ["none", "なし"], ["symmetric", "±値"], ["asymmetric", "正・負の誤差幅"], ["minmax", "最小・最大値"]], series.errorMode)}</select></label>
         <label class="draw-mode">Y誤差（±）の列<select data-series-field="error">${columnOptions(series.error, true)}</select></label>
-        <div class="field-grid"><label>Y誤差最小値<select data-series-field="errorMin">${columnOptions(series.errorMin, true)}</select></label><label>Y誤差最大値<select data-series-field="errorMax">${columnOptions(series.errorMax, true)}</select></label></div>
+        <div class="field-grid"><label title="Yから上方向の誤差幅。0以上の値が入った列を選びます。上端＝Y＋正の誤差幅。">正の誤差幅（＋）<select data-series-field="errorPlus">${columnOptions(series.errorPlus, true)}</select></label><label title="Yから下方向の誤差幅。こちらも0以上の値を指定します。下端＝Y−負の誤差幅。">負の誤差幅（−）<select data-series-field="errorMinus">${columnOptions(series.errorMinus, true)}</select></label></div>
+        <div class="field-grid"><label title="誤差幅ではなく下端のY値を指定します。最小値 ≤ Y ≤ 最大値。">Y誤差最小値<select data-series-field="errorMin">${columnOptions(series.errorMin, true)}</select></label><label title="誤差幅ではなく上端のY値を指定します。最小値 ≤ Y ≤ 最大値。">Y誤差最大値<select data-series-field="errorMax">${columnOptions(series.errorMax, true)}</select></label></div>
       </details></div>`;
   }).join("") || '<p class="empty-series">「系列を追加」でX列とY列を選んでください。</p>';
   $$('[data-axis]').forEach(input => {
@@ -465,6 +466,7 @@ function drawControls() {
   const generic=['General','Roughness'].includes(config.plotType || 'General');
   const markerFields=['mode','marker','markerSize','scatterColor','markerEdgeColor','markerFaceColor','markerEdgeAlpha','markerFaceAlpha','lineStyle','lineAlpha','error','errorMode','errorMin','errorMax'];
   $$('[data-series-field]').forEach(input=>{if(markerFields.includes(input.dataset.seriesField))input.closest('label').hidden=!generic;});
+  syncSeriesErrorControls();
   const seriesSection=$('#series-list').closest('.control-section');if(seriesSection)seriesSection.hidden=false;
   $('#add-series').hidden=xpsFit || histogram;
   $('#series-colormap').hidden=xpsFit || histogram;
@@ -476,6 +478,17 @@ function drawControls() {
   drawAnnotations();
   $$('[data-axis="xLabel"],[data-axis="yLabel"],[data-axis="xUnit"],[data-axis="yUnit"],.series-label').forEach(input=>input.title=MICRO_HINT);
   enhanceColorInputs();
+}
+
+function syncSeriesErrorControls() {
+  const modes = {error:['auto','symmetric'],errorPlus:['asymmetric'],errorMinus:['asymmetric'],errorMin:['minmax'],errorMax:['minmax']};
+  const generic = ['General','Roughness'].includes(config.plotType || 'General');
+  $$('[data-series-field]').forEach(input => {
+    const allowed = modes[input.dataset.seriesField];
+    if (!allowed) return;
+    const series = config.series[Number(input.closest('[data-series-index]').dataset.seriesIndex)];
+    input.closest('label').hidden = !generic || !series || !allowed.includes(series.errorMode || 'auto');
+  });
 }
 
 function drawAnnotations() {
@@ -992,6 +1005,7 @@ function applyControlInput(event) {
     item[input.dataset.seriesField] = input.type==='checkbox'?input.checked:input.value;
     const index=input.closest('[data-series-index]').dataset.seriesIndex;
     $$(`[data-series-index="${index}"] [data-series-field="${input.dataset.seriesField}"]`).forEach(field=>{if(field!==input){field.value=input.value;field.checked=input.checked;}});
+    if (input.dataset.seriesField === 'errorMode') syncSeriesErrorControls();
   } else if (input.dataset.annotationField) {
     const item = config.annotations[Number(input.closest("[data-annotation-index]").dataset.annotationIndex)];
     item[input.dataset.annotationField] = input.type === "checkbox" ? input.checked : input.type === "number" ? Number(input.value) : input.value;

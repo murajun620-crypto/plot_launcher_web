@@ -379,7 +379,7 @@ class PlotEngine:
             error_mode = item.get("errorMode", "auto")
             if error_mode == "auto":
                 error_mode = "none" if ei == -1 else "symmetric"
-            if error_mode not in {"none", "symmetric", "minmax"}:
+            if error_mode not in {"none", "symmetric", "asymmetric", "minmax"}:
                 raise ValueError("誤差の種類を確認してください。")
             if error_mode == "symmetric" and ei == -1:
                 raise ValueError("誤差（±）の列を指定してください。")
@@ -415,6 +415,21 @@ class PlotEngine:
                 max_values = pd.to_numeric(frame.iloc[:, maxi], errors="coerce").to_numpy(dtype=float) + yoff
                 if np.any(valid & np.isfinite(min_values) & (min_values > y)) or np.any(valid & np.isfinite(max_values) & (max_values < y)):
                     raise ValueError(f"「{name}」の誤差最小値 ≤ Y ≤ 誤差最大値にしてください。")
+            if error_mode == "asymmetric":
+                plus_index = column_index(item.get("errorPlus"), count, "正の誤差幅")
+                minus_index = column_index(item.get("errorMinus"), count, "負の誤差幅")
+                plus_values = pd.to_numeric(frame.iloc[:, plus_index], errors="coerce").to_numpy(dtype=float)
+                minus_values = pd.to_numeric(frame.iloc[:, minus_index], errors="coerce").to_numpy(dtype=float)
+                if np.any(valid & np.isfinite(plus_values) & (plus_values < 0)) or np.any(valid & np.isfinite(minus_values) & (minus_values < 0)):
+                    raise ValueError(f"「{name}」の正・負の誤差幅には、どちらも0以上の値を使用してください。")
+                # The renderer accepts absolute endpoints. Offsets move the
+                # centre and endpoints together; error widths stay unchanged.
+                min_values = y - minus_values
+                max_values = y + plus_values
+            if error_mode in {"asymmetric", "minmax"}:
+                missing_errors = int((valid & ~(np.isfinite(min_values) & np.isfinite(max_values))).sum())
+                if missing_errors:
+                    warnings.append(f"{name}: 空欄・非数値の誤差{missing_errors:,}点には誤差棒を描画しません")
             excluded = int(len(frame) - valid.sum())
             if excluded:
                 warnings.append(f"{name}: 空欄・非数値・対数軸の0以下の値を含む{excluded:,}点を除外")
@@ -448,7 +463,7 @@ class PlotEngine:
                 draw_error = len(draw_columns)
                 draw_columns[f"_error_{index}"] = np.where(valid, error_values, np.nan)
             draw_min = draw_max = -1
-            if error_mode == "minmax":
+            if error_mode in {"asymmetric", "minmax"}:
                 draw_min = len(draw_columns)
                 draw_columns[f"_min_{index}"] = np.where(valid, min_values, np.nan)
                 draw_max = len(draw_columns)
@@ -463,7 +478,7 @@ class PlotEngine:
             keys["xoffsets"].append("0")
             keys["yoffsets"].append("0")
             keys["errors"].append(str(draw_error))
-            keys["errorModes"].append(error_mode)
+            keys["errorModes"].append("minmax" if error_mode == "asymmetric" else error_mode)
             keys["errorMins"].append(str(draw_min))
             keys["errorMaxs"].append(str(draw_max))
             for key, target in (("scatterColor", "scatterColors"), ("markerEdgeColor", "edgeColors"), ("markerFaceColor", "faceColors")):

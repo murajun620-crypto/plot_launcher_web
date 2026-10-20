@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.6.0";
+export const APP_VERSION = "1.6.1";
 
 // src/plot_settings.py: default_auto_series_colors(), same order and shades.
 export const COLORS = ["#1F8FE0", "#D4291E", "#2BA84D", "#D77207", "#7D3EDD", "#787878", "#666666", "#0052A8", "#A10000", "#009F22"];
@@ -62,7 +62,7 @@ export function defaultAxes() {
 }
 
 export function createSeries(x, y, name, index = 0) {
-  return { x, y, name, visible: true, color: COLORS[index % COLORS.length], scatterColor: "auto", mode: "line", lineWidth: 1, lineStyle: "-", lineAlpha: 1, marker: "o", markerSize: 18, markerEdgeColor: "auto", markerFaceColor: "auto", markerEdgeAlpha: 0.8, markerFaceAlpha: 0.8, xOffset: 0, yOffset: 0, error: "", errorMode: "auto", errorMin: "", errorMax: "" };
+  return { x, y, name, visible: true, color: COLORS[index % COLORS.length], scatterColor: "auto", mode: "line", lineWidth: 1, lineStyle: "-", lineAlpha: 1, marker: "o", markerSize: 18, markerEdgeColor: "auto", markerFaceColor: "auto", markerEdgeAlpha: 0.8, markerFaceAlpha: 0.8, xOffset: 0, yOffset: 0, error: "", errorMode: "auto", errorMin: "", errorMax: "", errorPlus: "", errorMinus: "" };
 }
 
 export function initialSeries(columns, plotType = 'General') {
@@ -94,7 +94,7 @@ export function makeSettings(config, metadata, headerRow) {
     data: { filename: metadata.filename, sheet: metadata.sheets[metadata.sheetIndex], headerRow },
     plotType: config.plotType || "General", options,
     axes: structuredClone(config.axes), annotations: structuredClone(config.annotations || []),
-    series: config.series.map(series => ({ ...series, xColumn: metadata.columns[Number(series.x)]?.name, yColumn: metadata.columns[Number(series.y)]?.name, errorColumn: series.error === "" ? "" : metadata.columns[Number(series.error)]?.name, errorMinColumn: series.errorMin === "" ? "" : metadata.columns[Number(series.errorMin)]?.name, errorMaxColumn: series.errorMax === "" ? "" : metadata.columns[Number(series.errorMax)]?.name })),
+    series: config.series.map(series => ({ ...series, xColumn: metadata.columns[Number(series.x)]?.name, yColumn: metadata.columns[Number(series.y)]?.name, ...Object.fromEntries(["error", "errorMin", "errorMax", "errorPlus", "errorMinus"].map(key => [`${key}Column`, series[key] === "" || series[key] == null ? "" : metadata.columns[Number(series[key])]?.name])) })),
   };
 }
 
@@ -181,7 +181,7 @@ export function restoreSettings(document, metadata) {
     if (!item || typeof item !== "object" || typeof item.xColumn !== "string" || typeof item.yColumn !== "string") throw new Error("設定JSONの系列設定を確認してください。");
     const result = createSeries(find(item.xColumn), find(item.yColumn), item.yColumn, index);
     for (const key of Object.keys(result)) {
-      if (["x", "y", "error", "errorMin", "errorMax"].includes(key)) continue;
+      if (["x", "y", "error", "errorMin", "errorMax", "errorPlus", "errorMinus"].includes(key)) continue;
       if (Object.hasOwn(item, key)) {
         if (key === 'visible') {
           if (typeof item[key] !== 'boolean') throw new Error("設定JSONの系列表示を確認してください。");
@@ -193,7 +193,7 @@ export function restoreSettings(document, metadata) {
     }
     if (item.errorColumn !== undefined && typeof item.errorColumn !== "string") throw new Error("設定JSONの誤差列を確認してください。");
     result.error = item.errorColumn ? find(item.errorColumn) : "";
-    for (const key of ["errorMin", "errorMax"]) {
+    for (const key of ["errorMin", "errorMax", "errorPlus", "errorMinus"]) {
       if (item[`${key}Column`] !== undefined && typeof item[`${key}Column`] !== "string") throw new Error("設定JSONの誤差列を確認してください。");
       result[key] = item[`${key}Column`] ? find(item[`${key}Column`]) : "";
     }
