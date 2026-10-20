@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.6.1";
+export const APP_VERSION = "1.7.0";
 
 // src/plot_settings.py: default_auto_series_colors(), same order and shades.
 export const COLORS = ["#1F8FE0", "#D4291E", "#2BA84D", "#D77207", "#7D3EDD", "#787878", "#666666", "#0052A8", "#A10000", "#009F22"];
@@ -44,10 +44,13 @@ export function snapPoint(anchor, point) {
 
 export function defaultAxes() {
   return {
-    xLabelX: "", xLabelY: "", yLabelX: "", yLabelY: "",
+    xLabelX: "", xLabelY: "", yLabelX: "", yLabelY: "", y2LabelX: "", y2LabelY: "",
     xLabel: "", yLabel: "", xUnit: "auto", yUnit: "auto", xScale: "linear", yScale: "linear",
     xMin: "", xMax: "", yMin: "", yMax: "", xStep: "", yStep: "", width: 4, height: 3,
     xMinorStep: "", yMinorStep: "",
+    yColor: "auto", y2Color: "auto", y2Label: "", y2Unit: "auto", y2Scale: "linear",
+    y2Min: "", y2Max: "", y2Step: "", y2MinorStep: "", y2LogFormat: "power", y2LabelPad: 0, y2TickPad: 0,
+    hideY2Label: false, hideY2TickLabels: false, hideY2Ticks: false,
     fontFamily: "Liberation Sans", japaneseFontFamily: "Noto Sans JP", fontScale: 1, tickFontScale: 1, labelFontScale: 1,
     spineScale: 1, dataLineScale: 1, tickLength: 1, xLabelPad: 0, yLabelPad: 0, xTickPad: 0, yTickPad: 0,
     xLogFormat: "power", yLogFormat: "power", hideXLabel: false, hideYLabel: false,
@@ -62,7 +65,7 @@ export function defaultAxes() {
 }
 
 export function createSeries(x, y, name, index = 0) {
-  return { x, y, name, visible: true, color: COLORS[index % COLORS.length], scatterColor: "auto", mode: "line", lineWidth: 1, lineStyle: "-", lineAlpha: 1, marker: "o", markerSize: 18, markerEdgeColor: "auto", markerFaceColor: "auto", markerEdgeAlpha: 0.8, markerFaceAlpha: 0.8, xOffset: 0, yOffset: 0, error: "", errorMode: "auto", errorMin: "", errorMax: "", errorPlus: "", errorMinus: "" };
+  return { x, y, name, yAxis: "left", visible: true, color: COLORS[index % COLORS.length], scatterColor: "auto", mode: "line", lineWidth: 1, lineStyle: "-", lineAlpha: 1, marker: "o", markerSize: 18, markerEdgeColor: "auto", markerFaceColor: "auto", markerEdgeAlpha: 0.8, markerFaceAlpha: 0.8, xOffset: 0, yOffset: 0, error: "", errorMode: "auto", errorMin: "", errorMax: "", errorPlus: "", errorMinus: "" };
 }
 
 export function initialSeries(columns, plotType = 'General') {
@@ -187,6 +190,7 @@ export function restoreSettings(document, metadata) {
           if (typeof item[key] !== 'boolean') throw new Error("設定JSONの系列表示を確認してください。");
           result[key] = item[key]; continue;
         }
+        if (key === 'yAxis' && !['left','right'].includes(item[key])) throw new Error("設定JSONのY軸を確認してください。");
         if (!["string", "number"].includes(typeof item[key])) throw new Error("設定JSONの系列設定を確認してください。");
         result[key] = item[key];
       }

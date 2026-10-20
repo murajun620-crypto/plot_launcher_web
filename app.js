@@ -1,7 +1,7 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=5cc2c5d47a78";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=5cc2c5d47a78";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=5cc2c5d47a78";
-import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=5cc2c5d47a78";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=32cac0cc1114";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=32cac0cc1114";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=32cac0cc1114";
+import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=32cac0cc1114";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -186,7 +186,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=5cc2c5d47a78", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=32cac0cc1114", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -222,7 +222,7 @@ function choiceOptions(choices, selected) {
 }
 
 function enhanceColorInputs() {
-  for (const input of $$('input[type="color"],input[data-series-field$="Color"],input[data-option$="Color"]')) {
+  for (const input of $$('input[type="color"],input[data-axis$="Color"],input[data-series-field$="Color"],input[data-option$="Color"]')) {
     if (input.closest('#color-panel') || input.dataset.paletteEnhanced) continue;
     input.dataset.paletteEnhanced = 'true';
     const title = input.getAttribute('aria-label') || input.closest('label')?.childNodes[0]?.textContent?.trim() || '色';
@@ -282,18 +282,19 @@ $('#apply-color-code').addEventListener('click', () => chooseColor($('#color-cod
 $('#color-code').addEventListener('keydown', event => {if(event.key === 'Enter') {event.preventDefault(); chooseColor(event.target.value.trim());}});
 enhanceColorInputs();
 
+const axisName = axis => axis === 'y2' ? '右Y' : axis.toUpperCase();
 function openAxisEditor(axis, kind) {
   if (!metadata || loading || exporting || renderRunning || renderedRevision !== revision) return;
   const fields = $('#axis-editor-fields'); fields.dataset.axisName = axis;
-  const label = (key, text, type='text', extra='') => `<label>${text}<input data-axis="${key}" type="${type}" value="${escapeHTML(config.axes[key])}" ${type==='text'?`title="${MICRO_HINT}"`:''} ${extra}></label>`;
-  $('#axis-editor-title').textContent = `${axis.toUpperCase()}軸${kind === 'label' ? 'ラベル' : '目盛り'}の設定`;
+  const label = (key, text, type='text', extra='') => `<label>${text}<input data-axis="${key}" type="${type}" value="${escapeHTML(config.axes[key])}" ${type==='text' && /(Label|Unit)$/.test(key)?`title="${MICRO_HINT}"`:''} ${extra}></label>`;
+  $('#axis-editor-title').textContent = `${axisName(axis)}軸${kind === 'label' ? 'ラベル' : '目盛り'}の設定`;
   if (kind === 'label') {
     fields.innerHTML = label(`${axis}Label`,'ラベル（空欄で自動）','text','maxlength="500"') + label(`${axis}Unit`,'単位（autoで自動）') +
       `<div class="field-grid">${label(`${axis}LabelPad`,'ラベル追加余白 (pt)','number','min="-100" max="100" step="any"')}${label('labelFontScale','軸ラベル文字倍率','number','min=".2" max="3" step="any"')}</div>` +
       `<div class="field-grid">${label(`${axis}LabelX`,'ラベルX (軸比率)','number','step="any" placeholder="標準"')}${label(`${axis}LabelY`,'ラベルY (軸比率)','number','step="any" placeholder="標準"')}</div><button type="button" class="button quiet" data-reset-label>標準位置に戻す</button>`;
   } else {
     const automatic = config.axes[`${axis}Min`] === '' && config.axes[`${axis}Max`] === '';
-    fields.innerHTML = `<label class="log-format-field" data-log-format-for="${axis}">目盛りの表記<select data-axis="${axis}LogFormat" aria-label="${axis.toUpperCase()}軸の対数目盛り表記">${choiceOptions([['power','累乗（10ⁿ）'],['decimal','数値（0.1、1、10）']],config.axes[`${axis}LogFormat`])}</select></label>` +
+    fields.innerHTML = `<label class="log-format-field" data-log-format-for="${axis}">目盛りの表記<select data-axis="${axis}LogFormat" aria-label="${axisName(axis)}軸の対数目盛り表記">${choiceOptions([['power','累乗（10ⁿ）'],['decimal','数値（0.1、1、10）']],config.axes[`${axis}LogFormat`])}</select></label>` +
       `<label><input type="checkbox" data-axis-auto="range" ${automatic?'checked':''}>範囲を自動設定</label><div class="field-grid">${label(`${axis}Min`,'最小','number','step="any" placeholder="自動"')}${label(`${axis}Max`,'最大','number','step="any" placeholder="自動"')}</div>` +
       `<label><input type="checkbox" data-axis-auto="ticks" data-axis-name="${axis}">主目盛りを自動設定</label>` +
       label(`${axis}Step`,'主目盛り間隔','number','step="any" placeholder="自動"') +
@@ -302,7 +303,7 @@ function openAxisEditor(axis, kind) {
       `<label><input type="checkbox" data-axis="hideMinorTicks" data-invert="true" ${config.axes.hideMinorTicks?'':'checked'}>副目盛りを表示</label>` +
       `<div class="field-grid">${label(`${axis}TickPad`,'目盛り追加余白 (pt)','number','min="-100" max="100" step="any"')}${label('tickFontScale','目盛り文字倍率','number','min=".2" max="3" step="any"')}</div>`;
   }
-  fields.innerHTML += label('spineColor','枠線・文字色','color');
+  fields.innerHTML += axis === 'x' ? label('spineColor','枠線・文字色','color') : label(`${axis}Color`,'軸の文字色（autoで自動）','text','title="autoでは、左右別の軸を使う場合に各軸の最初の系列と同じ色にします。"');
   syncAxisEditor(); enhanceColorInputs(); $('#axis-editor').showModal();
 }
 function syncAxisEditor() {
@@ -325,7 +326,7 @@ function syncAxisAutomaticControls() {
     input.checked = keys.every(key => config.axes[`${axis}${key}`] === '');
     input.disabled = mode !== 'range' && config.axes[`${axis}Scale`] === 'log';
   }
-  for (const axis of ['x','y']) for (const key of ['Step','MinorStep']) {
+  for (const axis of ['x','y','y2']) for (const key of ['Step','MinorStep']) {
     $$(`[data-axis="${axis}${key}"]`).forEach(input => {
       input.disabled = config.axes[`${axis}Scale`] === 'log' || (!!input.closest('#axis-editor-fields') && config.axes[`${axis}${key}`] === '' && input !== document.activeElement);
     });
@@ -350,13 +351,13 @@ $('#axis-editor-fields').addEventListener('input', event => {
     setAxisAutomatic(input, axis);
   } else if (input.dataset.axis) {
     // A partial manual position must never make the plot disappear while typing.
-    if (/^[xy]Label[XY]$/.test(input.dataset.axis) && input.value !== '') {
+    if (/^(x|y|y2)Label[XY]$/.test(input.dataset.axis) && input.value !== '') {
       const other = `${axis}Label${input.dataset.axis.endsWith('X')?'Y':'X'}`;
       if(config.axes[other] === '') {config.axes[other] = String(figureResult.geometry.axisLabels?.find(label => label.axis === axis)?.anchor[other.endsWith('X')?0:1] ?? 0); fields.querySelector(`[data-axis="${other}"]`).value = config.axes[other];}
     }
-    if (/^[xy]Label[XY]$/.test(input.dataset.axis) && input.value === '') config.axes[`${axis}LabelX`] = config.axes[`${axis}LabelY`] = '';
+    if (/^(x|y|y2)Label[XY]$/.test(input.dataset.axis) && input.value === '') config.axes[`${axis}LabelX`] = config.axes[`${axis}LabelY`] = '';
     applyControlInput(event);
-    if (/^[xy]LabelPad$/.test(input.dataset.axis) || /^[xy]Label[XY]$/.test(input.dataset.axis)) {
+    if (/^(x|y|y2)LabelPad$/.test(input.dataset.axis) || /^(x|y|y2)Label[XY]$/.test(input.dataset.axis)) {
       for (const key of ['LabelX','LabelY']) {
         const field = fields.querySelector(`[data-axis="${axis}${key}"]`);
         if (field !== input) field.value = config.axes[`${axis}${key}`];
@@ -402,7 +403,7 @@ function drawPresetOptions() {
 
 $("#plot-type").addEventListener("change",event=>{
   applyPreset(config,presets.find(item=>item.id===event.target.value));
-  if(!['General','Roughness'].includes(config.plotType))config.series.forEach(item=>{item.mode='line';item.errorMode='none';});
+  if(!['General','Roughness'].includes(config.plotType))config.series.forEach(item=>{item.mode='line';item.errorMode='none';item.yAxis='left';});
   if(config.plotType==='Raman 3D') config.series=initialSeries(metadata.columns, config.plotType);
   if(config.plotType==='Particle Histogram')config.options.diameterColumn=Math.min(2,metadata.columns.length-1);
   drawControls();changed();
@@ -446,6 +447,7 @@ function drawControls() {
     return `<div class="series-card" data-series-index="${index}">
       <label class="series-visibility"><input data-series-field="visible" type="checkbox" ${series.visible!==false?'checked':''}>系列${index+1}を描画</label><div class="series-heading">${xpsFit?'実測点の列':`<input data-series-field="color" type="color" value="${escapeHTML(series.color)}" aria-label="系列${index + 1}の色"><input class="series-label" data-series-field="name" value="${escapeHTML(series.name)}" maxlength="200" aria-label="系列${index + 1}の名前"><button type="button" class="icon-button" data-remove="${index}" aria-label="系列${index + 1}を削除"><svg><use href="#i-close"/></svg></button>`}</div>
       <div class="field-grid"><label>X列<select data-series-field="x">${columnOptions(series.x)}</select></label><label>Y列<select data-series-field="y">${columnOptions(series.y)}</select></label></div>
+      <label title="右軸を選ぶと「03 軸とサイズ」に右Y軸の設定が表示されます。">使用するY軸<select data-series-field="yAxis">${choiceOptions([['left','左軸'],['right','右軸']],series.yAxis || 'left')}</select></label>
       <div class="annotation-buttons"><button type="button" class="button quiet" data-series-up="${index}" ${index===0?'disabled':''}>↑</button><button type="button" class="button quiet" data-series-down="${index}" ${index===config.series.length-1?'disabled':''}>↓</button><button type="button" class="button quiet" data-series-copy="${index}">複製</button></div><details class="series-advanced"><summary>線・マーカー・誤差</summary>
         <label class="draw-mode">描画方法<select data-series-field="mode">${choiceOptions([["line", "線"], ["scatter", "マーカー"], ["line+scatter", "線とマーカー"]], series.mode)}</select></label>
         <div class="field-grid">${input("lineWidth", "線幅 (pt)", 'min="0" max="6" step="any"')}<label>線種<select data-series-field="lineStyle">${choiceOptions([["-", "実線"], ["--", "破線"], ["-.", "一点鎖線"], [":", "点線"]], series.lineStyle)}</select></label></div>
@@ -464,9 +466,10 @@ function drawControls() {
     else input.value = value;
   });
   const generic=['General','Roughness'].includes(config.plotType || 'General');
-  const markerFields=['mode','marker','markerSize','scatterColor','markerEdgeColor','markerFaceColor','markerEdgeAlpha','markerFaceAlpha','lineStyle','lineAlpha','error','errorMode','errorMin','errorMax'];
+  const markerFields=['mode','marker','markerSize','scatterColor','markerEdgeColor','markerFaceColor','markerEdgeAlpha','markerFaceAlpha','lineStyle','lineAlpha','error','errorMode','errorMin','errorMax','yAxis'];
   $$('[data-series-field]').forEach(input=>{if(markerFields.includes(input.dataset.seriesField))input.closest('label').hidden=!generic;});
   syncSeriesErrorControls();
+  syncYAxesControls();
   const seriesSection=$('#series-list').closest('.control-section');if(seriesSection)seriesSection.hidden=false;
   $('#add-series').hidden=xpsFit || histogram;
   $('#series-colormap').hidden=xpsFit || histogram;
@@ -476,8 +479,14 @@ function drawControls() {
   updateButtons();
   syncAxisAutomaticControls();
   drawAnnotations();
-  $$('[data-axis="xLabel"],[data-axis="yLabel"],[data-axis="xUnit"],[data-axis="yUnit"],.series-label').forEach(input=>input.title=MICRO_HINT);
+  $$('[data-axis="xLabel"],[data-axis="yLabel"],[data-axis="y2Label"],[data-axis="xUnit"],[data-axis="yUnit"],[data-axis="y2Unit"],.series-label').forEach(input=>input.title=MICRO_HINT);
   enhanceColorInputs();
+}
+
+function syncYAxesControls() {
+  const active = ['General','Roughness'].includes(config.plotType || 'General') && config.series.some(item=>item.yAxis === 'right');
+  $('#right-axis-controls').hidden = !active;
+  $$('[data-axis="yAxisRight"]').forEach(input=>input.closest('label').hidden=active);
 }
 
 function syncSeriesErrorControls() {
@@ -958,7 +967,7 @@ function incompleteNumberInput(input) {
   if (input.type !== 'number') return false;
   if (input.validity?.badInput) return true;
   if (input.value !== '') return !Number.isFinite(Number(input.value));
-  return !['xMin','xMax','yMin','yMax','xStep','yStep','xMinorStep','yMinorStep','legendX','legendY','xLabelX','xLabelY','yLabelX','yLabelY'].includes(input.dataset.axis);
+  return !['xMin','xMax','yMin','yMax','y2Min','y2Max','xStep','yStep','y2Step','xMinorStep','yMinorStep','y2MinorStep','legendX','legendY','xLabelX','xLabelY','yLabelX','yLabelY','y2LabelX','y2LabelY'].includes(input.dataset.axis);
 }
 
 function applyControlInput(event) {
@@ -970,9 +979,10 @@ function applyControlInput(event) {
   if (input.dataset.axis) {
     const key = input.dataset.axis;
     config.axes[key] = input.type === "checkbox" ? (input.dataset.invert === "true" ? !input.checked : input.checked) : input.value;
-    if (/^[xy]Scale$/.test(key) && input.value === 'log') {
-      config.axes[`${key[0]}Step`] = config.axes[`${key[0]}MinorStep`] = '';
-      for (const suffix of ['Step','MinorStep']) $$(`[data-axis="${key[0]}${suffix}"]`).forEach(field=>field.value='');
+    if (/^(x|y|y2)Scale$/.test(key) && input.value === 'log') {
+      const axis=key.replace(/Scale$/,'');
+      config.axes[`${axis}Step`] = config.axes[`${axis}MinorStep`] = '';
+      for (const suffix of ['Step','MinorStep']) $$(`[data-axis="${axis}${suffix}"]`).forEach(field=>field.value='');
     }
     if (['backgroundColor','backgroundAlpha','transparent'].includes(key)) {
       if (key === 'backgroundColor') {
@@ -997,7 +1007,7 @@ function applyControlInput(event) {
         $$(`[data-axis="${related}"]`).forEach(field=>{if(field===input)return;if(field.type==='checkbox')field.checked=config.axes[related];else field.value=config.axes[related];});
       }
     }
-    if (/^[xy]LabelPad$/.test(key)) config.axes[`${key[0]}LabelX`] = config.axes[`${key[0]}LabelY`] = "";
+    if (/^(x|y|y2)LabelPad$/.test(key)) {const axis=key.replace(/LabelPad$/,'');config.axes[`${axis}LabelX`] = config.axes[`${axis}LabelY`] = "";}
     $$(`[data-axis="${key}"]`).forEach(field => {if(field !== input) {field.value = input.value; field.checked = field.dataset.invert === "true" ? !config.axes[key] : config.axes[key];}});
   }
   else if (input.dataset.seriesField) {
@@ -1006,6 +1016,7 @@ function applyControlInput(event) {
     const index=input.closest('[data-series-index]').dataset.seriesIndex;
     $$(`[data-series-index="${index}"] [data-series-field="${input.dataset.seriesField}"]`).forEach(field=>{if(field!==input){field.value=input.value;field.checked=input.checked;}});
     if (input.dataset.seriesField === 'errorMode') syncSeriesErrorControls();
+    if (input.dataset.seriesField === 'yAxis') syncYAxesControls();
   } else if (input.dataset.annotationField) {
     const item = config.annotations[Number(input.closest("[data-annotation-index]").dataset.annotationIndex)];
     item[input.dataset.annotationField] = input.type === "checkbox" ? input.checked : input.type === "number" ? Number(input.value) : input.value;
@@ -1312,7 +1323,7 @@ function positionInteractions() {
     button.classList.add("figure-drag-target");if(selected.has(target.id))button.classList.add('selected');
     if(target.kind !== 'ticks')button.dataset.dragId=target.id;
     if(target.axis) {button.dataset.editAxis = target.axis; button.dataset.axisKind = target.kind; if(target.kind === 'ticks')button.classList.add('axis-tick-target');}
-    button.title=target.axis ? `${target.axis.toUpperCase()}軸${target.kind === 'label' ? 'ラベル：ドラッグで移動・ダブルクリックで設定' : '目盛り：ダブルクリックで設定'}` : target.id==="legend"?"凡例をドラッグして移動":"注釈をドラッグして移動";
+    button.title=target.axis ? `${axisName(target.axis)}軸${target.kind === 'label' ? 'ラベル：ドラッグで移動・ダブルクリックで設定' : '目盛り：ダブルクリックで設定'}` : target.id==="legend"?"凡例をドラッグして移動":"注釈をドラッグして移動";
     button.setAttribute('aria-label',button.title);
     if(item?.locked)button.title+='（位置固定）';
     if(item && selected.has(item.id) && !item.locked){
@@ -1372,7 +1383,7 @@ function finishDrag(event) {
     else if(d.handle==='rotate'){d.item.rotation=(Number(d.start.rotation)+(event.clientX-d.x)/d.box.width*360)%360;if(event.shiftKey)d.item.rotation=Math.round(d.item.rotation/15)*15;}
     else for(const {item,start} of d.handle?[{item:d.item,start:d.start}]:d.items){
       const keys=start.type==='text'?['x','y']:d.handle?[`x${d.handle}`,`y${d.handle}`]:['x1','y1','x2','y2'];
-      for(const key of keys)item[key]=shiftCoordinate(start[key],key.startsWith('x')?dx:dy,figureResult[`${key[0]}Range`],config.axes[`${key[0]}Scale`],start.coordinate_system);
+      for(const key of keys)item[key]=shiftCoordinate(start[key],key.startsWith('x')?dx:dy,figureResult[`${key[0]}Range`],key.startsWith('y')?figureResult.yDataScale || config.axes.yScale:config.axes.xScale,start.coordinate_system);
       if(event.shiftKey && d.handle && start.type!=='text'){
         const other=d.handle==='1'?'2':'1';
         const snapped=snapPoint({x:Number(item[`x${other}`]),y:Number(item[`y${other}`])},{x:Number(item[`x${d.handle}`]),y:Number(item[`y${d.handle}`])});item[`x${d.handle}`]=snapped.x;item[`y${d.handle}`]=snapped.y;
@@ -1396,7 +1407,7 @@ function copyAnnotations(){clipboard=(config.annotations||[]).filter(item=>selec
 function pasteAnnotations(){
   config.annotations ||= [];selected.clear();
   for(const source of clipboard){if(config.annotations.length>=200)break;const item=structuredClone(source);item.id=crypto.randomUUID();item.locked=false;
-    for(const key of item.type==='text'?['x','y']:['x1','y1','x2','y2'])item[key]=shiftCoordinate(item[key],.025,figureResult?.[`${key[0]}Range`]||[0,1],config.axes[`${key[0]}Scale`],item.coordinate_system);
+    for(const key of item.type==='text'?['x','y']:['x1','y1','x2','y2'])item[key]=shiftCoordinate(item[key],.025,figureResult?.[`${key[0]}Range`]||[0,1],key.startsWith('y')?figureResult?.yDataScale || config.axes.yScale:config.axes.xScale,item.coordinate_system);
     config.annotations.push(item);selected.add(item.id);
   }drawAnnotations();changed();
 }

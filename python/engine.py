@@ -101,6 +101,17 @@ def column_index(value, column_count, label):
 
 
 @contextmanager
+def plot_target_axes(axes):
+    """Run the existing plot script on a second axes in the same figure."""
+    original = plot_utils.figure_with_fixed_axes_cm
+    plot_utils.figure_with_fixed_axes_cm = lambda *args, **kwargs: (axes.figure, axes)
+    try:
+        yield
+    finally:
+        plot_utils.figure_with_fixed_axes_cm = original
+
+
+@contextmanager
 def plot_environment(values, frame, sheet_name, filename):
     original_env = {key: value for key, value in os.environ.items() if key.startswith("PLOT_")}
     for key in original_env:
@@ -671,7 +682,43 @@ class PlotEngine:
 
     @micro_text_rendering()
     def render(self, config):
-        frame, values, diagnostics, warnings = self._prepare(config)
+        preset = config.get("plotType", "General")
+        original_series = config.get("series", [])
+        if not 1 <= len(original_series) <= MAX_SERIES:
+            raise ValueError(f"系列を1〜{MAX_SERIES}個追加してください。")
+        if any(item.get("yAxis", "left") not in {"left", "right"} for item in original_series):
+            raise ValueError("系列のY軸は左軸または右軸を選んでください。")
+        right_indices = [i for i, item in enumerate(original_series) if item.get("yAxis", "left") == "right"]
+        left_indices = [i for i in range(len(original_series)) if i not in right_indices]
+        if right_indices and preset not in {"General", "Roughness"}:
+            raise ValueError("左右のY軸はグラフ種別「一般」または「Roughness」で使用できます。")
+        dual = bool(left_indices and right_indices)
+        primary_name = "y" if left_indices or not right_indices else "y2"
+        primary_indices = left_indices if left_indices else right_indices
+        def axis_config(indices, name):
+            result = {**config, "axes": dict(config.get("axes", {})), "series": [original_series[i] for i in indices]}
+            if name == "y2":
+                for suffix, default in (("Label", ""), ("Unit", "auto"), ("Scale", "linear"), ("Min", ""), ("Max", ""), ("Step", ""), ("MinorStep", ""), ("LogFormat", "power"), ("LabelPad", 0), ("TickPad", 0)):
+                    result["axes"][f"y{suffix}"] = config.get("axes", {}).get(f"y2{suffix}", default)
+                for suffix in ("Label", "TickLabels", "Ticks"):
+                    result["axes"][f"hideY{suffix}"] = config.get("axes", {}).get(f"hideY2{suffix}", False)
+                result["axes"]["yAxisRight"] = True
+            elif dual:
+                result["axes"]["yAxisRight"] = False
+            return result
+        primary_config = axis_config(primary_indices, primary_name) if right_indices else config
+        frame, values, diagnostics, warnings = self._prepare(primary_config)
+        right_config = axis_config(right_indices, "y2") if dual else None
+        right_prepared = self._prepare(right_config) if dual else None
+        if dual:
+            # The shared X span can be much wider than either side alone.
+            # Apply the existing tick-count limits to their combined extent.
+            frames = (frame, right_prepared[0])
+            lo = float(values["PLOT_XMIN"]) if values["PLOT_XMIN"] else min(float(item.filter(regex=r"^_x_").min().min()) for item in frames)
+            hi = float(values["PLOT_XMAX"]) if values["PLOT_XMAX"] else max(float(item.filter(regex=r"^_x_").max().max()) for item in frames)
+            for key, maximum, label in (("PLOT_XTICK_STEP", 200, "目盛り"), ("PLOT_XMINOR_TICK_STEP", 1000, "副目盛り")):
+                if values[key] and abs(hi - lo) / float(values[key]) > maximum:
+                    raise ValueError(f"{label}が多すぎます。{label}間隔を広げてください。")
         previous_figures = set(plt.get_fignums())
         figure = None
         try:
@@ -679,7 +726,39 @@ class PlotEngine:
                 preset = config.get("plotType", "General")
                 namespace = runpy.run_path(str(self.source_dir / self.presets[preset]["script"]), run_name="__main__")
                 figure, axes = namespace["fig"], namespace["ax"]
-                series_groups = self._series_artists(axes, namespace, preset, config)
+                series_groups = self._series_artists(axes, namespace, preset, primary_config)
+                right_axes = None
+                if right_indices:
+                    handles_by_index = dict(zip(primary_indices, namespace["legend_handles"]))
+                    diagnostics_by_index = dict(zip(primary_indices, diagnostics))
+                    for group in series_groups:
+                        group["index"] = primary_indices[group["index"]]
+                    if dual:
+                        right_frame, right_values, right_diagnostics, right_warnings = right_prepared
+                        right_axes = axes.twinx()
+                        with plot_environment(right_values, right_frame, self.sheet_name, self.filename), plot_target_axes(right_axes):
+                            right_namespace = runpy.run_path(str(self.source_dir / self.presets[preset]["script"]), run_name="__main__")
+                            right_groups = self._series_artists(right_axes, right_namespace, preset, right_config)
+                            plot_utils.ensure_axis_limits_include_data(right_axes)
+                        for group in right_groups:
+                            group["index"] = right_indices[group["index"]]
+                        series_groups += right_groups
+                        diagnostics_by_index.update(zip(right_indices, right_diagnostics))
+                        handles_by_index.update(zip(right_indices, right_namespace["legend_handles"]))
+                        warnings += right_warnings
+                        right_axes.grid(False)
+                        # Only the outer right spine belongs to this axes.
+                        for side in ("left", "top", "bottom"):
+                            right_axes.spines[side].set_visible(False)
+                        axes.spines["right"].set_visible(False)
+                    series_groups.sort(key=lambda group: group["index"])
+                    diagnostics = [diagnostics_by_index[i] for i in range(len(original_series))]
+                    for target in (axes, right_axes):
+                        if target is not None and target.get_legend():
+                            target.get_legend().remove()
+                    visible = [i for i, item in enumerate(original_series) if item.get("visible", True)]
+                    if visible:
+                        plot_utils.apply_preview_legend(right_axes or axes, handles=[handles_by_index[i] for i in visible], labels=[diagnostics[i]["name"] for i in visible], fontsize=7)
                 statistics = None
                 if preset == "Particle Histogram":
                     statistics = {"median": float(namespace["median"]), "mean": float(namespace["mean"])}
@@ -690,8 +769,8 @@ class PlotEngine:
                 position = config.get("axes", {}).get("legendPosition", "best")
                 if position not in {"best", "upper right", "upper left", "lower right", "lower left"}:
                     raise ValueError("凡例の位置を選び直してください。")
-                legend = axes.get_legend()
-                if legend and any(not item["visible"] for item in diagnostics):
+                legend = (right_axes or axes).get_legend()
+                if legend and not right_indices and any(not item["visible"] for item in diagnostics):
                     handles, labels = axes.get_legend_handles_labels()
                     visible = [i for i, item in enumerate(diagnostics) if item["visible"]]
                     legend.remove()
@@ -719,6 +798,14 @@ class PlotEngine:
                     overlay.set_xlim(axes.get_xlim()); overlay.set_ylim(axes.get_zlim())
                     overlay.set_axis_off()
                     annotation_axes = overlay
+                elif dual:
+                    # Annotations stay above data from both axes and retain
+                    # their existing left-axis data coordinates.
+                    overlay = figure.add_axes(axes.get_position(), frameon=False, zorder=5)
+                    overlay.set_xscale(axes.get_xscale()); overlay.set_yscale(axes.get_yscale())
+                    overlay.set_xlim(axes.get_xlim()); overlay.set_ylim(axes.get_ylim())
+                    overlay.set_axis_off()
+                    annotation_axes = overlay
                 else:
                     annotation_axes = axes
                 # Figure and plot-area backgrounds each have their own fill.
@@ -731,7 +818,22 @@ class PlotEngine:
                             axis.pane.set_fill(False)
                 axes.patch.set_facecolor(values["PLOT_AXES_BACKGROUND_COLOR"])
                 axes.patch.set_alpha(float(values["PLOT_AXES_BACKGROUND_ALPHA"]))
-                editable_axes = [("x", axes.xaxis), ("y", axes.zaxis if preset == "Raman 3D" else axes.yaxis)]
+                editable_axes = [("x", axes.xaxis), (primary_name, axes.zaxis if preset == "Raman 3D" else axes.yaxis)]
+                if dual:
+                    editable_axes.append(("y2", right_axes.yaxis))
+                for name, axis in editable_axes:
+                    if name == "x":
+                        continue
+                    color = str(config.get("axes", {}).get(f"{name}Color", "auto"))
+                    if color == "auto":
+                        if not right_indices:
+                            continue
+                        indices = right_indices if name == "y2" else left_indices
+                        color = str(original_series[indices[0]].get("color", "#1F8FE0")) if right_indices else values["PLOT_SPINE_COLOR"]
+                    if not is_color_like(color):
+                        raise ValueError("Y軸の色はautoまたは色を指定してください。")
+                    axis.axes.tick_params(axis="y", which="both", colors=color)
+                    axis.label.set_color(color)
                 positioned_labels = {}
                 if preset == "Raman 3D":
                     figure.canvas.draw()  # Resolve the native projected label rotations first.
@@ -776,7 +878,8 @@ class PlotEngine:
                 manager.attach(figure, annotation_axes)
                 figure.canvas.draw()
                 # Hide off-screen log ticks before calculating the export box.
-                for axis, limits in ((axes.xaxis, axes.get_xlim()), (axes.yaxis, axes.get_ylim())):
+                for axis in [item[1] for item in editable_axes]:
+                    limits = axis.get_view_interval()
                     low, high = sorted(limits)
                     for tick in axis.get_major_ticks():
                         if not low <= tick.get_loc() <= high:
@@ -801,9 +904,9 @@ class PlotEngine:
                     return [(b.x0 - box.x0) / box.width, (box.y1 - b.y1) / box.height, b.width / box.width, b.height / box.height]
                 geometry = {"axes": svg_box(axes.get_window_extent(renderer)), "legend": svg_box(legend.get_window_extent(renderer)) if legend else None, "annotations": [], "axisLabels": [], "tickLabels": []}
                 geometry["series"] = self._data_geometry(series_groups, axes, box, renderer)
-                geometry["spines"] = [{"id": side, "paths": self._data_geometry([{"artists": [spine]}], axes, box, renderer)[0]["paths"]} for side, spine in axes.spines.items() if spine.get_visible() and preset != "Raman 3D"]
+                geometry["spines"] = [{"id": side, "paths": self._data_geometry([{"artists": [spine]}], axes, box, renderer)[0]["paths"]} for target in (axes, right_axes) if target is not None for side, spine in target.spines.items() if spine.get_visible() and preset != "Raman 3D"]
                 geometry["grid"] = self._data_geometry([{"part": "grid", "artists": [line for line in axes.get_xgridlines() + axes.get_ygridlines() if line.get_visible()]}], axes, box, renderer)
-                geometry["grid"] += self._data_geometry([{"part": "grid", "artists": [line for axis in (axes.xaxis, axes.yaxis) for tick in [*axis.get_major_ticks(), *axis.get_minor_ticks()] for line in (tick.tick1line, tick.tick2line) if line.get_visible()]}], axes, box, renderer)
+                geometry["grid"] += self._data_geometry([{"part": "grid", "artists": [line for _, axis in editable_axes for tick in [*axis.get_major_ticks(), *axis.get_minor_ticks()] for line in (tick.tick1line, tick.tick2line) if line.get_visible()]}], axes, box, renderer)
                 if preset == "Raman 3D":
                     geometry["depth"] = [svg_box(label.get_window_extent(renderer)) for label in [axes.yaxis.label, *axes.yaxis.get_ticklabels()] if label.get_visible() and label.get_text()]
                 for name, axis in editable_axes:
@@ -840,7 +943,7 @@ class PlotEngine:
                 return float(np.min(positive)) if len(positive) else None
             tick_steps = {name: {"major": tick_step(axis.get_majorticklocs()), "minor": tick_step(axis.get_minorticklocs())}
                           for name, axis in editable_axes}
-            return {"svg": image.getvalue().decode("utf-8"), "series": [item for item in diagnostics if item["visible"]], "warnings": warnings, "statistics": statistics, "xRange": list(annotation_axes.get_xlim()), "yRange": list(annotation_axes.get_ylim()), "tickSteps": tick_steps, "geometry": geometry, "fontFamily": family if (family := config.get("axes", {}).get("fontFamily")) else self.font_family}
+            return {"svg": image.getvalue().decode("utf-8"), "series": [item for item in diagnostics if item["visible"]], "warnings": warnings, "statistics": statistics, "xRange": list(annotation_axes.get_xlim()), "yRange": list(annotation_axes.get_ylim()), "y2Range": list((right_axes or axes).get_ylim()) if right_indices else None, "yDataScale": annotation_axes.get_yscale(), "tickSteps": tick_steps, "geometry": geometry, "fontFamily": family if (family := config.get("axes", {}).get("fontFamily")) else self.font_family}
         except Exception:
             for figure_number in set(plt.get_fignums()) - previous_figures:
                 plt.close(figure_number)

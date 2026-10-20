@@ -6,8 +6,8 @@
   <meta name="description" content="Excel・CSVの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=5cc2c5d47a78">
-  <script type="module" src="./app.js?v=5cc2c5d47a78"></script>
+  <link rel="stylesheet" href="./style.css?v=32cac0cc1114">
+  <script type="module" src="./app.js?v=32cac0cc1114"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -87,6 +87,19 @@
               <div class="field-grid three"><label>最小<input id="y-min" data-axis="yMin" type="number" step="any" placeholder="自動"></label><label>最大<input id="y-max" data-axis="yMax" type="number" step="any" placeholder="自動"></label><label>主目盛り間隔<input id="y-step" data-axis="yStep" type="number" step="any" placeholder="自動"></label></div>
               <div class="check-options axis-tick-auto"><label title="チェックすると手動の間隔を解除して自動に戻します。数値欄への入力でも手動に切り替わります。"><input type="checkbox" data-axis-auto="ticks" data-axis-name="y" aria-label="Y軸の主目盛りを自動設定" checked>主目盛りを自動</label><label><input type="checkbox" data-axis-auto="minor" data-axis-name="y" aria-label="Y軸の副目盛りを自動設定" checked>副目盛りを自動</label></div>
               <label class="minor-step-field" title="空欄は自動分割。線形軸の副目盛り間隔を指定します。対数軸は自動で配置します。">副目盛り間隔<input id="y-minor-step" data-axis="yMinorStep" type="number" step="any" placeholder="自動"></label>
+            </div>
+            <div id="right-axis-controls" hidden>
+              <div class="axis-group-title">右Y軸</div>
+              <div class="field-grid"><label>右Y軸ラベル<input id="y2-label" data-axis="y2Label" placeholder="空欄で列名を使用" maxlength="500"></label><label>右Y軸単位<input data-axis="y2Unit" value="auto" placeholder="auto / nm / %"></label></div>
+              <div class="field-grid"><label title="autoでは各軸の最初の系列と同じ色にします。">左Y軸の色<input data-axis="yColor" value="auto" placeholder="auto / #色"></label><label title="autoでは各軸の最初の系列と同じ色にします。">右Y軸の色<input data-axis="y2Color" value="auto" placeholder="auto / #色"></label></div>
+              <div class="axis-group">
+                <div class="axis-group-title">右Y軸の種類<select id="y2-scale" data-axis="y2Scale" aria-label="右Y軸の種類"><option value="linear">線形</option><option value="log">対数</option></select></div>
+                <label class="log-format-field" data-log-format-for="y2" hidden>目盛りの表記<select data-axis="y2LogFormat" aria-label="右Y軸の対数目盛り表記"><option value="power">累乗（10ⁿ）</option><option value="decimal">数値（0.1、1、10）</option></select></label>
+                <div class="field-grid three"><label>最小<input id="y2-min" data-axis="y2Min" type="number" step="any" placeholder="自動"></label><label>最大<input id="y2-max" data-axis="y2Max" type="number" step="any" placeholder="自動"></label><label>主目盛り間隔<input id="y2-step" data-axis="y2Step" type="number" step="any" placeholder="自動"></label></div>
+                <div class="check-options axis-tick-auto"><label title="手動の間隔を解除して自動に戻します。"><input type="checkbox" data-axis-auto="ticks" data-axis-name="y2" aria-label="右Y軸の主目盛りを自動設定" checked>主目盛りを自動</label><label><input type="checkbox" data-axis-auto="minor" data-axis-name="y2" aria-label="右Y軸の副目盛りを自動設定" checked>副目盛りを自動</label></div>
+                <label class="minor-step-field">副目盛り間隔<input id="y2-minor-step" data-axis="y2MinorStep" type="number" step="any" placeholder="自動"></label>
+              </div>
+              <details><summary>右Y軸の表示・余白</summary><div class="check-options"><label><input data-axis="hideY2Label" type="checkbox">ラベルを非表示</label><label><input data-axis="hideY2TickLabels" type="checkbox">目盛り数値を非表示</label><label><input data-axis="hideY2Ticks" type="checkbox">目盛り線を非表示</label></div><div class="field-grid"><label>ラベル追加余白 (pt)<input data-axis="y2LabelPad" type="number" min="-100" max="100" step="any" value="0"></label><label>目盛り追加余白 (pt)<input data-axis="y2TickPad" type="number" min="-100" max="100" step="any" value="0"></label></div></details>
             </div>
             <div class="check-options"><label title="X・Y軸共通。各軸の目盛り線を非表示にした場合は副目盛りも表示しません。"><input id="show-minor-ticks" data-axis="hideMinorTicks" data-invert="true" type="checkbox" checked>副目盛りを表示</label></div>
             <div class="field-grid size-fields"><label>軸領域の幅 <span>cm</span><input id="axes-width" data-axis="width" type="number" min="0.5" max="24" step="any" value="4" required></label><label>軸領域の高さ <span>cm</span><input id="axes-height" data-axis="height" type="number" min="0.5" max="24" step="any" value="3" required></label></div>
