@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.5.1";
+export const APP_VERSION = "1.6.0";
 
 // src/plot_settings.py: default_auto_series_colors(), same order and shades.
 export const COLORS = ["#1F8FE0", "#D4291E", "#2BA84D", "#D77207", "#7D3EDD", "#787878", "#666666", "#0052A8", "#A10000", "#009F22"];
@@ -137,6 +137,9 @@ export function parseProject(saved) {
     return {name:font.name, family:font.family, bytes};
   });
   if (typeof workspace.saveName !== 'string' || workspace.saveName.length > 120 || ![150,300,600,1200].includes(workspace.pngDpi) || !workspace.view || !Number.isFinite(workspace.view.zoom) || workspace.view.zoom < .25 || workspace.view.zoom > 4 || !Number.isFinite(workspace.view.x) || !Number.isFinite(workspace.view.y) || !Array.isArray(workspace.sections) || workspace.sections.length > 20 || workspace.sections.some(open => typeof open !== 'boolean')) throw new Error('プロジェクトの画面・保存設定を確認してください。');
+  if (workspace.sheetMode !== undefined && !['shared','individual'].includes(workspace.sheetMode)) throw new Error('プロジェクトの一括／個別設定を確認してください。');
+  const shared = workspace.sharedSettings;
+  if (shared != null && (shared.format !== 'plotlauncher-web' || shared.version !== 1 || shared.data?.filename !== data.filename || typeof shared.data.sheet !== 'string' || !Number.isInteger(shared.data.headerRow) || shared.data.headerRow < 1 || shared.data.headerRow > 1000 || !Array.isArray(shared.series) || shared.series.length < 1 || shared.series.length > 32 || !shared.axes || typeof shared.axes !== 'object')) throw new Error('プロジェクトの共通設定を確認してください。');
   if (workspace.sheetSettings !== undefined) {
     const indexes = new Set();
     if (!Array.isArray(workspace.sheetSettings) || workspace.sheetSettings.length > 1001) throw new Error('プロジェクトのシート設定を確認してください。');
@@ -145,6 +148,7 @@ export function parseProject(saved) {
       if (!Number.isInteger(item?.sheetIndex) || item.sheetIndex < 0 || item.sheetIndex > 1000 || indexes.has(item.sheetIndex) || setting?.format !== 'plotlauncher-web' || setting.version !== 1 || setting.data?.filename !== data.filename || typeof setting.data.sheet !== 'string' || !Number.isInteger(setting.data.headerRow) || setting.data.headerRow < 1 || setting.data.headerRow > 1000 || !Array.isArray(setting.series) || setting.series.length < 1 || setting.series.length > 32 || !setting.axes || typeof setting.axes !== 'object') throw new Error('プロジェクトのシート設定を確認してください。');
       indexes.add(item.sheetIndex);
       if (setting.inheritFirstSheet !== undefined && (typeof setting.inheritFirstSheet !== 'boolean' || setting.inheritFirstSheet && item.sheetIndex === 0)) throw new Error('プロジェクトのシート設定を確認してください。');
+      if (setting.inheritSharedSettings !== undefined && (typeof setting.inheritSharedSettings !== 'boolean' || setting.inheritSharedSettings && !shared)) throw new Error('プロジェクトの共通設定を確認してください。');
     }
     if (workspace.sheetSettings.some(item=>item.settings.inheritFirstSheet) && !indexes.has(0)) throw new Error('プロジェクトの先頭シート設定を確認してください。');
   }

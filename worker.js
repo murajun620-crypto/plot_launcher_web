@@ -1,4 +1,4 @@
-import { restoreSettings } from "./state.js?v=5e921a497d84";
+import { restoreSettings } from "./state.js?v=6f17791d01cb";
 // All user data stays in this worker's in-memory filesystem.
 const PYODIDE_VERSION = "0.29.3";
 const INDEX_URL = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
@@ -83,6 +83,7 @@ self.onmessage = ({ data }) => {
       let result = JSON.parse(dispatch(operation === "project" ? "load" : operation, JSON.stringify(payload)));
       if (operation === "project") {
         if (result.sheets[result.sheetIndex] !== args.settings.data.sheet) throw new Error("プロジェクトのシートが設定と一致しません。");
+        if (args.sharedSettings && !result.sheets.includes(args.sharedSettings.data.sheet)) throw new Error('プロジェクトの共通設定がデータと一致しません。');
         for (const item of args.sheetSettings || []) if (result.sheets[item.sheetIndex] !== item.settings.data.sheet) throw new Error('プロジェクトのシート設定がデータと一致しません。');
         const config = restoreSettings(args.settings, result), families = [];
         for (const font of args.fonts) {

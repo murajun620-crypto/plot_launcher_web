@@ -6,8 +6,8 @@
   <meta name="description" content="Excel・CSVの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=5e921a497d84">
-  <script type="module" src="./app.js?v=5e921a497d84"></script>
+  <link rel="stylesheet" href="./style.css?v=6f17791d01cb">
+  <script type="module" src="./app.js?v=6f17791d01cb"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -122,7 +122,7 @@
         <div><span class="eyebrow">FIGURE</span><h1>グラフプレビュー</h1></div>
                 <div class="export-buttons preview-file-actions">
           <button id="open-save" class="button primary" disabled title="形式と保存先を選んでグラフを保存します">グラフを保存</button>
-          <button id="open-save-all" class="button" disabled hidden title="1枚目のグラフ設定をほかのシートにも引き継いで保存します。各シートで後から行った個別調整も反映します。">全シートを一括保存</button>
+          <button id="open-save-all" class="button" disabled hidden title="選択中の一括／個別設定で全シートを保存します。">全シートを一括保存</button>
           <button id="copy-image" class="button" disabled title="選択した解像度でPNGをクリップボードにコピーします">画像をコピー</button>
         </div>
       </div>
@@ -130,6 +130,10 @@
         <button type="button" id="previous-sheet" class="button" aria-label="前のシート" disabled>◀</button>
         <output id="preview-sheet-name" aria-live="polite"></output>
         <button type="button" id="next-sheet" class="button" aria-label="次のシート" disabled>▶</button>
+        <fieldset class="sheet-settings-mode" aria-label="グラフ設定の適用範囲"><legend>設定</legend>
+          <label title="表示中のグラフ設定を全シートに適用します。どのシートで変更しても共通で反映します。"><input type="radio" name="sheet-settings-mode" id="sheet-mode-shared" value="shared" checked>一括</label>
+          <label title="シートごとに設定を保持します。ほかのシートの設定は変更しません。"><input type="radio" name="sheet-settings-mode" id="sheet-mode-individual" value="individual">個別</label>
+        </fieldset>
       </nav>
       <div class="figure-options"><span id="preview-state" class="preview-state">準備中</span><span class="toolbar-divider"></span><span id="figure-size">軸領域 4 × 3 cm</span><div class="save-options"><label title="PNG保存と画像コピーに共通で使用します">解像度<select id="png-dpi" aria-label="保存とコピーの解像度"><option value="150">150 dpi</option><option value="300">300 dpi</option><option value="600">600 dpi</option><option value="1200" selected>1200 dpi</option></select></label></div></div>
       <div id="figure-stage" class="figure-stage" aria-busy="true">
@@ -161,7 +165,7 @@
   <dialog id="save-dialog" class="save-dialog" aria-labelledby="save-dialog-title">
     <div class="dialog-heading"><h2 id="save-dialog-title">グラフを保存</h2><button id="close-save" class="button quiet" aria-label="保存画面を閉じる">閉じる</button></div>
     <section class="save-panel" aria-label="グラフの保存">
-      <label id="save-all-sheets-field" class="check" hidden title="1枚目を変更すると表示済みのシートにも設定を引き継ぎます。列名が異なる場合は同じ位置の列を使用。ヘッダー行はシート別に保持します。ダウンロードはZIPにまとめます。"><input type="checkbox" id="save-all-sheets">全シートを一括保存</label>
+      <label id="save-all-sheets-field" class="check" hidden title="プレビュー上の一括／個別設定に従って保存します。ヘッダー行はシート別に保持し、列名が異なる場合は同じ位置の列を使用します。ダウンロードはZIPにまとめます。"><input type="checkbox" id="save-all-sheets">全シートを一括保存</label>
       <label>ファイル名<input id="save-name" value="graph" maxlength="120" aria-label="保存するファイルの名前" title="拡張子は選択した形式に合わせて自動で付けます。同名ファイルは採番します。"></label>
       <fieldset class="save-formats"><legend title="複数の形式を同時に保存できます">保存形式</legend><div class="save-format-grid">
         <label class="check" title="画像として保存します"><input type="checkbox" data-export="png" checked>PNG</label>

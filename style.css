@@ -64,7 +64,7 @@ fieldset{margin:0;padding:0;border:0;min-width:0}
 .field-grid.three{grid-template-columns:1fr 1fr 1fr;gap:8px}
 label{display:flex;flex-direction:column;gap:6px;font-size:11px;font-weight:500;color:#5f6c80;min-width:0}
 label>span{font-size:10px;color:#9aa4b3}
-input:not([type=checkbox]):not([type=color]),select{width:100%;min-width:0;height:34px;border:1px solid #d9e0e9;border-radius:5px;padding:6px 9px;color:var(--ink);background:#fff;font-size:12px}
+input:not([type=checkbox]):not([type=color]):not([type=radio]),select{width:100%;min-width:0;height:34px;border:1px solid #d9e0e9;border-radius:5px;padding:6px 9px;color:var(--ink);background:#fff;font-size:12px}
 select{padding-right:23px}
 input::placeholder{color:#a6afbd;font-size:11px}
 input:focus,select:focus{outline:2px solid #abc8f3;outline-offset:1px;border-color:#5387cd}
@@ -266,9 +266,13 @@ button:focus-visible,summary:focus-visible,a:focus-visible{outline:2px solid #ab
 .save-folder-info{font-size:11px;color:var(--muted);overflow-wrap:anywhere}
 .preview-file-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .preview-file-actions>.primary{min-width:140px}
-.sheet-navigation{display:flex;align-items:center;gap:12px;margin-bottom:12px;max-width:100%}
+.sheet-navigation{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:12px;max-width:100%}
 .sheet-navigation output{font-size:13px;font-weight:550;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .sheet-navigation button{flex-shrink:0;min-width:38px}
+.sheet-settings-mode{display:flex;align-items:center;gap:12px;border:1px solid var(--border);border-radius:6px;padding:6px 12px;margin:0 0 0 8px;min-width:0;font-size:12px;background:#fff}
+.sheet-settings-mode legend{float:left;padding:0;margin-right:10px;color:var(--muted)}
+.sheet-settings-mode label{display:flex;flex-direction:row;align-items:center;gap:5px;font-size:12px;white-space:nowrap;cursor:pointer}
+.sheet-settings-mode input{margin:0;width:13px;height:13px;accent-color:var(--blue)}
 .save-progress{white-space:pre-line}
 
 button.drop-zone:not(:disabled):hover{background:#164c92;border-color:var(--blue);color:#fff}

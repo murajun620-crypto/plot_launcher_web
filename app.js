@@ -1,7 +1,7 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=5e921a497d84";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=5e921a497d84";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=5e921a497d84";
-import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=5e921a497d84";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=6f17791d01cb";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=6f17791d01cb";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=6f17791d01cb";
+import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=6f17791d01cb";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -22,20 +22,43 @@ const folderSupported = typeof window.showDirectoryPicker === 'function';
 const importedFonts = new Map();
 let savedProjectState = null;
 let sheetSettings = new Map(), cancelBatch = false;
+let sheetMode = 'shared', sharedSettings = null;
 $('#app-version').textContent = `v${APP_VERSION}`;
 
 function projectSheetSettings() {
   const sheets = new Map(sheetSettings);
   if (metadata && config.series.length) {
     const current = makeSettings(config, metadata, loadedHeader);
-    // A new edit on the first sheet supersedes earlier inherited/individual
-    // graph settings. Keep each target's header row for reading its own data.
-    if (metadata.sheetIndex === 0 && JSON.stringify(sheets.get(0)) !== JSON.stringify(current)) {
-      for (const [index, settings] of sheets) if (index !== 0) sheets.set(index, {...settings, inheritFirstSheet:true});
-    }
     sheets.set(metadata.sheetIndex, current);
   }
   return [...sheets].sort(([a],[b])=>a-b).map(([sheetIndex,settings])=>({sheetIndex,settings}));
+}
+
+function currentSharedSettings() {
+  if (!metadata || !config.series.length) return sharedSettings;
+  const current = makeSettings(config, metadata, loadedHeader), baseline = sheetSettings.get(metadata.sheetIndex);
+  const graph = settings => JSON.stringify(settings && {plotType:settings.plotType, options:settings.options, axes:settings.axes, series:settings.series, annotations:settings.annotations});
+  // Do not rebase column positions merely because a reordered sheet was viewed.
+  return !sharedSettings || graph(current) !== graph(baseline) ? current : sharedSettings;
+}
+
+function setSheetMode(mode) {
+  if (!['shared','individual'].includes(mode) || mode === sheetMode || loading || exporting || !metadata) return;
+  const sheets = new Map(projectSheetSettings().map(item=>[item.sheetIndex,item.settings]));
+  if (mode === 'shared') {
+    sharedSettings = config.series.length ? makeSettings(config,metadata,loadedHeader) : sharedSettings || sheets.get(0) || sheets.values().next().value || null;
+  } else {
+    sharedSettings = currentSharedSettings();
+    // Freeze the shared appearance as the starting point of individual edits.
+    // Each sheet keeps its own header row and resolves columns when opened.
+    if (sharedSettings) for (const [index,settings] of sheets) if (index !== metadata.sheetIndex) {
+      const inherited = {...settings, inheritSharedSettings:true};
+      delete inherited.inheritFirstSheet;
+      sheets.set(index,inherited);
+    }
+  }
+  sheetSettings = sheets; sheetMode = mode; updateButtons();
+  status(mode === 'shared' ? '一括設定：表示中のグラフ設定を全シートに適用します。' : '個別設定：シートごとにグラフ設定を変更できます。','ready');
 }
 
 function projectEditState() {
@@ -45,6 +68,7 @@ function projectEditState() {
   return {source:sourceData, fonts:[...importedFonts.values()], content:JSON.stringify({
     settings:metadata ? makeSettings(config,metadata,loadedHeader) : config,
     sheetIndex:metadata?.sheetIndex, sample, sheetSettings:projectSheetSettings(),
+    sheetMode, sharedSettings:sheetMode === 'shared' ? currentSharedSettings() : sharedSettings,
     saveName:$('#save-name').value, pngDpi:Number($('#png-dpi').value)
   })};
 }
@@ -110,6 +134,10 @@ function updateButtons() {
   $("#header-row").disabled = !engineReady || !metadata || busy;
   $("#sheet-select").disabled = !engineReady || !metadata || busy || metadata.sheets.length < 2;
   const multipleSheets = (metadata?.sheets.length ?? 0) > 1;
+  for (const mode of ['shared','individual']) {
+    $(`#sheet-mode-${mode}`).checked = sheetMode === mode;
+    $(`#sheet-mode-${mode}`).disabled = !engineReady || busy || !multipleSheets;
+  }
   $('#sheet-navigation').hidden = $('#open-save-all').hidden = $('#save-all-sheets-field').hidden = !multipleSheets;
   $('#previous-sheet').disabled = !engineReady || busy || !multipleSheets || metadata.sheetIndex <= 0;
   $('#next-sheet').disabled = !engineReady || busy || !multipleSheets || metadata.sheetIndex >= metadata.sheets.length - 1;
@@ -158,7 +186,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=5e921a497d84", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=6f17791d01cb", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -507,6 +535,11 @@ function initialSheetConfig(data) {
   return result;
 }
 
+function configurationForSheet(data, setting, template) {
+  const inherited = sheetMode === 'shared' ? template : setting?.inheritSharedSettings ? sharedSettings : setting?.inheritFirstSheet ? sheetSettings.get(0) : !setting ? template : null;
+  return inherited ? configForSheet(inherited, data) : setting ? restoreSettings(setting, data) : initialSheetConfig(data);
+}
+
 async function loadFile(file, isSample = false, reload = false, fromClipboard = false) {
   if (loading || exporting || !engineReady) return;
   if (!reload && (!/\.(xlsx|xlsm|xls|csv)$/i.test(file.name) || file.size > 30 * 1024 * 1024)) {
@@ -516,7 +549,7 @@ async function loadFile(file, isSample = false, reload = false, fromClipboard = 
   const sheetIndex = reload ? Number($('#sheet-select').value) : 0;
   const switchingSheet = reload && sheetIndex !== metadata.sheetIndex;
   const nextSheets = reload ? new Map(projectSheetSettings().map(item=>[item.sheetIndex,item.settings])) : new Map();
-  const firstSettings = nextSheets.get(0);
+  const nextShared = reload && sheetMode === 'shared' ? currentSharedSettings() : sharedSettings;
   const stored = switchingSheet ? nextSheets.get(sheetIndex) : null;
   const headerRow = reload ? (stored?.data.headerRow ?? Number($("#header-row").value)) : 1;
   if (!Number.isInteger(headerRow) || headerRow < 1 || headerRow > 1000) {
@@ -540,6 +573,7 @@ async function loadFile(file, isSample = false, reload = false, fromClipboard = 
     sheetSettings = nextSheets;
     if (!reload) {
       sheetSettings.clear();
+      sheetMode = 'shared'; sharedSettings = null;
       sourceData = {filename, bytes:originalBytes};
       sourceHandle = sourceHandles.get(file) || null; sourceDirectory = null;
       $('#save-destination').value = folderSupported ? (isSample || fromClipboard ? 'folder' : 'source') : 'download';
@@ -549,19 +583,21 @@ async function loadFile(file, isSample = false, reload = false, fromClipboard = 
     // Retain settings if the same columns are still present after a sheet/header change.
     let retained;
     if (reload && previousSettings) sheetSettings.set(previous.sheetIndex, previousSettings);
-    if (stored && !stored.inheritFirstSheet) {
-      try { retained = restoreSettings(stored, metadata); } catch {}
-    } else if (switchingSheet && sheetIndex !== 0 && firstSettings) {
-      try { retained = configForSheet(firstSettings, metadata); } catch {}
-    } else if (reload && previousSettings) {
-      try { retained = configForSheet(previousSettings, metadata); } catch {}
+    if (reload) {
+      if (sheetMode === 'shared') sharedSettings = nextShared;
+      const template = sheetMode === 'shared' ? nextShared : sharedSettings || nextSheets.get(0) || previousSettings;
+      try {retained = configurationForSheet(metadata, switchingSheet ? stored : previousSettings, template);} catch {}
     }
     config = retained || initialSheetConfig(metadata);
-    if (reload && config.series.length) sheetSettings.set(sheetIndex, makeSettings(config, metadata, loadedHeader));
     if (sample && !reload) {
       config.series = metadata.columns.slice(1).map((column, index) => createSeries(0, column.index, column.name, index));
       config.axes.xLabel = "Potential"; config.axes.xUnit = "V";
       config.axes.yLabel = "Current density"; config.axes.yUnit = "mA/cm^2";
+    }
+    if (config.series.length) {
+      const current = makeSettings(config, metadata, loadedHeader);
+      sheetSettings.set(sheetIndex,current);
+      if (sheetMode === 'shared' && !sharedSettings) sharedSettings = current;
     }
     if (!reload) $("#save-name").value = safeStem(filename);
     selected.clear(); history=[];future=[];lastState=structuredClone(config);view={zoom:1,x:0,y:0};
@@ -828,7 +864,7 @@ async function exportSheets(formats) {
   $('#cancel-batch').hidden = false; $('#cancel-batch').disabled = false; updateButtons();
   const filename = metadata.filename, names = [...metadata.sheets];
   const snapshots = new Map(projectSheetSettings().map(item=>[item.sheetIndex,item.settings]));
-  const template = snapshots.get(0) || (config.series.length ? makeSettings(config, metadata, loadedHeader) : null);
+  const template = sheetMode === 'shared' ? currentSharedSettings() : sharedSettings || snapshots.get(0) || (config.series.length ? makeSettings(config, metadata, loadedHeader) : null);
   const stem = safeStem($('#save-name').value), dpi = Number($('#png-dpi').value);
   const asZip = !folderSupported || $('#save-destination').value === 'download';
   const files = [], saved = [], errors = [];
@@ -837,6 +873,7 @@ async function exportSheets(formats) {
     // Ask for a destination while this action still has the click gesture.
     const saveFile = await prepareSaver();
     sheetSettings = new Map(snapshots);
+    if (sheetMode === 'shared') sharedSettings = template;
     for (let index=0;index<names.length && !cancelBatch;index++) {
       const setting = snapshots.get(index), headerRow = setting?.data.headerRow ?? loadedHeader;
       const prefix = `${index + 1} / ${names.length} · ${names[index]}`;
@@ -845,7 +882,7 @@ async function exportSheets(formats) {
       try {
         const data = await request('sheet-info', {filename, sheetIndex:index, headerRow});
         if (!data.rowCount || data.columns.length < 2) throw new Error('描画するデータがありません。');
-        sheetConfig = setting && !setting.inheritFirstSheet ? restoreSettings(setting, data) : template ? configForSheet(template, data) : initialSheetConfig(data);
+        sheetConfig = configurationForSheet(data, setting, template);
         if (!sheetConfig.series.length) throw new Error('X列とY列を設定してください。');
         sheetSettings.set(index, makeSettings(sheetConfig, data, headerRow));
       } catch (error) {errors.push(`${names[index]}：${error.message}`);continue;}
@@ -901,6 +938,7 @@ async function changeSheet(index) {
 }
 $('#previous-sheet').addEventListener('click', () => changeSheet(metadata?.sheetIndex - 1));
 $('#next-sheet').addEventListener('click', () => changeSheet(metadata?.sheetIndex + 1));
+for (const mode of ['shared','individual']) $(`#sheet-mode-${mode}`).addEventListener('change', () => setSheetMode(mode));
 $("#header-row").addEventListener("change", () => loadFile(null, false, true));
 $("#plot-form").addEventListener("submit", event => event.preventDefault());
 function incompleteNumberInput(input) {
@@ -998,7 +1036,7 @@ async function saveProject() {
     const saveFile=await prepareDocumentSaver(name,"PlotLauncherプロジェクト",".plotproject");
     const savedState=projectEditState();
     const project=makeProject(makeSettings(config,metadata,loadedHeader), {...sourceData,sheetIndex:metadata.sheetIndex,headerRow:loadedHeader,sample}, [...importedFonts.values()], {
-      saveName:$("#save-name").value,pngDpi:Number($("#png-dpi").value),view:{...view},sections:$$('#controls-panel .control-section').map(section=>section.open),sheetSettings:projectSheetSettings()
+      saveName:$("#save-name").value,pngDpi:Number($("#png-dpi").value),view:{...view},sections:$$('#controls-panel .control-section').map(section=>section.open),sheetSettings:projectSheetSettings(),sheetMode,sharedSettings:sheetMode === 'shared' ? currentSharedSettings() : sharedSettings
     });
     const blob=new Blob([JSON.stringify(project)],{type:'application/json'});
     if(blob.size>PROJECT_MAX_SIZE)throw new Error('プロジェクトは130 MB以内にしてください。');
@@ -1022,9 +1060,11 @@ async function readProject(file, saved) {
     const project=parseProject(saved || JSON.parse(await file.text()));
     const retainedData={filename:project.data.filename,bytes:project.data.bytes.slice(0)};
     const retainedFonts=project.fonts.map(font=>({...font,bytes:font.bytes.slice(0)}));
-    const result=await request('project',{filename:project.data.filename,bytes:project.data.bytes,sheetIndex:project.data.sheetIndex,headerRow:project.data.headerRow,settings:project.settings,fonts:project.fonts,sheetSettings:project.workspace.sheetSettings || []});
+    const result=await request('project',{filename:project.data.filename,bytes:project.data.bytes,sheetIndex:project.data.sheetIndex,headerRow:project.data.headerRow,settings:project.settings,fonts:project.fonts,sheetSettings:project.workspace.sheetSettings || [],sharedSettings:project.workspace.sharedSettings});
     metadata=result.metadata; config=result.config; sourceData=retainedData; sample=project.data.sample;
     sheetSettings=new Map((project.workspace.sheetSettings || []).map(item=>[item.sheetIndex,item.settings]));
+    // Older projects may contain distinct sheet styles; keep those individual.
+    sheetMode=project.workspace.sheetMode || 'individual'; sharedSettings=project.workspace.sharedSettings || null;
     sourceHandle=sourceHandles.get(file) || null; sourceDirectory=null;
     $('#save-destination').value=folderSupported?'source':'download'; refreshSaveDestination(); loadedHeader=metadata.headerRow;
     importedFonts.clear(); retainedFonts.forEach(font=>importedFonts.set(font.name,font));
