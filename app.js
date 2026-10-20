@@ -1,6 +1,7 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=a660752b52eb";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=a660752b52eb";
-import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=a660752b52eb";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=1fec4d441866";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=1fec4d441866";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=1fec4d441866";
+import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=1fec4d441866";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -20,7 +21,14 @@ const sourceHandles = new WeakMap();
 const folderSupported = typeof window.showDirectoryPicker === 'function';
 const importedFonts = new Map();
 let savedProjectState = null;
+let sheetSettings = new Map(), cancelBatch = false;
 $('#app-version').textContent = `v${APP_VERSION}`;
+
+function projectSheetSettings() {
+  const sheets = new Map(sheetSettings);
+  if (metadata && config.series.length) sheets.set(metadata.sheetIndex, makeSettings(config, metadata, loadedHeader));
+  return [...sheets].sort(([a],[b])=>a-b).map(([sheetIndex,settings])=>({sheetIndex,settings}));
+}
 
 function projectEditState() {
   // Retained data/font objects are immutable; compare references rather than
@@ -28,7 +36,7 @@ function projectEditState() {
   // Zoom, pan, selection and expanded sections only change the viewing state.
   return {source:sourceData, fonts:[...importedFonts.values()], content:JSON.stringify({
     settings:metadata ? makeSettings(config,metadata,loadedHeader) : config,
-    sheetIndex:metadata?.sheetIndex, sample,
+    sheetIndex:metadata?.sheetIndex, sample, sheetSettings:projectSheetSettings(),
     saveName:$('#save-name').value, pngDpi:Number($('#png-dpi').value)
   })};
 }
@@ -93,14 +101,26 @@ function updateButtons() {
   $("#plot-fields").disabled = !engineReady || !metadata || busy;
   $("#header-row").disabled = !engineReady || !metadata || busy;
   $("#sheet-select").disabled = !engineReady || !metadata || busy || metadata.sheets.length < 2;
+  const multipleSheets = (metadata?.sheets.length ?? 0) > 1;
+  $('#sheet-navigation').hidden = $('#open-save-all').hidden = $('#save-all-sheets-field').hidden = !multipleSheets;
+  $('#previous-sheet').disabled = !engineReady || busy || !multipleSheets || metadata.sheetIndex <= 0;
+  $('#next-sheet').disabled = !engineReady || busy || !multipleSheets || metadata.sheetIndex >= metadata.sheets.length - 1;
+  $('#open-save-all').disabled = !engineReady || busy || !multipleSheets || renderRunning;
+  $('#save-all-sheets').disabled = busy || !multipleSheets;
+  if (!multipleSheets) $('#save-all-sheets').checked = false;
+  if (metadata) {
+    $('#preview-sheet-name').textContent = `${metadata.sheetIndex + 1} / ${metadata.sheets.length} · ${metadata.sheets[metadata.sheetIndex]}`;
+    $('#preview-sheet-name').title = metadata.sheets[metadata.sheetIndex];
+  }
   $("#open-settings").disabled = !metadata || busy;
   $("#save-settings").disabled = !metadata || busy || config.series.length === 0;
   $("#refresh-preview").disabled = !metadata || busy;
   $("#add-series").disabled = config.series.length >= 32 || (metadata?.columns.length ?? 0) < 2;
   $("#load-font").disabled = !engineReady || busy;
-  $$('[data-export]').forEach(button => { button.disabled = !engineReady || busy || renderedRevision !== revision || renderRunning; });
+  const canSave = engineReady && !busy && !renderRunning && (renderedRevision === revision || multipleSheets && $('#save-all-sheets').checked);
+  $$('[data-export]').forEach(button => { button.disabled = !canSave; });
   $("#open-save").disabled = !engineReady || busy || renderedRevision !== revision || renderRunning;
-  $("#confirm-save").disabled = !engineReady || busy || renderedRevision !== revision || renderRunning;
+  $("#confirm-save").disabled = !canSave;
   for (const id of ["#save-name", "#png-dpi", "#save-destination", "#choose-save-folder", "#close-save"]) $(id).disabled = busy;
   $("#copy-image").disabled = !engineReady || busy || renderedRevision !== revision || renderRunning;
   $("#figure-stage").setAttribute("aria-busy", String(loading || exporting || renderRunning || !engineReady));
@@ -130,7 +150,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=a660752b52eb", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=1fec4d441866", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -469,13 +489,26 @@ function resetPreview() {
   renderedRevision = -1;
 }
 
+function initialSheetConfig(data) {
+  const inferred = data.plotType || 'General';
+  const result = {axes:defaultAxes(), plotType:inferred, options:{}, series:initialSeries(data.columns, inferred)};
+  applyPreset(result, presets.find(item=>item.id===inferred));
+  if (inferred==='XPS Fit') result.series=[createSeries(0,1,data.columns[1]?.name || 'Raw')];
+  if (inferred==='Roughness') result.series.forEach(item=>item.mode='line+scatter');
+  if (inferred==='Particle Histogram') result.options.diameterColumn=Math.min(2,data.columns.length-1);
+  return result;
+}
+
 async function loadFile(file, isSample = false, reload = false, fromClipboard = false) {
   if (loading || exporting || !engineReady) return;
   if (!reload && (!/\.(xlsx|xlsm|xls|csv)$/i.test(file.name) || file.size > 30 * 1024 * 1024)) {
     status("30 MB以内のExcel（.xlsx / .xlsm / .xls）またはCSVを選んでください。", "error");
     return;
   }
-  const headerRow = reload ? Number($("#header-row").value) : 1;
+  const sheetIndex = reload ? Number($('#sheet-select').value) : 0;
+  const switchingSheet = reload && sheetIndex !== metadata.sheetIndex;
+  const stored = switchingSheet ? sheetSettings.get(sheetIndex) : null;
+  const headerRow = reload ? (stored?.data.headerRow ?? Number($("#header-row").value)) : 1;
   if (!Number.isInteger(headerRow) || headerRow < 1 || headerRow > 1000) {
     status("ヘッダー行は1〜1000の整数で指定してください。", "error");
     return;
@@ -487,13 +520,15 @@ async function loadFile(file, isSample = false, reload = false, fromClipboard = 
   status("データを読み込んでいます…");
   try {
     const filename = reload ? metadata.filename : file.name;
-    const args = { filename, headerRow, sheetIndex: reload ? Number($("#sheet-select").value) : 0 };
+    const args = { filename, headerRow, sheetIndex };
     if (!reload) args.bytes = await file.arrayBuffer();
     const originalBytes = args.bytes?.slice(0);
     const previous = metadata;
+    const previousSettings = previous && config.series.length ? makeSettings(config, previous, loadedHeader) : null;
     metadata = await request("load", args);
     loadedHeader = metadata.headerRow || headerRow;
     if (!reload) {
+      sheetSettings.clear();
       sourceData = {filename, bytes:originalBytes};
       sourceHandle = sourceHandles.get(file) || null; sourceDirectory = null;
       $('#save-destination').value = folderSupported ? (isSample || fromClipboard ? 'folder' : 'source') : 'download';
@@ -502,17 +537,13 @@ async function loadFile(file, isSample = false, reload = false, fromClipboard = 
     sample = reload ? sample : isSample;
     // Retain settings if the same columns are still present after a sheet/header change.
     let retained;
-    if (reload && previous && config.series.length) {
-      try { retained = restoreSettings(makeSettings(config, previous, headerRow), metadata); } catch {}
+    if (reload && previousSettings) sheetSettings.set(previous.sheetIndex, previousSettings);
+    if (stored) {
+      try { retained = restoreSettings(stored, metadata); } catch {}
+    } else if (reload && previousSettings) {
+      try { retained = configForSheet(previousSettings, metadata); } catch {}
     }
-    const inferred=metadata.plotType || 'General';
-    config = retained || { axes: defaultAxes(), plotType: inferred, options: {}, series: initialSeries(metadata.columns, inferred) };
-    if(!retained){
-      applyPreset(config,presets.find(item=>item.id===inferred));
-      if(inferred==='XPS Fit')config.series=[createSeries(0,1,metadata.columns[1]?.name || 'Raw')];
-      if(inferred==='Roughness')config.series.forEach(item=>item.mode='line+scatter');
-      if(inferred==='Particle Histogram')config.options.diameterColumn=Math.min(2,metadata.columns.length-1);
-    }
+    config = retained || initialSheetConfig(metadata);
     if (sample && !reload) {
       config.series = metadata.columns.slice(1).map((column, index) => createSeries(0, column.index, column.name, index));
       config.axes.xLabel = "Potential"; config.axes.xUnit = "V";
@@ -742,19 +773,24 @@ async function copyFigureImage() {
   }
 }
 
-function openSaveDialog() {
-  if ($('#open-save').disabled) return;
+function openSaveDialog(allSheets = false) {
+  if ($(allSheets ? '#open-save-all' : '#open-save').disabled) return;
+  $('#save-all-sheets').checked = allSheets;
   $('#save-progress').textContent = '';
-  refreshSaveDestination(); $('#save-dialog').showModal();
+  refreshSaveDestination(); updateButtons(); $('#save-dialog').showModal();
 }
-$('#open-save').addEventListener('click', openSaveDialog);
+$('#open-save').addEventListener('click', () => openSaveDialog());
+$('#open-save-all').addEventListener('click', () => openSaveDialog(true));
+$('#save-all-sheets').addEventListener('change', updateButtons);
 $('#close-save').addEventListener('click', () => {if (!exporting) $('#save-dialog').close();});
 $('#save-dialog').addEventListener('cancel', event => {if (exporting) event.preventDefault();});
-$('#confirm-save').addEventListener('click', () => exportFigure($$('[data-export]').filter(input => input.checked).map(input => input.dataset.export)));
-async function exportFigure(formats) {
-  if (exporting || loading || renderedRevision !== revision) return;
+$('#confirm-save').addEventListener('click', () => exportFigure($$('[data-export]').filter(input => input.checked).map(input => input.dataset.export), $('#save-all-sheets').checked));
+$('#cancel-batch').addEventListener('click', () => {cancelBatch=true;$('#cancel-batch').disabled=true;status('処理中のファイルが完成したところで停止します…');});
+async function exportFigure(formats, allSheets = false) {
+  if (exporting || loading || renderRunning || !engineReady || !metadata || (!allSheets && renderedRevision !== revision)) return;
   formats = typeof formats === 'string' ? [formats] : formats;
   if (!formats.length) {status('保存形式を1つ以上選択してください。', 'error'); return;}
+  if (allSheets && metadata.sheets.length > 1) return exportSheets(formats);
   exporting = true; updateButtons();
   const stem = safeStem($('#save-name').value), snapshot = structuredClone(config), dpi = Number($('#png-dpi').value);
   const saved = [];
@@ -770,7 +806,61 @@ async function exportFigure(formats) {
   } catch (error) {
     const message = error.name === 'AbortError' ? '保存をキャンセルしました。' : error.message;
     status(`${message}${saved.length ? ` 保存済み：${saved.join('、')}` : ''}`, error.name === 'AbortError' ? 'ready' : 'error');
-  } finally {exporting = false; updateButtons();}
+  } finally {exporting = false; updateButtons(); if(renderWanted)renderPreview();}
+}
+
+async function exportSheets(formats) {
+  exporting = true; cancelBatch = false;
+  $('#cancel-batch').hidden = false; $('#cancel-batch').disabled = false; updateButtons();
+  const filename = metadata.filename, names = [...metadata.sheets], active = metadata.sheetIndex;
+  const template = config.series.length ? makeSettings(config, metadata, loadedHeader) : null;
+  const snapshots = new Map(sheetSettings);
+  if (template) snapshots.set(active, template);
+  const stem = safeStem($('#save-name').value), dpi = Number($('#png-dpi').value);
+  const asZip = !folderSupported || $('#save-destination').value === 'download';
+  const files = [], saved = [], errors = [];
+  let zipBytes = 0;
+  try {
+    // Ask for a destination while this action still has the click gesture.
+    const saveFile = await prepareSaver();
+    for (let index=0;index<names.length && !cancelBatch;index++) {
+      const setting = snapshots.get(index), headerRow = setting?.data.headerRow ?? loadedHeader;
+      const prefix = `${index + 1} / ${names.length} · ${names[index]}`;
+      let sheetConfig;
+      status(`${prefix} を準備しています…`);
+      try {
+        const data = await request('sheet-info', {filename, sheetIndex:index, headerRow});
+        if (!data.rowCount || data.columns.length < 2) throw new Error('描画するデータがありません。');
+        sheetConfig = setting ? restoreSettings(setting, data) : template ? configForSheet(template, data) : initialSheetConfig(data);
+        if (!sheetConfig.series.length) throw new Error('X列とY列を設定してください。');
+        sheetSettings.set(index, makeSettings(sheetConfig, data, headerRow));
+      } catch (error) {errors.push(`${names[index]}：${error.message}`);continue;}
+      for (const format of formats) {
+        if (cancelBatch) break;
+        status(`${prefix} · ${format.toUpperCase()}を作成しています…`);
+        let result;
+        try {result = await request('sheet-export', {filename, sheetIndex:index, headerRow, config:sheetConfig, format, dpi});}
+        catch (error) {errors.push(`${names[index]}（${format.toUpperCase()}）：${error.message}`);continue;}
+        const bytes = Uint8Array.from(atob(result.base64), character=>character.charCodeAt(0));
+        const name = `${sheetFileStem(stem,names[index],index)}.${format}`;
+        if (asZip) {
+          zipBytes += bytes.length;
+          if (zipBytes > 250 * 1024 * 1024) throw new Error('ZIPが250 MBを超えます。保存先にフォルダを指定して保存してください。');
+          files.push({name,bytes});
+        } else saved.push(await saveFile(new Blob([bytes]),name));
+      }
+    }
+    if (asZip && files.length) saved.push(await saveFile(zipFiles(files),`${stem}_sheets.zip`));
+    const count = asZip ? files.length : saved.length;
+    const summary = `${cancelBatch ? '一括保存を中止しました。' : ''}${count}ファイルを${asZip ? 'ZIPにまとめて' : ''}保存しました。`;
+    status(`${summary}${errors.length ? `\n保存できなかった項目：\n${errors.join('\n')}` : ''}`, errors.length || !count && !cancelBatch ? 'error' : 'ready');
+  } catch (error) {
+    const cancelled = error.name === 'AbortError';
+    status(`${cancelled ? '保存をキャンセルしました。' : error.message}${saved.length ? `\n保存済み：${saved.join('、')}` : ''}`,cancelled?'ready':'error');
+  } finally {
+    exporting = false; $('#cancel-batch').hidden = true; updateButtons();
+    if (renderWanted) renderPreview();
+  }
 }
 
 async function prepareDocumentSaver(name, description, extension) {
@@ -790,6 +880,13 @@ window.addEventListener("dragover", event => event.preventDefault());
 window.addEventListener("drop", event => {event.preventDefault();const file=event.dataTransfer.files[0];if(file && /\.(json|plotproject)$/i.test(file.name))openDroppedFile(file);});
 $("#sample-data").addEventListener("click", loadSample);
 $("#sheet-select").addEventListener("change", () => loadFile(null, false, true));
+async function changeSheet(index) {
+  if (!engineReady || loading || exporting || !metadata || index < 0 || index >= metadata.sheets.length || index === metadata.sheetIndex) return;
+  $('#sheet-select').value = String(index);
+  return loadFile(null, false, true);
+}
+$('#previous-sheet').addEventListener('click', () => changeSheet(metadata?.sheetIndex - 1));
+$('#next-sheet').addEventListener('click', () => changeSheet(metadata?.sheetIndex + 1));
 $("#header-row").addEventListener("change", () => loadFile(null, false, true));
 $("#plot-form").addEventListener("submit", event => event.preventDefault());
 function incompleteNumberInput(input) {
@@ -887,7 +984,7 @@ async function saveProject() {
     const saveFile=await prepareDocumentSaver(name,"PlotLauncherプロジェクト",".plotproject");
     const savedState=projectEditState();
     const project=makeProject(makeSettings(config,metadata,loadedHeader), {...sourceData,sheetIndex:metadata.sheetIndex,headerRow:loadedHeader,sample}, [...importedFonts.values()], {
-      saveName:$("#save-name").value,pngDpi:Number($("#png-dpi").value),view:{...view},sections:$$('#controls-panel .control-section').map(section=>section.open)
+      saveName:$("#save-name").value,pngDpi:Number($("#png-dpi").value),view:{...view},sections:$$('#controls-panel .control-section').map(section=>section.open),sheetSettings:projectSheetSettings()
     });
     const blob=new Blob([JSON.stringify(project)],{type:'application/json'});
     if(blob.size>PROJECT_MAX_SIZE)throw new Error('プロジェクトは130 MB以内にしてください。');
@@ -911,8 +1008,9 @@ async function readProject(file, saved) {
     const project=parseProject(saved || JSON.parse(await file.text()));
     const retainedData={filename:project.data.filename,bytes:project.data.bytes.slice(0)};
     const retainedFonts=project.fonts.map(font=>({...font,bytes:font.bytes.slice(0)}));
-    const result=await request('project',{filename:project.data.filename,bytes:project.data.bytes,sheetIndex:project.data.sheetIndex,headerRow:project.data.headerRow,settings:project.settings,fonts:project.fonts});
+    const result=await request('project',{filename:project.data.filename,bytes:project.data.bytes,sheetIndex:project.data.sheetIndex,headerRow:project.data.headerRow,settings:project.settings,fonts:project.fonts,sheetSettings:project.workspace.sheetSettings || []});
     metadata=result.metadata; config=result.config; sourceData=retainedData; sample=project.data.sample;
+    sheetSettings=new Map((project.workspace.sheetSettings || []).map(item=>[item.sheetIndex,item.settings]));
     sourceHandle=sourceHandles.get(file) || null; sourceDirectory=null;
     $('#save-destination').value=folderSupported?'source':'download'; refreshSaveDestination(); loadedHeader=metadata.headerRow;
     importedFonts.clear(); retainedFonts.forEach(font=>importedFonts.set(font.name,font));

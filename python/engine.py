@@ -239,6 +239,19 @@ class PlotEngine:
         self.xps_csv = suffix == ".csv" and bool(xps_header)
         return {"filename": filename, "sheets": sheets, "sheetIndex": sheets.index(sheet_name), "columns": columns, "rowCount": len(frame), "rows": rows, "headerRow": int(header), "xpsCSV": self.xps_csv, "plotType": "XPS Fit" if self.xps_csv else self.infer_plot_type(filename)}
 
+    @contextmanager
+    def sheet_data(self, path, filename, sheet_index, header_row):
+        """Read/export another sheet without replacing the editable preview."""
+        previous = dict(self.__dict__)
+        self.figure = None
+        try:
+            yield self.load(path, filename, sheet_index, header_row)
+        finally:
+            if self.figure is not None and self.figure is not previous.get("figure"):
+                plt.close(self.figure)
+            self.__dict__.clear()
+            self.__dict__.update(previous)
+
     def _prepare(self, config):
         preset = config.get("plotType", "General")
         if preset not in self.presets:
@@ -941,6 +954,9 @@ class PlotEngine:
         args = json.loads(payload)
         if operation == "load":
             result = self.load(**args)
+        elif operation in {"sheet-info", "sheet-export"}:
+            with self.sheet_data(args["path"], args["filename"], args["sheet_index"], args["header_row"]) as metadata:
+                result = metadata if operation == "sheet-info" else self.export(args["config"], args["format"], args.get("dpi", 1200))
         elif operation == "render":
             result = self.render(args["config"])
         elif operation == "export":

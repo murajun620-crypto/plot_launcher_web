@@ -266,6 +266,10 @@ button:focus-visible,summary:focus-visible,a:focus-visible{outline:2px solid #ab
 .save-folder-info{font-size:11px;color:var(--muted);overflow-wrap:anywhere}
 .preview-file-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .preview-file-actions>.primary{min-width:140px}
+.sheet-navigation{display:flex;align-items:center;gap:12px;margin-bottom:12px;max-width:100%}
+.sheet-navigation output{font-size:13px;font-weight:550;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.sheet-navigation button{flex-shrink:0;min-width:38px}
+.save-progress{white-space:pre-line}
 
 button.drop-zone:not(:disabled):hover{background:#164c92;border-color:var(--blue);color:#fff}
 .paste-data{width:100%;margin-top:8px}

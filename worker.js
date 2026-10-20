@@ -1,4 +1,4 @@
-import { restoreSettings } from "./state.js?v=a660752b52eb";
+import { restoreSettings } from "./state.js?v=1fec4d441866";
 // All user data stays in this worker's in-memory filesystem.
 const PYODIDE_VERSION = "0.29.3";
 const INDEX_URL = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
@@ -77,9 +77,13 @@ self.onmessage = ({ data }) => {
         pyodide.FS.writeFile(path, new Uint8Array(args.bytes));
         payload = { path };
       }
+      if (operation === 'sheet-info' || operation === 'sheet-export') {
+        payload = {path:currentPath, filename:args.filename, sheet_index:args.sheetIndex, header_row:args.headerRow, config:args.config, format:args.format, dpi:args.dpi};
+      }
       let result = JSON.parse(dispatch(operation === "project" ? "load" : operation, JSON.stringify(payload)));
       if (operation === "project") {
         if (result.sheets[result.sheetIndex] !== args.settings.data.sheet) throw new Error("プロジェクトのシートが設定と一致しません。");
+        for (const item of args.sheetSettings || []) if (result.sheets[item.sheetIndex] !== item.settings.data.sheet) throw new Error('プロジェクトのシート設定がデータと一致しません。');
         const config = restoreSettings(args.settings, result), families = [];
         for (const font of args.fonts) {
           const path = `/app/user-font-${++uploadNumber}.ttf`;
