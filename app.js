@@ -1,7 +1,7 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=9a54ef1f1565";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9a54ef1f1565";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=9a54ef1f1565";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=9a54ef1f1565";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=1701bf7d04c9";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=1701bf7d04c9";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=1701bf7d04c9";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=1701bf7d04c9";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -188,7 +188,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=9a54ef1f1565", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=1701bf7d04c9", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {

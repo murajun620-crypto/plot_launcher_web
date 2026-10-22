@@ -3,6 +3,6 @@
     "id": "Polishing Rate",
     "label": "研磨レート",
     "script": "generic_xy_base.py",
-    "labels": ["polishing time", "min", "Removal thickness", "μm"]
+    "labels": ["Polishing time", "min", "Removal thickness", "μm"]
   }
 ]
