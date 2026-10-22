@@ -1,7 +1,7 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=c4441896f74c";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=c4441896f74c";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=c4441896f74c";
-import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=c4441896f74c";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=58b14d40dd44";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=58b14d40dd44";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=58b14d40dd44";
+import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=58b14d40dd44";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -186,7 +186,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=c4441896f74c", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=58b14d40dd44", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -403,7 +403,7 @@ function drawPresetOptions() {
 
 $("#plot-type").addEventListener("change",event=>{
   applyPreset(config,presets.find(item=>item.id===event.target.value));
-  if(!['General','Roughness'].includes(config.plotType))config.series.forEach(item=>{item.mode='line';item.errorMode='none';item.yAxis='left';});
+  if(!['General','Roughness','Polishing Rate'].includes(config.plotType))config.series.forEach(item=>{item.mode='line';item.errorMode='none';item.yAxis='left';});
   if(['XPS Fit','Particle Histogram','bar_graph_general','Raman 3D'].includes(config.plotType))config.series.forEach(item=>item.trendType='none');
   if(config.plotType==='Raman 3D') config.series=initialSeries(metadata.columns, config.plotType);
   if(config.plotType==='Particle Histogram')config.options.diameterColumn=Math.min(2,metadata.columns.length-1);
@@ -416,7 +416,7 @@ $("#preset-options").addEventListener('click',event=>{
 });
 for(const [id,paired] of [['shared-x-series',false],['paired-series',true]]) $("#"+id).addEventListener('click',()=>{
   const columns=metadata.columns, pairs=[];
-  for(let i=1;i<columns.length && pairs.length<32;i+=paired?2:1) pairs.push(createSeries(paired?i-1:0,i,columns[i].name,pairs.length));
+  for(let i=1;i<columns.length && pairs.length<32;i+=paired?2:1) pairs.push(createSeries(paired?i-1:0,i,columns[i].name,pairs.length,config.plotType));
   config.series=pairs;drawControls();changed();
 });
 $("#series-colors").addEventListener('click',()=>{config.series.forEach((item,i)=>item.color=COLORS[i%COLORS.length]);drawControls();changed();});
@@ -477,7 +477,7 @@ function drawControls() {
     if (input.type === "checkbox") input.checked = input.dataset.invert === 'true' ? !value : Boolean(value);
     else input.value = value;
   });
-  const generic=['General','Roughness'].includes(config.plotType || 'General');
+  const generic=['General','Roughness','Polishing Rate'].includes(config.plotType || 'General');
   const markerFields=['mode','marker','markerSize','scatterColor','markerEdgeColor','markerFaceColor','markerEdgeAlpha','markerFaceAlpha','lineStyle','lineAlpha','error','errorMode','errorMin','errorMax','yAxis'];
   $$('[data-series-field]').forEach(input=>{if(markerFields.includes(input.dataset.seriesField))input.closest('label').hidden=!generic;});
   syncSeriesErrorControls();
@@ -497,7 +497,7 @@ function drawControls() {
 }
 
 function syncYAxesControls() {
-  const active = ['General','Roughness'].includes(config.plotType || 'General') && config.series.some(item=>item.yAxis === 'right');
+  const active = ['General','Roughness','Polishing Rate'].includes(config.plotType || 'General') && config.series.some(item=>item.yAxis === 'right');
   $('#right-axis-controls').hidden = !active;
   $$('[data-axis="yAxisRight"]').forEach(input=>input.closest('label').hidden=active);
 }
@@ -516,7 +516,7 @@ function syncTrendControls() {
 
 function syncSeriesErrorControls() {
   const modes = {error:['auto','symmetric'],errorPlus:['asymmetric'],errorMinus:['asymmetric'],errorMin:['minmax'],errorMax:['minmax']};
-  const generic = ['General','Roughness'].includes(config.plotType || 'General');
+  const generic = ['General','Roughness','Polishing Rate'].includes(config.plotType || 'General');
   $$('[data-series-field]').forEach(input => {
     const allowed = modes[input.dataset.seriesField];
     if (!allowed) return;
@@ -637,7 +637,7 @@ async function loadFile(file, isSample = false, reload = false, fromClipboard = 
     }
     config = retained || initialSheetConfig(metadata);
     if (sample && !reload) {
-      config.series = metadata.columns.slice(1).map((column, index) => createSeries(0, column.index, column.name, index));
+      config.series = metadata.columns.slice(1).map((column, index) => createSeries(0, column.index, column.name, index, config.plotType));
       config.axes.xLabel = "Potential"; config.axes.xUnit = "V";
       config.axes.yLabel = "Current density"; config.axes.yUnit = "mA/cm^2";
     }
@@ -1071,7 +1071,7 @@ $("#add-series").addEventListener("click", () => {
   const numeric = metadata.columns.filter(column => column.numeric > 0);
   const x = config.series[0]?.x ?? numeric[0]?.index ?? 0;
   const y = numeric[Math.min(config.series.length + 1, numeric.length - 1)]?.index ?? Math.min(1, metadata.columns.length - 1);
-  config.series.push(createSeries(x, y, metadata.columns[y].name, config.series.length));
+  config.series.push(createSeries(x, y, metadata.columns[y].name, config.series.length, config.plotType));
   drawControls();
   changed();
 });

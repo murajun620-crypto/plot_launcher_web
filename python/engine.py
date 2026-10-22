@@ -256,6 +256,7 @@ class PlotEngine:
             tree = ast.parse((self.source_dir / "launcher_constants.py").read_text(encoding="utf-8-sig"))
             constants = {node.targets[0].id: ast.literal_eval(node.value) for node in tree.body if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name) and node.targets[0].id in {"SCRIPT_MAP", "AXIS_LABEL_DEFAULTS"}}
             catalog = [{"id": key, "script": script, "labels": constants["AXIS_LABEL_DEFAULTS"][key]} for key, script in constants["SCRIPT_MAP"].items()]
+            catalog.extend(json.loads((Path(__file__).resolve().parents[1] / "preset_extensions.json").read_text(encoding="utf-8")))
         self.presets = {preset["id"]: preset for preset in catalog}
         try:
             from desktop_defaults import infer_plot_type_from_filename, gradient_colors_from_name
@@ -684,7 +685,7 @@ class PlotEngine:
     def _series_artists(self, axes, namespace, preset, config):
         """Keep series indices and limits stable when temporarily hiding data."""
         extra = []
-        if preset in {"General", "Roughness"}:
+        if preset in {"General", "Roughness", "Polishing Rate"}:
             handles = namespace["legend_handles"]
             children = [artist for artist in axes.get_children() if isinstance(artist, (Line2D, PathCollection, LineCollection, PolyCollection))]
             starts = [children.index(handle) for handle in handles]
@@ -840,8 +841,8 @@ class PlotEngine:
             raise ValueError("系列のY軸は左軸または右軸を選んでください。")
         right_indices = [i for i, item in enumerate(original_series) if item.get("yAxis", "left") == "right"]
         left_indices = [i for i in range(len(original_series)) if i not in right_indices]
-        if right_indices and preset not in {"General", "Roughness"}:
-            raise ValueError("左右のY軸はグラフ種別「一般」または「Roughness」で使用できます。")
+        if right_indices and preset not in {"General", "Roughness", "Polishing Rate"}:
+            raise ValueError("左右のY軸はグラフ種別「一般」「Roughness」「研磨レート」で使用できます。")
         dual = bool(left_indices and right_indices)
         primary_name = "y" if left_indices or not right_indices else "y2"
         primary_indices = left_indices if left_indices else right_indices
@@ -938,7 +939,7 @@ class PlotEngine:
                     axes.grid(True, alpha=0.15, linewidth=0.5)
                 else:
                     axes.grid(False)
-                if preset in {"General", "Roughness"}:
+                if preset in {"General", "Roughness", "Polishing Rate"}:
                     plot_utils.ensure_axis_limits_include_data(axes)
                 fits, equation_specs = [], []
                 if preset not in {"XPS Fit", "Particle Histogram", "bar_graph_general", "Raman 3D"}:
