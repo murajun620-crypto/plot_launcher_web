@@ -1,12 +1,14 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=58b14d40dd44";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=58b14d40dd44";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=58b14d40dd44";
-import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=58b14d40dd44";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=9a54ef1f1565";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9a54ef1f1565";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=9a54ef1f1565";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=9a54ef1f1565";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 const escapeHTML = text => String(text).replace(/[&<>"']/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character]));
 const MICRO_HINT = 'μは \\micro と入力できます（例：\\microm、\\microA）。';
+const UNIT_HINT = '単位の表記を選択します。「自由入力」で任意の単位を入力できます。データの数値は換算しません。';
+const UNIT_VALUES = new Set(['auto', '', ...UNIT_GROUPS.flatMap(([, units]) => units.map(unit => Array.isArray(unit) ? unit[0] : unit))]);
 let worker, engineReady = false, requestID = 0;
 const requests = new Map();
 let metadata = null, config = { axes: defaultAxes(), series: [] };
@@ -186,7 +188,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=58b14d40dd44", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=9a54ef1f1565", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -283,13 +285,28 @@ $('#color-code').addEventListener('keydown', event => {if(event.key === 'Enter')
 enhanceColorInputs();
 
 const axisName = axis => axis === 'y2' ? '右Y' : axis.toUpperCase();
+function syncUnitControls(manualKey = null) {
+  const options = units => units.map(unit => {
+    const [value, text] = Array.isArray(unit) ? unit : [unit, unit];
+    return `<option value="${escapeHTML(value)}">${escapeHTML(text)}</option>`;
+  }).join('');
+  for (const picker of $$('[data-unit-axis]')) {
+    const key = `${picker.dataset.unitAxis}Unit`, value = String(config.axes[key] ?? 'auto');
+    const custom = manualKey === key || !UNIT_VALUES.has(value);
+    picker.innerHTML = options([['auto', '自動（列名から）'], ['', '単位なし']]) + UNIT_GROUPS.map(([name, units]) => `<optgroup label="${escapeHTML(name)}">${options(units)}</optgroup>`).join('') + options([['__custom__', '自由入力…']]);
+    picker.value = custom ? '__custom__' : value;
+    picker.title = UNIT_HINT;
+    const input = picker.parentElement.querySelector(`[data-axis="${key}"]`);
+    input.value = value; input.hidden = !custom; input.title = MICRO_HINT;
+  }
+}
 function openAxisEditor(axis, kind) {
   if (!metadata || loading || exporting || renderRunning || renderedRevision !== revision) return;
   const fields = $('#axis-editor-fields'); fields.dataset.axisName = axis;
-  const label = (key, text, type='text', extra='') => `<label>${text}<input data-axis="${key}" type="${type}" value="${escapeHTML(config.axes[key])}" ${type==='text' && /(Label|Unit)$/.test(key)?`title="${MICRO_HINT}"`:''} ${extra}></label>`;
+  const label = (key, text, type='text', extra='') => `<label>${text}${key.endsWith('Unit') ? `<select data-unit-axis="${key.slice(0,-4)}" aria-label="${axisName(axis)}軸の単位"></select>` : ''}<input data-axis="${key}" type="${type}" value="${escapeHTML(config.axes[key])}" ${type==='text' && /(Label|Unit)$/.test(key)?`title="${MICRO_HINT}"`:''} ${key.endsWith('Unit') ? `aria-label="${axisName(axis)}軸単位を入力" placeholder="任意の単位"` : ''} ${extra}></label>`;
   $('#axis-editor-title').textContent = `${axisName(axis)}軸${kind === 'label' ? 'ラベル' : '目盛り'}の設定`;
   if (kind === 'label') {
-    fields.innerHTML = label(`${axis}Label`,'ラベル（空欄で自動）','text','maxlength="500"') + label(`${axis}Unit`,'単位（autoで自動）') +
+    fields.innerHTML = label(`${axis}Label`,'ラベル（空欄で自動）','text','maxlength="500"') + label(`${axis}Unit`,'単位') +
       `<div class="field-grid">${label(`${axis}LabelPad`,'ラベル追加余白 (pt)','number','min="-100" max="100" step="any"')}${label('labelFontScale','軸ラベル文字倍率','number','min=".2" max="3" step="any"')}</div>` +
       `<div class="field-grid">${label(`${axis}LabelX`,'ラベルX (軸比率)','number','step="any" placeholder="標準"')}${label(`${axis}LabelY`,'ラベルY (軸比率)','number','step="any" placeholder="標準"')}</div><button type="button" class="button quiet" data-reset-label>標準位置に戻す</button>`;
   } else {
@@ -304,7 +321,7 @@ function openAxisEditor(axis, kind) {
       `<div class="field-grid">${label(`${axis}TickPad`,'目盛り追加余白 (pt)','number','min="-100" max="100" step="any"')}${label('tickFontScale','目盛り文字倍率','number','min=".2" max="3" step="any"')}</div>`;
   }
   fields.innerHTML += axis === 'x' ? label('spineColor','枠線・文字色','color') : label(`${axis}Color`,'軸の色（autoで自動）','text','title="軸線・目盛線・目盛数値・ラベルに適用します。autoでは、左右別の軸を使う場合に各軸の最初の系列と同じ色にします。"');
-  syncAxisEditor(); enhanceColorInputs(); $('#axis-editor').showModal();
+  syncAxisEditor(); syncUnitControls(); enhanceColorInputs(); $('#axis-editor').showModal();
 }
 function syncAxisEditor() {
   const fields = $('#axis-editor-fields'), axis = fields.dataset.axisName;
@@ -349,6 +366,8 @@ $('#axis-editor-fields').addEventListener('input', event => {
   if (incompleteNumberInput(input)) return;
   if (input.dataset.axisAuto) {
     setAxisAutomatic(input, axis);
+  } else if (input.dataset.unitAxis) {
+    applyControlInput(event);
   } else if (input.dataset.axis) {
     // A partial manual position must never make the plot disappear while typing.
     if (/^(x|y|y2)Label[XY]$/.test(input.dataset.axis) && input.value !== '') {
@@ -492,6 +511,7 @@ function drawControls() {
   updateButtons();
   syncAxisAutomaticControls();
   drawAnnotations();
+  syncUnitControls();
   $$('[data-axis="xLabel"],[data-axis="yLabel"],[data-axis="y2Label"],[data-axis="xUnit"],[data-axis="yUnit"],[data-axis="y2Unit"],.series-label').forEach(input=>input.title=MICRO_HINT);
   enhanceColorInputs();
 }
@@ -1002,6 +1022,16 @@ function applyControlInput(event) {
   // Do not commit incomplete values or assign back to the field being edited.
   if (incompleteNumberInput(input)) return;
   if (input.dataset.axisAuto) {setAxisAutomatic(input);return;}
+  if (input.dataset.unitAxis) {
+    const key = `${input.dataset.unitAxis}Unit`;
+    if (input.value === '__custom__') {
+      syncUnitControls(key);
+      const custom = input.parentElement.querySelector(`[data-axis="${key}"]`);
+      custom.focus(); custom.select(); return;
+    }
+    config.axes[key] = input.value;
+    syncUnitControls(); changed(); return;
+  }
   if (input.dataset.axis) {
     const key = input.dataset.axis;
     config.axes[key] = input.type === "checkbox" ? (input.dataset.invert === "true" ? !input.checked : input.checked) : input.value;
@@ -1035,6 +1065,7 @@ function applyControlInput(event) {
     }
     if (/^(x|y|y2)LabelPad$/.test(key)) {const axis=key.replace(/LabelPad$/,'');config.axes[`${axis}LabelX`] = config.axes[`${axis}LabelY`] = "";}
     $$(`[data-axis="${key}"]`).forEach(field => {if(field !== input) {field.value = input.value; field.checked = field.dataset.invert === "true" ? !config.axes[key] : config.axes[key];}});
+    if (/^(x|y|y2)Unit$/.test(key)) syncUnitControls(key);
   }
   else if (input.dataset.seriesField) {
     const item = config.series[Number(input.closest("[data-series-index]").dataset.seriesIndex)];
@@ -1275,7 +1306,7 @@ function openElementEditor(part,index=0) {
     if(input.type==='checkbox')input.checked=data.invert==='true'?!value:Boolean(value);else input.value=value;
   });
   $('#element-editor-title').textContent=title;
-  $('#element-editor').showModal();enhanceColorInputs();syncAxisAutomaticControls();
+  $('#element-editor').showModal();enhanceColorInputs();syncAxisAutomaticControls();syncUnitControls();
 }
 $('#element-editor-fields').addEventListener('input',applyControlInput);
 $('#close-element-editor').addEventListener('click',()=>$('#element-editor').close());

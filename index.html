@@ -6,8 +6,8 @@
   <meta name="description" content="Excel・CSVの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=58b14d40dd44">
-  <script type="module" src="./app.js?v=58b14d40dd44"></script>
+  <link rel="stylesheet" href="./style.css?v=9a54ef1f1565">
+  <script type="module" src="./app.js?v=9a54ef1f1565"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -73,7 +73,7 @@
             <summary class="section-heading"><h2><span class="step">03</span>軸とサイズ</h2><span id="axes-title" class="section-note">一般</span></summary>
             <label class="full-field">X軸ラベル<input id="x-label" data-axis="xLabel" type="text" maxlength="500" placeholder="空欄で列名を使用"></label>
             <label class="full-field">Y軸ラベル<input id="y-label" data-axis="yLabel" type="text" maxlength="500" placeholder="空欄で列名を使用"></label>
-            <div class="field-grid"><label>X軸単位<input data-axis="xUnit" value="auto" placeholder="auto / V / cm^-1"></label><label>Y軸単位<input data-axis="yUnit" value="auto" placeholder="auto / mA/cm^2"></label></div>
+            <div class="field-grid"><label>X軸単位<select data-unit-axis="x" aria-label="X軸の単位"></select><input data-axis="xUnit" value="auto" aria-label="X軸単位を入力" placeholder="任意の単位" hidden></label><label>Y軸単位<select data-unit-axis="y" aria-label="Y軸の単位"></select><input data-axis="yUnit" value="auto" aria-label="Y軸単位を入力" placeholder="任意の単位" hidden></label></div>
             <div class="axis-group">
               <div class="axis-group-title">X軸<select id="x-scale" data-axis="xScale" aria-label="X軸の種類"><option value="linear">線形</option><option value="log">対数</option></select></div>
               <label class="log-format-field" data-log-format-for="x" hidden>目盛りの表記<select id="x-log-format" data-axis="xLogFormat" aria-label="X軸の対数目盛り表記"><option value="power">累乗（10ⁿ）</option><option value="decimal">数値（0.1、1、10）</option></select></label>
@@ -90,7 +90,7 @@
             </div>
             <div id="right-axis-controls" hidden>
               <div class="axis-group-title">右Y軸</div>
-              <div class="field-grid"><label>右Y軸ラベル<input id="y2-label" data-axis="y2Label" placeholder="空欄で列名を使用" maxlength="500"></label><label>右Y軸単位<input data-axis="y2Unit" value="auto" placeholder="auto / nm / %"></label></div>
+              <div class="field-grid"><label>右Y軸ラベル<input id="y2-label" data-axis="y2Label" placeholder="空欄で列名を使用" maxlength="500"></label><label>右Y軸単位<select data-unit-axis="y2" aria-label="右Y軸の単位"></select><input data-axis="y2Unit" value="auto" aria-label="右Y軸単位を入力" placeholder="任意の単位" hidden></label></div>
               <div class="field-grid"><label title="autoでは各軸の最初の系列と同じ色にします。">左Y軸の色<input data-axis="yColor" value="auto" placeholder="auto / #色"></label><label title="autoでは各軸の最初の系列と同じ色にします。">右Y軸の色<input data-axis="y2Color" value="auto" placeholder="auto / #色"></label></div>
               <div class="axis-group">
                 <div class="axis-group-title">右Y軸の種類<select id="y2-scale" data-axis="y2Scale" aria-label="右Y軸の種類"><option value="linear">線形</option><option value="log">対数</option></select></div>

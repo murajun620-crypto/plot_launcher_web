@@ -1,4 +1,18 @@
-export const APP_VERSION = "1.8.1";
+export const APP_VERSION = "1.8.2";
+
+// Labels are readable in the picker; values retain the existing unit syntax.
+export const UNIT_GROUPS = [
+  ['時間', ['s', 'ms', 'μs', 'ns', 'min', 'h']],
+  ['長さ', ['pm', 'nm', 'μm', 'mm', 'cm', 'm', 'Å']],
+  ['波数・エネルギー', [['cm$^{-1}$', 'cm⁻¹'], 'eV', 'keV', 'MeV']],
+  ['電位・電流', ['V', 'mV', 'μV', 'A', 'mA', 'μA', 'nA', 'pA']],
+  ['電流密度', [['A/cm$^2$', 'A/cm²'], ['mA/cm$^2$', 'mA/cm²'], ['μA/cm$^2$', 'μA/cm²'], ['nA/cm$^2$', 'nA/cm²']]],
+  ['速度', ['nm/min', 'μm/min', 'nm/h', 'μm/h', 'm/s']],
+  ['濃度', ['mol/L', 'mmol/L', 'μmol/L', 'mg/L']],
+  ['温度・力学', ['°C', 'K', 'N', 'mN', 'μN', 'Pa', 'kPa', 'MPa', 'GPa']],
+  ['周波数', ['Hz', 'kHz', 'MHz', 'GHz']],
+  ['その他', ['%', 'arb. units', 'cps', '°', 'Ω', 'kΩ', 'S/cm']],
+];
 
 // src/plot_settings.py: default_auto_series_colors(), same order and shades.
 export const COLORS = ["#1F8FE0", "#D4291E", "#2BA84D", "#D77207", "#7D3EDD", "#787878", "#666666", "#0052A8", "#A10000", "#009F22"];
