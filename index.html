@@ -6,8 +6,8 @@
   <meta name="description" content="Excel・CSVの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=314dd3d36add">
-  <script type="module" src="./app.js?v=314dd3d36add"></script>
+  <link rel="stylesheet" href="./style.css?v=3c5b8cfc696d">
+  <script type="module" src="./app.js?v=3c5b8cfc696d"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -58,9 +58,15 @@
         <p class="field-hint">列名が並ぶ行を指定してください。</p>
       </details>
 
+      <details class="control-section" open>
+        <summary class="section-heading"><h2>プリセット</h2></summary>
+        <fieldset id="preset-fields" disabled><label>グラフのプリセット<select id="plot-type"></select></label><p id="preset-note" class="field-hint"></p><div id="preset-options"></div></fieldset>
+        <label id="user-preset-field" class="user-preset-field" hidden title="保存した設定を適用します。列名が一致すればその列を、名前が違えば同じ位置の列を使用します。">マイプリセット<select id="user-preset-select" disabled><option value="">選択して適用</option></select></label>
+        <div class="preset-actions"><button id="register-user-preset" type="button" class="button quiet" disabled title="現在の軸・系列・注釈などを名前付きで登録します。測定データやフォントファイルは含みません。">現在の設定を登録</button><button id="manage-user-presets" type="button" class="button quiet" title="マイプリセットの名前変更・削除・書き出し・読み込み">管理・共有</button></div>
+        <p id="user-preset-message" class="preset-message" role="status" hidden></p>
+      </details>
       <form id="plot-form" novalidate>
         <fieldset id="plot-fields" disabled>
-          <details class="control-section" open><summary class="section-heading"><h2>プリセット</h2></summary><label>グラフのプリセット<select id="plot-type"></select></label><p id="preset-note" class="field-hint"></p><div id="preset-options"></div></details>
           <details class="control-section" open>
             <summary class="section-heading"><h2><span class="step">02</span>系列</h2><span id="series-count" class="section-note">0 系列</span></summary>
             <div id="series-list" class="series-list"><p class="empty-series">ファイルを読み込むと、X列・Y列を選べます。</p></div>
@@ -166,6 +172,22 @@
       <footer class="preview-footer"><span>PlotLauncher Web · 一般グラフ</span></footer>
     </main>
   </div>
+  <dialog id="register-preset-dialog" class="plot-dialog" aria-labelledby="register-preset-title">
+    <div class="dialog-heading"><strong id="register-preset-title">マイプリセットを登録</strong><button id="close-register-preset" type="button" class="button quiet">閉じる</button></div>
+    <label>プリセット名<input id="user-preset-name" maxlength="80" placeholder="例：Waviness（論文用）" autocomplete="off"></label>
+    <label id="overwrite-preset-field" hidden><input id="overwrite-user-preset" type="checkbox">同名のプリセットを上書きする</label>
+    <p id="register-preset-error" class="preset-error" role="alert"></p>
+    <button id="confirm-register-preset" type="button" class="button primary">登録</button>
+  </dialog>
+  <dialog id="manage-presets-dialog" class="plot-dialog" aria-labelledby="manage-presets-title">
+    <div class="dialog-heading"><strong id="manage-presets-title">マイプリセットの管理・共有</strong><button id="close-manage-presets" type="button" class="button quiet">閉じる</button></div>
+    <label>登録済みプリセット<select id="managed-preset-select"></select></label>
+    <label>プリセット名<input id="managed-preset-name" maxlength="80" autocomplete="off"></label>
+    <div class="preset-actions"><button id="rename-user-preset" type="button" class="button">名前を変更</button><button id="delete-user-preset" type="button" class="button">削除</button></div>
+    <div class="preset-actions"><button id="export-user-presets" type="button" class="button" title="登録済みの全プリセットをJSONファイルに保存します。別のPCへの移行やバックアップに使用できます。">全件を書き出す</button><button id="import-user-presets" type="button" class="button">読み込む</button></div>
+    <input id="user-presets-file" type="file" accept=".json,application/json" hidden>
+    <p id="manage-presets-message" class="preset-message" role="status"></p>
+  </dialog>
   <dialog id="paste-dialog" class="plot-dialog paste-dialog" aria-labelledby="paste-dialog-title">
     <div class="dialog-heading"><strong id="paste-dialog-title">データを貼り付け</strong><button type="button" id="close-paste" class="button quiet">閉じる</button></div>
     <label for="paste-text">Excelでコピーしたセル範囲<textarea id="paste-text" rows="6" placeholder="ここに Ctrl/Command＋V で貼り付け" spellcheck="false" title="X列とY列を含む範囲をコピーします。タブ区切り・CSVに対応。貼り付けたデータは、現在のデータと入れ替わります。"></textarea></label>

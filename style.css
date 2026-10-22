@@ -75,6 +75,11 @@ input[type=color]{border:0;cursor:pointer;background:transparent;width:27px;heig
 input[type=color]::-webkit-color-swatch-wrapper{padding:3px}
 input[type=color]::-webkit-color-swatch{border:0;border-radius:5px}
 .field-hint{margin:7px 0 0;font-size:10px;line-height:1.7;color:#98a3b3}
+.preset-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.preset-actions .button{font-size:11px}
+.user-preset-field{margin-top:14px}
+.preset-message{font-size:11px;line-height:1.6;color:var(--muted);overflow-wrap:anywhere}
+.preset-error,.preset-message.error{color:var(--danger);font-size:11px;line-height:1.6}
 .series-list{display:flex;flex-direction:column;gap:12px}
 .empty-series{margin:0;color:var(--muted);font-size:11px;line-height:1.7}
 .series-card{padding:12px;border:1px solid var(--border);border-radius:7px;min-width:0}

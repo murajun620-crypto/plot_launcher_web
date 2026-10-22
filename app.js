@@ -1,7 +1,8 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=314dd3d36add";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=314dd3d36add";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=314dd3d36add";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=314dd3d36add";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=3c5b8cfc696d";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=3c5b8cfc696d";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=3c5b8cfc696d";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=3c5b8cfc696d";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=3c5b8cfc696d";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -25,6 +26,7 @@ const importedFonts = new Map();
 let savedProjectState = null;
 let sheetSettings = new Map(), cancelBatch = false;
 let sheetMode = 'shared', sharedSettings = null;
+let myPresets = [];
 $('#app-version').textContent = `v${APP_VERSION}`;
 
 function projectSheetSettings() {
@@ -133,6 +135,7 @@ function updateButtons() {
   $("#sample-data").disabled = !engineReady || busy;
   $("#paste-data").disabled = !engineReady || busy;
   $("#plot-fields").disabled = !engineReady || !metadata || busy;
+  $('#preset-fields').disabled = !engineReady || !metadata || busy;
   $("#header-row").disabled = !engineReady || !metadata || busy;
   $("#sheet-select").disabled = !engineReady || !metadata || busy || metadata.sheets.length < 2;
   const multipleSheets = (metadata?.sheets.length ?? 0) > 1;
@@ -164,6 +167,7 @@ function updateButtons() {
   $("#figure-stage").setAttribute("aria-busy", String(loading || exporting || renderRunning || !engineReady));
   $('#save-destination').disabled = $('#choose-save-folder').disabled = busy;
   syncColorIcons();
+  updateUserPresetActions();
 }
 
 function request(operation, args) {
@@ -188,7 +192,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=314dd3d36add", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=3c5b8cfc696d", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -855,14 +859,15 @@ $('#choose-save-folder').addEventListener('click',async()=>{
 for(const [selector,description,accept,open] of [
   ['#data-file','Excel / CSV',{'application/octet-stream':['.xlsx','.xlsm','.xls','.csv']},loadFile],
   ['#project-file','PlotLauncherプロジェクト',{'application/json':['.plotproject','.json']},readProject],
-  ['#settings-file','設定JSON',{'application/json':['.json']},readSettings]
+  ['#settings-file','設定JSON',{'application/json':['.json']},readSettings],
+  ['#user-presets-file','マイプリセットJSON',{'application/json':['.json']},importUserPresetsFile]
 ]) $(selector).addEventListener('click',async event=>{
   if(typeof window.showOpenFilePicker!=='function')return;
-  event.preventDefault();if(loading||exporting||!engineReady)return;
+  event.preventDefault();if(loading||exporting||(!engineReady && selector!=='#user-presets-file'))return;
   try {
     const [handle]=await window.showOpenFilePicker({...filePickerOptions('plotlauncher-files',description,accept,saveDirectory||sourceDirectory||sourceHandle),multiple:false});
     const file=await handle.getFile();sourceHandles.set(file,handle);await open(file);
-  } catch(error){if(error.name!=='AbortError')status(error.message,'error');}
+  } catch(error){if(error.name!=='AbortError'){if(selector==='#user-presets-file')presetMessage('#manage-presets-message',error.message,true);else status(error.message,'error');}}
 });
 refreshSaveDestination();
 
@@ -1087,6 +1092,7 @@ function applyControlInput(event) {
   syncAxisAutomaticControls(); changed();
 }
 $("#plot-form").addEventListener("input", applyControlInput);
+$('#preset-options').addEventListener('input', applyControlInput);
 $("#series-list").addEventListener("click", event => {
   const reset=event.target.closest('[data-reset-trend]');
   if(reset){const index=Number(reset.dataset.resetTrend);config.series[index].trendX=config.series[index].trendY='';for(const key of ['trendX','trendY'])$$(`[data-series-index="${index}"] [data-series-field="${key}"]`).forEach(input=>input.value='');changed();return;}
@@ -1197,6 +1203,138 @@ $('#save-settings').addEventListener('click', async()=>{
   } catch(error){status(error.name==='AbortError'?'保存をキャンセルしました。':error.message,error.name==='AbortError'?'ready':'error');}
   finally{exporting=false;updateButtons();if(renderWanted)renderPreview();}
 });
+
+function presetMessage(selector, text, error = false) {
+  const element = $(selector); element.textContent = text; element.hidden = !text; element.classList[error?'add':'remove']('error');
+}
+function presetFailure(error) {
+  if (error.name === 'QuotaExceededError') return 'ブラウザの保存容量が不足しています。既存の登録内容は変更していません。';
+  if (error.name === 'SecurityError') return 'ブラウザへの保存が許可されていません。サイトデータの保存設定を確認してください。';
+  return error.message;
+}
+function updateUserPresetActions() {
+  const busy = loading || exporting;
+  $('#register-user-preset').disabled = !engineReady || !metadata || !config.series.length || busy || renderRunning || renderedRevision !== revision;
+  $('#manage-user-presets').disabled = exporting;
+  $('#user-preset-select').disabled = !engineReady || !metadata || !myPresets.length || busy || renderRunning;
+  const current = myPresets.find(item=>item.id === $('#managed-preset-select').value);
+  $('#managed-preset-select').disabled = !myPresets.length || exporting;
+  $('#managed-preset-name').disabled = !current || exporting;
+  $('#rename-user-preset').disabled = !current || exporting;
+  $('#delete-user-preset').disabled = !current || exporting;
+  $('#export-user-presets').disabled = !myPresets.length || exporting;
+  $('#import-user-presets').disabled = exporting;
+}
+function syncManagedPreset() {
+  const current = myPresets.find(item=>item.id === $('#managed-preset-select').value);
+  $('#managed-preset-name').value = current?.name || '';
+  updateUserPresetActions();
+}
+function drawUserPresetLibrary() {
+  const selected = $('#managed-preset-select').value;
+  $('#user-preset-field').hidden = !myPresets.length;
+  $('#user-preset-select').innerHTML = '<option value="">選択して適用</option>' + choiceOptions(myPresets.map(item=>[item.id,item.name]),'');
+  $('#user-preset-select').value = '';
+  $('#managed-preset-select').innerHTML = myPresets.length ? choiceOptions(myPresets.map(item=>[item.id,item.name]),selected) : '<option value="">登録なし</option>';
+  $('#managed-preset-select').value = myPresets.some(item=>item.id === selected) ? selected : myPresets[0]?.id || '';
+  syncManagedPreset();
+}
+function refreshUserPresets() {
+  try {myPresets = readUserPresets(window.localStorage); presetMessage('#user-preset-message','');}
+  catch(error) {presetMessage('#user-preset-message',`マイプリセットを読み込めませんでした。${presetFailure(error)}`,true);}
+  drawUserPresetLibrary();
+}
+function changeUserPresets(change) {
+  const storage = window.localStorage;
+  const next = change(readUserPresets(storage));
+  myPresets = writeUserPresets(storage,next);
+  presetMessage('#user-preset-message',''); drawUserPresetLibrary();
+}
+function syncPresetRegistration(reset = false) {
+  if (reset) $('#overwrite-user-preset').checked = false;
+  const name = $('#user-preset-name').value.trim(), duplicate = myPresets.some(item=>item.name === name);
+  $('#overwrite-preset-field').hidden = !duplicate;
+  if (!duplicate) $('#overwrite-user-preset').checked = false;
+  $('#confirm-register-preset').textContent = duplicate ? '上書き' : '登録';
+  $('#confirm-register-preset').disabled = !name || $('#register-user-preset').disabled || duplicate && !$('#overwrite-user-preset').checked;
+}
+$('#register-user-preset').addEventListener('click',()=>{
+  if ($('#register-user-preset').disabled) return;
+  $('#user-preset-name').value = '';
+  $('#register-preset-error').textContent = '';
+  syncPresetRegistration(true); $('#register-preset-dialog').showModal(); $('#user-preset-name').focus();
+});
+$('#user-preset-name').addEventListener('input',()=>syncPresetRegistration(true));
+$('#overwrite-user-preset').addEventListener('change',()=>syncPresetRegistration());
+$('#user-preset-name').addEventListener('keydown',event=>{if(event.key === 'Enter'){event.preventDefault();if(!$('#confirm-register-preset').disabled)$('#confirm-register-preset').click();}});
+$('#close-register-preset').addEventListener('click',()=>$('#register-preset-dialog').close());
+$('#confirm-register-preset').addEventListener('click',()=>{
+  if ($('#confirm-register-preset').disabled || !metadata) return;
+  try {
+    const entry = captureUserPreset($('#user-preset-name').value,config,metadata,loadedHeader);
+    changeUserPresets(entries=>upsertUserPreset(entries,entry,$('#overwrite-user-preset').checked));
+    $('#register-preset-dialog').close(); presetMessage('#user-preset-message',`「${entry.name}」をブラウザに保存しました。`);
+  } catch(error) {$('#register-preset-error').textContent = presetFailure(error);}
+});
+$('#user-preset-select').addEventListener('change',event=>{
+  const entry = myPresets.find(item=>item.id === event.target.value);
+  event.target.value = '';
+  if (!entry || !metadata || loading || exporting || renderRunning) return;
+  try {
+    const next = applyUserPreset(entry,metadata);
+    const fonts = [next.axes.fontFamily,next.axes.japaneseFontFamily,...(next.annotations || []).filter(item=>item.type === 'text' && item.visible !== false).map(item=>item.font_family)].filter(Boolean);
+    const missing = [...new Set(fonts.filter(font=>!loadedFonts.has(font)))];
+    if (missing.length) throw new Error(`先にフォント「${missing.join('、')}」を読み込んでください。プリセットにはフォントファイルを含みません。`);
+    config = next; selected.clear(); drawControls(); changed();
+    presetMessage('#user-preset-message',`「${entry.name}」を適用しました。`);
+  } catch(error) {presetMessage('#user-preset-message',presetFailure(error),true);}
+});
+$('#manage-user-presets').addEventListener('click',()=>{
+  refreshUserPresets(); presetMessage('#manage-presets-message',''); $('#manage-presets-dialog').showModal();
+});
+$('#close-manage-presets').addEventListener('click',()=>$('#manage-presets-dialog').close());
+$('#managed-preset-select').addEventListener('change',syncManagedPreset);
+$('#rename-user-preset').addEventListener('click',()=>{
+  try {changeUserPresets(entries=>renameUserPreset(entries,$('#managed-preset-select').value,userPresetName($('#managed-preset-name').value)));presetMessage('#manage-presets-message','名前を変更しました。');}
+  catch(error) {presetMessage('#manage-presets-message',presetFailure(error),true);}
+});
+$('#delete-user-preset').addEventListener('click',()=>{
+  const entry = myPresets.find(item=>item.id === $('#managed-preset-select').value);
+  if (!entry || !window.confirm(`マイプリセット「${entry.name}」を削除しますか？`)) return;
+  try {changeUserPresets(entries=>entries.filter(item=>item.id !== entry.id));presetMessage('#manage-presets-message','削除しました。');}
+  catch(error) {presetMessage('#manage-presets-message',presetFailure(error),true);}
+});
+$('#export-user-presets').addEventListener('click',async()=>{
+  if (!myPresets.length || exporting) return;
+  exporting = true; updateButtons();
+  try {
+    const blob = new Blob([encodeUserPresets(myPresets)],{type:'application/json'});
+    const save = await prepareDocumentSaver('plotlauncher-presets.json','マイプリセットJSON','.json');
+    await save(blob,'plotlauncher-presets.json');presetMessage('#manage-presets-message','全プリセットを書き出しました。');
+  } catch(error) {presetMessage('#manage-presets-message',error.name === 'AbortError' ? '書き出しをキャンセルしました。' : presetFailure(error),error.name !== 'AbortError');}
+  finally {exporting = false; updateButtons(); if(renderWanted)renderPreview();}
+});
+async function importUserPresetsFile(file) {
+  if (exporting) return;
+  try {
+    if (file.size > USER_PRESET_FILE_LIMIT) throw new Error('プリセットJSONは4 MB以内のファイルを選んでください。');
+    const incoming = decodeUserPresets(await file.text()), storage = window.localStorage;
+    let current;
+    try {current = readUserPresets(storage);}
+    catch(error) {
+      const raw = storage.getItem(USER_PRESET_KEY);
+      if (raw === null || !window.confirm('保存済みのマイプリセットが読み取れません。元の内容を退避し、選択したJSONから復元しますか？')) throw error;
+      storage.setItem(USER_PRESET_KEY+'.recovery',raw); current = [];
+    }
+    const next = mergeUserPresets(current,incoming);
+    myPresets = writeUserPresets(storage,next); drawUserPresetLibrary();presetMessage('#user-preset-message','');
+    presetMessage('#manage-presets-message',`${next.length-current.length}件を追加しました。同じ内容は追加せず、同名で内容が違う場合は名前に番号を付けます。`);
+  } catch(error) {presetMessage('#manage-presets-message',presetFailure(error),true);}
+}
+$('#import-user-presets').addEventListener('click',()=>$('#user-presets-file').click());
+$('#user-presets-file').addEventListener('change',event=>{const file=event.target.files[0];event.target.value='';if(file)importUserPresetsFile(file);});
+window.addEventListener('storage',event=>{if(event.key === USER_PRESET_KEY || event.key === null){refreshUserPresets();syncPresetRegistration(true);}});
+refreshUserPresets();
 $("#open-settings").addEventListener("click", () => $("#settings-file").click());
 async function readSettings(file) {
   if(!metadata){status('設定を開く前にExcel/CSVを読み込んでください。','error');return;}
