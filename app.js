@@ -1,7 +1,7 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=1701bf7d04c9";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=1701bf7d04c9";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=1701bf7d04c9";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=1701bf7d04c9";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=314dd3d36add";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=314dd3d36add";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=314dd3d36add";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=314dd3d36add";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -188,7 +188,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=1701bf7d04c9", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=314dd3d36add", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -398,7 +398,7 @@ function drawPresetOptions() {
   const number=(key,label,def,min=0,max=100,step=.1)=>`<label>${label}<input data-option="${key}" type="number" value="${escapeHTML(options[key] ?? def)}" min="${min}" max="${max}" step="any"></label>`;
   const color=(key,label,def)=>`<label>${label}<input data-option="${key}" value="${escapeHTML(options[key] ?? def)}"></label>`;
   let html='';
-  const notes={"XPS Fit":"CSV/Au 10列/Ag 8列の配置を自動判定。成分の塗りつぶしは背景との差で描画します。", "Particle Histogram":"選択した粒径列から頻度%と対数正規分布を描画します。ビン幅は20 nmです。", "Raman 3D":"共通のX列と各Y列からウォーターフォールを作成します。Y軸設定は強度（Z軸）に適用します。", "bar_graph_general":"数値X・カテゴリXに対応した集合棒グラフです。", "Roughness":"線＋マーカー、Y対数軸が初期設定です。"};
+  const notes={"XPS Fit":"CSV/Au 10列/Ag 8列の配置を自動判定。成分の塗りつぶしは背景との差で描画します。", "Particle Histogram":"選択した粒径列から頻度%と対数正規分布を描画します。ビン幅は20 nmです。", "Raman 3D":"共通のX列と各Y列からウォーターフォールを作成します。Y軸設定は強度（Z軸）に適用します。", "bar_graph_general":"数値X・カテゴリXに対応した集合棒グラフです。", "Roughness":"線＋マーカー、Y対数軸が初期設定です。", "Waviness":"Roughnessと同じ線＋マーカー、Y対数軸が初期設定です。"};
   $("#plot-type").title=notes[type] || "プリセットに合わせて軸ラベル・単位を設定します。";
   $("#preset-note").textContent=""; $("#preset-note").hidden=true;
   if(type==='bar_graph_general') html=`<div class="field-grid">${number('barWidth','棒幅',.8,.01,100)}${number('barAlpha','不透明度',.9,0,1)}${number('barEdgeWidth','縁幅 (pt)',.4,0,20)}${color('barEdgeColor','縁色 (auto / #色)','auto')}</div>`;
@@ -422,7 +422,7 @@ function drawPresetOptions() {
 
 $("#plot-type").addEventListener("change",event=>{
   applyPreset(config,presets.find(item=>item.id===event.target.value));
-  if(!['General','Roughness','Polishing Rate'].includes(config.plotType))config.series.forEach(item=>{item.mode='line';item.errorMode='none';item.yAxis='left';});
+  if(!['General','Roughness','Polishing Rate','Waviness'].includes(config.plotType))config.series.forEach(item=>{item.mode='line';item.errorMode='none';item.yAxis='left';});
   if(['XPS Fit','Particle Histogram','bar_graph_general','Raman 3D'].includes(config.plotType))config.series.forEach(item=>item.trendType='none');
   if(config.plotType==='Raman 3D') config.series=initialSeries(metadata.columns, config.plotType);
   if(config.plotType==='Particle Histogram')config.options.diameterColumn=Math.min(2,metadata.columns.length-1);
@@ -496,7 +496,7 @@ function drawControls() {
     if (input.type === "checkbox") input.checked = input.dataset.invert === 'true' ? !value : Boolean(value);
     else input.value = value;
   });
-  const generic=['General','Roughness','Polishing Rate'].includes(config.plotType || 'General');
+  const generic=['General','Roughness','Polishing Rate','Waviness'].includes(config.plotType || 'General');
   const markerFields=['mode','marker','markerSize','scatterColor','markerEdgeColor','markerFaceColor','markerEdgeAlpha','markerFaceAlpha','lineStyle','lineAlpha','error','errorMode','errorMin','errorMax','yAxis'];
   $$('[data-series-field]').forEach(input=>{if(markerFields.includes(input.dataset.seriesField))input.closest('label').hidden=!generic;});
   syncSeriesErrorControls();
@@ -517,7 +517,7 @@ function drawControls() {
 }
 
 function syncYAxesControls() {
-  const active = ['General','Roughness','Polishing Rate'].includes(config.plotType || 'General') && config.series.some(item=>item.yAxis === 'right');
+  const active = ['General','Roughness','Polishing Rate','Waviness'].includes(config.plotType || 'General') && config.series.some(item=>item.yAxis === 'right');
   $('#right-axis-controls').hidden = !active;
   $$('[data-axis="yAxisRight"]').forEach(input=>input.closest('label').hidden=active);
 }
@@ -536,7 +536,7 @@ function syncTrendControls() {
 
 function syncSeriesErrorControls() {
   const modes = {error:['auto','symmetric'],errorPlus:['asymmetric'],errorMinus:['asymmetric'],errorMin:['minmax'],errorMax:['minmax']};
-  const generic = ['General','Roughness','Polishing Rate'].includes(config.plotType || 'General');
+  const generic = ['General','Roughness','Polishing Rate','Waviness'].includes(config.plotType || 'General');
   $$('[data-series-field]').forEach(input => {
     const allowed = modes[input.dataset.seriesField];
     if (!allowed) return;

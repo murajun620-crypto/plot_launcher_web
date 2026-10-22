@@ -4,5 +4,11 @@
     "label": "研磨レート",
     "script": "generic_xy_base.py",
     "labels": ["Polishing time", "min", "Removal thickness", "μm"]
+  },
+  {
+    "id": "Waviness",
+    "label": "Waviness",
+    "script": "roughness.py",
+    "labels": ["Polishing time", "min", "Waviness", "nm"]
   }
 ]

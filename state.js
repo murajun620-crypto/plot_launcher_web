@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.8.3";
+export const APP_VERSION = "1.8.4";
 
 // Labels are readable in the picker; values retain the existing unit syntax.
 export const UNIT_GROUPS = [
@@ -26,15 +26,16 @@ export const COLOR_PALETTE = {
     black:["#E6E6E6","#D5D5D5","#C4C4C4","#B3B3B3","#A2A2A2","#8F8F8F","#7C7C7C","#666666","#4A4A4A","#2A2A2A"],
   };
 
-export const PLOT_TYPES = ["CV/LSV", "CA", "CP", "EDX", "XPS Survey", "XPS Core", "XPS Fit", "XAFS", "Raman Spectrum", "AFM Section", "Particle Histogram", "General", "Roughness", "bar_graph_general", "Raman 3D", "Polishing Rate"];
+export const PLOT_TYPES = ["CV/LSV", "CA", "CP", "EDX", "XPS Survey", "XPS Core", "XPS Fit", "XAFS", "Raman Spectrum", "AFM Section", "Particle Histogram", "General", "Roughness", "bar_graph_general", "Raman 3D", "Polishing Rate", "Waviness"];
 
 export function applyPreset(config, preset) {
   config.plotType = preset.id;
   const [xLabel, xUnit, yLabel, yUnit] = preset.labels;
   Object.assign(config.axes, {xLabel: xLabel === "auto" ? "" : xLabel, xUnit, yLabel: yLabel === "auto" ? "" : yLabel, yUnit});
   const spectrum = ["EDX", "XPS Survey", "XPS Core", "XPS Fit", "XAFS", "Raman Spectrum"].includes(preset.id);
-  Object.assign(config.axes, {hideYTickLabels: spectrum, hideYTicks: spectrum, xScale: "linear", yScale: preset.id === "Roughness" ? "log" : "linear", grid: preset.id === "Raman 3D"});
-  if (preset.id === "Roughness") config.series.forEach(series => series.mode = "line+scatter");
+  Object.assign(config.axes, {hideYTickLabels: spectrum, hideYTicks: spectrum, xScale: "linear", yScale: ['Roughness','Waviness'].includes(preset.id) ? "log" : "linear", grid: preset.id === "Raman 3D"});
+  if (['Roughness','Waviness'].includes(preset.id)) config.series.forEach(series => series.mode = "line+scatter");
+  if (preset.id === 'Waviness') Object.assign(config.axes, {yMin: '', yMax: '', yStep: '', yMinorStep: '', yLogFormat: 'power', legendPosition: 'best', legendX: '', legendY: ''});
   if (preset.id === "Polishing Rate") {
     Object.assign(config.axes, {width: 5, height: 3.75, xMin: "0", yMin: "0", xMax: "", yMax: "", xStep: "", yStep: "", xMinorStep: "", yMinorStep: "", hideXTicks: false, hideXTickLabels: false, hideMinorTicks: false, legend: true, legendPosition: "upper left", legendX: "", legendY: ""});
     config.series.forEach((series, index) => Object.assign(series, {mode: "line+scatter", marker: "o", lineStyle: "-", color: index === 2 ? "#000000" : COLORS[index % COLORS.length]}));
@@ -83,7 +84,7 @@ export function defaultAxes() {
 }
 
 export function createSeries(x, y, name, index = 0, plotType = "General") {
-  return { x, y, name, yAxis: "left", visible: true, color: plotType === "Polishing Rate" && index === 2 ? "#000000" : COLORS[index % COLORS.length], scatterColor: "auto", mode: plotType === "Polishing Rate" ? "line+scatter" : "line", lineWidth: 1, lineStyle: "-", lineAlpha: 1, marker: "o", markerSize: 18, markerEdgeColor: "auto", markerFaceColor: "auto", markerEdgeAlpha: 0.8, markerFaceAlpha: 0.8, xOffset: 0, yOffset: 0, error: "", errorMode: "auto", errorMin: "", errorMax: "", errorPlus: "", errorMinus: "", trendType: "none", trendOrigin: false, trendDegree: 2, trendEquation: true, trendColor: "auto", trendStyle: "--", trendWidth: 1, trendFontSize: 6, trendDigits: 4, trendX: "", trendY: "" };
+  return { x, y, name, yAxis: "left", visible: true, color: plotType === "Polishing Rate" && index === 2 ? "#000000" : COLORS[index % COLORS.length], scatterColor: "auto", mode: ['Polishing Rate','Waviness'].includes(plotType) ? "line+scatter" : "line", lineWidth: 1, lineStyle: "-", lineAlpha: 1, marker: "o", markerSize: 18, markerEdgeColor: "auto", markerFaceColor: "auto", markerEdgeAlpha: 0.8, markerFaceAlpha: 0.8, xOffset: 0, yOffset: 0, error: "", errorMode: "auto", errorMin: "", errorMax: "", errorPlus: "", errorMinus: "", trendType: "none", trendOrigin: false, trendDegree: 2, trendEquation: true, trendColor: "auto", trendStyle: "--", trendWidth: 1, trendFontSize: 6, trendDigits: 4, trendX: "", trendY: "" };
 }
 
 export function initialSeries(columns, plotType = 'General') {
