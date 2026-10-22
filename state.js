@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.7.1";
+export const APP_VERSION = "1.8.0";
 
 // src/plot_settings.py: default_auto_series_colors(), same order and shades.
 export const COLORS = ["#1F8FE0", "#D4291E", "#2BA84D", "#D77207", "#7D3EDD", "#787878", "#666666", "#0052A8", "#A10000", "#009F22"];
@@ -65,7 +65,7 @@ export function defaultAxes() {
 }
 
 export function createSeries(x, y, name, index = 0) {
-  return { x, y, name, yAxis: "left", visible: true, color: COLORS[index % COLORS.length], scatterColor: "auto", mode: "line", lineWidth: 1, lineStyle: "-", lineAlpha: 1, marker: "o", markerSize: 18, markerEdgeColor: "auto", markerFaceColor: "auto", markerEdgeAlpha: 0.8, markerFaceAlpha: 0.8, xOffset: 0, yOffset: 0, error: "", errorMode: "auto", errorMin: "", errorMax: "", errorPlus: "", errorMinus: "" };
+  return { x, y, name, yAxis: "left", visible: true, color: COLORS[index % COLORS.length], scatterColor: "auto", mode: "line", lineWidth: 1, lineStyle: "-", lineAlpha: 1, marker: "o", markerSize: 18, markerEdgeColor: "auto", markerFaceColor: "auto", markerEdgeAlpha: 0.8, markerFaceAlpha: 0.8, xOffset: 0, yOffset: 0, error: "", errorMode: "auto", errorMin: "", errorMax: "", errorPlus: "", errorMinus: "", trendType: "none", trendOrigin: false, trendDegree: 2, trendEquation: true, trendColor: "auto", trendStyle: "--", trendWidth: 1, trendFontSize: 6, trendDigits: 4, trendX: "", trendY: "" };
 }
 
 export function initialSeries(columns, plotType = 'General') {
@@ -186,11 +186,12 @@ export function restoreSettings(document, metadata) {
     for (const key of Object.keys(result)) {
       if (["x", "y", "error", "errorMin", "errorMax", "errorPlus", "errorMinus"].includes(key)) continue;
       if (Object.hasOwn(item, key)) {
-        if (key === 'visible') {
+        if (['visible','trendOrigin','trendEquation'].includes(key)) {
           if (typeof item[key] !== 'boolean') throw new Error("設定JSONの系列表示を確認してください。");
           result[key] = item[key]; continue;
         }
         if (key === 'yAxis' && !['left','right'].includes(item[key])) throw new Error("設定JSONのY軸を確認してください。");
+        if (key === 'trendType' && !['none','linear','polynomial','exponential','logarithmic','power'].includes(item[key])) throw new Error("設定JSONの近似線を確認してください。");
         if (!["string", "number"].includes(typeof item[key])) throw new Error("設定JSONの系列設定を確認してください。");
         result[key] = item[key];
       }

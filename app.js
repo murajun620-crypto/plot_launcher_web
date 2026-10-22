@@ -1,7 +1,7 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=e51daecc14b3";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=e51daecc14b3";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=e51daecc14b3";
-import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=e51daecc14b3";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=c4441896f74c";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=c4441896f74c";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=c4441896f74c";
+import { APP_VERSION, COLORS, COLOR_PALETTE, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=c4441896f74c";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -186,7 +186,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=e51daecc14b3", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=c4441896f74c", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -404,6 +404,7 @@ function drawPresetOptions() {
 $("#plot-type").addEventListener("change",event=>{
   applyPreset(config,presets.find(item=>item.id===event.target.value));
   if(!['General','Roughness'].includes(config.plotType))config.series.forEach(item=>{item.mode='line';item.errorMode='none';item.yAxis='left';});
+  if(['XPS Fit','Particle Histogram','bar_graph_general','Raman 3D'].includes(config.plotType))config.series.forEach(item=>item.trendType='none');
   if(config.plotType==='Raman 3D') config.series=initialSeries(metadata.columns, config.plotType);
   if(config.plotType==='Particle Histogram')config.options.diameterColumn=Math.min(2,metadata.columns.length-1);
   drawControls();changed();
@@ -458,6 +459,17 @@ function drawControls() {
         <label class="draw-mode">Y誤差（±）の列<select data-series-field="error">${columnOptions(series.error, true)}</select></label>
         <div class="field-grid"><label title="Yから上方向の誤差幅。0以上の値が入った列を選びます。上端＝Y＋正の誤差幅。">正の誤差幅（＋）<select data-series-field="errorPlus">${columnOptions(series.errorPlus, true)}</select></label><label title="Yから下方向の誤差幅。こちらも0以上の値を指定します。下端＝Y−負の誤差幅。">負の誤差幅（−）<select data-series-field="errorMinus">${columnOptions(series.errorMinus, true)}</select></label></div>
         <div class="field-grid"><label title="誤差幅ではなく下端のY値を指定します。最小値 ≤ Y ≤ 最大値。">Y誤差最小値<select data-series-field="errorMin">${columnOptions(series.errorMin, true)}</select></label><label title="誤差幅ではなく上端のY値を指定します。最小値 ≤ Y ≤ 最大値。">Y誤差最大値<select data-series-field="errorMax">${columnOptions(series.errorMax, true)}</select></label></div>
+      </details><details class="series-trend"><summary>近似線</summary>
+        <label title="表示中のX/Y値（オフセット適用後）の有効な点を最小二乗法で近似します。軸範囲外の点も含み、誤差棒を重みには使いません。">近似の種類<select data-series-field="trendType">${choiceOptions([['none','なし'],['linear','直線'],['polynomial','多項式'],['exponential','指数'],['logarithmic','対数'],['power','べき乗']],series.trendType || 'none')}</select></label>
+        <label class="series-visibility" title="切片を0に固定して y=ax を求めます。チェックを外すと y=ax+b の傾きと切片を求めます。対数軸には原点を表示できません。"><input type="checkbox" data-series-field="trendOrigin" ${series.trendOrigin?'checked':''}>原点を通る直線</label>
+        ${input('trendDegree','多項式の次数','min="2" max="6" step="1"')}
+        <label class="series-visibility"><input type="checkbox" data-series-field="trendEquation" ${series.trendEquation!==false?'checked':''}>数式を表示</label>
+        <details class="trend-appearance"><summary>線・数式の表示</summary><div class="field-grid">${input('trendWidth','近似線幅 (pt)','min=".1" max="6" step="any"')}<label>近似線の線種<select data-series-field="trendStyle">${choiceOptions([['--','破線'],['-','実線'],['-.','一点鎖線'],[':','点線']],series.trendStyle || '--')}</select></label></div>
+          <label title="autoは系列と同じ色です。">近似線・数式の色<input data-series-field="trendColor" value="${escapeHTML(series.trendColor || 'auto')}" placeholder="auto / #色"></label>
+          <div class="field-grid">${input('trendFontSize','数式の文字サイズ (pt)','min="3" max="24" step="any"')}${input('trendDigits','係数の有効桁数','min="2" max="15" step="1" title="表示だけを丸めます。近似線の描画には丸め前の係数を使います。"')}</div>
+          <div class="field-grid">${input('trendX','数式X (軸比率)','min="-10" max="10" step="any" placeholder="自動"')}${input('trendY','数式Y (軸比率)','min="-10" max="10" step="any" placeholder="自動"')}</div>
+          <button type="button" class="button quiet" data-reset-trend="${index}">数式の位置を自動に戻す</button>
+        </details>
       </details></div>`;
   }).join("") || '<p class="empty-series">「系列を追加」でX列とY列を選んでください。</p>';
   $$('[data-axis]').forEach(input => {
@@ -470,6 +482,7 @@ function drawControls() {
   $$('[data-series-field]').forEach(input=>{if(markerFields.includes(input.dataset.seriesField))input.closest('label').hidden=!generic;});
   syncSeriesErrorControls();
   syncYAxesControls();
+  syncTrendControls();
   const seriesSection=$('#series-list').closest('.control-section');if(seriesSection)seriesSection.hidden=false;
   $('#add-series').hidden=xpsFit || histogram;
   $('#series-colormap').hidden=xpsFit || histogram;
@@ -487,6 +500,18 @@ function syncYAxesControls() {
   const active = ['General','Roughness'].includes(config.plotType || 'General') && config.series.some(item=>item.yAxis === 'right');
   $('#right-axis-controls').hidden = !active;
   $$('[data-axis="yAxisRight"]').forEach(input=>input.closest('label').hidden=active);
+}
+
+function syncTrendControls() {
+  const supported = !['XPS Fit','Particle Histogram','bar_graph_general','Raman 3D'].includes(config.plotType);
+  const seriesFor = element => config.series[Number(element.closest('[data-series-index]').dataset.seriesIndex)];
+  $$('.series-trend').forEach(element=>element.hidden=!supported);
+  $$('.trend-appearance').forEach(element=>{const item=seriesFor(element);element.hidden=!item || !item.trendType || item.trendType==='none';});
+  $$('[data-series-field]').forEach(input=>{
+    const key=input.dataset.seriesField;if(!key.startsWith('trend'))return;
+    const item=seriesFor(input),kind=item?.trendType || 'none',enabled=kind!=='none';
+    input.closest('label').hidden=!supported || !item || (key==='trendType'?false:key==='trendOrigin'?kind!=='linear':key==='trendDegree'?kind!=='polynomial':!enabled || (['trendX','trendY','trendFontSize','trendDigits'].includes(key) && item.trendEquation===false));
+  });
 }
 
 function syncSeriesErrorControls() {
@@ -967,6 +992,7 @@ function incompleteNumberInput(input) {
   if (input.type !== 'number') return false;
   if (input.validity?.badInput) return true;
   if (input.value !== '') return !Number.isFinite(Number(input.value));
+  if (['trendX','trendY'].includes(input.dataset.seriesField)) return false;
   return !['xMin','xMax','yMin','yMax','y2Min','y2Max','xStep','yStep','y2Step','xMinorStep','yMinorStep','y2MinorStep','legendX','legendY','xLabelX','xLabelY','yLabelX','yLabelY','y2LabelX','y2LabelY'].includes(input.dataset.axis);
 }
 
@@ -1017,6 +1043,7 @@ function applyControlInput(event) {
     $$(`[data-series-index="${index}"] [data-series-field="${input.dataset.seriesField}"]`).forEach(field=>{if(field!==input){field.value=input.value;field.checked=input.checked;}});
     if (input.dataset.seriesField === 'errorMode') syncSeriesErrorControls();
     if (input.dataset.seriesField === 'yAxis') syncYAxesControls();
+    if (['trendType','trendEquation'].includes(input.dataset.seriesField)) syncTrendControls();
   } else if (input.dataset.annotationField) {
     const item = config.annotations[Number(input.closest("[data-annotation-index]").dataset.annotationIndex)];
     item[input.dataset.annotationField] = input.type === "checkbox" ? input.checked : input.type === "number" ? Number(input.value) : input.value;
@@ -1030,6 +1057,8 @@ function applyControlInput(event) {
 }
 $("#plot-form").addEventListener("input", applyControlInput);
 $("#series-list").addEventListener("click", event => {
+  const reset=event.target.closest('[data-reset-trend]');
+  if(reset){const index=Number(reset.dataset.resetTrend);config.series[index].trendX=config.series[index].trendY='';for(const key of ['trendX','trendY'])$$(`[data-series-index="${index}"] [data-series-field="${key}"]`).forEach(input=>input.value='');changed();return;}
   const reorder=event.target.closest('[data-series-up],[data-series-down],[data-series-copy]');
   if(reorder){const kind=Object.keys(reorder.dataset)[0],index=Number(reorder.dataset[kind]);if(kind==='seriesCopy' && config.series.length<32)config.series.splice(index+1,0,structuredClone(config.series[index]));else if(kind!=='seriesCopy'){const other=index+(kind==='seriesUp'?-1:1);[config.series[index],config.series[other]]=[config.series[other],config.series[index]];}drawControls();changed();return;}
   const button = event.target.closest("[data-remove]");
@@ -1206,7 +1235,11 @@ $("#annotation-list").addEventListener("click", event => {
 function openElementEditor(part,index=0) {
   if(!metadata || loading || exporting || renderRunning || renderedRevision!==revision)return;
   const fields=$('#element-editor-fields');let sources=[],title='';
-  if(part==='series') {
+  if(part==='trend') {
+    const series=config.series[index];if(!series)return;
+    title=`系列${index+1}「${series.name}」の近似線`;
+    sources=[$(`#series-list [data-series-index="${index}"] .series-trend`)];
+  } else if(part==='series') {
     const series=config.series[index];if(!series)return;
     title=`系列${index+1}「${series.name}」の設定`;
     sources=[$(`#series-list [data-series-index="${index}"]`)];
@@ -1228,6 +1261,7 @@ function openElementEditor(part,index=0) {
   }
   if(part==='grid')sources.push(...$$('#plot-form [data-axis-auto="minor"]').map(input=>input.closest('label')));
   fields.innerHTML=sources.filter(Boolean).map(source=>source.outerHTML).join('');
+  if(part==='trend')fields.innerHTML=`<div data-series-index="${index}">${fields.innerHTML}</div>`;
   // Reuse the sidebar controls, restoring live values and color-picker handlers.
   fields.querySelectorAll('.color-control').forEach(wrapper=>{const input=wrapper.querySelector('input');if(input){input.hidden=false;delete input.dataset.paletteEnhanced;wrapper.replaceWith(input);}});
   fields.querySelectorAll('[id]').forEach(element=>element.removeAttribute('id'));
@@ -1301,7 +1335,7 @@ function positionInteractions() {
   const hitSize = 24;
   Object.assign(overlay.style, {left:'0',top:'0',width:'100%',height:'100%'});
   if(figureResult.geometry.series) dataInteractions(overlay,imageBox);
-  const targets = [...(figureResult.geometry.axisLabels || []), ...(figureResult.geometry.tickLabels || []), ...[...figureResult.geometry.annotations].sort((a,b)=>(config.annotations?.find(item=>item.id===a.id)?.zorder??20)-(config.annotations?.find(item=>item.id===b.id)?.zorder??20))];
+  const targets = [...(figureResult.geometry.axisLabels || []), ...(figureResult.geometry.tickLabels || []), ...[...figureResult.geometry.annotations,...(figureResult.geometry.trendEquations || [])].sort((a,b)=>(a.seriesIndex!==undefined?30:config.annotations?.find(item=>item.id===a.id)?.zorder??20)-(b.seriesIndex!==undefined?30:config.annotations?.find(item=>item.id===b.id)?.zorder??20))];
   if (figureResult.geometry.legend) targets.unshift({id:"legend",box:figureResult.geometry.legend});
   for (const target of targets) {
     const item = config.annotations?.find(item => item.id === target.id);
@@ -1323,7 +1357,8 @@ function positionInteractions() {
     button.classList.add("figure-drag-target");if(selected.has(target.id))button.classList.add('selected');
     if(target.kind !== 'ticks')button.dataset.dragId=target.id;
     if(target.axis) {button.dataset.editAxis = target.axis; button.dataset.axisKind = target.kind; if(target.kind === 'ticks')button.classList.add('axis-tick-target');}
-    button.title=target.axis ? `${axisName(target.axis)}軸${target.kind === 'label' ? 'ラベル：ドラッグで移動・ダブルクリックで設定' : '目盛り：ダブルクリックで設定'}` : target.id==="legend"?"凡例をドラッグして移動":"注釈をドラッグして移動";
+    if(target.seriesIndex!==undefined)button.dataset.trendIndex=String(target.seriesIndex);
+    button.title=target.seriesIndex!==undefined ? `系列${target.seriesIndex+1}の近似式：ドラッグで移動・ダブルクリックで設定` : target.axis ? `${axisName(target.axis)}軸${target.kind === 'label' ? 'ラベル：ドラッグで移動・ダブルクリックで設定' : '目盛り：ダブルクリックで設定'}` : target.id==="legend"?"凡例をドラッグして移動":"注釈をドラッグして移動";
     button.setAttribute('aria-label',button.title);
     if(item?.locked)button.title+='（位置固定）';
     if(item && selected.has(item.id) && !item.locked){
@@ -1352,7 +1387,7 @@ $("#figure-interactions").addEventListener("pointerdown", event => {
   }
   if(item?.locked || (item && !selected.has(id))){syncInteractionSelection();return;}
   const imageBox=$("#figure-image").getBoundingClientRect();
-  dragging={pointerId:event.pointerId,id,item,axis:target.dataset.editAxis,anchor:figureResult.geometry.axisLabels?.find(label=>label.id===id)?.anchor,start:item?structuredClone(item):null,items:(config.annotations||[]).filter(item=>selected.has(item.id)&&!item.locked).map(item=>({item,start:structuredClone(item)})),handle:target.dataset.handle,x:event.clientX,y:event.clientY,box:imageBox,axes:figureResult.geometry.axes,legend:figureResult.geometry.legend};
+  dragging={pointerId:event.pointerId,id,item,axis:target.dataset.editAxis,trendIndex:target.dataset.trendIndex,anchor:[...(figureResult.geometry.axisLabels || []),...(figureResult.geometry.trendEquations || [])].find(label=>label.id===id)?.anchor,start:item?structuredClone(item):null,items:(config.annotations||[]).filter(item=>selected.has(item.id)&&!item.locked).map(item=>({item,start:structuredClone(item)})),handle:target.dataset.handle,x:event.clientX,y:event.clientY,box:imageBox,axes:figureResult.geometry.axes,legend:figureResult.geometry.legend};
   target.setPointerCapture(event.pointerId); event.preventDefault();
 });
 $("#figure-interactions").addEventListener("pointermove", event => {
@@ -1369,7 +1404,11 @@ function finishDrag(event) {
     return;
   }
   const [ax,ay,aw,ah]=d.axes, dx=(event.clientX-d.x)/d.box.width/aw,dy=-(event.clientY-d.y)/d.box.height/ah;
-  if(d.axis && d.anchor) {
+  if(d.trendIndex!==undefined && d.anchor) {
+    const item=config.series[Number(d.trendIndex)];
+    item.trendX=Math.max(-10,Math.min(10,d.anchor[0]+dx)).toFixed(4);item.trendY=Math.max(-10,Math.min(10,d.anchor[1]+dy)).toFixed(4);
+    for(const key of ['trendX','trendY'])$$(`[data-series-index="${d.trendIndex}"] [data-series-field="${key}"]`).forEach(input=>input.value=item[key]);
+  } else if(d.axis && d.anchor) {
     config.axes[`${d.axis}LabelX`] = Math.max(-10,Math.min(10,d.anchor[0]+dx)).toFixed(4);
     config.axes[`${d.axis}LabelY`] = Math.max(-10,Math.min(10,d.anchor[1]+dy)).toFixed(4);
     for(const key of ['LabelX','LabelY'])$$(`[data-axis="${d.axis}${key}"]`).forEach(input=>input.value=config.axes[`${d.axis}${key}`]);
@@ -1492,6 +1531,8 @@ function nearestSeries(event,fallback) {
 }
 
 function editPreviewElement(event) {
+  const trend=event.target.closest('[data-trend-index]');
+  if(trend?.dataset.trendIndex!==undefined){event.preventDefault();openElementEditor('trend',Number(trend.dataset.trendIndex));return;}
   const axis=event.target.closest('[data-edit-axis]');
   if(axis){event.preventDefault();openAxisEditor(axis.dataset.editAxis,axis.dataset.axisKind);return;}
   const series=event.target.closest('[data-edit-series]');

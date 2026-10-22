@@ -44,6 +44,103 @@ MAX_COLUMNS = 256
 MAX_SERIES = 32
 
 
+def fit_trendline(x, y, kind, *, origin=False, degree=2, xlog=False, ylog=False, digits=4):
+    """Unweighted XY regression; log/exp/power use transformed least squares."""
+    if kind not in {"linear", "polynomial", "exponential", "logarithmic", "power"}:
+        raise ValueError("近似の種類を選び直してください。")
+    x, y = np.asarray(x, dtype=float), np.asarray(y, dtype=float)
+    valid = np.isfinite(x) & np.isfinite(y)
+    if kind in {"logarithmic", "power"}:
+        valid &= x > 0
+    if kind in {"exponential", "power"}:
+        valid &= y > 0
+    excluded = int((np.isfinite(x) & np.isfinite(y) & ~valid).sum())
+    x, y = x[valid], y[valid]
+    order = int(number(degree, "多項式の次数", minimum=2, maximum=6)) if kind == "polynomial" else 1
+    if kind == "polynomial" and float(degree) != order:
+        raise ValueError("多項式の次数は2〜6の整数にしてください。")
+    if len(x) < order + 1:
+        raise ValueError(f"近似には有効なデータが{order + 1}点以上必要です。")
+    digits_value = number(digits, "係数の有効桁数", minimum=2, maximum=15)
+    if not digits_value.is_integer():
+        raise ValueError("係数の有効桁数は2〜15の整数にしてください。")
+    digits = int(digits_value)
+    with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
+        if kind == "linear" and origin:
+            scale = float(np.max(np.abs(x)))
+            if scale == 0:
+                raise ValueError("原点を通る近似には0以外のX値が必要です。")
+            scaled = x / scale
+            slope_scaled = float(np.dot(scaled, y) / np.dot(scaled, scaled))
+            coefficients = np.array([0., slope_scaled / scale])
+            predict = lambda values: slope_scaled * (values / scale)
+        else:
+            tx = np.log(x) if kind in {"logarithmic", "power"} else x
+            ty = np.log(y) if kind in {"exponential", "power"} else y
+            if len(np.unique(tx)) < order + 1:
+                raise ValueError(f"近似には異なるX値が{order + 1}種類以上必要です。")
+            polynomial, diagnostic = np.polynomial.Polynomial.fit(tx, ty, order, full=True)
+            if diagnostic[1] < order + 1:
+                raise ValueError("X値が近すぎて近似係数を求められません。")
+            coefficients = polynomial.convert().coef
+            if kind in {"exponential", "power"}:
+                coefficients = np.array([np.exp(coefficients[0]), coefficients[1]])
+                predict = lambda values: np.exp(polynomial(np.log(values) if kind == "power" else values))
+            else:
+                predict = lambda values: polynomial(np.log(values) if kind == "logarithmic" else values)
+        if not np.isfinite(coefficients).all():
+            raise ValueError("近似係数が大きすぎます。データの単位や範囲を確認してください。")
+        if kind in {"exponential", "power"} and coefficients[0] <= 0:
+            raise ValueError("近似係数が小さすぎます。データの単位や範囲を確認してください。")
+        lo, hi = float(x.min()), float(x.max())
+        if kind == "linear" and origin and not xlog and not ylog:
+            lo, hi = min(lo, 0.), max(hi, 0.)
+        if lo == hi:
+            lo, hi = (lo/2, hi*2) if xlog else (min(lo, 0.), max(hi, 0.))
+        grid = np.geomspace(lo, hi, 256) if lo > 0 and (xlog or kind in {"logarithmic", "power"}) else np.linspace(lo, hi, 256)
+        fitted = predict(grid)
+        show = np.isfinite(fitted) & ((grid > 0) if xlog else True) & ((fitted > 0) if ylog else True)
+        if not np.any(show):
+            raise ValueError("現在の軸では近似線を表示できません。")
+        fitted = np.where(show, fitted, np.nan)
+
+    def coefficient(value):
+        # Drop round-off-only polynomial terms, retaining small coefficients
+        # whose contribution is meaningful on the actual X scale.
+        return format(float(value), f".{digits}g")
+    def math_number(value):
+        text = coefficient(value)
+        if "e" in text:
+            mantissa, exponent = text.split("e")
+            return rf"{mantissa}\times10^{{{int(exponent)}}}"
+        return "0" if text in {"-0", "0"} else text
+    if kind in {"linear", "polynomial"}:
+        displayed = coefficients.copy()
+        with np.errstate(over="ignore", invalid="ignore"):
+            contributions = np.abs(displayed) * np.max(np.abs(x)) ** np.arange(len(displayed))
+        displayed[contributions < np.finfo(float).eps * 256 * np.max(np.abs(y))] = 0
+        terms = []
+        for power in reversed(range(len(displayed))):
+            value = displayed[power]
+            if value == 0:
+                continue
+            variable = "" if power == 0 else "x" if power == 1 else f"x^{{{power}}}"
+            sign = "-" if value < 0 else "+" if terms else ""
+            terms.append(sign + math_number(abs(value)) + variable)
+        chunks = ["".join(terms[i:i+3]) for i in range(0, len(terms), 3)] or ["0"]
+        equation = "$y = " + chunks[0] + "$" + "".join("\n$" + part + "$" for part in chunks[1:])
+    elif kind == "logarithmic":
+        b, a = coefficients
+        equation = rf"$y = {math_number(a)}\ln(x) {'-' if b < 0 else '+'} {math_number(abs(b))}$"
+    elif kind == "exponential":
+        a, b = coefficients
+        equation = rf"$y = {math_number(a)}e^{{{math_number(b)}x}}$"
+    else:
+        a, b = coefficients
+        equation = rf"$y = {math_number(a)}x^{{{math_number(b)}}}$"
+    return {"x": grid, "y": fitted, "coefficients": coefficients.tolist(), "equation": equation, "points": len(x), "excluded": excluded}
+
+
 def expand_micro(text, *, plain=False):
     """Expand the upright-micro shorthand without changing saved input text."""
     if not isinstance(text, str) or r"\micro" not in text:
@@ -621,6 +718,59 @@ class PlotEngine:
             result.append({"index": index, "artists": artists})
         return result + extra
 
+    def _add_trendlines(self, axes, frame, config, indices, groups, values, warnings):
+        fits, equations = [], []
+        for local, item in enumerate(config.get("series", [])):
+            kind = item.get("trendType", "none")
+            if kind == "none" or not item.get("visible", True):
+                continue
+            name = str(item.get("name") or f"Series {indices[local]+1}")
+            line = None
+            previous_limits = axes.get_xlim(), axes.get_ylim()
+            try:
+                origin, show_equation = item.get("trendOrigin", False), item.get("trendEquation", True)
+                if not isinstance(origin, bool) or not isinstance(show_equation, bool):
+                    raise ValueError("原点・数式のチェック設定を確認してください。")
+                result = fit_trendline(frame[f"_x_{local}"], frame[f"_y_{local}"], kind, origin=origin,
+                    degree=item.get("trendDegree", 2), digits=item.get("trendDigits", 4),
+                    xlog=axes.get_xscale() == "log", ylog=axes.get_yscale() == "log")
+                color = str(item.get("trendColor", "auto"))
+                if color == "auto":
+                    color = str(item.get("color", "#1F8FE0"))
+                if not is_color_like(color):
+                    raise ValueError("近似線の色を確認してください。")
+                style = item.get("trendStyle", "--")
+                if style not in {"-", "--", "-.", ":"}:
+                    raise ValueError("近似線の線種を確認してください。")
+                width = number(item.get("trendWidth", 1), "近似線の線幅", minimum=.1, maximum=6)
+                font_size = number(item.get("trendFontSize", 6), "数式の文字サイズ", minimum=3, maximum=24)
+                position = [number(item.get(f"trend{key}", ""), "数式の位置", minimum=-10, maximum=10, optional=True) for key in ("X", "Y")]
+                line, = axes.plot(result["x"], result["y"], color=color, linestyle=style, linewidth=width,
+                    label="_nolegend_", zorder=4, scalex=False, scaley=False)
+                plot_utils.ensure_axis_limits_include_data(axes)
+                for axis, limits in (("X", axes.get_xlim()), ("Y", axes.get_ylim())):
+                    for suffix, maximum in (("TICK_STEP", 200), ("MINOR_TICK_STEP", 1000)):
+                        step = values[f"PLOT_{axis}{suffix}"]
+                        if step and abs(limits[1]-limits[0]) / float(step) > maximum:
+                            raise ValueError("近似線を含めると目盛りが多すぎます。目盛り間隔を広げてください。")
+                index = indices[local]
+                next(group for group in groups if group.get("index") == index)["artists"].append(line)
+                fits.append({"index": index, "kind": kind, **{key: result[key] for key in ("coefficients", "equation", "points", "excluded")}})
+                if result["excluded"]:
+                    warnings.append(f"{name}: 近似の定義域外の{result['excluded']:,}点を近似計算から除外しました")
+                if show_equation:
+                    title = name[:32] + "…" if len(name) > 32 else name
+                    if len(re.findall(r"(?<!\\)\$", title)) % 2:
+                        title = re.sub(r"(?<!\\)\$", lambda _match: r"\$", title)
+                    equations.append({"index": index, "text": title + "\n" + result["equation"], "color": color,
+                        "fontsize": font_size * float(config.get("axes", {}).get("fontScale", 1)), "position": position})
+            except (ValueError, np.linalg.LinAlgError, FloatingPointError) as error:
+                if line is not None:
+                    line.remove()
+                    axes.set_xlim(previous_limits[0]); axes.set_ylim(previous_limits[1])
+                warnings.append(f"{name}: 近似線を描画できません（{error}）")
+        return fits, equations
+
     @staticmethod
     def _data_geometry(groups, axes, box, renderer):
         """Normalize visible artist paths to the exported SVG, rather than data bounds."""
@@ -790,6 +940,15 @@ class PlotEngine:
                     axes.grid(False)
                 if preset in {"General", "Roughness"}:
                     plot_utils.ensure_axis_limits_include_data(axes)
+                fits, equation_specs = [], []
+                if preset not in {"XPS Fit", "Particle Histogram", "bar_graph_general", "Raman 3D"}:
+                    fits, equation_specs = self._add_trendlines(axes, frame, primary_config, primary_indices, series_groups, values, warnings)
+                    if dual:
+                        with plot_environment(right_values, right_frame, self.sheet_name, self.filename):
+                            right_fits, right_equations = self._add_trendlines(right_axes, right_frame, right_config, right_indices, series_groups, right_values, warnings)
+                        fits += right_fits; equation_specs += right_equations
+                        # Right-side fits may extend the shared X range.
+                        plot_utils.ensure_axis_limits_include_data(axes)
                 if preset == "Raman 3D":
                     options = config.get("options", {})
                     axes.view_init(elev=number(options.get("elevation", 24), "仰角", minimum=-180, maximum=180), azim=number(options.get("azimuth", -66), "方位角", minimum=-360, maximum=360))
@@ -878,6 +1037,23 @@ class PlotEngine:
                         annotation.font_family = [annotation.font_family, config.get("axes", {}).get("japaneseFontFamily", "Noto Sans JP"), "DejaVu Sans"]
                 manager = AnnotationManager(collection, logger=warnings.append)
                 manager.attach(figure, annotation_axes)
+                equation_artists = []
+                if equation_specs:
+                    figure.canvas.draw()
+                    renderer = figure.canvas.get_renderer()
+                    region = annotation_axes.get_window_extent(renderer)
+                    top = .97
+                    if legend:
+                        legend_box = legend.get_window_extent(renderer)
+                        if legend_box.x0 < region.x0 + .55 * region.width and legend_box.y1 > region.y0 + .5 * region.height:
+                            top = min(top, (legend_box.y0-region.y0)/region.height-.04)
+                    for spec in sorted(equation_specs, key=lambda item: item["index"]):
+                        x, y = spec["position"]
+                        anchor = [.03 if x is None else x, top if y is None else y]
+                        artist = annotation_axes.text(*anchor, spec["text"], transform=annotation_axes.transAxes,
+                            ha="left", va="top", fontsize=spec["fontsize"], color=spec["color"], zorder=30, clip_on=False)
+                        equation_artists.append((spec["index"], artist, anchor))
+                        top -= artist.get_window_extent(renderer).height/region.height+.03
                 figure.canvas.draw()
                 # Hide off-screen log ticks before calculating the export box.
                 for axis in [item[1] for item in editable_axes]:
@@ -906,6 +1082,8 @@ class PlotEngine:
                     return [(b.x0 - box.x0) / box.width, (box.y1 - b.y1) / box.height, b.width / box.width, b.height / box.height]
                 geometry = {"axes": svg_box(axes.get_window_extent(renderer)), "legend": svg_box(legend.get_window_extent(renderer)) if legend else None, "annotations": [], "axisLabels": [], "tickLabels": []}
                 geometry["series"] = self._data_geometry(series_groups, axes, box, renderer)
+                geometry["trendEquations"] = [{"id": f"trend-equation-{index}", "seriesIndex": index,
+                    "box": svg_box(artist.get_window_extent(renderer)), "anchor": anchor} for index, artist, anchor in equation_artists]
                 geometry["spines"] = [{"id": side, "paths": self._data_geometry([{"artists": [spine]}], axes, box, renderer)[0]["paths"]} for target in (axes, right_axes) if target is not None for side, spine in target.spines.items() if spine.get_visible() and preset != "Raman 3D"]
                 geometry["grid"] = self._data_geometry([{"part": "grid", "artists": [line for line in axes.get_xgridlines() + axes.get_ygridlines() if line.get_visible()]}], axes, box, renderer)
                 geometry["grid"] += self._data_geometry([{"part": "grid", "artists": [line for _, axis in editable_axes for tick in [*axis.get_major_ticks(), *axis.get_minor_ticks()] for line in (tick.tick1line, tick.tick2line) if line.get_visible()]}], axes, box, renderer)
@@ -945,7 +1123,7 @@ class PlotEngine:
                 return float(np.min(positive)) if len(positive) else None
             tick_steps = {name: {"major": tick_step(axis.get_majorticklocs()), "minor": tick_step(axis.get_minorticklocs())}
                           for name, axis in editable_axes}
-            return {"svg": image.getvalue().decode("utf-8"), "series": [item for item in diagnostics if item["visible"]], "warnings": warnings, "statistics": statistics, "xRange": list(annotation_axes.get_xlim()), "yRange": list(annotation_axes.get_ylim()), "y2Range": list((right_axes or axes).get_ylim()) if right_indices else None, "yDataScale": annotation_axes.get_yscale(), "tickSteps": tick_steps, "geometry": geometry, "fontFamily": family if (family := config.get("axes", {}).get("fontFamily")) else self.font_family}
+            return {"svg": image.getvalue().decode("utf-8"), "series": [item for item in diagnostics if item["visible"]], "fits": sorted(fits, key=lambda item: item["index"]), "warnings": warnings, "statistics": statistics, "xRange": list(annotation_axes.get_xlim()), "yRange": list(annotation_axes.get_ylim()), "y2Range": list((right_axes or axes).get_ylim()) if right_indices else None, "yDataScale": annotation_axes.get_yscale(), "tickSteps": tick_steps, "geometry": geometry, "fontFamily": family if (family := config.get("axes", {}).get("fontFamily")) else self.font_family}
         except Exception:
             for figure_number in set(plt.get_fignums()) - previous_figures:
                 plt.close(figure_number)
@@ -955,7 +1133,13 @@ class PlotEngine:
     def export(self, config, format_name, dpi=1200):
         if format_name not in {"svg", "png", "pdf", "pptx"}:
             raise ValueError("SVG・PNG・PDF・PowerPointのいずれかを選んでください。")
-        self.render(config)
+        rendered = self.render(config)
+        if config.get("plotType", "General") not in {"XPS Fit", "Particle Histogram", "bar_graph_general", "Raman 3D"}:
+            requested = {i for i, item in enumerate(config.get("series", [])) if item.get("visible", True) and item.get("trendType", "none") != "none"}
+            missing = requested - {fit["index"] for fit in rendered["fits"]}
+            if missing:
+                names = "、".join(str(config["series"][i].get("name") or f"系列{i+1}") for i in sorted(missing))
+                raise ValueError(f"{names}の近似線を計算できないため保存できません。プレビューの警告を確認し、近似の種類・データ・目盛りを変更するか、近似を「なし」にしてください。")
         if format_name == "pptx":
             return {"format": "pptx", "base64": base64.b64encode(self.powerpoint_file()).decode("ascii")}
         resolution = number(dpi, "PNG解像度", minimum=150, maximum=1200)
