@@ -1,5 +1,5 @@
-import { makeSettings, restoreSettings } from "./state.js?v=3c5b8cfc696d";
-import { configForSheet } from "./sheets.js?v=3c5b8cfc696d";
+import { makeSettings, restoreSettings } from "./state.js?v=4173acdef4c3";
+import { configForSheet } from "./sheets.js?v=4173acdef4c3";
 
 export const USER_PRESET_KEY = 'plotlauncher.user-presets.v1';
 export const USER_PRESET_LIMIT = 100;

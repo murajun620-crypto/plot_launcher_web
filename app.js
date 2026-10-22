@@ -1,8 +1,8 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=3c5b8cfc696d";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=3c5b8cfc696d";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=3c5b8cfc696d";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=3c5b8cfc696d";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=3c5b8cfc696d";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=4173acdef4c3";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=4173acdef4c3";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=4173acdef4c3";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=4173acdef4c3";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=4173acdef4c3";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -192,7 +192,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=3c5b8cfc696d", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=4173acdef4c3", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -1218,9 +1218,11 @@ function updateUserPresetActions() {
   $('#manage-user-presets').disabled = exporting;
   $('#user-preset-select').disabled = !engineReady || !metadata || !myPresets.length || busy || renderRunning;
   const current = myPresets.find(item=>item.id === $('#managed-preset-select').value);
-  $('#managed-preset-select').disabled = !myPresets.length || exporting;
-  $('#managed-preset-name').disabled = !current || exporting;
-  $('#rename-user-preset').disabled = !current || exporting;
+  $('#managed-preset-select').disabled = exporting;
+  $('#managed-preset-name').disabled = exporting;
+  $('#rename-user-preset').textContent = current ? '名前を変更' : '現在の設定を登録';
+  $('#rename-user-preset').disabled = exporting || !$('#managed-preset-name').value.trim() || !current && $('#register-user-preset').disabled;
+  presetMessage('#manage-presets-hint',!current && $('#register-user-preset').disabled ? (!metadata ? 'データを読み込み、グラフを表示すると登録できます。' : 'プレビューを更新すると登録できます。') : '');
   $('#delete-user-preset').disabled = !current || exporting;
   $('#export-user-presets').disabled = !myPresets.length || exporting;
   $('#import-user-presets').disabled = exporting;
@@ -1235,8 +1237,8 @@ function drawUserPresetLibrary() {
   $('#user-preset-field').hidden = !myPresets.length;
   $('#user-preset-select').innerHTML = '<option value="">選択して適用</option>' + choiceOptions(myPresets.map(item=>[item.id,item.name]),'');
   $('#user-preset-select').value = '';
-  $('#managed-preset-select').innerHTML = myPresets.length ? choiceOptions(myPresets.map(item=>[item.id,item.name]),selected) : '<option value="">登録なし</option>';
-  $('#managed-preset-select').value = myPresets.some(item=>item.id === selected) ? selected : myPresets[0]?.id || '';
+  $('#managed-preset-select').innerHTML = '<option value="">新規登録（現在の設定）</option>' + choiceOptions(myPresets.map(item=>[item.id,item.name]),selected);
+  $('#managed-preset-select').value = myPresets.some(item=>item.id === selected) ? selected : '';
   syncManagedPreset();
 }
 function refreshUserPresets() {
@@ -1266,7 +1268,7 @@ $('#register-user-preset').addEventListener('click',()=>{
 });
 $('#user-preset-name').addEventListener('input',()=>syncPresetRegistration(true));
 $('#overwrite-user-preset').addEventListener('change',()=>syncPresetRegistration());
-$('#user-preset-name').addEventListener('keydown',event=>{if(event.key === 'Enter'){event.preventDefault();if(!$('#confirm-register-preset').disabled)$('#confirm-register-preset').click();}});
+$('#user-preset-name').addEventListener('keydown',event=>{if(event.key === 'Enter' && !event.isComposing){event.preventDefault();if(!$('#confirm-register-preset').disabled)$('#confirm-register-preset').click();}});
 $('#close-register-preset').addEventListener('click',()=>$('#register-preset-dialog').close());
 $('#confirm-register-preset').addEventListener('click',()=>{
   if ($('#confirm-register-preset').disabled || !metadata) return;
@@ -1294,8 +1296,21 @@ $('#manage-user-presets').addEventListener('click',()=>{
 });
 $('#close-manage-presets').addEventListener('click',()=>$('#manage-presets-dialog').close());
 $('#managed-preset-select').addEventListener('change',syncManagedPreset);
+$('#managed-preset-name').addEventListener('input',updateUserPresetActions);
+$('#managed-preset-name').addEventListener('keydown',event=>{if(event.key === 'Enter' && !event.isComposing){event.preventDefault();if(!$('#rename-user-preset').disabled)$('#rename-user-preset').click();}});
 $('#rename-user-preset').addEventListener('click',()=>{
-  try {changeUserPresets(entries=>renameUserPreset(entries,$('#managed-preset-select').value,userPresetName($('#managed-preset-name').value)));presetMessage('#manage-presets-message','名前を変更しました。');}
+  if ($('#rename-user-preset').disabled) return;
+  try {
+    const id = $('#managed-preset-select').value, name = userPresetName($('#managed-preset-name').value);
+    if (id) {changeUserPresets(entries=>renameUserPreset(entries,id,name));presetMessage('#manage-presets-message','名前を変更しました。');}
+    else {
+      if ($('#register-user-preset').disabled || !metadata) return;
+      const entry = captureUserPreset(name,config,metadata,loadedHeader);
+      changeUserPresets(entries=>upsertUserPreset(entries,entry));
+      $('#managed-preset-select').value = entry.id; syncManagedPreset();
+      presetMessage('#manage-presets-message',`「${entry.name}」をブラウザに保存しました。`);
+    }
+  }
   catch(error) {presetMessage('#manage-presets-message',presetFailure(error),true);}
 });
 $('#delete-user-preset').addEventListener('click',()=>{
