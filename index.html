@@ -6,8 +6,8 @@
   <meta name="description" content="Excel・CSVの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=4173acdef4c3">
-  <script type="module" src="./app.js?v=4173acdef4c3"></script>
+  <link rel="stylesheet" href="./style.css?v=dfaf97b05c82">
+  <script type="module" src="./app.js?v=dfaf97b05c82"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -105,7 +105,7 @@
                 <div class="check-options axis-tick-auto"><label title="手動の間隔を解除して自動に戻します。"><input type="checkbox" data-axis-auto="ticks" data-axis-name="y2" aria-label="右Y軸の主目盛りを自動設定" checked>主目盛りを自動</label><label><input type="checkbox" data-axis-auto="minor" data-axis-name="y2" aria-label="右Y軸の副目盛りを自動設定" checked>副目盛りを自動</label></div>
                 <label class="minor-step-field">副目盛り間隔<input id="y2-minor-step" data-axis="y2MinorStep" type="number" step="any" placeholder="自動"></label>
               </div>
-              <details><summary>右Y軸の表示・余白</summary><div class="check-options"><label><input data-axis="hideY2Label" type="checkbox">ラベルを非表示</label><label><input data-axis="hideY2TickLabels" type="checkbox">目盛り数値を非表示</label><label><input data-axis="hideY2Ticks" type="checkbox">目盛り線を非表示</label></div><div class="field-grid"><label>ラベル追加余白 (pt)<input data-axis="y2LabelPad" type="number" min="-100" max="100" step="any" value="0"></label><label>目盛り追加余白 (pt)<input data-axis="y2TickPad" type="number" min="-100" max="100" step="any" value="0"></label></div></details>
+              <details><summary>右Y軸の表示・余白</summary><div class="check-options"><label><input data-axis="hideY2Label" type="checkbox">ラベルを非表示</label><label><input data-axis="hideY2TickLabels" type="checkbox">目盛り数値を非表示</label><label><input data-axis="hideY2Ticks" type="checkbox">目盛り線を非表示</label></div><div class="field-grid"><label>ラベル余白 (pt)<input data-axis="y2LabelPad" type="number" min="-100" max="100" step="any" value="4"></label><label>目盛り追加余白 (pt)<input data-axis="y2TickPad" type="number" min="-100" max="100" step="any" value="0"></label></div></details>
             </div>
             <div class="check-options"><label title="X・Y軸共通。各軸の目盛り線を非表示にした場合は副目盛りも表示しません。"><input id="show-minor-ticks" data-axis="hideMinorTicks" data-invert="true" type="checkbox" checked>副目盛りを表示</label></div>
             <div class="field-grid size-fields"><label>軸領域の幅 <span>cm</span><input id="axes-width" data-axis="width" type="number" min="0.5" max="24" step="any" value="4" required></label><label>軸領域の高さ <span>cm</span><input id="axes-height" data-axis="height" type="number" min="0.5" max="24" step="any" value="3" required></label></div>

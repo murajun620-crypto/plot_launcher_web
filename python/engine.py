@@ -428,13 +428,7 @@ class PlotEngine:
             values[f"PLOT_{env}"] = str(number(axes.get(key, default), "マーカー・誤差棒のサイズ", minimum=0, maximum=20))
         for axis in ("x", "y"):
             for key, env in (("LabelPad", "LABEL_PAD"), ("TickPad", "TICK_PAD")):
-                values[f"PLOT_{axis.upper()}{env}"] = str(number(axes.get(f"{axis}{key}", 0), "軸の余白", minimum=-100, maximum=100))
-            # Without tick numbers the native label falls against the spine.
-            # Keep a 6 pt base gap (at the standard 8 pt label size); the UI
-            # padding remains an extra offset and manual coordinates win later.
-            if axis == "y" and preset in {"EDX", "XPS Survey", "XPS Core", "XPS Fit", "XAFS", "Raman Spectrum"} and axes.get("hideYTickLabels", False):
-                base_gap = 6 * font_scale * number(axes.get("labelFontScale", 1), "軸ラベル倍率", minimum=0.2, maximum=3)
-                values["PLOT_YLABEL_PAD"] = str(float(values["PLOT_YLABEL_PAD"]) + base_gap)
+                values[f"PLOT_{axis.upper()}{env}"] = str(number(axes.get(f"{axis}{key}", 4 if key == "LabelPad" else 0), "軸の余白", minimum=-100, maximum=100))
             form = axes.get(f"{axis}LogFormat", "power")
             if form not in {"power", "decimal"}:
                 raise ValueError("対数目盛りの表記を確認してください。")
@@ -849,7 +843,7 @@ class PlotEngine:
         def axis_config(indices, name):
             result = {**config, "axes": dict(config.get("axes", {})), "series": [original_series[i] for i in indices]}
             if name == "y2":
-                for suffix, default in (("Label", ""), ("Unit", "auto"), ("Scale", "linear"), ("Min", ""), ("Max", ""), ("Step", ""), ("MinorStep", ""), ("LogFormat", "power"), ("LabelPad", 0), ("TickPad", 0)):
+                for suffix, default in (("Label", ""), ("Unit", "auto"), ("Scale", "linear"), ("Min", ""), ("Max", ""), ("Step", ""), ("MinorStep", ""), ("LogFormat", "power"), ("LabelPad", 4), ("TickPad", 0)):
                     result["axes"][f"y{suffix}"] = config.get("axes", {}).get(f"y2{suffix}", default)
                 for suffix in ("Label", "TickLabels", "Ticks"):
                     result["axes"][f"hideY{suffix}"] = config.get("axes", {}).get(f"hideY2{suffix}", False)
@@ -998,6 +992,9 @@ class PlotEngine:
                         axis.axes.spines[axis.get_label_position()].set_color(color)
                 positioned_labels = {}
                 if preset == "Raman 3D":
+                    # The displayed Y quantity is the 3D Z axis. Apply the
+                    # same padding as every 2D Y label before projection.
+                    axes.zaxis.labelpad = float(values["PLOT_YLABEL_PAD"])
                     figure.canvas.draw()  # Resolve the native projected label rotations first.
                 for name, axis in editable_axes:
                     axis.label.set_fontweight("normal")

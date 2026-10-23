@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.9.1";
+export const APP_VERSION = "1.9.2";
 
 // Labels are readable in the picker; values retain the existing unit syntax.
 export const UNIT_GROUPS = [
@@ -68,10 +68,10 @@ export function defaultAxes() {
     xMin: "", xMax: "", yMin: "", yMax: "", xStep: "", yStep: "", width: 4, height: 3,
     xMinorStep: "", yMinorStep: "",
     yColor: "auto", y2Color: "auto", y2Label: "", y2Unit: "auto", y2Scale: "linear",
-    y2Min: "", y2Max: "", y2Step: "", y2MinorStep: "", y2LogFormat: "power", y2LabelPad: 0, y2TickPad: 0,
+    y2Min: "", y2Max: "", y2Step: "", y2MinorStep: "", y2LogFormat: "power", y2LabelPad: 4, y2TickPad: 0,
     hideY2Label: false, hideY2TickLabels: false, hideY2Ticks: false,
     fontFamily: "Liberation Sans", japaneseFontFamily: "Noto Sans JP", fontScale: 1, tickFontScale: 1, labelFontScale: 1,
-    spineScale: 1, dataLineScale: 1, tickLength: 1, xLabelPad: 0, yLabelPad: 0, xTickPad: 0, yTickPad: 0,
+    spineScale: 1, dataLineScale: 1, tickLength: 1, xLabelPad: 4, yLabelPad: 4, xTickPad: 0, yTickPad: 0,
     xLogFormat: "power", yLogFormat: "power", hideXLabel: false, hideYLabel: false,
     hideXTickLabels: false, hideYTickLabels: false, hideXTicks: false, hideYTicks: false,
     hideMinorTicks: false, spineLeft: true, spineRight: true, spineTop: true, spineBottom: true,

@@ -1,8 +1,8 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=4173acdef4c3";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=4173acdef4c3";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=4173acdef4c3";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=4173acdef4c3";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=4173acdef4c3";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=dfaf97b05c82";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=dfaf97b05c82";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=dfaf97b05c82";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=dfaf97b05c82";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=dfaf97b05c82";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -108,7 +108,7 @@ function desktopAppearance() {
     <div class="field-grid">${numeric("tickFontScale", "目盛り文字倍率", .2)}${numeric("labelFontScale", "軸ラベル倍率", .2)}${numeric("spineScale", "枠線倍率", .1, 5)}${numeric("dataLineScale", "データ線倍率", 0, 6)}${numeric("tickLength", "目盛り長さ倍率", 0, 5)}</div>
     <p class="field-hint">倍率1：目盛り7 pt、軸ラベル8 pt、枠線0.8 pt、主目盛り2.5 pt・副目盛り1.25 pt。</p>
     <details><summary>余白・軸の表示</summary>
-    <div class="field-grid">${numeric("xLabelPad", "Xラベル追加余白 (pt)", -100, 100)}${numeric("yLabelPad", "Yラベル追加余白 (pt)", -100, 100)}${numeric("xTickPad", "X目盛り追加余白 (pt)", -100, 100)}${numeric("yTickPad", "Y目盛り追加余白 (pt)", -100, 100)}</div>
+    <div class="field-grid">${numeric("xLabelPad", "Xラベル余白 (pt)", -100, 100)}${numeric("yLabelPad", "Yラベル余白 (pt)", -100, 100)}${numeric("xTickPad", "X目盛り追加余白 (pt)", -100, 100)}${numeric("yTickPad", "Y目盛り追加余白 (pt)", -100, 100)}</div>
     <div class="check-options">${check("hideXLabel", "Xラベルを隠す")}${check("hideYLabel", "Yラベルを隠す")}${check("hideXTickLabels", "X目盛り文字を隠す")}${check("hideYTickLabels", "Y目盛り文字を隠す")}${check("hideXTicks", "X目盛り線を隠す")}${check("hideYTicks", "Y目盛り線を隠す")}${check("spineLeft", "左枠")}${check("spineRight", "右枠")}${check("spineTop", "上枠")}${check("spineBottom", "下枠")}${check("yAxisRight", "Y軸を右側")}${check("xAxisTop", "X軸を上側")}</div></details>
     <details><summary>背景・誤差棒</summary>
     <div class="check-options"><label><input id="background-enabled" data-axis="transparent" data-invert="true" type="checkbox">図全体の背景色を使用</label></div>
@@ -192,7 +192,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=4173acdef4c3", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=dfaf97b05c82", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -311,7 +311,7 @@ function openAxisEditor(axis, kind) {
   $('#axis-editor-title').textContent = `${axisName(axis)}軸${kind === 'label' ? 'ラベル' : '目盛り'}の設定`;
   if (kind === 'label') {
     fields.innerHTML = label(`${axis}Label`,'ラベル（空欄で自動）','text','maxlength="500"') + label(`${axis}Unit`,'単位') +
-      `<div class="field-grid">${label(`${axis}LabelPad`,'ラベル追加余白 (pt)','number','min="-100" max="100" step="any"')}${label('labelFontScale','軸ラベル文字倍率','number','min=".2" max="3" step="any"')}</div>` +
+      `<div class="field-grid">${label(`${axis}LabelPad`,'ラベル余白 (pt)','number','min="-100" max="100" step="any"')}${label('labelFontScale','軸ラベル文字倍率','number','min=".2" max="3" step="any"')}</div>` +
       `<div class="field-grid">${label(`${axis}LabelX`,'ラベルX (軸比率)','number','step="any" placeholder="標準"')}${label(`${axis}LabelY`,'ラベルY (軸比率)','number','step="any" placeholder="標準"')}</div><button type="button" class="button quiet" data-reset-label>標準位置に戻す</button>`;
   } else {
     const automatic = config.axes[`${axis}Min`] === '' && config.axes[`${axis}Max`] === '';
