@@ -1,8 +1,8 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=dfaf97b05c82";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=dfaf97b05c82";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=dfaf97b05c82";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=dfaf97b05c82";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=dfaf97b05c82";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=14e8f362a60f";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=14e8f362a60f";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=14e8f362a60f";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=14e8f362a60f";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=14e8f362a60f";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -192,7 +192,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=dfaf97b05c82", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=14e8f362a60f", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
