@@ -419,6 +419,7 @@ class PlotEngine:
             "yAxisRight": "YAXIS_RIGHT", "xAxisTop": "XAXIS_TOP",
         }.items():
             values[f"PLOT_{env}"] = "1" if axes.get(key, key.startswith("spine")) else "0"
+        values["PLOT_HIDE_MINORTICKS"] = "1" if all(axes.get(f"hide{axis}MinorTicks", axes.get("hideMinorTicks", False)) for axis in ("X", "Y")) else "0"
         for key, env, default in (
             ("markerEdgeWidth", "GENERIC_SCATTER_EDGE_WIDTH", 0.6),
             ("errorLineWidth", "GENERIC_ERROR_LINEWIDTH", 0.8),
@@ -845,8 +846,8 @@ class PlotEngine:
             if name == "y2":
                 for suffix, default in (("Label", ""), ("Unit", "auto"), ("Scale", "linear"), ("Min", ""), ("Max", ""), ("Step", ""), ("MinorStep", ""), ("LogFormat", "power"), ("LabelPad", 2), ("TickPad", 0)):
                     result["axes"][f"y{suffix}"] = config.get("axes", {}).get(f"y2{suffix}", default)
-                for suffix in ("Label", "TickLabels", "Ticks"):
-                    result["axes"][f"hideY{suffix}"] = config.get("axes", {}).get(f"hideY2{suffix}", False)
+                for suffix in ("Label", "TickLabels", "Ticks", "MinorTicks"):
+                    result["axes"][f"hideY{suffix}"] = config.get("axes", {}).get(f"hideY2{suffix}", config.get("axes", {}).get("hideMinorTicks", False) if suffix == "MinorTicks" else False)
                 result["axes"]["yAxisRight"] = True
             elif dual:
                 result["axes"]["yAxisRight"] = False
@@ -975,6 +976,12 @@ class PlotEngine:
                 editable_axes = [("x", axes.xaxis), (primary_name, axes.zaxis if preset == "Raman 3D" else axes.yaxis)]
                 if dual:
                     editable_axes.append(("y2", right_axes.yaxis))
+                # Some presets reset minor locators after applying axis options.
+                # Apply per-axis visibility after all preset drawing is complete.
+                from matplotlib.ticker import NullLocator
+                for name, axis in editable_axes:
+                    if config.get("axes", {}).get(f"hide{name.upper()}MinorTicks", config.get("axes", {}).get("hideMinorTicks", False)):
+                        axis.set_minor_locator(NullLocator())
                 for name, axis in editable_axes:
                     if name == "x":
                         continue

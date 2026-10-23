@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.9.4";
+export const APP_VERSION = "1.9.5";
 
 // Labels are readable in the picker; values retain the existing unit syntax.
 export const UNIT_GROUPS = [
@@ -37,7 +37,7 @@ export function applyPreset(config, preset) {
   if (['Roughness','Waviness'].includes(preset.id)) config.series.forEach(series => series.mode = "line+scatter");
   if (preset.id === 'Waviness') Object.assign(config.axes, {yMin: '', yMax: '', yStep: '', yMinorStep: '', yLogFormat: 'power', legendPosition: 'best', legendX: '', legendY: ''});
   if (preset.id === "Polishing Rate") {
-    Object.assign(config.axes, {width: 5, height: 3.75, xMin: "0", yMin: "0", xMax: "", yMax: "", xStep: "", yStep: "", xMinorStep: "", yMinorStep: "", hideXTicks: false, hideXTickLabels: false, hideMinorTicks: false, legend: true, legendPosition: "upper left", legendX: "", legendY: ""});
+    Object.assign(config.axes, {width: 5, height: 3.75, xMin: "0", yMin: "0", xMax: "", yMax: "", xStep: "", yStep: "", xMinorStep: "", yMinorStep: "", hideXTicks: false, hideXTickLabels: false, hideMinorTicks: false, hideXMinorTicks: false, hideYMinorTicks: false, hideY2MinorTicks: false, legend: true, legendPosition: "upper left", legendX: "", legendY: ""});
     config.series.forEach((series, index) => Object.assign(series, {mode: "line+scatter", marker: "o", lineStyle: "-", color: index === 2 ? "#000000" : COLORS[index % COLORS.length]}));
   }
   config.options ||= {};
@@ -74,7 +74,8 @@ export function defaultAxes() {
     spineScale: 1, dataLineScale: 1, tickLength: 1, xLabelPad: 2, yLabelPad: 2, xTickPad: 0, yTickPad: 0,
     xLogFormat: "power", yLogFormat: "power", hideXLabel: false, hideYLabel: false,
     hideXTickLabels: false, hideYTickLabels: false, hideXTicks: false, hideYTicks: false,
-    hideMinorTicks: false, spineLeft: true, spineRight: true, spineTop: true, spineBottom: true,
+    hideMinorTicks: false, hideXMinorTicks: false, hideYMinorTicks: false, hideY2MinorTicks: false,
+    spineLeft: true, spineRight: true, spineTop: true, spineBottom: true,
     yAxisRight: false, xAxisTop: false, spineColor: "#000000",
     legend: true, legendPosition: "best", legendX: "", legendY: "", legendScale: 1, legendFontScale: 1,
     transparent: true, backgroundColor: "#ffffff", backgroundAlpha: 1, grid: false,
@@ -199,6 +200,9 @@ export function restoreSettings(document, metadata) {
       axes[key] = value;
     }
   }
+  for (const key of ['hideXMinorTicks','hideYMinorTicks','hideY2MinorTicks']) {
+    if (!Object.hasOwn(document.axes, key)) axes[key] = axes.hideMinorTicks;
+  }
   const series = document.series.map((item, index) => {
     if (!item || typeof item !== "object" || typeof item.xColumn !== "string" || typeof item.yColumn !== "string") throw new Error("設定JSONの系列設定を確認してください。");
     const result = createSeries(find(item.xColumn), find(item.yColumn), item.yColumn, index);
@@ -261,6 +265,7 @@ function fromDesktopSettings(saved, metadata) {
     axes[`${axis}TickPad`] = saved.axis_padding?.[`${axis}_tick`] || 0;
   }
   for (const [key, source] of Object.entries({hideXLabel:"hide_xlabel",hideYLabel:"hide_ylabel",hideXTickLabels:"hide_xticklabels",hideYTickLabels:"hide_yticklabels",hideXTicks:"hide_xticks",hideYTicks:"hide_yticks",hideMinorTicks:"hide_minorticks",yAxisRight:"yaxis_right",xAxisTop:"xaxis_top"})) axes[key] = axisOptions[source] ?? false;
+  for (const key of ['hideXMinorTicks','hideYMinorTicks','hideY2MinorTicks']) axes[key] = axes.hideMinorTicks;
   for (const side of ["Left", "Right", "Top", "Bottom"]) axes[`spine${side}`] = !axisOptions[`hide_spine_${side.toLowerCase()}`];
   axes.markerEdgeWidth = general.scatter_edge_width ?? .6;
   axes.errorLineWidth = general.error_linewidth ?? .8; axes.errorCapSize = general.error_capsize ?? 3; axes.errorCapThick = general.error_capthick ?? .8;

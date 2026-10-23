@@ -1,8 +1,8 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=dd7eb127e4e4";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=dd7eb127e4e4";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=dd7eb127e4e4";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=dd7eb127e4e4";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=dd7eb127e4e4";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=aa72a49badb6";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=aa72a49badb6";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=aa72a49badb6";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=aa72a49badb6";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=aa72a49badb6";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -120,6 +120,7 @@ function desktopAppearance() {
         <tr><th scope="row">軸ラベル</th>${displayCell("hideXLabel", "X軸ラベル")}${displayCell("hideYLabel", "Y軸ラベル")}</tr>
         <tr><th scope="row">目盛り数値</th>${displayCell("hideXTickLabels", "X軸の目盛り数値")}${displayCell("hideYTickLabels", "Y軸の目盛り数値")}</tr>
         <tr><th scope="row">目盛り線</th>${displayCell("hideXTicks", "X軸の目盛り線")}${displayCell("hideYTicks", "Y軸の目盛り線")}</tr>
+        <tr><th scope="row">副目盛線</th>${displayCell("hideXMinorTicks", "X軸の副目盛線")}${displayCell("hideYMinorTicks", "Y軸の副目盛線")}</tr>
       </tbody></table>
     </fieldset>
     <fieldset class="axis-control-group"><legend>枠線の表示</legend><div class="axis-switch-grid">${check("spineLeft", "左")}${check("spineRight", "右")}${check("spineTop", "上")}${check("spineBottom", "下")}</div></fieldset>
@@ -206,7 +207,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=dd7eb127e4e4", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=aa72a49badb6", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -335,7 +336,7 @@ function openAxisEditor(axis, kind) {
       label(`${axis}Step`,'主目盛り間隔','number','step="any" placeholder="自動"') +
       `<label><input type="checkbox" data-axis-auto="minor" data-axis-name="${axis}">副目盛りを自動設定</label>` +
       label(`${axis}MinorStep`,'副目盛り間隔','number','step="any" placeholder="自動"') +
-      `<label><input type="checkbox" data-axis="hideMinorTicks" data-invert="true" ${config.axes.hideMinorTicks?'':'checked'}>副目盛りを表示</label>` +
+      `<label><input type="checkbox" data-axis="hide${axis === 'x' ? 'X' : axis === 'y2' ? 'Y2' : 'Y'}MinorTicks" data-invert="true" ${config.axes[`hide${axis === 'x' ? 'X' : axis === 'y2' ? 'Y2' : 'Y'}MinorTicks`]?'':'checked'}>副目盛線を表示</label>` +
       `<div class="field-grid">${label(`${axis}TickPad`,'目盛り追加余白 (pt)','number','min="-100" max="100" step="any"')}${label('tickFontScale','目盛り文字倍率','number','min=".2" max="3" step="any"')}</div>`;
   }
   fields.innerHTML += axis === 'x' ? label('spineColor','枠線・文字色','color') : label(`${axis}Color`,'軸の色（autoで自動）','text','title="軸線・目盛線・目盛数値・ラベルに適用します。autoでは、左右別の軸を使う場合に各軸の最初の系列と同じ色にします。"');
@@ -1453,7 +1454,7 @@ function openElementEditor(part,index=0) {
   else {
     const keys=part==='figureBackground'?['transparent','backgroundColor','backgroundAlpha']:
       part==='plotBackground'?['plotBackgroundEnabled','plotBackgroundColor','plotBackgroundAlpha']:
-      part==='grid'?['grid','tickLength','hideXTicks','hideYTicks','hideMinorTicks','xMinorStep','yMinorStep']:
+      part==='grid'?['grid','tickLength','hideXTicks','hideYTicks','hideXMinorTicks','hideYMinorTicks','xMinorStep','yMinorStep']:
       ['spineColor','spineScale','spineLeft','spineRight','spineTop','spineBottom','yAxisRight','xAxisTop'];
     title=({figureBackground:'図全体の背景',plotBackground:'枠内の背景',grid:'目盛り線・グリッド',frame:'枠線'})[part]+'の設定';
     sources=keys.map(key=>$(`#plot-form [data-axis="${key}"]`)?.closest('label'));
