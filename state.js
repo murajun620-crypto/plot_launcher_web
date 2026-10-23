@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.9.3";
+export const APP_VERSION = "1.9.4";
 
 // Labels are readable in the picker; values retain the existing unit syntax.
 export const UNIT_GROUPS = [

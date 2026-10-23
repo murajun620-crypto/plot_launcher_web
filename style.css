@@ -105,6 +105,19 @@ input[type=color]::-webkit-color-swatch{border:0;border-radius:5px}
 .appearance-options>.field-grid{margin-top:15px}
 .check-options{display:flex;flex-wrap:wrap;gap:12px;margin-top:15px}
 .check-options label{flex-direction:row;align-items:center;font-size:10px;gap:6px}
+.axis-control-group{margin-top:14px;padding:8px 12px 12px;border:1px solid var(--border);border-radius:6px}
+.axis-control-group legend{padding:0 5px;color:#526075;font-size:11px;font-weight:600}
+.axis-visibility-table{width:100%;border-collapse:collapse;font-size:11px}
+.axis-visibility-table th{padding:8px 0;text-align:left;font-weight:400;background:transparent;position:static;color:#5f6c80}
+.axis-visibility-table th:first-child{width:auto;color:#5f6c80}
+.axis-visibility-table td{padding:0}
+.axis-visibility-table thead th{color:var(--muted);font-size:10px}
+.axis-visibility-table th:not(:first-child),.axis-visibility-table td{text-align:center;width:48px}
+.axis-visibility-table label{position:relative;display:flex;align-items:center;justify-content:center;padding:6px;cursor:pointer}
+.axis-visibility-table label span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.axis-switch-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 10px}
+.axis-switch-grid label{flex-direction:row;align-items:center;gap:7px;font-size:11px;cursor:pointer}
+.right-axis-visibility{grid-template-columns:1fr;margin:14px 0}
 .controls-footer{display:flex;align-items:center;gap:7px;justify-content:center;color:#94a0b0;font-size:10px;padding:18px 12px}
 .preview-area{padding:30px 40px 22px;min-width:0}
 .preview-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:20px;margin-bottom:16px}
