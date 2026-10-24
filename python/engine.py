@@ -26,7 +26,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 from matplotlib import font_manager, pyplot as plt
-from matplotlib.colors import is_color_like
+from matplotlib.colors import is_color_like, to_rgba
 from matplotlib.backends.backend_svg import RendererSVG
 from matplotlib.lines import Line2D
 from matplotlib.collections import PathCollection, PolyCollection, LineCollection
@@ -710,7 +710,7 @@ class PlotEngine:
             return pd.DataFrame({"_x": first_x, **{f"_y_{i}": draw_columns[f"_y_{i}"] for i in range(len(series))}}), values, diagnostics, warnings
         return pd.DataFrame(draw_columns), values, diagnostics, warnings
 
-    def _series_artists(self, axes, namespace, preset, config):
+    def _series_artists(self, axes, namespace, preset, config, frame=None):
         """Keep series indices and limits stable when temporarily hiding data."""
         extra = []
         if preset in {"General", "Roughness", "Polishing Rate", "Waviness"}:
@@ -739,6 +739,53 @@ class PlotEngine:
             extra = [{"part": "preset", "artists": list(axes.lines) + [artist for artist in axes.collections if isinstance(artist, PolyCollection)]}]
         else:
             groups = [[line] for line in axes.lines]
+            if preset != "Raman 3D":
+                handles = []
+                for index, artists in enumerate(groups):
+                    item = config["series"][index]
+                    line = artists[0]
+                    x, y = np.asarray(line.get_xdata(), dtype=float), np.asarray(line.get_ydata(), dtype=float)
+                    mode, color = item.get("mode", "line"), item.get("color", line.get_color())
+                    point_color = item.get("scatterColor", "auto")
+                    point_color = color if point_color == "auto" else point_color
+                    handle, label = line, line.get_label()
+                    line.set_linestyle(item.get("lineStyle", "-"))
+                    line.set_alpha(number(item.get("lineAlpha", 1), "線の不透明度", minimum=0, maximum=1))
+                    if mode == "scatter" or line.get_linewidth() == 0:
+                        line.set_linestyle("None"); line.set_linewidth(0)
+                    if mode in {"scatter", "line+scatter"}:
+                        colors = []
+                        for key, alpha in (("markerFaceColor", "markerFaceAlpha"), ("markerEdgeColor", "markerEdgeAlpha")):
+                            token = item.get(key, "auto")
+                            token = point_color if token == "auto" else token
+                            colors.append(to_rgba(token, number(item.get(alpha, .8), "マーカーの不透明度", minimum=0, maximum=1)))
+                        scatter = axes.scatter(x, y, s=float(item.get("markerSize", 18)), marker=item.get("marker", "o"),
+                            facecolors=[colors[0]], edgecolors=[colors[1]], linewidths=float(config.get("axes", {}).get("markerEdgeWidth", .6)), zorder=3,
+                            label=label if mode == "scatter" else "_nolegend_")
+                        artists.append(scatter)
+                        if mode == "scatter":
+                            line.set_label("_nolegend_"); handle = scatter
+                    error_mode = item.get("errorMode", "auto")
+                    error = None
+                    if frame is not None:
+                        if f"_error_{index}" in frame:
+                            width = frame[f"_error_{index}"].to_numpy(dtype=float)
+                            error = np.vstack((width, width))
+                        elif f"_min_{index}" in frame and f"_max_{index}" in frame:
+                            error = np.vstack((y - frame[f"_min_{index}"].to_numpy(dtype=float), frame[f"_max_{index}"].to_numpy(dtype=float) - y))
+                    if error is not None and error_mode != "none":
+                        mask = np.isfinite(x) & np.isfinite(y) & np.isfinite(error).all(axis=0) & (error >= 0).all(axis=0)
+                        if mask.any():
+                            style = config.get("axes", {})
+                            bars = axes.errorbar(x[mask], y[mask], yerr=error[:,mask], fmt="none", ecolor=point_color,
+                                elinewidth=float(style.get("errorLineWidth", .8)), capsize=float(style.get("errorCapSize", 3)), capthick=float(style.get("errorCapThick", .8)), zorder=1, label="_nolegend_")
+                            artists.extend([*bars.lines[1], *bars.lines[2]])
+                            namespace["web_errorbars"] = True
+                    handles.append(handle)
+                namespace["legend_handles"] = handles
+                if axes.get_legend():
+                    axes.get_legend().remove()
+                    plot_utils.apply_preview_legend(axes, handles=handles, labels=[item.get("name", f"Series {i+1}") for i,item in enumerate(config["series"])])
         result = []
         for index, artists in enumerate(groups):
             visible = config.get("series", [])[index].get("visible", True)
@@ -869,8 +916,8 @@ class PlotEngine:
             raise ValueError("系列のY軸は左軸または右軸を選んでください。")
         right_indices = [i for i, item in enumerate(original_series) if item.get("yAxis", "left") == "right"]
         left_indices = [i for i in range(len(original_series)) if i not in right_indices]
-        if right_indices and preset not in {"General", "Roughness", "Polishing Rate", "Waviness"}:
-            raise ValueError("左右のY軸はグラフ種別「一般」「Roughness」「研磨レート」「Waviness」で使用できます。")
+        if right_indices and preset in {"XPS Fit", "Particle Histogram", "bar_graph_general", "Raman 3D"}:
+            raise ValueError("この専用グラフでは左右のY軸を分けられません。")
         dual = bool(left_indices and right_indices)
         primary_name = "y" if left_indices or not right_indices else "y2"
         primary_indices = left_indices if left_indices else right_indices
@@ -905,7 +952,7 @@ class PlotEngine:
                 preset = config.get("plotType", "General")
                 namespace = runpy.run_path(str(self.source_dir / self.presets[preset]["script"]), run_name="__main__")
                 figure, axes = namespace["fig"], namespace["ax"]
-                series_groups = self._series_artists(axes, namespace, preset, primary_config)
+                series_groups = self._series_artists(axes, namespace, preset, primary_config, frame)
                 right_axes = None
                 if right_indices:
                     handles_by_index = dict(zip(primary_indices, namespace["legend_handles"]))
@@ -917,7 +964,7 @@ class PlotEngine:
                         right_axes = axes.twinx()
                         with plot_environment(right_values, right_frame, self.sheet_name, self.filename), plot_target_axes(right_axes):
                             right_namespace = runpy.run_path(str(self.source_dir / self.presets[preset]["script"]), run_name="__main__")
-                            right_groups = self._series_artists(right_axes, right_namespace, preset, right_config)
+                            right_groups = self._series_artists(right_axes, right_namespace, preset, right_config, right_frame)
                             plot_utils.ensure_axis_limits_include_data(right_axes)
                         for group in right_groups:
                             group["index"] = right_indices[group["index"]]
@@ -967,7 +1014,7 @@ class PlotEngine:
                     axes.grid(True, alpha=0.15, linewidth=0.5)
                 else:
                     axes.grid(False)
-                if preset in {"General", "Roughness", "Polishing Rate", "Waviness"}:
+                if preset in {"General", "Roughness", "Polishing Rate", "Waviness"} or namespace.get("web_errorbars"):
                     plot_utils.ensure_axis_limits_include_data(axes)
                 fits, equation_specs = [], []
                 if preset not in {"XPS Fit", "Particle Histogram", "bar_graph_general", "Raman 3D"}:
@@ -1013,6 +1060,12 @@ class PlotEngine:
                 # Apply per-axis visibility after all preset drawing is complete.
                 from matplotlib.ticker import NullLocator
                 for name, axis in editable_axes:
+                    for which, prefix, ticks in (("major", "Major", axis.get_major_ticks()), ("minor", "Minor", axis.get_minor_ticks())):
+                        width = number(config.get("axes", {}).get(f"{name}{prefix}TickWidth", 1), "目盛線の太さ（標準比）", minimum=0, maximum=5)
+                        length = number(config.get("axes", {}).get(f"{name}{prefix}TickLength", 1), "目盛線の長さ（標準比）", minimum=0, maximum=5)
+                        if ticks:
+                            base = ticks[0].tick1line
+                            axis.set_tick_params(which=which, width=base.get_markeredgewidth()*width, length=base.get_markersize()*length)
                     if config.get("axes", {}).get(f"hide{name.upper()}MinorTicks", config.get("axes", {}).get("hideMinorTicks", False)):
                         axis.set_minor_locator(NullLocator())
                 for name, axis in editable_axes:
@@ -1125,7 +1178,7 @@ class PlotEngine:
                     "box": svg_box(artist.get_window_extent(renderer)), "anchor": anchor} for index, artist, anchor in equation_artists]
                 geometry["spines"] = [{"id": side, "paths": self._data_geometry([{"artists": [spine]}], axes, box, renderer)[0]["paths"]} for target in (axes, right_axes) if target is not None for side, spine in target.spines.items() if spine.get_visible() and preset != "Raman 3D"]
                 geometry["grid"] = self._data_geometry([{"part": "grid", "artists": [line for line in axes.get_xgridlines() + axes.get_ygridlines() if line.get_visible()]}], axes, box, renderer)
-                geometry["grid"] += self._data_geometry([{"part": "grid", "artists": [line for _, axis in editable_axes for tick in [*axis.get_major_ticks(), *axis.get_minor_ticks()] for line in (tick.tick1line, tick.tick2line) if line.get_visible()]}], axes, box, renderer)
+                geometry["tickLines"] = [{"axis": name, "boxes": [svg_box(line.get_window_extent(renderer)) for tick in [*axis.get_major_ticks(), *axis.get_minor_ticks()] for line in (tick.tick1line, tick.tick2line) if line.get_visible() and line.get_markersize() > 0 and line.get_markeredgewidth() > 0]} for name, axis in editable_axes] if preset != "Raman 3D" else []
                 if preset == "Raman 3D":
                     geometry["depth"] = [svg_box(label.get_window_extent(renderer)) for label in [axes.yaxis.label, *axes.yaxis.get_ticklabels()] if label.get_visible() and label.get_text()]
                 for name, axis in editable_axes:

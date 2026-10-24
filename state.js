@@ -1,5 +1,5 @@
-import { resetPresetUnitScales } from "./units.js?v=18fa184cd5f2";
-export const APP_VERSION = "1.11.2";
+import { resetPresetUnitScales } from "./units.js?v=70b8f6cd5347";
+export const APP_VERSION = "2.0.0";
 
 // Labels are readable in the picker; values retain the existing unit syntax.
 export const UNIT_GROUPS = [
@@ -75,6 +75,7 @@ export function defaultAxes() {
     fontFamily: "Arial", japaneseFontFamily: "Noto Sans JP", fontScale: 1, tickFontScale: 1, labelFontScale: 1,
     xUnitScale: 1, yUnitScale: 1, y2UnitScale: 1,
     spineScale: 1, dataLineScale: 1, tickLength: 1, xLabelPad: 2, yLabelPad: 2, xTickPad: 0, yTickPad: 0,
+    ...Object.fromEntries(['x','y','y2'].flatMap(axis=>['MajorTickWidth','MinorTickWidth','MajorTickLength','MinorTickLength'].map(key=>[axis+key,1]))),
     xLogFormat: "power", yLogFormat: "power", hideXLabel: false, hideYLabel: false,
     hideXTickLabels: false, hideYTickLabels: false, hideXTicks: false, hideYTicks: false,
     hideMinorTicks: false, hideXMinorTicks: false, hideYMinorTicks: false, hideY2MinorTicks: false,
