@@ -1,9 +1,9 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=70b8f6cd5347";
-import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=70b8f6cd5347";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=70b8f6cd5347";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=70b8f6cd5347";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=70b8f6cd5347";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=70b8f6cd5347";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=6be114672ab4";
+import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=6be114672ab4";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=6be114672ab4";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=6be114672ab4";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=6be114672ab4";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=6be114672ab4";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -124,7 +124,7 @@ let fontAccessMessage = '';
 const failedLocalFonts = new Set(), localFontAliases = new Map();
 
 function desktopAppearance() {
-  const numeric = (key, label, min = 0, max = 3, step = 0.1) => `<label${isLabelPadding(key) ? ` title="${LABEL_PADDING_HINT}"` : ''}>${label}<input data-axis="${key}" type="number" min="${axisControlValue(key, min)}" max="${axisControlValue(key, max)}" step="any"></label>`;
+  const numeric = (key, label, min = 0, max = 3, step = 0.1) => `<label${isLabelPadding(key) ? ` title="${LABEL_PADDING_HINT}"` : ''}>${label}<input data-axis="${key}" type="number" min="${axisControlValue(key, min)}" max="${axisControlValue(key, max)}" step="${step}"></label>`;
   const check = (key, label) => `<label><input data-axis="${key}" type="checkbox">${label}</label>`;
   const displayCell = (key, label) => `<td><label><input data-axis="${key}" data-invert="true" type="checkbox"><span>${label}を表示</span></label></td>`;
   $("#desktop-appearance").innerHTML = `
@@ -134,7 +134,7 @@ function desktopAppearance() {
     <label class="full-field">日本語フォント<select id="japanese-font-family" data-axis="japaneseFontFamily"><option>Noto Sans JP</option><option>Liberation Sans</option><option>DejaVu Sans</option></select></label>
     <button type="button" id="load-font" class="button quiet">詳細設定</button><input id="font-file" type="file" accept=".ttf,.otf,.ttc" multiple hidden>
     <p class="field-hint">Arialと選択したPCのフォントを自動で読み込みます。アクセスできない場合はArialをLiberation Sansで代替します。日本語はNoto Sans JP、数式はSTIX Sansを使います。ファイルからの読み込みは詳細設定にあります。</p>
-    <label title="軸ラベルを基準に、目盛り・凡例もまとめて拡大縮小します。標準は8 ptです。">全体のフォントサイズ (pt)<input id="font-scale" data-axis="fontScale" type="number" min="4" max="24" step="any" value="8" required></label>
+    <label title="軸ラベルを基準に、目盛り・凡例もまとめて拡大縮小します。標準は8 ptです。">全体のフォントサイズ (pt)<input id="font-scale" data-axis="fontScale" type="number" min="4" max="24" step="0.1" value="8" required></label>
     <div class="field-grid">${numeric("tickFontScale", "目盛りのフォントサイズ (pt)", .2)}${numeric("labelFontScale", "軸ラベルのフォントサイズ (pt)", .2)}</div></details>
     <details class="settings-panel"><summary>余白・ラベルと目盛りの表示</summary>
     <div class="field-grid">${numeric("xLabelPad", "Xラベル追加余白 (pt)", -100, 100)}${numeric("yLabelPad", "Yラベル追加余白 (pt)", -100, 100)}${numeric("xTickPad", "X目盛り追加余白 (pt)", -100, 100)}${numeric("yTickPad", "Y目盛り追加余白 (pt)", -100, 100)}</div>
@@ -156,7 +156,7 @@ function desktopAppearance() {
         <label class="frame-edge frame-right"><input data-axis="spineRight" type="checkbox" aria-label="右枠を表示">右枠</label>
         <label class="frame-edge frame-bottom"><input data-axis="spineBottom" type="checkbox" aria-label="下枠を表示">下枠</label>
       </div></fieldset>
-      <fieldset class="axis-control-group"><legend>色・太さ</legend><div class="field-grid"><label>枠線の色<input data-axis="spineColor" type="color"></label>${numeric("spineScale", "枠線の太さ (pt)", .1, 5)}</div></fieldset>
+      <fieldset class="axis-control-group"><legend>色・太さ</legend><div class="field-grid"><label>枠線の色<input data-axis="spineColor" type="color"></label>${numeric("spineScale", "枠線の太さ (pt)", .1, 5, .01)}</div></fieldset>
       <fieldset class="axis-control-group"><legend>軸の位置</legend><div class="field-grid">
         <label>X軸<select data-axis="xAxisTop" data-axis-boolean="true"><option value="false">下側</option><option value="true">上側</option></select></label>
         <label>Y軸<select data-axis="yAxisRight" data-axis-boolean="true"><option value="false">左側</option><option value="true">右側</option></select></label>
@@ -175,7 +175,7 @@ function desktopAppearance() {
 }
 
 function tickLineControls(axis) {
-  return `<table class="tick-line-table"><thead><tr><th>目盛線</th><th>太さ（標準比）</th><th>長さ（標準比）</th></tr></thead><tbody>${[['Major','主目盛線'],['Minor','副目盛線']].map(([kind,name])=>`<tr><th scope="row">${name}</th>${[['Width','太さ'],['Length','長さ']].map(([key,label])=>`<td><label title="1が標準。0.5で半分、2で2倍。0で非表示になります。"><span>${name}の${label}（標準比）</span><input data-axis="${axis}${kind}Tick${key}" aria-label="${name}の${label}（標準比）" type="number" min="0" max="5" step="any" value="${config.axes[`${axis}${kind}Tick${key}`] ?? 1}"></label></td>`).join('')}</tr>`).join('')}</tbody></table>`;
+  return `<table class="tick-line-table"><thead><tr><th>目盛線</th><th>太さ（標準比）</th><th>長さ（標準比）</th></tr></thead><tbody>${[['Major','主目盛線'],['Minor','副目盛線']].map(([kind,name])=>`<tr><th scope="row">${name}</th>${[['Width','太さ'],['Length','長さ']].map(([key,label])=>`<td><label title="1が標準。0.5で半分、2で2倍。0で非表示になります。"><span>${name}の${label}（標準比）</span><input data-axis="${axis}${kind}Tick${key}" aria-label="${name}の${label}（標準比）" type="number" min="0" max="5" step="0.1" value="${config.axes[`${axis}${kind}Tick${key}`] ?? 1}"></label></td>`).join('')}</tr>`).join('')}</tbody></table>`;
 }
 desktopAppearance();
 compactHelp();
@@ -262,7 +262,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=70b8f6cd5347", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=6be114672ab4", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -397,11 +397,11 @@ function openAxisEditor(axis, kind) {
   $('#axis-editor-title').textContent = `${axisName(axis)}軸${kind === 'label' ? 'ラベル' : '目盛り'}の設定`;
   if (kind === 'label') {
     html = label(`${axis}Label`,'ラベル（空欄で自動）','text','maxlength="500"') + label(`${axis}Unit`,'単位') +
-      `<div class="field-grid">${label(`${axis}LabelPad`,'ラベル追加余白 (pt)','number',`min="${-100-LABEL_PADDING_BASE}" max="${100-LABEL_PADDING_BASE}" step="any"`)}${label('labelFontScale','フォントサイズ (pt)','number',`min="${axisControlValue('labelFontScale',.2)}" max="${axisControlValue('labelFontScale',3)}" step="any"`)}</div>` +
+      `<div class="field-grid">${label(`${axis}LabelPad`,'ラベル追加余白 (pt)','number',`min="${-100-LABEL_PADDING_BASE}" max="${100-LABEL_PADDING_BASE}" step="0.1"`)}${label('labelFontScale','フォントサイズ (pt)','number',`min="${axisControlValue('labelFontScale',.2)}" max="${axisControlValue('labelFontScale',3)}" step="0.1"`)}</div>` +
       `<button type="button" class="button quiet" data-reset-label>標準位置に戻す</button>`;
   } else {
     const automatic = config.axes[`${axis}Min`] === '' && config.axes[`${axis}Max`] === '';
-    html = `<div class="field-grid"><label>軸の種類<select data-axis="${axis}Scale">${choiceOptions([['linear','線形'],['log','対数']],config.axes[`${axis}Scale`])}</select></label>${label('tickFontScale','フォントサイズ (pt)','number',`min="${axisControlValue('tickFontScale',.2)}" max="${axisControlValue('tickFontScale',3)}" step="any"`)}</div>` + tickLineControls(axis) +
+    html = `<div class="field-grid"><label>軸の種類<select data-axis="${axis}Scale">${choiceOptions([['linear','線形'],['log','対数']],config.axes[`${axis}Scale`])}</select></label>${label('tickFontScale','フォントサイズ (pt)','number',`min="${axisControlValue('tickFontScale',.2)}" max="${axisControlValue('tickFontScale',3)}" step="0.1"`)}</div>` + tickLineControls(axis) +
       `<details class="settings-panel"><summary>範囲・目盛り間隔</summary><label class="log-format-field" data-log-format-for="${axis}">目盛りの表記<select data-axis="${axis}LogFormat" aria-label="${axisName(axis)}軸の対数目盛り表記">${choiceOptions([['power','累乗（10ⁿ）'],['decimal','数値（0.1、1、10）']],config.axes[`${axis}LogFormat`])}</select></label>` +
       `<label><input type="checkbox" data-axis-auto="range" ${automatic?'checked':''}>範囲を自動設定</label><div class="field-grid">${label(`${axis}Min`,'最小','number','step="any" placeholder="自動"')}${label(`${axis}Max`,'最大','number','step="any" placeholder="自動"')}</div>` +
       `<label><input type="checkbox" data-axis-auto="ticks" data-axis-name="${axis}">主目盛りを自動設定</label>` +
@@ -410,7 +410,7 @@ function openAxisEditor(axis, kind) {
       label(`${axis}MinorStep`,'副目盛り間隔','number','step="any" placeholder="自動"') + '</details>' +
       `<details class="settings-panel"><summary>表示・色・余白</summary>` +
       `<label><input type="checkbox" data-axis="hide${axis === 'x' ? 'X' : axis === 'y2' ? 'Y2' : 'Y'}MinorTicks" data-invert="true" ${config.axes[`hide${axis === 'x' ? 'X' : axis === 'y2' ? 'Y2' : 'Y'}MinorTicks`]?'':'checked'}>副目盛線を表示</label>` +
-      label(`${axis}TickPad`,'目盛り追加余白 (pt)','number','min="-100" max="100" step="any"');
+      label(`${axis}TickPad`,'目盛り追加余白 (pt)','number','min="-100" max="100" step="0.1"');
   }
   const flag=axis.toUpperCase();
   html+=`<div class="check-options">${(kind==='label'?[['Label','軸ラベル']]:[['TickLabels','目盛り数値'],['Ticks','主目盛線']]).map(([key,text])=>`<label><input data-axis="hide${flag}${key}" data-invert="true" type="checkbox" ${config.axes[`hide${flag}${key}`]?'':'checked'}>${text}を表示</label>`).join('')}</div>`;
@@ -495,7 +495,7 @@ $('#axis-editor-fields').addEventListener('focusout', syncAxisEditor);
 
 function drawPresetOptions() {
   const type=config.plotType || "General", options=config.options ||= {};
-  const number=(key,label,def,min=0,max=100,step=.1)=>`<label>${label}<input data-option="${key}" type="number" value="${escapeHTML(options[key] ?? def)}" min="${min}" max="${max}" step="any"></label>`;
+  const number=(key,label,def,min=0,max=100,step=.1)=>`<label>${label}<input data-option="${key}" type="number" value="${escapeHTML(options[key] ?? def)}" min="${min}" max="${max}" step="${step}"></label>`;
   const color=(key,label,def)=>`<label>${label}<input data-option="${key}" value="${escapeHTML(options[key] ?? def)}"></label>`;
   let html='';
   const notes={"XPS Fit":"CSV/Au 10列/Ag 8列の配置を自動判定。成分の塗りつぶしは背景との差で描画します。", "Particle Histogram":"選択した粒径列から頻度%と対数正規分布を描画します。ビン幅は20 nmです。", "Raman 3D":"共通のX列と各Y列からウォーターフォールを作成します。Y軸設定は強度（Z軸）に適用します。", "bar_graph_general":"数値X・カテゴリXに対応した集合棒グラフです。", "Roughness":"線＋マーカー、Y対数軸が初期設定です。", "Waviness":"Roughnessと同じ線＋マーカー、Y対数軸が初期設定です。"};
@@ -568,24 +568,24 @@ function drawControls() {
       <div class="field-grid"><label>グラフの種類<select data-series-field="mode">${choiceOptions([["line", "線"], ["scatter", "点"], ["line+scatter", "線＋点"]], series.mode)}</select></label><label title="右軸を選ぶと右側に独立したY軸を表示します。">使用するY軸<select data-series-field="yAxis">${choiceOptions([['left','左軸'],['right','右軸']],series.yAxis || 'left')}</select></label></div>
       <details class="series-columns settings-panel"><summary>データ列・オフセット</summary><div class="field-grid"><label>X列<select data-series-field="x">${columnOptions(series.x)}</select></label><label>Y列<select data-series-field="y">${columnOptions(series.y)}</select></label></div><div class="field-grid">${input("xOffset", "Xオフセット", 'step="any"')}${input("yOffset", "Yオフセット", 'step="any"')}</div></details>
       <div class="annotation-buttons"><button type="button" class="button quiet" data-series-up="${index}" ${index===0?'disabled':''}>↑</button><button type="button" class="button quiet" data-series-down="${index}" ${index===config.series.length-1?'disabled':''}>↓</button><button type="button" class="button quiet" data-series-copy="${index}">複製</button></div><details class="series-advanced settings-panel"><summary>線・点の見た目</summary>
-        <div class="field-grid">${input("lineWidth", "線幅 (pt)", 'min="0" max="6" step="any"')}<label>線種<select data-series-field="lineStyle">${choiceOptions([["-", "実線"], ["--", "破線"], ["-.", "一点鎖線"], [":", "点線"]], series.lineStyle)}</select></label></div>
-        <div class="field-grid"><label>マーカー<select data-series-field="marker">${choiceOptions([["o", "丸"], ["s", "四角"], ["^", "三角 ▲"], ["v", "三角 ▼"], ["D", "ひし形"], ["+", "+"], ["x", "×"], ["*", "星"], ["p", "五角形"], ["h", "六角形"]], series.marker)}</select></label>${input("markerSize", "マーカー面積 (pt²)", 'min="1" max="200" step="any"')}</div>
-        <label title="全系列に共通です。">点の縁の太さ (pt・全系列)<input data-axis="markerEdgeWidth" type="number" min="0" max="20" step="any" value="${config.axes.markerEdgeWidth}"></label>
+        <div class="field-grid">${input("lineWidth", "線幅 (pt)", 'min="0" max="6" step="0.1"')}<label>線種<select data-series-field="lineStyle">${choiceOptions([["-", "実線"], ["--", "破線"], ["-.", "一点鎖線"], [":", "点線"]], series.lineStyle)}</select></label></div>
+        <div class="field-grid"><label>マーカー<select data-series-field="marker">${choiceOptions([["o", "丸"], ["s", "四角"], ["^", "三角 ▲"], ["v", "三角 ▼"], ["D", "ひし形"], ["+", "+"], ["x", "×"], ["*", "星"], ["p", "五角形"], ["h", "六角形"]], series.marker)}</select></label>${input("markerSize", "マーカー面積 (pt²)", 'min="1" max="200" step="0.1"')}</div>
+        <label title="全系列に共通です。">点の縁の太さ (pt・全系列)<input data-axis="markerEdgeWidth" type="number" min="0" max="20" step="0.1" value="${config.axes.markerEdgeWidth}"></label>
         <div class="field-grid"><label>マーカー色<input data-series-field="scatterColor" value="${escapeHTML(series.scatterColor)}" placeholder="auto / #色"></label>${opacityControl('data-series-field="lineAlpha"','線の不透明度',series.lineAlpha ?? 1)}<label>マーカー縁色<input data-series-field="markerEdgeColor" value="${escapeHTML(series.markerEdgeColor)}" placeholder="auto / none / #色"></label><label>マーカー塗り色<input data-series-field="markerFaceColor" value="${escapeHTML(series.markerFaceColor)}" placeholder="auto / none / #色"></label>${opacityControl('data-series-field="markerEdgeAlpha"','縁の不透明度',series.markerEdgeAlpha ?? 1)}${opacityControl('data-series-field="markerFaceAlpha"','塗りの不透明度',series.markerFaceAlpha ?? 1)}</div>
       </details><details class="series-errors settings-panel"><summary>エラーバー</summary><label class="draw-mode">誤差の種類<select data-series-field="errorMode">${choiceOptions([["auto", "±列から自動"], ["none", "なし"], ["symmetric", "±値"], ["asymmetric", "正・負の誤差幅"], ["minmax", "最小・最大値"]], series.errorMode)}</select></label>
         <label class="draw-mode">Y誤差（±）の列<select data-series-field="error">${columnOptions(series.error, true)}</select></label>
         <div class="field-grid"><label title="Yから上方向の誤差幅。0以上の値が入った列を選びます。上端＝Y＋正の誤差幅。">正の誤差幅（＋）<select data-series-field="errorPlus">${columnOptions(series.errorPlus, true)}</select></label><label title="Yから下方向の誤差幅。こちらも0以上の値を指定します。下端＝Y−負の誤差幅。">負の誤差幅（−）<select data-series-field="errorMinus">${columnOptions(series.errorMinus, true)}</select></label></div>
         <div class="field-grid"><label title="誤差幅ではなく下端のY値を指定します。最小値 ≤ Y ≤ 最大値。">Y誤差最小値<select data-series-field="errorMin">${columnOptions(series.errorMin, true)}</select></label><label title="誤差幅ではなく上端のY値を指定します。最小値 ≤ Y ≤ 最大値。">Y誤差最大値<select data-series-field="errorMax">${columnOptions(series.errorMax, true)}</select></label></div>
-        <details class="settings-panel"><summary>太さ・キャップ（全系列）</summary><div class="field-grid">${['errorLineWidth','errorCapSize','errorCapThick'].map((key,i)=>`<label>${['線の太さ (pt)','キャップの長さ (pt)','キャップの太さ (pt)'][i]}<input data-axis="${key}" type="number" min="0" max="20" step="any" value="${config.axes[key]}"></label>`).join('')}</div></details>
+        <details class="settings-panel"><summary>太さ・キャップ（全系列）</summary><div class="field-grid">${['errorLineWidth','errorCapSize','errorCapThick'].map((key,i)=>`<label>${['線の太さ (pt)','キャップの長さ (pt)','キャップの太さ (pt)'][i]}<input data-axis="${key}" type="number" min="0" max="20" step="0.1" value="${config.axes[key]}"></label>`).join('')}</div></details>
       </details><details class="series-trend settings-panel"><summary>近似線</summary>
         <label title="表示中のX/Y値（オフセット適用後）の有効な点を最小二乗法で近似します。軸範囲外の点も含み、誤差棒を重みには使いません。">近似の種類<select data-series-field="trendType">${choiceOptions([['none','なし'],['linear','直線'],['polynomial','多項式'],['exponential','指数'],['logarithmic','対数'],['power','べき乗']],series.trendType || 'none')}</select></label>
         <label class="series-visibility" title="切片を0に固定して y=ax を求めます。チェックを外すと y=ax+b の傾きと切片を求めます。対数軸には原点を表示できません。"><input type="checkbox" data-series-field="trendOrigin" ${series.trendOrigin?'checked':''}>原点を通る直線</label>
         ${input('trendDegree','多項式の次数','min="2" max="6" step="1"')}
         <label class="series-visibility"><input type="checkbox" data-series-field="trendEquation" ${series.trendEquation!==false?'checked':''}>数式を表示</label>
-        <details class="trend-appearance"><summary>線・数式の表示</summary><div class="field-grid">${input('trendWidth','近似線幅 (pt)','min=".1" max="6" step="any"')}<label>近似線の線種<select data-series-field="trendStyle">${choiceOptions([['--','破線'],['-','実線'],['-.','一点鎖線'],[':','点線']],series.trendStyle || '--')}</select></label></div>
+        <details class="trend-appearance"><summary>線・数式の表示</summary><div class="field-grid">${input('trendWidth','近似線幅 (pt)','min=".1" max="6" step="0.1"')}<label>近似線の線種<select data-series-field="trendStyle">${choiceOptions([['--','破線'],['-','実線'],['-.','一点鎖線'],[':','点線']],series.trendStyle || '--')}</select></label></div>
           <label title="autoは系列と同じ色です。">近似線・数式の色<input data-series-field="trendColor" value="${escapeHTML(series.trendColor || 'auto')}" placeholder="auto / #色"></label>
-          <div class="field-grid">${input('trendFontSize','数式のフォントサイズ (pt)',`min="${3*config.axes.fontScale}" max="${24*config.axes.fontScale}" step="any"`)}${input('trendDigits','係数の有効桁数','min="2" max="15" step="1" title="表示だけを丸めます。近似線の描画には丸め前の係数を使います。"')}</div>
-          <div class="field-grid">${input('trendX','数式の横位置（左0・右1）','min="-10" max="10" step="any" placeholder="自動"')}${input('trendY','数式の縦位置（下0・上1）','min="-10" max="10" step="any" placeholder="自動"')}</div>
+          <div class="field-grid">${input('trendFontSize','数式のフォントサイズ (pt)',`min="${3*config.axes.fontScale}" max="${24*config.axes.fontScale}" step="0.1"`)}${input('trendDigits','係数の有効桁数','min="2" max="15" step="1" title="表示だけを丸めます。近似線の描画には丸め前の係数を使います。"')}</div>
+          <div class="field-grid">${input('trendX','数式の横位置（左0・右1）','min="-10" max="10" step="0.01" placeholder="自動"')}${input('trendY','数式の縦位置（下0・上1）','min="-10" max="10" step="0.01" placeholder="自動"')}</div>
           <button type="button" class="button quiet" data-reset-trend="${index}">数式の位置を自動に戻す</button>
         </details>
       </details></div>`;
@@ -650,7 +650,7 @@ function syncSeriesErrorControls() {
 function drawAnnotations() {
   $("#annotation-list").innerHTML = (config.annotations || []).map((item, index) => {
     const text = (key, label) => `<label>${label}<input data-annotation-field="${key}" value="${escapeHTML(item[key] ?? '')}"></label>`;
-    const num = (key, label) => `<label>${label}<input type="number" step="any" data-annotation-field="${key}" value="${escapeHTML(item[key] ?? '')}"></label>`;
+    const num = (key, label) => `<label>${label}<input type="number" step="${/^[xy][12]?$/.test(key) ? (item.coordinate_system === 'data' ? 'any' : '.01') : key === 'rotation' ? '1' : '.1'}" data-annotation-field="${key}" value="${escapeHTML(item[key] ?? '')}"></label>`;
     return `<details class="annotation-card ${selected.has(item.id)?'selected':''}" data-annotation-index="${index}" ${selected.has(item.id)?'open':''}><summary><button type="button" class="button quiet" data-select-annotation="${escapeHTML(item.id)}" aria-pressed="${selected.has(item.id)}">${{text:"文字",arrow:"矢印",segment:"線"}[item.type]} ${index+1} ${escapeHTML(item.text || '')}</button></summary>
       ${item.type === "text" ? text("text", "文字") : ''}
       <div class="field-grid">${item.type === "text" ? num("x", "X") + num("y", "Y") + num("font_size", "フォントサイズ (pt)") + num("rotation", "回転 (度)") : num("x1", "始点X") + num("y1", "始点Y") + num("x2", "終点X") + num("y2", "終点Y") + num("line_width", "線幅 (pt)") + text("line_style", "線種 (- / -- / -. / :)")}
@@ -1750,8 +1750,8 @@ function openElementEditor(part,index=0) {
   }
   if(part==='grid')sources.push(...$$('#plot-form [data-axis-auto="minor"]').map(input=>input.closest('label')));
   fields.innerHTML=sources.filter(Boolean).map(source=>source.outerHTML).join('');
-  if(part==='legend')fields.innerHTML=`<label><input data-axis="legend" type="checkbox" ${config.axes.legend?'checked':''}>凡例を表示</label><label>フォントサイズ (pt)<input data-axis="legendFontScale" type="number" min="${axisControlValue('legendFontScale',.2)}" max="${axisControlValue('legendFontScale',3)}" step="any" value="${axisControlValue('legendFontScale',config.axes.legendFontScale)}"></label><button type="button" class="button quiet" data-reset-legend>標準位置に戻す</button><details class="settings-panel"><summary>線・点の大きさ</summary><label>大きさ（標準比）<input data-axis="legendScale" type="number" min=".2" max="3" step="any" value="${config.axes.legendScale}"></label></details>`;
-  if(part==='figureBackground')fields.innerHTML+=`<details class="settings-panel"><summary>グラフの種類・サイズ</summary><label>グラフのプリセット<select data-preview-preset>${choiceOptions(presets.map(item=>[item.id,item.label]),config.plotType)}</select></label><div class="field-grid">${['width','height'].map((key,i)=>`<label>${['軸領域の幅 (cm)','軸領域の高さ (cm)'][i]}<input data-axis="${key}" type="number" min=".5" max="24" step="any" value="${config.axes[key]}"></label>`).join('')}</div></details>`+$('#font-settings').outerHTML;
+  if(part==='legend')fields.innerHTML=`<label><input data-axis="legend" type="checkbox" ${config.axes.legend?'checked':''}>凡例を表示</label><label>フォントサイズ (pt)<input data-axis="legendFontScale" type="number" min="${axisControlValue('legendFontScale',.2)}" max="${axisControlValue('legendFontScale',3)}" step="0.1" value="${axisControlValue('legendFontScale',config.axes.legendFontScale)}"></label><button type="button" class="button quiet" data-reset-legend>標準位置に戻す</button><details class="settings-panel"><summary>線・点の大きさ</summary><label>大きさ（標準比）<input data-axis="legendScale" type="number" min=".2" max="3" step="0.1" value="${config.axes.legendScale}"></label></details>`;
+  if(part==='figureBackground')fields.innerHTML+=`<details class="settings-panel"><summary>グラフの種類・サイズ</summary><label>グラフのプリセット<select data-preview-preset>${choiceOptions(presets.map(item=>[item.id,item.label]),config.plotType)}</select></label><div class="field-grid">${['width','height'].map((key,i)=>`<label>${['軸領域の幅 (cm)','軸領域の高さ (cm)'][i]}<input data-axis="${key}" type="number" min=".5" max="24" step="0.1" value="${config.axes[key]}"></label>`).join('')}</div></details>`+$('#font-settings').outerHTML;
   if(part==='plotBackground')fields.innerHTML+=`<details class="settings-panel"><summary>グリッド</summary><label><input data-axis="grid" type="checkbox" ${config.axes.grid?'checked':''}>グリッドを表示</label></details>`;
   if(part==='grid')fields.innerHTML=`<label><input data-axis="grid" type="checkbox" ${config.axes.grid?'checked':''}>グリッドを表示</label>`+['x','y',...(config.series.some(item=>item.yAxis==='right')?['y2']:[])].map(axis=>`<details class="settings-panel"><summary>${axisName(axis)}軸の目盛線</summary>${tickLineControls(axis)}</details>`).join('');
   if(part==='trend')fields.innerHTML=`<div data-series-index="${index}">${fields.innerHTML}</div>`;
