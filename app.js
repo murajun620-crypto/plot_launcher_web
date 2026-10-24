@@ -1,8 +1,8 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=aa72a49badb6";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=aa72a49badb6";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=aa72a49badb6";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=aa72a49badb6";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=aa72a49badb6";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=f4f8bdc21f86";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=f4f8bdc21f86";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=f4f8bdc21f86";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=f4f8bdc21f86";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=f4f8bdc21f86";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -101,6 +101,12 @@ const catalogReady = fetch(new URL("./presets.json" + new URL(import.meta.url).s
 });
 catalogReady.catch(error => fatal(error.message));
 const loadedFonts = new Set(["Liberation Sans", "Noto Sans JP", "DejaVu Sans"]);
+const FONT_FOLDERS = {
+  windows: [['標準フォント', '%WINDIR%\\Fonts'], ['ユーザーのフォント', '%LOCALAPPDATA%\\Microsoft\\Windows\\Fonts']],
+  mac: [['追加の標準フォント（Arialなど）', '/System/Library/Fonts/Supplemental'], ['標準フォント', '/System/Library/Fonts'], ['全ユーザーのフォント', '/Library/Fonts'], ['ユーザーのフォント', '~/Library/Fonts']],
+};
+let localFontChoices = [];
+let fontQueryID = 0, fontQueryRunning = false;
 
 function desktopAppearance() {
   const numeric = (key, label, min = 0, max = 3, step = 0.1) => `<label${isLabelPadding(key) ? ` title="${LABEL_PADDING_HINT}"` : ''}>${label}<input data-axis="${key}" type="number" min="${axisControlValue(key, min)}" max="${axisControlValue(key, max)}" step="any"></label>`;
@@ -173,6 +179,7 @@ function updateButtons() {
   $("#refresh-preview").disabled = !metadata || busy;
   $("#add-series").disabled = config.series.length >= 32 || (metadata?.columns.length ?? 0) < 2;
   $("#load-font").disabled = !engineReady || busy;
+  for (const id of ['#choose-font-files','#browse-local-fonts','#import-local-fonts']) $(id).disabled = !engineReady || busy || (id !== '#choose-font-files' && fontQueryRunning) || (id === '#import-local-fonts' && !$('#local-font-select').selectedOptions?.length);
   const canSave = engineReady && !busy && !renderRunning && (renderedRevision === revision || multipleSheets && $('#save-all-sheets').checked);
   $$('[data-export]').forEach(button => { button.disabled = !canSave; });
   $("#open-save").disabled = !engineReady || busy || renderedRevision !== revision || renderRunning;
@@ -207,7 +214,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=aa72a49badb6", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=f4f8bdc21f86", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -1390,10 +1397,93 @@ $("#settings-file").addEventListener("change", async event => {
   if (file) await readSettings(file);
 });
 $("#retry-engine").addEventListener("click", () => location.reload());
-$("#load-font").addEventListener("click", () => $("#font-file").click());
+function fontMessage(text, error = false) {
+  $('#font-load-message').textContent = text;
+  $('#font-load-message').className = `preset-message${error ? ' error' : ''}`;
+}
+function syncFontFolder() {
+  const folders = FONT_FOLDERS[$('#font-os').value] || FONT_FOLDERS.windows;
+  $('#font-folder-path').value = folders[Number($('#font-folder').value) || 0]?.[1] || folders[0][1];
+  $('#font-folder-guide').textContent = $('#font-os').value === 'mac' ? 'ファイル選択画面で ⌘＋Shift＋G → パスを貼り付け → Enter。' : 'ファイル選択画面で Ctrl＋L → パスを貼り付け → Enter。';
+}
+function chooseFontOS() {
+  const folders = FONT_FOLDERS[$('#font-os').value] || FONT_FOLDERS.windows;
+  $('#font-folder').replaceChildren(...folders.map(([label], index) => new Option(label, String(index))));
+  $('#font-folder').value = '0'; syncFontFolder();
+}
+$('#load-font').addEventListener('click', () => {
+  if (!engineReady || loading || exporting) return;
+  if (!$('#font-os').value) {
+    const platform = navigator.userAgentData?.platform || navigator.platform || '';
+    $('#font-os').value = /mac/i.test(platform) ? 'mac' : 'windows';
+    chooseFontOS();
+  }
+  $('#browse-local-fonts').hidden = typeof window.queryLocalFonts !== 'function';
+  fontMessage(''); updateButtons(); $('#font-load-dialog').showModal();
+});
+$('#font-os').addEventListener('change', chooseFontOS);
+$('#font-folder').addEventListener('change', syncFontFolder);
+$('#close-font-load').addEventListener('click', () => $('#font-load-dialog').close());
+$('#font-load-dialog').addEventListener('close', () => { fontQueryID++; fontQueryRunning = false; updateButtons(); });
+$('#copy-font-folder').addEventListener('click', async () => {
+  try {
+    if (!navigator.clipboard?.writeText) throw new Error('パス欄を選択してコピーしてください。');
+    await navigator.clipboard.writeText($('#font-folder-path').value);
+    fontMessage('パスをコピーしました。「フォントファイルを選ぶ」を押し、選択画面に貼り付けてください。');
+  } catch { $('#font-folder-path').focus(); $('#font-folder-path').select(); fontMessage('パス欄を選択しました。Ctrl／⌘＋Cでコピーしてください。'); }
+});
+$('#choose-font-files').addEventListener('click', async () => {
+  if (!engineReady || loading || exporting) return;
+  if (typeof window.showOpenFilePicker !== 'function') { $('#font-file').click(); return; }
+  try {
+    const handles = await window.showOpenFilePicker({...filePickerOptions('plotlauncher-fonts', 'フォント（TTF / OTF / TTC）', {'font/ttf':['.ttf'], 'font/otf':['.otf'], 'font/collection':['.ttc']}), multiple:true});
+    const files = await Promise.all(handles.map(handle => handle.getFile()));
+    if (await loadFontFiles(files)) $('#font-load-dialog').close();
+  } catch (error) { fontMessage(error.name === 'AbortError' ? 'フォントの選択をキャンセルしました。' : `ファイルを選べませんでした：${error.message}`, error.name !== 'AbortError'); }
+});
+function drawLocalFonts() {
+  const query = $('#local-font-search').value.trim().normalize('NFKC').toLowerCase();
+  const items = localFontChoices.map((font,index) => ({font,index})).filter(({font}) => `${font.fullName} ${font.family} ${font.style}`.normalize('NFKC').toLowerCase().includes(query));
+  $('#local-font-select').replaceChildren(...items.map(({font,index}) => new Option(font.fullName || `${font.family} ${font.style}`, String(index))));
+  fontMessage(`${items.length}件のフォント。通常・太字・斜体は別々に選択できます。`); updateButtons();
+}
+$('#browse-local-fonts').addEventListener('click', async () => {
+  if (!engineReady || loading || exporting || fontQueryRunning || typeof window.queryLocalFonts !== 'function') return;
+  const queryID = ++fontQueryID;
+  fontQueryRunning = true; updateButtons(); fontMessage('フォントへのアクセスを確認しています…');
+  try {
+    const fonts = await window.queryLocalFonts();
+    if (queryID !== fontQueryID) return;
+    localFontChoices = [...fonts].sort((a,b) => (a.fullName || a.family).localeCompare(b.fullName || b.family));
+    $('#local-font-list').hidden = false; $('#local-font-search').value = ''; drawLocalFonts();
+    if (!localFontChoices.length) fontMessage('利用できるフォントがありません。「フォントファイルを選ぶ」から読み込めます。');
+  } catch (error) { if (queryID === fontQueryID) fontMessage(error.name === 'NotAllowedError' ? 'フォントへのアクセスが許可されませんでした。「フォントファイルを選ぶ」からも読み込めます。' : `フォントを取得できませんでした：${error.message}`, true); }
+  finally { if (queryID === fontQueryID) {fontQueryRunning = false; updateButtons();} }
+});
+$('#local-font-search').addEventListener('input', drawLocalFonts);
+$('#local-font-select').addEventListener('change', updateButtons);
+$('#import-local-fonts').addEventListener('click', async () => {
+  if (!engineReady || loading || exporting) return;
+  const selected = [...($('#local-font-select').selectedOptions || [])].map(option => localFontChoices[Number(option.value)]).filter(Boolean);
+  if (!selected.length) return;
+  loading = true; updateButtons(); fontMessage('フォントを読み込んでいます…');
+  let files;
+  try {
+    files = await Promise.all(selected.map(async font => {
+      const blob = await font.blob();
+      if (blob.size > 20 * 1024 * 1024) throw new Error('フォントは20 MB以内にしてください。');
+      return new File([blob], `local-${safeStem(font.postscriptName || font.fullName || font.family)}.ttf`, {type:'font/ttf'});
+    }));
+  } catch (error) { fontMessage(`フォントを読み込めませんでした：${error.message}`, true); }
+  finally { loading = false; updateButtons(); if (!files && renderWanted) renderPreview(); }
+  if (files && await loadFontFiles(files)) $('#font-load-dialog').close();
+});
 $("#font-file").addEventListener("change", async event => {
   const files = [...event.target.files]; event.target.value = "";
-  if (!files.length || loading || exporting) return;
+  if (await loadFontFiles(files)) $('#font-load-dialog').close();
+});
+async function loadFontFiles(files) {
+  if (!files.length || loading || exporting || !engineReady) return false;
   loading = true; updateButtons();
   try {
     for (const file of files) {
@@ -1409,10 +1499,10 @@ $("#font-file").addEventListener("change", async event => {
       loadedFonts.add(result.family);
       config.axes.fontFamily = result.family;
     }
-    drawControls(); changed();
-  } catch (error) { status(error.message, "error"); }
+    drawControls(); changed(); return true;
+  } catch (error) { status(error.message, "error"); fontMessage(error.message, true); return false; }
   finally { loading = false; updateButtons(); if (renderWanted) renderPreview(); }
-});
+}
 $$('[data-add-annotation]').forEach(button => button.addEventListener("click", () => {
   config.annotations ||= [];
   if (config.annotations.length >= 200) return;

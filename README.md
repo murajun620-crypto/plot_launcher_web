@@ -109,6 +109,8 @@ Web版の配信ファイルを保存しています。mainブランチのルー�
 欧文用Liberation Sansと日本語用Noto Sans JPを同梱しています。SIL Open Font License 1.1はassets/fonts/Liberation-OFL.txt、assets/fonts/OFL.txtにあります。
 
 Arialを使う場合は、表示オプションの「手元のフォントを読み込む」で利用するPCのArialを選んでください。日本語フォントも選択できます。フォントはブラウザ内だけで使用します。
+v1.9.6ではWindows／Macのフォントフォルダのパスをコピーできます。ファイル選択画面でWindowsはCtrl＋L、Macは⌘＋Shift＋Gを押して貼り付けます。対応ブラウザは前回のフォント選択先を記憶します。
+対応ブラウザでは「インストール済みフォントから選ぶ」で、許可後に一覧から検索・複数選択して読み込めます。非対応の場合も従来のTTF／OTF／TTCファイル選択を利用できます。
 
 CV/LSV、CA、CP、EDX、XPS Survey/Core/Fit、XAFS、Raman Spectrum、AFM Section、ヒストグラム、一般、Roughness、棒グラフ、Raman 3Dに対応。各種別に適した軸ラベルと単位を設定します。
 

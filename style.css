@@ -303,5 +303,14 @@ button.drop-zone:not(:disabled):hover{background:#164c92;border-color:var(--blue
 .paste-dialog>#import-paste{width:100%;margin-top:10px}
 .axis-tick-auto{margin:10px 0 8px;gap:8px 14px}
 .axis-tick-auto label{font-size:10px}
+.font-load-dialog{width:min(520px,calc(100vw - 24px))}
+.font-folder-options{margin-top:18px;padding-top:14px;border-top:1px solid var(--border)}
+.font-folder-options legend{padding-right:10px;font-size:12px;font-weight:600;color:#526075}
+.font-folder-copy{display:flex;align-items:end;gap:8px}
+.font-folder-copy label{flex:1;min-width:0}
+.font-folder-copy .button{white-space:nowrap;margin-bottom:10px}
+.font-folder-guide{font-size:11px;color:#5f6c80;line-height:1.6;margin:0 0 12px}
+#local-font-select{height:auto;min-height:140px;padding:6px}
+#local-font-select option{padding:4px}
 .minor-step-field{margin-top:8px}
 .log-format-field{margin-bottom:10px}

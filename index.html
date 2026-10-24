@@ -6,8 +6,8 @@
   <meta name="description" content="Excel・CSVの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=aa72a49badb6">
-  <script type="module" src="./app.js?v=aa72a49badb6"></script>
+  <link rel="stylesheet" href="./style.css?v=f4f8bdc21f86">
+  <script type="module" src="./app.js?v=f4f8bdc21f86"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -231,6 +231,22 @@
   <dialog id="element-editor" class="plot-dialog" aria-labelledby="element-editor-title">
     <div class="dialog-heading"><strong id="element-editor-title"></strong><button type="button" class="button quiet" id="close-element-editor">閉じる</button></div>
     <div id="element-editor-fields"></div>
+  </dialog>
+  <dialog id="font-load-dialog" class="plot-dialog font-load-dialog" aria-labelledby="font-load-title">
+    <div class="dialog-heading"><strong id="font-load-title">手元のフォントを読み込む</strong><button id="close-font-load" type="button" class="button quiet">閉じる</button></div>
+    <button id="browse-local-fonts" type="button" class="button" title="対応ブラウザで、許可後にPCにインストールされたフォントを一覧から選べます。選択したフォントはブラウザ内だけで使用します。" hidden>インストール済みフォントから選ぶ</button>
+    <div id="local-font-list" hidden>
+      <label>フォント名で検索<input id="local-font-search" type="search" placeholder="例：Arial、游ゴシック" autocomplete="off"></label>
+      <label>フォント<select id="local-font-select" size="6" multiple title="Ctrl／⌘を押しながら複数選択できます。"></select></label>
+      <button id="import-local-fonts" type="button" class="button primary" disabled>選択したフォントを読み込む</button>
+    </div>
+    <fieldset class="font-folder-options"><legend>フォントフォルダから選ぶ</legend>
+      <div class="field-grid"><label>OS<select id="font-os"><option value="" hidden>OSを選択</option><option value="windows">Windows</option><option value="mac">Mac</option></select></label><label>フォントの場所<select id="font-folder"></select></label></div>
+      <div class="font-folder-copy"><label>フォルダのパス<input id="font-folder-path" readonly spellcheck="false" aria-label="フォントフォルダのパス"></label><button id="copy-font-folder" type="button" class="button">パスをコピー</button></div>
+      <p id="font-folder-guide" class="font-folder-guide"></p>
+      <button id="choose-font-files" type="button" class="button primary" title="TTF／OTF／TTCを選択します。通常・太字・斜体をまとめて読み込めます。対応ブラウザは前回のフォント選択先を記憶します。">フォントファイルを選ぶ</button>
+    </fieldset>
+    <p id="font-load-message" class="preset-message" role="status" aria-live="polite"></p>
   </dialog>
   <noscript>このアプリを使用するにはJavaScriptを有効にしてください。</noscript>
 </body>
