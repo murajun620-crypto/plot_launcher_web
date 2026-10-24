@@ -65,10 +65,10 @@ used = apply_paper_style(ax, ax_w_cm=ax_w_cm, **STYLE_OPTIONS)
 lw = used["data_linewidth"]
 
 # ---- 繝偵せ繝医げ繝ｩ繝・磯ｻ蠎ｦ%・・
-bin_width = 20
+bin_width = 20 * float(os.getenv("PLOT_HIST_X_SCALE", "1"))
 bins = np.arange(0, d.max() + bin_width, bin_width)
 counts, edges = np.histogram(d, bins=bins)
-freq = counts / counts.sum() * 100
+freq = counts / counts.sum() * 100 * float(os.getenv("PLOT_HIST_Y_SCALE", "1"))
 centers = (edges[:-1] + edges[1:]) / 2
 
 ax.bar(
@@ -88,7 +88,7 @@ sigma = ln_d.std(ddof=0)
 
 x_fit = np.linspace(d.min(), d.max(), 500)
 pdf = (1 / (x_fit * sigma * np.sqrt(2 * np.pi))) * np.exp(-((np.log(x_fit) - mu) ** 2) / (2 * sigma**2))
-pdf_scaled = pdf * 100 * bin_width
+pdf_scaled = pdf * 100 * bin_width * float(os.getenv("PLOT_HIST_Y_SCALE", "1"))
 
 ax.plot(x_fit, pdf_scaled, color=COLORS["red"][4], linewidth=lw, label=f"{d_col} fit")
 

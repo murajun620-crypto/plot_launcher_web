@@ -386,6 +386,9 @@ class PlotEngine:
         font_scale = number(axes.get("fontScale", 1), "文字サイズ", minimum=0.5, maximum=3)
         family = axes.get("fontFamily", self.font_family)
         japanese_family = axes.get("japaneseFontFamily", "Noto Sans JP")
+        requested_family = family
+        if family == "Arial" and family not in self.font_families:
+            family = "Liberation Sans" if "Liberation Sans" in self.font_families else self.font_family
         if family not in self.font_families:
             raise ValueError(f"フォント「{family}」を読み込んでください。設定JSONにはフォントファイルを含みません。")
         if japanese_family not in self.font_families:
@@ -469,9 +472,12 @@ class PlotEngine:
             values[f"PLOT_{axis.upper()}MINOR_TICK_STEP"] = "" if minor_step is None else str(minor_step)
 
         frame = self.frame
+        unit_scales = {axis: number(axes.get(f"{axis}UnitScale", 1), "単位の表示倍率", minimum=1e-30, maximum=1e30) for axis in ("x", "y")}
         draw_columns = {}
         keys = {key: [] for key in ("columns", "names", "colors", "modes", "widths", "markers", "sizes", "xoffsets", "yoffsets", "errors", "errorModes", "errorMins", "errorMaxs", "scatterColors", "edgeColors", "faceColors", "lineAlphas", "edgeAlphas", "faceAlphas")}
         diagnostics, warnings = [], []
+        if requested_family != family:
+            warnings.append(f"Arialが未読込のため{family}で代替表示しています。インストール済みフォントからArialを読み込んでください。")
         extents = {"x": [], "y": []}
         for index, item in enumerate(series):
             if not isinstance(item.get("visible", True), bool):
@@ -489,8 +495,8 @@ class PlotEngine:
                 raise ValueError("誤差（±）の列を指定してください。")
             xoff = number(item.get("xOffset", 0), "Xオフセット")
             yoff = number(item.get("yOffset", 0), "Yオフセット")
-            x = pd.to_numeric(frame.iloc[:, xi], errors="coerce").to_numpy(dtype=float) + xoff
-            y = pd.to_numeric(frame.iloc[:, yi], errors="coerce").to_numpy(dtype=float) + yoff
+            x = pd.to_numeric(frame.iloc[:, xi], errors="coerce").to_numpy(dtype=float) * unit_scales["x"] + xoff
+            y = pd.to_numeric(frame.iloc[:, yi], errors="coerce").to_numpy(dtype=float) * unit_scales["y"] + yoff
             categorical = preset == "bar_graph_general" and not np.isfinite(x).all()
             if categorical:
                 x = np.arange(len(frame), dtype=float)
@@ -506,7 +512,7 @@ class PlotEngine:
             if not valid.any():
                 raise ValueError(f"「{name}」に描画できる数値の組がありません。列・軸・オフセットを確認してください。")
             if error_mode == "symmetric":
-                error_values = pd.to_numeric(frame.iloc[:, ei], errors="coerce").to_numpy(dtype=float)
+                error_values = pd.to_numeric(frame.iloc[:, ei], errors="coerce").to_numpy(dtype=float) * unit_scales["y"]
                 if np.any(valid & np.isfinite(error_values) & (error_values < 0)):
                     raise ValueError(f"「{name}」の誤差には0以上の値を使用してください。")
                 missing_errors = int((valid & ~np.isfinite(error_values)).sum())
@@ -515,15 +521,15 @@ class PlotEngine:
             if error_mode == "minmax":
                 mini = column_index(item.get("errorMin"), count, "誤差の最小値")
                 maxi = column_index(item.get("errorMax"), count, "誤差の最大値")
-                min_values = pd.to_numeric(frame.iloc[:, mini], errors="coerce").to_numpy(dtype=float) + yoff
-                max_values = pd.to_numeric(frame.iloc[:, maxi], errors="coerce").to_numpy(dtype=float) + yoff
+                min_values = pd.to_numeric(frame.iloc[:, mini], errors="coerce").to_numpy(dtype=float) * unit_scales["y"] + yoff
+                max_values = pd.to_numeric(frame.iloc[:, maxi], errors="coerce").to_numpy(dtype=float) * unit_scales["y"] + yoff
                 if np.any(valid & np.isfinite(min_values) & (min_values > y)) or np.any(valid & np.isfinite(max_values) & (max_values < y)):
                     raise ValueError(f"「{name}」の誤差最小値 ≤ Y ≤ 誤差最大値にしてください。")
             if error_mode == "asymmetric":
                 plus_index = column_index(item.get("errorPlus"), count, "正の誤差幅")
                 minus_index = column_index(item.get("errorMinus"), count, "負の誤差幅")
-                plus_values = pd.to_numeric(frame.iloc[:, plus_index], errors="coerce").to_numpy(dtype=float)
-                minus_values = pd.to_numeric(frame.iloc[:, minus_index], errors="coerce").to_numpy(dtype=float)
+                plus_values = pd.to_numeric(frame.iloc[:, plus_index], errors="coerce").to_numpy(dtype=float) * unit_scales["y"]
+                minus_values = pd.to_numeric(frame.iloc[:, minus_index], errors="coerce").to_numpy(dtype=float) * unit_scales["y"]
                 if np.any(valid & np.isfinite(plus_values) & (plus_values < 0)) or np.any(valid & np.isfinite(minus_values) & (minus_values < 0)):
                     raise ValueError(f"「{name}」の正・負の誤差幅には、どちらも0以上の値を使用してください。")
                 # The renderer accepts absolute endpoints. Offsets move the
@@ -600,6 +606,14 @@ class PlotEngine:
                     manual_unit = str(axes.get(f"{axis.lower()}Unit", "auto")).strip()
                     values[f"PLOT_{axis}LABEL_TEXT"] = manual_text or text.strip()
                     values[f"PLOT_{axis}UNIT"] = expand_micro(unit.strip() if manual_unit.lower() == "auto" else manual_unit, plain=True)
+        if preset == "Particle Histogram":
+            diameter = column_index(options.get("diameterColumn", series[0]["y"]), count, "粒径")
+            histogram_data = pd.to_numeric(self.frame.iloc[:, diameter], errors="coerce").replace([np.inf, -np.inf], np.nan)
+            positive = histogram_data[histogram_data > 0]
+            if not len(positive):
+                raise ValueError("粒径には正の数値が必要です。")
+            extents["x"] = [0, float(positive.max()) * unit_scales["x"]]
+            extents["y"] = [0, 100 * unit_scales["y"]]
         for axis in ("x", "y"):
             step = values[f"PLOT_{axis.upper()}TICK_STEP"]
             lo = limits[f"{axis}Min"] if limits[f"{axis}Min"] is not None else min(extents[axis])
@@ -634,6 +648,8 @@ class PlotEngine:
             ("bgLineWidth", "XPSFIT_BG_LINE_WIDTH", 0, 0, 20),
         ):
             values[f"PLOT_{env}"] = str(number(options.get(key, default), key, minimum=lo, maximum=hi))
+        if preset == "bar_graph_general" and not categorical:
+            values["PLOT_BAR_WIDTH"] = str(float(values["PLOT_BAR_WIDTH"]) * unit_scales["x"])
         for key, env, default in (("barEdgeColor", "BAR_EDGE_COLOR", "auto"), ("scatterEdgeColor", "XPSFIT_SCATTER_EDGE_COLOR", "#2A2A2A"), ("scatterFaceColor", "XPSFIT_SCATTER_FACE_COLOR", "#ffffff"), ("fitLineColor", "XPSFIT_FIT_LINE_COLOR", "#2A2A2A"), ("bgLineColor", "XPSFIT_BG_LINE_COLOR", "#8A8A8A")):
             value = str(options.get(key, default))
             if value not in {"auto", "none"} and not is_color_like(value):
@@ -641,13 +657,15 @@ class PlotEngine:
             values[f"PLOT_{env}"] = value
         values["PLOT_R3D_NORMALIZE"] = "1" if options.get("normalize", True) else "0"
         if preset == "Particle Histogram":
-            diameter = column_index(options.get("diameterColumn", series[0]["y"]), count, "粒径")
-            data = pd.to_numeric(self.frame.iloc[:, diameter], errors="coerce").replace([np.inf, -np.inf], np.nan)
+            data = histogram_data
             if not (np.isfinite(data) & (data > 0)).any():
                 raise ValueError("粒径には正の数値が必要です。")
             if data.max() / 20 > 10000:
                 raise ValueError("粒径の単位・列を確認してください。Web版では幅20 nmのビンを1万個以内にしてください。")
             diagnostics = [{"name": str(self.frame.columns[diameter]), "points": int((np.isfinite(data) & (data > 0)).sum()), "visible": series[0].get("visible", True)}]
+            data = data * unit_scales["x"]
+            values["PLOT_HIST_X_SCALE"] = str(unit_scales["x"])
+            values["PLOT_HIST_Y_SCALE"] = str(unit_scales["y"])
             return pd.DataFrame({"_index": np.arange(len(data)), "_unused": data, str(self.frame.columns[diameter]): data}), values, diagnostics, warnings
         if preset == "XPS Fit":
             if count < 8:
@@ -667,7 +685,22 @@ class PlotEngine:
             values["PLOT_XPSFIT_SCATTER_MAP"] = f'{series[0]["x"]}:{series[0]["y"]}'
             if getattr(self, "xps_csv", False):
                 values["PLOT_XLSX_PATH"] = "/data/xps.csv"
-            return self.frame.apply(pd.to_numeric, errors="coerce"), values, diagnostics, warnings
+            scaled_frame = self.frame.apply(pd.to_numeric, errors="coerce").astype(float)
+            if getattr(self, "xps_csv", False):
+                x_columns, y_columns = {0}, {1, 3, 6, *range(7, count)}
+            elif count >= 10:
+                x_columns, y_columns = {0, 3}, {1, 4, 5, 6, 7, 8, 9}
+            else:
+                x_columns, y_columns = {0}, {1, 2, 3, 4, 7}
+            x_columns.add(column_index(series[0]["x"], count, "XPS X")); y_columns.add(column_index(series[0]["y"], count, "XPS Y"))
+            for fill in fills:
+                x_columns.add(column_index(fill["x"], count, "XPS成分")); y_columns.update(column_index(fill[key], count, "XPS成分") for key in ("upper", "lower"))
+            if x_columns & y_columns and unit_scales["x"] != unit_scales["y"]:
+                raise ValueError("XPSの同じ列をX・Y両方の単位で換算できません。列設定を確認してください。")
+            for axis, columns in (("x", x_columns), ("y", y_columns - x_columns)):
+                for column in columns:
+                    scaled_frame.iloc[:, column] = scaled_frame.iloc[:, column] * unit_scales[axis]
+            return scaled_frame, values, diagnostics, warnings
         if preset == "Raman 3D":
             # Native waterfall consumes first X plus all subsequent Y columns.
             first_x = np.asarray(draw_columns["_x_0"])
@@ -844,7 +877,7 @@ class PlotEngine:
         def axis_config(indices, name):
             result = {**config, "axes": dict(config.get("axes", {})), "series": [original_series[i] for i in indices]}
             if name == "y2":
-                for suffix, default in (("Label", ""), ("Unit", "auto"), ("Scale", "linear"), ("Min", ""), ("Max", ""), ("Step", ""), ("MinorStep", ""), ("LogFormat", "power"), ("LabelPad", 2), ("TickPad", 0)):
+                for suffix, default in (("Label", ""), ("Unit", "auto"), ("UnitScale", 1), ("Scale", "linear"), ("Min", ""), ("Max", ""), ("Step", ""), ("MinorStep", ""), ("LogFormat", "power"), ("LabelPad", 2), ("TickPad", 0)):
                     result["axes"][f"y{suffix}"] = config.get("axes", {}).get(f"y2{suffix}", default)
                 for suffix in ("Label", "TickLabels", "Ticks", "MinorTicks"):
                     result["axes"][f"hideY{suffix}"] = config.get("axes", {}).get(f"hideY2{suffix}", config.get("axes", {}).get("hideMinorTicks", False) if suffix == "MinorTicks" else False)
@@ -1039,7 +1072,7 @@ class PlotEngine:
                 for annotation in collection.items:
                     if annotation.type == "text":
                         if annotation.font_family == "Arial" and "Arial" not in self.font_families:
-                            annotation.font_family = config.get("axes", {}).get("fontFamily", self.font_family)
+                            annotation.font_family = values["PLOT_FONT_FAMILY"].split(",")[0]
                         annotation.font_family = [annotation.font_family, config.get("axes", {}).get("japaneseFontFamily", "Noto Sans JP"), "DejaVu Sans"]
                 manager = AnnotationManager(collection, logger=warnings.append)
                 manager.attach(figure, annotation_axes)
@@ -1129,7 +1162,15 @@ class PlotEngine:
                 return float(np.min(positive)) if len(positive) else None
             tick_steps = {name: {"major": tick_step(axis.get_majorticklocs()), "minor": tick_step(axis.get_minorticklocs())}
                           for name, axis in editable_axes}
-            return {"svg": image.getvalue().decode("utf-8"), "series": [item for item in diagnostics if item["visible"]], "fits": sorted(fits, key=lambda item: item["index"]), "warnings": warnings, "statistics": statistics, "xRange": list(annotation_axes.get_xlim()), "yRange": list(annotation_axes.get_ylim()), "y2Range": list((right_axes or axes).get_ylim()) if right_indices else None, "yDataScale": annotation_axes.get_yscale(), "tickSteps": tick_steps, "geometry": geometry, "fontFamily": family if (family := config.get("axes", {}).get("fontFamily")) else self.font_family}
+            axis_info = {}
+            for name, axis in editable_axes:
+                low, high = sorted(axis.get_view_interval())
+                ticks = [abs(float(tick)) for tick in axis.get_majorticklocs() if math.isfinite(tick) and low - 1e-12 * max(1, abs(low)) <= tick <= high + 1e-12 * max(1, abs(high))]
+                prepared = right_prepared[1] if name == "y2" and dual else values
+                axis_info[name] = {"unit": prepared.get(f"PLOT_{'X' if name == 'x' else 'Y'}UNIT", ""), "tickMax": max(ticks, default=0),
+                    "hidden": bool(config.get("axes", {}).get(f"hide{name.upper()}TickLabels", False)),
+                    "categorical": name == "x" and preset == "bar_graph_general" and not namespace.get("is_numeric_x", True)}
+            return {"svg": image.getvalue().decode("utf-8"), "series": [item for item in diagnostics if item["visible"]], "fits": sorted(fits, key=lambda item: item["index"]), "warnings": warnings, "statistics": statistics, "xRange": list(annotation_axes.get_xlim()), "yRange": list(annotation_axes.get_ylim()), "y2Range": list((right_axes or axes).get_ylim()) if right_indices else None, "yDataScale": annotation_axes.get_yscale(), "tickSteps": tick_steps, "axisInfo": axis_info, "geometry": geometry, "fontFamily": values["PLOT_FONT_FAMILY"].split(",")[0]}
         except Exception:
             for figure_number in set(plt.get_fignums()) - previous_figures:
                 plt.close(figure_number)

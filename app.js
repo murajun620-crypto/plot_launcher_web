@@ -1,8 +1,9 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=f4f8bdc21f86";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=f4f8bdc21f86";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=f4f8bdc21f86";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=f4f8bdc21f86";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=f4f8bdc21f86";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=cc49d1740273";
+import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=cc49d1740273";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=cc49d1740273";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=cc49d1740273";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=cc49d1740273";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=cc49d1740273";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -13,8 +14,11 @@ const LABEL_PADDING_HINT = `0は標準の余白（${LABEL_PADDING_BASE} pt）。
 const isLabelPadding = key => /^(x|y|y2)LabelPad$/.test(key);
 // Project/settings values remain absolute points; only controls show offsets.
 const axisControlValue = (key, value) => isLabelPadding(key) ? Number((Number(value) - LABEL_PADDING_BASE).toPrecision(12)) : value;
-const UNIT_HINT = '単位の表記を選択します。「自由入力」で任意の単位を入力できます。データの数値は換算しません。';
+const UNIT_HINT = '互換性のある単位をリストから選ぶと数値も換算します。自由入力は表記のみを変更します。元データは保持します。';
+const readableUnit = unit => String(unit || '').replace(/\$\^\{?-1\}?\$/g, '⁻¹').replace(/\$\^\{?2\}?\$/g, '²');
 const UNIT_VALUES = new Set(['auto', '', ...UNIT_GROUPS.flatMap(([, units]) => units.map(unit => Array.isArray(unit) ? unit[0] : unit))]);
+const EXTRA_UNITS = [...new Set(UNIT_FAMILIES.flatMap(family=>family.map(([unit])=>unit)))].filter(unit=>!UNIT_VALUES.has(unit));
+EXTRA_UNITS.forEach(unit=>UNIT_VALUES.add(unit));
 let worker, engineReady = false, requestID = 0;
 const requests = new Map();
 let metadata = null, config = { axes: defaultAxes(), series: [] };
@@ -32,6 +36,8 @@ let savedProjectState = null;
 let sheetSettings = new Map(), cancelBatch = false;
 let sheetMode = 'shared', sharedSettings = null;
 let myPresets = [];
+let unitAdvice = null, unitAdviceSource = null;
+const declinedUnits = new Set();
 $('#app-version').textContent = `v${APP_VERSION}`;
 
 function projectSheetSettings() {
@@ -113,10 +119,11 @@ function desktopAppearance() {
   const check = (key, label) => `<label><input data-axis="${key}" type="checkbox">${label}</label>`;
   const displayCell = (key, label) => `<td><label><input data-axis="${key}" data-invert="true" type="checkbox"><span>${label}を表示</span></label></td>`;
   $("#desktop-appearance").innerHTML = `
-    <label class="full-field">図のフォント<select id="font-family" data-axis="fontFamily"><option>Liberation Sans</option><option>Noto Sans JP</option><option>DejaVu Sans</option></select></label>
+    <label class="full-field">図のフォント<select id="font-family" data-axis="fontFamily"><option value="Arial">Arial（未読込）</option><option>Liberation Sans</option><option>Noto Sans JP</option><option>DejaVu Sans</option></select></label>
+    <button type="button" id="choose-installed-fonts" class="button" title="PCにインストールされたフォントから選びます。初期選択はArialです。">インストール済みフォントから選ぶ</button><p id="font-status" class="preset-message" role="status"></p>
     <label class="full-field">日本語フォント<select id="japanese-font-family" data-axis="japaneseFontFamily"><option>Noto Sans JP</option><option>Liberation Sans</option><option>DejaVu Sans</option></select></label>
-    <button type="button" id="load-font" class="button quiet">手元のフォントを読み込む</button><input id="font-file" type="file" accept=".ttf,.otf,.ttc" multiple hidden>
-    <p class="field-hint">Arialを使う場合は、手元のフォントを読み込んでください。標準のLiberation SansはArialと文字幅が互換です。日本語はNoto Sans JP、数式はSTIX Sansを使います。</p>
+    <button type="button" id="load-font" class="button quiet">詳細設定</button><input id="font-file" type="file" accept=".ttf,.otf,.ttc" multiple hidden>
+    <p class="field-hint">インストール済みフォントからArialを選択して読み込みます。読み込み前は文字幅が互換のLiberation Sansで代替します。日本語はNoto Sans JP、数式はSTIX Sansを使います。</p>
     <div class="field-grid">${numeric("tickFontScale", "目盛り文字倍率", .2)}${numeric("labelFontScale", "軸ラベル倍率", .2)}${numeric("spineScale", "枠線倍率", .1, 5)}${numeric("dataLineScale", "データ線倍率", 0, 6)}${numeric("tickLength", "目盛り長さ倍率", 0, 5)}</div>
     <p class="field-hint">倍率1：目盛り7 pt、軸ラベル8 pt、枠線0.8 pt、主目盛り2.5 pt・副目盛り1.25 pt。</p>
     <details><summary>余白・軸の表示</summary>
@@ -179,6 +186,9 @@ function updateButtons() {
   $("#refresh-preview").disabled = !metadata || busy;
   $("#add-series").disabled = config.series.length >= 32 || (metadata?.columns.length ?? 0) < 2;
   $("#load-font").disabled = !engineReady || busy;
+  $('#choose-installed-fonts').disabled = !engineReady || busy || fontQueryRunning;
+  $('#font-status').textContent = config.axes.fontFamily === 'Arial' && !loadedFonts.has('Arial') ? 'Arial未読込：現在はLiberation Sansで代替表示します。上のボタンからArialを読み込んでください。' : '';
+  $('#apply-unit-suggestion').disabled = busy || renderRunning || renderedRevision !== revision;
   for (const id of ['#choose-font-files','#browse-local-fonts','#import-local-fonts']) $(id).disabled = !engineReady || busy || (id !== '#choose-font-files' && fontQueryRunning) || (id === '#import-local-fonts' && !$('#local-font-select').selectedOptions?.length);
   const canSave = engineReady && !busy && !renderRunning && (renderedRevision === revision || multipleSheets && $('#save-all-sheets').checked);
   $$('[data-export]').forEach(button => { button.disabled = !canSave; });
@@ -214,7 +224,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=f4f8bdc21f86", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=cc49d1740273", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -313,13 +323,13 @@ enhanceColorInputs();
 const axisName = axis => axis === 'y2' ? '右Y' : axis.toUpperCase();
 function syncUnitControls(manualKey = null) {
   const options = units => units.map(unit => {
-    const [value, text] = Array.isArray(unit) ? unit : [unit, unit];
+    const [value, text] = Array.isArray(unit) ? unit : [unit, readableUnit(unit)];
     return `<option value="${escapeHTML(value)}">${escapeHTML(text)}</option>`;
   }).join('');
   for (const picker of $$('[data-unit-axis]')) {
     const key = `${picker.dataset.unitAxis}Unit`, value = String(config.axes[key] ?? 'auto');
     const custom = manualKey === key || !UNIT_VALUES.has(value);
-    picker.innerHTML = options([['auto', '自動（列名から）'], ['', '単位なし']]) + UNIT_GROUPS.map(([name, units]) => `<optgroup label="${escapeHTML(name)}">${options(units)}</optgroup>`).join('') + options([['__custom__', '自由入力…']]);
+    picker.innerHTML = options([['auto', '自動（列名から）'], ['', '単位なし']]) + [...UNIT_GROUPS,['その他の換算単位',EXTRA_UNITS]].map(([name, units]) => `<optgroup label="${escapeHTML(name)}">${options(units)}</optgroup>`).join('') + options([['__custom__', '自由入力…']]);
     picker.value = custom ? '__custom__' : value;
     picker.title = UNIT_HINT;
     const input = picker.parentElement.querySelector(`[data-axis="${key}"]`);
@@ -482,6 +492,7 @@ function drawControls() {
   for (const [selector, key] of [["#font-family", "fontFamily"], ["#japanese-font-family", "japaneseFontFamily"]]) {
     const field = $(selector), family = config.axes[key];
     if (![...field.options].some(option => option.value === family)) field.add(new Option(`${family}（要読み込み）`, family));
+    for (const option of field.options) if (option.value === 'Arial') option.textContent = loadedFonts.has('Arial') ? 'Arial' : 'Arial（未読込・代替表示）';
   }
   const xpsFit=config.plotType==='XPS Fit';
   const histogram=config.plotType==='Particle Histogram';
@@ -603,6 +614,7 @@ function drawMetadata() {
 
 function resetPreview() {
   figureResult = null;
+  unitAdvice = null; $('#unit-suggestion').hidden = true;
   $("#figure-interactions").replaceChildren();
   if (previewURL) URL.revokeObjectURL(previewURL);
   previewURL = null;
@@ -800,6 +812,7 @@ async function renderPreview() {
     $("#plot-warnings").hidden = !result.warnings.length;
     status(`${result.series.length} 系列を描画しました · ${result.series.map(series => `${series.points.toLocaleString()} 点`).join(" / ")}`, "ready");
     renderedRevision = revision;
+    showUnitAdvice();
   } catch (error) {
     if (targetRevision !== revision) return;
     $("#preview-state").className = "preview-state error";
@@ -812,6 +825,34 @@ async function renderPreview() {
     if (renderWanted) renderPreview();
   }
 }
+
+function showUnitAdvice() {
+  if (unitAdviceSource !== sourceData) {unitAdviceSource = sourceData; declinedUnits.clear();}
+  unitAdvice = null;
+  for (const axis of ['x','y','y2']) {
+    const suggestion = unitSuggestion(axis, figureResult?.axisInfo?.[axis]);
+    if (suggestion && !declinedUnits.has(`${metadata?.sheetIndex}:${axis}:${suggestion.from}`)) {unitAdvice=suggestion;break;}
+  }
+  $('#unit-suggestion').hidden = !unitAdvice;
+  if (!unitAdvice) return;
+  const maximum=Number(unitAdvice.maximum.toPrecision(5));
+  $('#unit-suggestion-text').textContent = unitAdvice.factor ?
+    `${axisName(unitAdvice.axis)}軸の主目盛りの最大絶対値は ${maximum} ${readableUnit(unitAdvice.from)} です（推奨0.1〜1000）。${readableUnit(unitAdvice.to)}へ換算しますか？ 数値も×${Number(unitAdvice.factor.toPrecision(8))}に変更します。` :
+    `${axisName(unitAdvice.axis)}軸の主目盛りの最大絶対値は ${maximum} です（推奨0.1〜1000）。${unitAdvice.from ? '対応する換算先がないため、軸の単位を確認してください。' : '換算のため、先に軸の単位を設定してください。'}`;
+  $('#apply-unit-suggestion').hidden = !unitAdvice.factor;
+  $('#dismiss-unit-suggestion').textContent = unitAdvice.factor ? 'いいえ' : '閉じる';
+}
+$('#apply-unit-suggestion').addEventListener('click', () => {
+  if (!unitAdvice?.factor || loading || exporting || renderRunning || renderedRevision!==revision) return;
+  try {
+    config=convertAxisUnit(config,unitAdvice.axis,unitAdvice.from,unitAdvice.to);
+    unitAdvice=null;$('#unit-suggestion').hidden=true;drawControls();changed();
+  } catch(error) {status(error.message,'error');}
+});
+$('#dismiss-unit-suggestion').addEventListener('click', () => {
+  if (unitAdvice) declinedUnits.add(`${metadata?.sheetIndex}:${unitAdvice.axis}:${unitAdvice.from}`);
+  showUnitAdvice();
+});
 
 function download(blob, filename) {
   const url = URL.createObjectURL(blob), link = document.createElement("a");
@@ -1056,7 +1097,12 @@ function applyControlInput(event) {
       const custom = input.parentElement.querySelector(`[data-axis="${key}"]`);
       custom.focus(); custom.select(); return;
     }
-    config.axes[key] = input.value;
+    const axis=input.dataset.unitAxis,from=config.axes[key]==='auto' ? figureResult?.axisInfo?.[axis]?.unit : config.axes[key];
+    try {
+      if (input.value!==from && !figureResult?.axisInfo?.[axis]?.categorical && unitConversion(from,input.value)) {
+        config=convertAxisUnit(config,axis,from,input.value);drawControls();
+      } else config.axes[key] = input.value;
+    } catch(error) {syncUnitControls();status(error.message,'error');return;}
     syncUnitControls(); changed(); return;
   }
   if (input.dataset.axis) {
@@ -1308,7 +1354,7 @@ $('#user-preset-select').addEventListener('change',event=>{
   try {
     const next = applyUserPreset(entry,metadata);
     const fonts = [next.axes.fontFamily,next.axes.japaneseFontFamily,...(next.annotations || []).filter(item=>item.type === 'text' && item.visible !== false).map(item=>item.font_family)].filter(Boolean);
-    const missing = [...new Set(fonts.filter(font=>!loadedFonts.has(font)))];
+    const missing = [...new Set(fonts.filter(font=>font!=='Arial' && !loadedFonts.has(font)))];
     if (missing.length) throw new Error(`先にフォント「${missing.join('、')}」を読み込んでください。プリセットにはフォントファイルを含みません。`);
     config = next; selected.clear(); drawControls(); changed();
     presetMessage('#user-preset-message',`「${entry.name}」を適用しました。`);
@@ -1411,7 +1457,7 @@ function chooseFontOS() {
   $('#font-folder').replaceChildren(...folders.map(([label], index) => new Option(label, String(index))));
   $('#font-folder').value = '0'; syncFontFolder();
 }
-$('#load-font').addEventListener('click', () => {
+function openFontSettings(installed = false) {
   if (!engineReady || loading || exporting) return;
   if (!$('#font-os').value) {
     const platform = navigator.userAgentData?.platform || navigator.platform || '';
@@ -1419,7 +1465,15 @@ $('#load-font').addEventListener('click', () => {
     chooseFontOS();
   }
   $('#browse-local-fonts').hidden = typeof window.queryLocalFonts !== 'function';
+  $('#font-load-title').textContent = installed ? 'インストール済みフォントから選ぶ' : 'フォントの詳細設定';
+  $('#font-advanced-fields').open = !installed || typeof window.queryLocalFonts !== 'function';
   fontMessage(''); updateButtons(); $('#font-load-dialog').showModal();
+}
+$('#load-font').addEventListener('click', () => openFontSettings());
+$('#choose-installed-fonts').addEventListener('click', () => {
+  openFontSettings(true);
+  if (typeof window.queryLocalFonts === 'function') return browseLocalFonts();
+  fontMessage('このブラウザではフォント一覧を取得できません。詳細設定からArialのファイルを読み込んでください。');
 });
 $('#font-os').addEventListener('change', chooseFontOS);
 $('#font-folder').addEventListener('change', syncFontFolder);
@@ -1444,10 +1498,13 @@ $('#choose-font-files').addEventListener('click', async () => {
 function drawLocalFonts() {
   const query = $('#local-font-search').value.trim().normalize('NFKC').toLowerCase();
   const items = localFontChoices.map((font,index) => ({font,index})).filter(({font}) => `${font.fullName} ${font.family} ${font.style}`.normalize('NFKC').toLowerCase().includes(query));
-  $('#local-font-select').replaceChildren(...items.map(({font,index}) => new Option(font.fullName || `${font.family} ${font.style}`, String(index))));
+  $('#local-font-select').replaceChildren(...items.map(({font,index}) => {
+    const option=new Option(font.fullName || `${font.family} ${font.style}`, String(index));
+    option.selected=!query && font.family===config.axes.fontFamily && /regular|normal|book|標準/i.test(font.style || 'Regular');return option;
+  }));
   fontMessage(`${items.length}件のフォント。通常・太字・斜体は別々に選択できます。`); updateButtons();
 }
-$('#browse-local-fonts').addEventListener('click', async () => {
+async function browseLocalFonts() {
   if (!engineReady || loading || exporting || fontQueryRunning || typeof window.queryLocalFonts !== 'function') return;
   const queryID = ++fontQueryID;
   fontQueryRunning = true; updateButtons(); fontMessage('フォントへのアクセスを確認しています…');
@@ -1459,7 +1516,8 @@ $('#browse-local-fonts').addEventListener('click', async () => {
     if (!localFontChoices.length) fontMessage('利用できるフォントがありません。「フォントファイルを選ぶ」から読み込めます。');
   } catch (error) { if (queryID === fontQueryID) fontMessage(error.name === 'NotAllowedError' ? 'フォントへのアクセスが許可されませんでした。「フォントファイルを選ぶ」からも読み込めます。' : `フォントを取得できませんでした：${error.message}`, true); }
   finally { if (queryID === fontQueryID) {fontQueryRunning = false; updateButtons();} }
-});
+}
+$('#browse-local-fonts').addEventListener('click', browseLocalFonts);
 $('#local-font-search').addEventListener('input', drawLocalFonts);
 $('#local-font-select').addEventListener('change', updateButtons);
 $('#import-local-fonts').addEventListener('click', async () => {
@@ -1835,6 +1893,14 @@ function editPreviewElement(event) {
   else openElementEditor('annotation',(config.annotations||[]).findIndex(item=>item.id===target.dataset.dragId));
 }
 $('#figure-interactions').addEventListener('dblclick',editPreviewElement);
+$('#figure-paper').addEventListener('dblclick', event => {
+  if (event.defaultPrevented || !figureResult || loading || exporting || renderRunning || renderedRevision!==revision) return;
+  if (event.target.closest('[data-drag-id],[data-edit-axis],[data-edit-series],[data-edit-part],[data-trend-index]')) return;
+  const box=$('#figure-image').getBoundingClientRect(),[x,y,w,h]=figureResult.geometry.axes;
+  const px=(event.clientX-box.left)/box.width,py=(event.clientY-box.top)/box.height;
+  if (px>=x && px<=x+w && py>=y && py<=y+h) return;
+  event.preventDefault();openElementEditor('figureBackground');
+});
 $('#figure-interactions').addEventListener('keydown',event=>{if(event.key==='Enter' || event.key===' ')editPreviewElement(event);});
 // Each glyph retains its own small hit area; highlight every number on that axis.
 function highlightTicks(event,active){
