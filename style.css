@@ -64,7 +64,11 @@ fieldset{margin:0;padding:0;border:0;min-width:0}
 .field-grid.three{grid-template-columns:1fr 1fr 1fr;gap:8px}
 label{display:flex;flex-direction:column;gap:6px;font-size:11px;font-weight:500;color:#5f6c80;min-width:0}
 label>span{font-size:10px;color:#9aa4b3}
-input:not([type=checkbox]):not([type=color]):not([type=radio]),select{width:100%;min-width:0;height:34px;border:1px solid #d9e0e9;border-radius:5px;padding:6px 9px;color:var(--ink);background:#fff;font-size:12px}
+input:not([type=checkbox]):not([type=color]):not([type=radio]):not([type=range]),select{width:100%;min-width:0;height:34px;border:1px solid #d9e0e9;border-radius:5px;padding:6px 9px;color:var(--ink);background:#fff;font-size:12px}
+input[type=range]{width:100%;min-width:0;height:27px;margin:0;padding:0;border:0;background:transparent;accent-color:var(--blue);cursor:pointer}
+input[type=range]:disabled{cursor:default;opacity:.45}
+.opacity-control .opacity-caption{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:inherit;color:inherit}
+.opacity-caption output{flex-shrink:0;font-variant-numeric:tabular-nums;color:var(--ink);font-size:11px;font-weight:500}
 select{padding-right:23px}
 input::placeholder{color:#a6afbd;font-size:11px}
 input:focus,select:focus{outline:2px solid #abc8f3;outline-offset:1px;border-color:#5387cd}
