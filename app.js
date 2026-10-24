@@ -1,9 +1,9 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=6be114672ab4";
-import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=6be114672ab4";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=6be114672ab4";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=6be114672ab4";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=6be114672ab4";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=6be114672ab4";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=cd41c82c9af6";
+import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=cd41c82c9af6";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=cd41c82c9af6";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=cd41c82c9af6";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=cd41c82c9af6";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=cd41c82c9af6";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -18,6 +18,7 @@ const axisControlValue = (key, value) => isLabelPadding(key) ? Number((Number(va
 const axisConfigValue = (key, value) => isLabelPadding(key) ? Number((Number(value) + LABEL_PADDING_BASE).toPrecision(12)) : key === 'spineScale' ? Number((Number(value) / .8).toPrecision(12)) : /^(fontScale|tickFontScale|labelFontScale|legendFontScale)$/.test(key) ? Number((Number(value)/fontPointBase(key)).toPrecision(12)) : value;
 const editableXY = type => !['XPS Fit','Particle Histogram','bar_graph_general','Raman 3D'].includes(type);
 const seriesControlValue = (key,value) => key==='trendFontSize' ? Number((Number(value || 6)*Number(config.axes.fontScale)).toPrecision(12)) : value;
+const SERIES_APPEARANCE_FIELDS = ['mode','lineWidth','markerSize','lineStyle','marker','lineAlpha','scatterColor','markerEdgeColor','markerFaceColor','markerEdgeAlpha','markerFaceAlpha'];
 const opacityPercent = value => `${Number((Number(value) * 100).toFixed(2))}%`;
 const opacityControl = (attributes, label, value = 1) => `<label class="opacity-control" title="0%は透明、100%は不透明。←／→キーで1%ずつ調整できます。"><span class="opacity-caption">${escapeHTML(label)}<output aria-hidden="true">${opacityPercent(value)}</output></span><input ${attributes} data-opacity type="range" min="0" max="1" step="0.01" value="${escapeHTML(value)}" aria-label="${escapeHTML(label)}" aria-valuetext="${opacityPercent(value)}"></label>`;
 const UNIT_HINT = '互換性のある単位をリストから選ぶと数値も換算します。自由入力は表記のみを変更します。元データは保持します。';
@@ -234,6 +235,8 @@ function updateButtons() {
   $("#confirm-save").disabled = !canSave;
   for (const id of ["#save-name", "#png-dpi", "#save-destination", "#choose-save-folder", "#close-save"]) $(id).disabled = busy;
   $("#copy-image").disabled = !engineReady || busy || renderedRevision !== revision || renderRunning;
+  $('#edit-all-series').hidden = !editableXY(config.plotType || 'General');
+  $('#edit-all-series').disabled = !engineReady || busy || !config.series.length || renderedRevision !== revision || renderRunning;
   $("#figure-stage").setAttribute("aria-busy", String(loading || exporting || renderRunning || !engineReady));
   $('#save-destination').disabled = $('#choose-save-folder').disabled = busy;
   syncColorIcons();
@@ -262,7 +265,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=6be114672ab4", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=cd41c82c9af6", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -334,7 +337,8 @@ function syncOpacityControls(activeInput = null) {
       data.annotationField ? config.annotations?.[Number(input.closest('[data-annotation-index]')?.dataset.annotationIndex)]?.[data.annotationField] :
       data.fill ? config.options?.fills?.[Number(input.closest('[data-fill-index]')?.dataset.fillIndex)]?.[data.fill] : config.options?.[data.option]) ?? input.value;
     if (input !== activeInput) input.value=value;
-    const percent=opacityPercent(value), output=input.closest('.opacity-control')?.querySelector('output');
+    const mixed=data.seriesAll==='true' && config.series.some(item=>String(item[data.seriesField])!==String(value));
+    const percent=mixed?'混在':opacityPercent(value), output=input.closest('.opacity-control')?.querySelector('output');
     if(output)output.textContent=percent;
     input.setAttribute('aria-valuetext',percent);
   }
@@ -1154,6 +1158,9 @@ function incompleteNumberInput(input) {
 
 function applyControlInput(event) {
   const input = event.target;
+  if (input.dataset.seriesScope !== undefined) {
+    openElementEditor(input.value==='all'?'seriesAll':'series',Number($('#element-editor-fields').dataset.seriesEditorIndex || 0));return;
+  }
   // Native number inputs keep an internal editing buffer for "0.", "-", "1e-".
   // Do not commit incomplete values or assign back to the field being edited.
   if (incompleteNumberInput(input)) return;
@@ -1214,10 +1221,12 @@ function applyControlInput(event) {
     if (/^(x|y|y2)Unit$/.test(key)) syncUnitControls(key);
   }
   else if (input.dataset.seriesField) {
-    const item = config.series[Number(input.closest("[data-series-index]").dataset.seriesIndex)];
-    item[input.dataset.seriesField] = input.type==='checkbox'?input.checked:input.dataset.seriesField==='trendFontSize'?Number((Number(input.value)/Number(config.axes.fontScale)).toPrecision(12)):input.type==='range'?Number(input.value):input.value;
-    const index=input.closest('[data-series-index]').dataset.seriesIndex;
-    $$(`[data-series-index="${index}"] [data-series-field="${input.dataset.seriesField}"]`).forEach(field=>{if(field!==input){field.value=input.value;field.checked=input.checked;}});
+    const key=input.dataset.seriesField,index=Number(input.closest('[data-series-index]').dataset.seriesIndex);
+    const indices=input.dataset.seriesAll==='true' && SERIES_APPEARANCE_FIELDS.includes(key)?config.series.map((_,i)=>i):[index];
+    for(const index of indices) {
+      config.series[index][key] = input.type==='checkbox'?input.checked:key==='trendFontSize'?Number((Number(input.value)/Number(config.axes.fontScale)).toPrecision(12)):input.type==='range'?Number(input.value):input.value;
+      $$(`[data-series-index="${index}"] [data-series-field="${key}"]`).forEach(field=>{if(field!==input){field.value=input.value;field.checked=input.checked;}});
+    }
     if (input.dataset.seriesField === 'errorMode') syncSeriesErrorControls();
     if (input.dataset.seriesField === 'yAxis') syncYAxesControls();
     if (['trendType','trendEquation'].includes(input.dataset.seriesField)) syncTrendControls();
@@ -1721,9 +1730,13 @@ $("#annotation-list").addEventListener("click", event => {
 
 
 function openElementEditor(part,index=0) {
-  if(!metadata || loading || exporting || renderRunning || renderedRevision!==revision)return;
+  const switchingSeries=$('#element-editor').open && ['series','seriesAll'].includes(part);
+  if(!metadata || loading || exporting || (renderRunning || renderedRevision!==revision) && !switchingSeries)return;
   const fields=$('#element-editor-fields');let sources=[],title='';
-  if(part==='trend') {
+  if(part==='seriesAll') {
+    if(!editableXY(config.plotType) || !config.series[index])return;
+    title='全系列の見た目';
+  } else if(part==='trend') {
     const series=config.series[index];if(!series)return;
     title=`系列${index+1}「${series.name}」の近似線`;
     sources=[$(`#series-list [data-series-index="${index}"] .series-trend`)];
@@ -1750,6 +1763,12 @@ function openElementEditor(part,index=0) {
   }
   if(part==='grid')sources.push(...$$('#plot-form [data-axis-auto="minor"]').map(input=>input.closest('label')));
   fields.innerHTML=sources.filter(Boolean).map(source=>source.outerHTML).join('');
+  if(part==='seriesAll') {
+    const control=key=>$(`#series-list [data-series-index="${index}"] [data-series-field="${key}"]`)?.closest('label')?.outerHTML || '';
+    fields.innerHTML=`<div data-series-index="${index}"><div class="field-grid">${SERIES_APPEARANCE_FIELDS.slice(0,3).map(control).join('')}</div><details class="settings-panel"><summary>線・点の詳細</summary><div class="field-grid">${SERIES_APPEARANCE_FIELDS.slice(3).map(control).join('')}</div></details></div>`;
+  }
+  fields.dataset.seriesEditorIndex=String(index);
+  if(['series','seriesAll'].includes(part) && editableXY(config.plotType))fields.innerHTML=`<label class="series-scope">見た目の適用先<select data-series-scope title="全系列では変更した項目だけをまとめて反映します。データ列・系列名・系列色は保持します。">${choiceOptions([['one',`この系列（${config.series[index].name}）`],['all',`全系列（${config.series.length}系列）`]],part==='seriesAll'?'all':'one')}</select></label>`+fields.innerHTML;
   if(part==='legend')fields.innerHTML=`<label><input data-axis="legend" type="checkbox" ${config.axes.legend?'checked':''}>凡例を表示</label><label>フォントサイズ (pt)<input data-axis="legendFontScale" type="number" min="${axisControlValue('legendFontScale',.2)}" max="${axisControlValue('legendFontScale',3)}" step="0.1" value="${axisControlValue('legendFontScale',config.axes.legendFontScale)}"></label><button type="button" class="button quiet" data-reset-legend>標準位置に戻す</button><details class="settings-panel"><summary>線・点の大きさ</summary><label>大きさ（標準比）<input data-axis="legendScale" type="number" min=".2" max="3" step="0.1" value="${config.axes.legendScale}"></label></details>`;
   if(part==='figureBackground')fields.innerHTML+=`<details class="settings-panel"><summary>グラフの種類・サイズ</summary><label>グラフのプリセット<select data-preview-preset>${choiceOptions(presets.map(item=>[item.id,item.label]),config.plotType)}</select></label><div class="field-grid">${['width','height'].map((key,i)=>`<label>${['軸領域の幅 (cm)','軸領域の高さ (cm)'][i]}<input data-axis="${key}" type="number" min=".5" max="24" step="0.1" value="${config.axes[key]}"></label>`).join('')}</div></details>`+$('#font-settings').outerHTML;
   if(part==='plotBackground')fields.innerHTML+=`<details class="settings-panel"><summary>グリッド</summary><label><input data-axis="grid" type="checkbox" ${config.axes.grid?'checked':''}>グリッドを表示</label></details>`;
@@ -1771,9 +1790,17 @@ function openElementEditor(part,index=0) {
     if(input.type==='checkbox')input.checked=data.invert==='true'?!value:Boolean(value);else input.value=data.axis?axisControlValue(data.axis,value):data.seriesField?seriesControlValue(data.seriesField,value):value;
   });
   $('#element-editor-title').textContent=title;
+  if(part==='seriesAll')fields.querySelectorAll('[data-series-field]').forEach(input=>{
+    input.dataset.seriesAll='true';
+    const key=input.dataset.seriesField,mixed=config.series.some(item=>String(item[key])!==String(config.series[index][key]));
+    if(!mixed)return;
+    if(input.tagName==='SELECT'){const option=new Option('混在','');option.disabled=true;input.add(option,0);input.value='';}
+    else if(input.type!=='range'){input.value='';input.placeholder='混在';}
+  });
   $('#element-editor').showModal();enhanceColorInputs();syncAxisAutomaticControls();syncUnitControls();syncOpacityControls();
 }
 $('#element-editor-fields').addEventListener('input',applyControlInput);
+$('#edit-all-series').addEventListener('click',()=>openElementEditor('seriesAll'));
 $('#element-editor-fields').addEventListener('click',event=>{
   if(event.target.closest('[data-reset-legend]')){config.axes.legendX=config.axes.legendY='';config.axes.legendPosition='best';drawControls();changed();return;}
   const reset=event.target.closest('[data-reset-trend]');if(reset){const item=config.series[Number(reset.dataset.resetTrend)];item.trendX=item.trendY='';$$(`[data-series-index="${reset.dataset.resetTrend}"] [data-series-field="trendX"],[data-series-index="${reset.dataset.resetTrend}"] [data-series-field="trendY"]`).forEach(input=>input.value='');changed();}

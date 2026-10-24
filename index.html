@@ -6,8 +6,8 @@
   <meta name="description" content="Excel・CSVの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=6be114672ab4">
-  <script type="module" src="./app.js?v=6be114672ab4"></script>
+  <link rel="stylesheet" href="./style.css?v=cd41c82c9af6">
+  <script type="module" src="./app.js?v=cd41c82c9af6"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -69,6 +69,7 @@
         <fieldset id="plot-fields" disabled>
           <details class="control-section" open>
             <summary class="section-heading"><h2><span class="step">02</span>系列</h2><span id="series-count" class="section-note">0 系列</span></summary>
+            <button id="edit-all-series" class="button quiet" type="button" disabled title="線・点の種類、サイズ、線幅などを全系列へまとめて設定します。データ列・名前・系列色は保持します。">全系列の見た目</button>
             <div id="series-list" class="series-list"><p class="empty-series">ファイルを読み込むと、X列・Y列を選べます。</p></div>
             <button id="add-series" class="button add-series" type="button"><svg><use href="#i-plus"/></svg>系列を追加</button>
             <details id="series-colormap" class="settings-panel"><summary>まとめて配色</summary><div class="field-grid"><label>連続配色<select id="color-map"><option value="viridis">Viridis</option><option value="plasma">Plasma</option><option value="spectrum">Spectrum</option></select></label><label>適用先<select id="colormap-target"><option value="both">線とマーカー</option><option value="line">線</option><option value="scatter">マーカー</option></select></label></div><button id="apply-colormap" type="button" class="button quiet">配色を適用</button></details>
