@@ -258,6 +258,32 @@ button:focus-visible,summary:focus-visible,a:focus-visible{outline:2px solid #ab
 #element-editor{width:min(430px,calc(100vw - 24px))}
 #element-editor .series-card{border:0;padding:0}
 
+/* Keep frequent controls visible and group optional settings by purpose. */
+.controls .settings-panel{border-top:1px solid #e9edf3;margin-top:10px;padding:0}
+.controls .settings-panel>summary,#desktop-appearance .settings-panel>summary{display:flex;align-items:center;justify-content:space-between;gap:10px;list-style:none;cursor:pointer;color:#43556d;font-size:12px;font-weight:500;min-height:40px;padding:10px 0;margin:0}
+.controls .settings-panel>summary::-webkit-details-marker{display:none}
+.controls .settings-panel>summary::after{content:'＋';color:#8592a4;font-size:14px;font-weight:400}
+.controls .settings-panel[open]>summary::after{content:'−'}
+.controls .settings-panel[open]{padding-bottom:8px}
+.settings-summary{font-size:10px;font-weight:400;color:#7b899c;margin-left:auto;white-space:nowrap}
+.control-subheading{font-size:11px;font-weight:600;color:#788395;margin:18px 0 2px}
+.appearance-options{padding-top:0}
+.data-options{margin-top:14px}
+.controls .series-advanced>summary,.controls .series-trend>summary{font-size:11px;color:#526075}
+.frame-settings .axis-control-group{margin:0 0 14px;padding:12px}
+.frame-settings .axis-control-group:last-child{margin-bottom:0}
+.frame-settings .axis-control-group legend{font-size:12px}
+.frame-edge-picker{display:grid;grid-template-columns:minmax(62px,1fr) minmax(78px,1.35fr) minmax(62px,1fr);grid-template-rows:auto 68px auto;align-items:center;gap:5px}
+.frame-guide{grid-area:2/2;border:2px dashed #d7dfe9;height:68px;display:grid;place-items:center;font-size:11px;color:#8290a3;background:#f8fafc}
+.frame-edge-picker:has([data-axis="spineTop"]:checked) .frame-guide{border-top-style:solid;border-top-color:var(--ink)}
+.frame-edge-picker:has([data-axis="spineBottom"]:checked) .frame-guide{border-bottom-style:solid;border-bottom-color:var(--ink)}
+.frame-edge-picker:has([data-axis="spineLeft"]:checked) .frame-guide{border-left-style:solid;border-left-color:var(--ink)}
+.frame-edge-picker:has([data-axis="spineRight"]:checked) .frame-guide{border-right-style:solid;border-right-color:var(--ink)}
+.controls .frame-edge-picker label,.plot-dialog .frame-edge-picker label{display:flex;flex-direction:row;align-items:center;justify-content:center;gap:5px;padding:7px 0;margin:0;font-size:12px;cursor:pointer;white-space:nowrap}
+.frame-top{grid-area:1/2}.frame-left{grid-area:2/1}.frame-right{grid-area:2/3}.frame-bottom{grid-area:3/2}
+.plot-dialog .frame-settings .field-grid>label{margin:0}
+.plot-dialog .frame-settings{margin-top:4px}
+
 /* Common file/save controls shared with MiFiTo. Keep brand colors independent. */
 .header-actions{gap:6px;white-space:nowrap}
 .header-actions .privacy-note,.header-actions .privacy{font-size:0;margin-right:2px}

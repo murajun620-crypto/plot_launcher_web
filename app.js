@@ -1,9 +1,9 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=cc49d1740273";
-import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=cc49d1740273";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=cc49d1740273";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=cc49d1740273";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=cc49d1740273";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=cc49d1740273";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=3192577fa72a";
+import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=3192577fa72a";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=3192577fa72a";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=3192577fa72a";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=3192577fa72a";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=3192577fa72a";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -12,8 +12,9 @@ const MICRO_HINT = 'μは \\micro と入力できます（例：\\microm、\\mic
 const LABEL_PADDING_BASE = defaultAxes().xLabelPad;
 const LABEL_PADDING_HINT = `0は標準の余白（${LABEL_PADDING_BASE} pt）。正の値で広く、負の値で狭くします。`;
 const isLabelPadding = key => /^(x|y|y2)LabelPad$/.test(key);
-// Project/settings values remain absolute points; only controls show offsets.
-const axisControlValue = (key, value) => isLabelPadding(key) ? Number((Number(value) - LABEL_PADDING_BASE).toPrecision(12)) : value;
+// Keep saved settings compatible; controls show padding offsets and line widths in pt.
+const axisControlValue = (key, value) => isLabelPadding(key) ? Number((Number(value) - LABEL_PADDING_BASE).toPrecision(12)) : key === 'spineScale' ? Number((Number(value) * .8).toPrecision(12)) : value;
+const axisConfigValue = (key, value) => isLabelPadding(key) ? Number((Number(value) + LABEL_PADDING_BASE).toPrecision(12)) : key === 'spineScale' ? Number((Number(value) / .8).toPrecision(12)) : value;
 const UNIT_HINT = '互換性のある単位をリストから選ぶと数値も換算します。自由入力は表記のみを変更します。元データは保持します。';
 const readableUnit = unit => String(unit || '').replace(/\$\^\{?-1\}?\$/g, '⁻¹').replace(/\$\^\{?2\}?\$/g, '²');
 const UNIT_VALUES = new Set(['auto', '', ...UNIT_GROUPS.flatMap(([, units]) => units.map(unit => Array.isArray(unit) ? unit[0] : unit))]);
@@ -119,14 +120,16 @@ function desktopAppearance() {
   const check = (key, label) => `<label><input data-axis="${key}" type="checkbox">${label}</label>`;
   const displayCell = (key, label) => `<td><label><input data-axis="${key}" data-invert="true" type="checkbox"><span>${label}を表示</span></label></td>`;
   $("#desktop-appearance").innerHTML = `
+    <details class="settings-panel" id="font-settings"><summary>フォント・文字サイズ</summary>
     <label class="full-field">図のフォント<select id="font-family" data-axis="fontFamily"><option value="Arial">Arial（未読込）</option><option>Liberation Sans</option><option>Noto Sans JP</option><option>DejaVu Sans</option></select></label>
     <button type="button" id="choose-installed-fonts" class="button" title="PCにインストールされたフォントから選びます。初期選択はArialです。">インストール済みフォントから選ぶ</button><p id="font-status" class="preset-message" role="status"></p>
     <label class="full-field">日本語フォント<select id="japanese-font-family" data-axis="japaneseFontFamily"><option>Noto Sans JP</option><option>Liberation Sans</option><option>DejaVu Sans</option></select></label>
     <button type="button" id="load-font" class="button quiet">詳細設定</button><input id="font-file" type="file" accept=".ttf,.otf,.ttc" multiple hidden>
     <p class="field-hint">インストール済みフォントからArialを選択して読み込みます。読み込み前は文字幅が互換のLiberation Sansで代替します。日本語はNoto Sans JP、数式はSTIX Sansを使います。</p>
-    <div class="field-grid">${numeric("tickFontScale", "目盛り文字倍率", .2)}${numeric("labelFontScale", "軸ラベル倍率", .2)}${numeric("spineScale", "枠線倍率", .1, 5)}${numeric("dataLineScale", "データ線倍率", 0, 6)}${numeric("tickLength", "目盛り長さ倍率", 0, 5)}</div>
-    <p class="field-hint">倍率1：目盛り7 pt、軸ラベル8 pt、枠線0.8 pt、主目盛り2.5 pt・副目盛り1.25 pt。</p>
-    <details><summary>余白・軸の表示</summary>
+    <label title="標準は1。目盛り・軸ラベル・凡例の文字をまとめて変更します。">文字サイズ（標準比）<input id="font-scale" data-axis="fontScale" type="number" min="0.5" max="3" step="any" value="1" required></label>
+    <div class="field-grid">${numeric("tickFontScale", "目盛り文字（標準比）", .2)}${numeric("labelFontScale", "軸ラベル（標準比）", .2)}</div>
+    <p class="field-hint">標準1：目盛り7 pt、軸ラベル8 pt。全体の文字サイズに各項目の倍率を掛けます。</p></details>
+    <details class="settings-panel"><summary>余白・ラベルと目盛りの表示</summary>
     <div class="field-grid">${numeric("xLabelPad", "Xラベル追加余白 (pt)", -100, 100)}${numeric("yLabelPad", "Yラベル追加余白 (pt)", -100, 100)}${numeric("xTickPad", "X目盛り追加余白 (pt)", -100, 100)}${numeric("yTickPad", "Y目盛り追加余白 (pt)", -100, 100)}</div>
     <fieldset class="axis-control-group"><legend>ラベル・目盛りの表示</legend>
       <table class="axis-visibility-table"><thead><tr><th scope="col">項目</th><th scope="col">X軸</th><th scope="col">Y軸</th></tr></thead><tbody>
@@ -136,11 +139,30 @@ function desktopAppearance() {
         <tr><th scope="row">副目盛線</th>${displayCell("hideXMinorTicks", "X軸の副目盛線")}${displayCell("hideYMinorTicks", "Y軸の副目盛線")}</tr>
       </tbody></table>
     </fieldset>
-    <fieldset class="axis-control-group"><legend>枠線の表示</legend><div class="axis-switch-grid">${check("spineLeft", "左")}${check("spineRight", "右")}${check("spineTop", "上")}${check("spineBottom", "下")}</div></fieldset>
-    <fieldset class="axis-control-group"><legend>軸の位置</legend><div class="axis-switch-grid">${check("yAxisRight", "Y軸を右側")}${check("xAxisTop", "X軸を上側")}</div></fieldset></details>
-    <details><summary>背景・誤差棒</summary>
+    <div class="check-options"><label><input id="show-grid" data-axis="grid" type="checkbox">グリッドを表示</label></div>
+    ${numeric("tickLength", "目盛りの長さ（標準比）", 0, 5)}</details>
+    <details class="settings-panel"><summary>枠線・軸の位置</summary><div id="frame-settings-content" class="frame-settings">
+      <fieldset class="axis-control-group"><legend>表示する枠線</legend><div class="frame-edge-picker">
+        <div class="frame-guide" aria-hidden="true">グラフ</div>
+        <label class="frame-edge frame-top"><input data-axis="spineTop" type="checkbox" aria-label="上枠を表示">上枠</label>
+        <label class="frame-edge frame-left"><input data-axis="spineLeft" type="checkbox" aria-label="左枠を表示">左枠</label>
+        <label class="frame-edge frame-right"><input data-axis="spineRight" type="checkbox" aria-label="右枠を表示">右枠</label>
+        <label class="frame-edge frame-bottom"><input data-axis="spineBottom" type="checkbox" aria-label="下枠を表示">下枠</label>
+      </div></fieldset>
+      <fieldset class="axis-control-group"><legend>色・太さ</legend><div class="field-grid"><label>枠線の色<input data-axis="spineColor" type="color"></label>${numeric("spineScale", "枠線の太さ (pt)", .1, 5)}</div></fieldset>
+      <fieldset class="axis-control-group"><legend>軸の位置</legend><div class="field-grid">
+        <label>X軸<select data-axis="xAxisTop" data-axis-boolean="true"><option value="false">下側</option><option value="true">上側</option></select></label>
+        <label>Y軸<select data-axis="yAxisRight" data-axis-boolean="true"><option value="false">左側</option><option value="true">右側</option></select></label>
+      </div></fieldset>
+    </div></details>
+    <details class="settings-panel"><summary>背景色</summary>
+    <fieldset class="axis-control-group"><legend>図全体</legend>
     <div class="check-options"><label><input id="background-enabled" data-axis="transparent" data-invert="true" type="checkbox">図全体の背景色を使用</label></div>
-    <div class="field-grid"><label>枠線色<input data-axis="spineColor" type="color"></label><label>図全体の背景色<input data-axis="backgroundColor" type="color"></label>${numeric("backgroundAlpha", "図全体の背景不透明度", 0, 1)}</div><div class="check-options">${check("plotBackgroundEnabled", "枠内の背景色を使用")}</div><div class="field-grid"><label>枠内の背景色<input data-axis="plotBackgroundColor" type="color"></label>${numeric("plotBackgroundAlpha", "枠内の背景不透明度", 0, 1)}</div><div class="field-grid">${numeric("markerEdgeWidth", "マーカー縁幅 (pt)", 0, 20)}${numeric("errorLineWidth", "誤差棒幅 (pt)", 0, 20)}${numeric("errorCapSize", "誤差キャップ (pt)", 0, 20)}${numeric("errorCapThick", "キャップ幅 (pt)", 0, 20)}</div></details>`;
+    <div class="field-grid"><label>図全体の背景色<input data-axis="backgroundColor" type="color"></label>${numeric("backgroundAlpha", "不透明度（0〜1）", 0, 1)}</div></fieldset>
+    <fieldset class="axis-control-group"><legend>グラフの枠内</legend><div class="check-options">${check("plotBackgroundEnabled", "枠内の背景色を使用")}</div><div class="field-grid"><label>枠内の背景色<input data-axis="plotBackgroundColor" type="color"></label>${numeric("plotBackgroundAlpha", "不透明度（0〜1）", 0, 1)}</div></fieldset></details>
+    <details class="settings-panel"><summary>データ線・マーカー・誤差棒</summary>
+    ${numeric("dataLineScale", "データ線の太さ（標準比）", 0, 6)}
+    <div class="field-grid">${numeric("markerEdgeWidth", "マーカーの縁 (pt)", 0, 20)}${numeric("errorLineWidth", "誤差棒の太さ (pt)", 0, 20)}${numeric("errorCapSize", "キャップの長さ (pt)", 0, 20)}${numeric("errorCapThick", "キャップの太さ (pt)", 0, 20)}</div></details>`;
   $("#legend-appearance").innerHTML = `${numeric("legendScale", "凡例サイズ倍率", .2)}${numeric("legendFontScale", "凡例文字倍率", .2)}${numeric("legendX", "凡例X (軸比率)", -10, 10, .01)}${numeric("legendY", "凡例Y (軸比率)", -10, 10, .01)}`;
 }
 desktopAppearance();
@@ -165,8 +187,10 @@ function updateButtons() {
   $("#plot-fields").disabled = !engineReady || !metadata || busy;
   $('#preset-fields').disabled = !engineReady || !metadata || busy;
   $("#header-row").disabled = !engineReady || !metadata || busy;
+  $('#data-options').hidden = !metadata;
   $("#sheet-select").disabled = !engineReady || !metadata || busy || metadata.sheets.length < 2;
   const multipleSheets = (metadata?.sheets.length ?? 0) > 1;
+  $('#sheet-select-field').hidden = !multipleSheets;
   for (const mode of ['shared','individual']) {
     $(`#sheet-mode-${mode}`).checked = sheetMode === mode;
     $(`#sheet-mode-${mode}`).disabled = !engineReady || busy || !multipleSheets;
@@ -224,7 +248,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=cc49d1740273", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=3192577fa72a", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -371,6 +395,10 @@ function syncAxisEditor() {
   syncAxisAutomaticControls();
 }
 function syncAxisAutomaticControls() {
+  for (const axis of ['x','y','y2']) {
+    const manual = ['Min','Max','Step','MinorStep'].some(key=>config.axes[`${axis}${key}`] !== '');
+    $(`#${axis}-settings-summary`).textContent = `${config.axes[`${axis}Scale`] === 'log' ? '対数' : '線形'}・${manual ? '指定あり' : '自動'}`;
+  }
   for (const field of $$('[data-log-format-for]')) field.hidden = config.axes[`${field.dataset.logFormatFor}Scale`] !== 'log';
   for (const input of $$('[data-axis-auto]')) {
     const axis = input.dataset.axisName || (input.closest('#axis-editor-fields') ? $('#axis-editor-fields').dataset.axisName : null);
@@ -1108,7 +1136,7 @@ function applyControlInput(event) {
   if (input.dataset.axis) {
     const key = input.dataset.axis;
     config.axes[key] = input.type === "checkbox" ? (input.dataset.invert === "true" ? !input.checked : input.checked) :
-      isLabelPadding(key) ? Number((Number(input.value) + LABEL_PADDING_BASE).toPrecision(12)) : input.value;
+      input.dataset.axisBoolean === 'true' ? input.value === 'true' : axisConfigValue(key,input.value);
     if (/^(x|y|y2)Scale$/.test(key) && input.value === 'log') {
       const axis=key.replace(/Scale$/,'');
       config.axes[`${axis}Step`] = config.axes[`${axis}MinorStep`] = '';
@@ -1599,6 +1627,7 @@ function openElementEditor(part,index=0) {
     sources=[$(`#annotation-list [data-annotation-index="${index}"]`)];
   } else if(part==='legend'){title='凡例の設定';sources=[$('.legend-controls')];}
   else if(part==='preset'){title='グラフの設定';sources=[$('#preset-options')];}
+  else if(part==='frame'){title='枠線・軸の位置';sources=[$('#frame-settings-content')];}
   else {
     const keys=part==='figureBackground'?['transparent','backgroundColor','backgroundAlpha']:
       part==='plotBackground'?['plotBackgroundEnabled','plotBackgroundColor','plotBackgroundAlpha']:
@@ -1613,8 +1642,9 @@ function openElementEditor(part,index=0) {
   // Reuse the sidebar controls, restoring live values and color-picker handlers.
   fields.querySelectorAll('.color-control').forEach(wrapper=>{const input=wrapper.querySelector('input');if(input){input.hidden=false;delete input.dataset.paletteEnhanced;wrapper.replaceWith(input);}});
   fields.querySelectorAll('[id]').forEach(element=>element.removeAttribute('id'));
-  fields.querySelectorAll('button,summary').forEach(element=>element.remove());
-  fields.querySelectorAll('details').forEach(element=>element.open=true);
+  fields.querySelectorAll('button').forEach(element=>element.remove());
+  fields.querySelectorAll('.annotation-card > summary').forEach(element=>element.remove());
+  fields.querySelectorAll('details').forEach(element=>element.open=element.classList.contains('annotation-card') || element.classList.contains('series-advanced') || part==='trend' && element.classList.contains('series-trend'));
   fields.querySelectorAll('[data-axis],[data-series-field],[data-annotation-field],[data-option],[data-fill]').forEach(input=>{
     const data=input.dataset;
     const value=data.axis?config.axes[data.axis]:data.seriesField?config.series[Number(input.closest('[data-series-index]').dataset.seriesIndex)][data.seriesField]:
