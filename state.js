@@ -1,5 +1,5 @@
-import { resetPresetUnitScales } from "./units.js?v=3192577fa72a";
-export const APP_VERSION = "1.11.0";
+import { resetPresetUnitScales } from "./units.js?v=e370012b73fe";
+export const APP_VERSION = "1.11.1";
 
 // Labels are readable in the picker; values retain the existing unit syntax.
 export const UNIT_GROUPS = [

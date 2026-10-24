@@ -477,7 +477,7 @@ class PlotEngine:
         keys = {key: [] for key in ("columns", "names", "colors", "modes", "widths", "markers", "sizes", "xoffsets", "yoffsets", "errors", "errorModes", "errorMins", "errorMaxs", "scatterColors", "edgeColors", "faceColors", "lineAlphas", "edgeAlphas", "faceAlphas")}
         diagnostics, warnings = [], []
         if requested_family != family:
-            warnings.append(f"Arialが未読込のため{family}で代替表示しています。インストール済みフォントからArialを読み込んでください。")
+            warnings.append(f"Arialが未読込のため{family}で代替表示しています。フォント欄でブラウザのアクセスを許可すると自動で読み込みます。非対応ブラウザでは詳細設定から読み込めます。")
         extents = {"x": [], "y": []}
         for index, item in enumerate(series):
             if not isinstance(item.get("visible", True), bool):

@@ -1,4 +1,4 @@
-import { restoreSettings } from "./state.js?v=3192577fa72a";
+import { restoreSettings } from "./state.js?v=e370012b73fe";
 // All user data stays in this worker's in-memory filesystem.
 const PYODIDE_VERSION = "0.29.3";
 const INDEX_URL = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;

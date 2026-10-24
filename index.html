@@ -6,8 +6,8 @@
   <meta name="description" content="Excel・CSVの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=3192577fa72a">
-  <script type="module" src="./app.js?v=3192577fa72a"></script>
+  <link rel="stylesheet" href="./style.css?v=e370012b73fe">
+  <script type="module" src="./app.js?v=e370012b73fe"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -233,7 +233,7 @@
   </dialog>
   <dialog id="font-load-dialog" class="plot-dialog font-load-dialog" aria-labelledby="font-load-title">
     <div class="dialog-heading"><strong id="font-load-title">フォントの詳細設定</strong><button id="close-font-load" type="button" class="button quiet">閉じる</button></div>
-    <button id="browse-local-fonts" type="button" class="button" title="対応ブラウザで、許可後にPCにインストールされたフォントを一覧から選べます。選択したフォントはブラウザ内だけで使用します。" hidden>インストール済みフォントから選ぶ</button>
+    <button id="browse-local-fonts" type="button" class="button" title="通常は自動で取得します。フォントを追加した場合や、太字・斜体も読み込みたい場合に使用します。" hidden>PCのフォント一覧を更新</button>
     <div id="local-font-list" hidden>
       <label>フォント名で検索<input id="local-font-search" type="search" placeholder="例：Arial、游ゴシック" autocomplete="off"></label>
       <label>フォント<select id="local-font-select" size="6" multiple title="Ctrl／⌘を押しながら複数選択できます。"></select></label>

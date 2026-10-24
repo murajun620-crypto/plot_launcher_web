@@ -1,9 +1,9 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=3192577fa72a";
-import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=3192577fa72a";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=3192577fa72a";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=3192577fa72a";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=3192577fa72a";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=3192577fa72a";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=e370012b73fe";
+import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=e370012b73fe";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=e370012b73fe";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=e370012b73fe";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=e370012b73fe";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=e370012b73fe";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -90,7 +90,7 @@ function projectEditState() {
 }
 
 function hasUnsavedChanges() {
-  if (!sourceData && !importedFonts.size) return false;
+  if (!sourceData && ![...importedFonts.values()].some(font=>!font.automatic)) return false;
   const current = projectEditState(), saved = savedProjectState;
   return !saved || current.source !== saved.source || current.content !== saved.content ||
     current.fonts.length !== saved.fonts.length || current.fonts.some((font,index)=>font !== saved.fonts[index]);
@@ -114,6 +114,9 @@ const FONT_FOLDERS = {
 };
 let localFontChoices = [];
 let fontQueryID = 0, fontQueryRunning = false;
+let fontAccess = typeof window.queryLocalFonts === 'function' ? 'idle' : 'unsupported';
+let fontAccessMessage = '';
+const failedLocalFonts = new Set(), localFontAliases = new Map();
 
 function desktopAppearance() {
   const numeric = (key, label, min = 0, max = 3, step = 0.1) => `<label${isLabelPadding(key) ? ` title="${LABEL_PADDING_HINT}"` : ''}>${label}<input data-axis="${key}" type="number" min="${axisControlValue(key, min)}" max="${axisControlValue(key, max)}" step="any"></label>`;
@@ -121,11 +124,11 @@ function desktopAppearance() {
   const displayCell = (key, label) => `<td><label><input data-axis="${key}" data-invert="true" type="checkbox"><span>${label}を表示</span></label></td>`;
   $("#desktop-appearance").innerHTML = `
     <details class="settings-panel" id="font-settings"><summary>フォント・文字サイズ</summary>
-    <label class="full-field">図のフォント<select id="font-family" data-axis="fontFamily"><option value="Arial">Arial（未読込）</option><option>Liberation Sans</option><option>Noto Sans JP</option><option>DejaVu Sans</option></select></label>
-    <button type="button" id="choose-installed-fonts" class="button" title="PCにインストールされたフォントから選びます。初期選択はArialです。">インストール済みフォントから選ぶ</button><p id="font-status" class="preset-message" role="status"></p>
+    <label class="full-field" title="PCのフォントを自動で一覧に追加し、選ぶと読み込みます。初回のみブラウザの許可が必要です。">図のフォント<select id="font-family" data-axis="fontFamily"><option value="Arial">Arial</option><option>Liberation Sans</option><option>Noto Sans JP</option><option>DejaVu Sans</option></select></label>
+    <p id="font-status" class="preset-message" role="status" hidden></p>
     <label class="full-field">日本語フォント<select id="japanese-font-family" data-axis="japaneseFontFamily"><option>Noto Sans JP</option><option>Liberation Sans</option><option>DejaVu Sans</option></select></label>
     <button type="button" id="load-font" class="button quiet">詳細設定</button><input id="font-file" type="file" accept=".ttf,.otf,.ttc" multiple hidden>
-    <p class="field-hint">インストール済みフォントからArialを選択して読み込みます。読み込み前は文字幅が互換のLiberation Sansで代替します。日本語はNoto Sans JP、数式はSTIX Sansを使います。</p>
+    <p class="field-hint">Arialと選択したPCのフォントを自動で読み込みます。アクセスできない場合はArialをLiberation Sansで代替します。日本語はNoto Sans JP、数式はSTIX Sansを使います。ファイルからの読み込みは詳細設定にあります。</p>
     <label title="標準は1。目盛り・軸ラベル・凡例の文字をまとめて変更します。">文字サイズ（標準比）<input id="font-scale" data-axis="fontScale" type="number" min="0.5" max="3" step="any" value="1" required></label>
     <div class="field-grid">${numeric("tickFontScale", "目盛り文字（標準比）", .2)}${numeric("labelFontScale", "軸ラベル（標準比）", .2)}</div>
     <p class="field-hint">標準1：目盛り7 pt、軸ラベル8 pt。全体の文字サイズに各項目の倍率を掛けます。</p></details>
@@ -210,8 +213,10 @@ function updateButtons() {
   $("#refresh-preview").disabled = !metadata || busy;
   $("#add-series").disabled = config.series.length >= 32 || (metadata?.columns.length ?? 0) < 2;
   $("#load-font").disabled = !engineReady || busy;
-  $('#choose-installed-fonts').disabled = !engineReady || busy || fontQueryRunning;
-  $('#font-status').textContent = config.axes.fontFamily === 'Arial' && !loadedFonts.has('Arial') ? 'Arial未読込：現在はLiberation Sansで代替表示します。上のボタンからArialを読み込んでください。' : '';
+  const fontFallback = config.axes.fontFamily === 'Arial' && !loadedFonts.has('Arial');
+  const fontHint = fontAccessMessage || (fontAccess === 'checking' ? 'PCのフォントを確認しています…' : fontFallback ? fontAccess === 'unsupported' ? 'PCフォントの自動取得に非対応です。詳細設定から読み込めます。' : fontAccess === 'prompt' ? '初回のみ、フォント欄を開いてブラウザのアクセスを許可してください。' : fontAccess === 'ready' ? 'Arialが見つからないため、代替フォントを使用します。' : '' : '');
+  $('#font-status').textContent = fontHint; $('#font-status').hidden = !fontHint;
+  $('#font-status').title = fontFallback ? 'Arialへのアクセス前は、文字幅が互換のLiberation Sansで描画します。' : '';
   $('#apply-unit-suggestion').disabled = busy || renderRunning || renderedRevision !== revision;
   for (const id of ['#choose-font-files','#browse-local-fonts','#import-local-fonts']) $(id).disabled = !engineReady || busy || (id !== '#choose-font-files' && fontQueryRunning) || (id === '#import-local-fonts' && !$('#local-font-select').selectedOptions?.length);
   const canSave = engineReady && !busy && !renderRunning && (renderedRevision === revision || multipleSheets && $('#save-all-sheets').checked);
@@ -248,7 +253,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=3192577fa72a", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=e370012b73fe", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -261,6 +266,8 @@ function startWorker() {
       $("#preview-state").textContent = "データ未選択";
       status("Excel / CSVファイルを選んでください。", "ready");
       await openGalleryProject();
+      // Permission waiting must never delay opening data or a gallery project.
+      void browseLocalFonts({automatic:true});
     } else if (data.type === "fatal") {
       console.error(data.detail);
       fatal(data.error);
@@ -517,11 +524,7 @@ $("#apply-offsets").addEventListener('click',()=>{
 function drawControls() {
   $("#plot-type").value = config.plotType || "General";
   drawPresetOptions();
-  for (const [selector, key] of [["#font-family", "fontFamily"], ["#japanese-font-family", "japaneseFontFamily"]]) {
-    const field = $(selector), family = config.axes[key];
-    if (![...field.options].some(option => option.value === family)) field.add(new Option(`${family}（要読み込み）`, family));
-    for (const option of field.options) if (option.value === 'Arial') option.textContent = loadedFonts.has('Arial') ? 'Arial' : 'Arial（未読込・代替表示）';
-  }
+  syncFontChoices();
   const xpsFit=config.plotType==='XPS Fit';
   const histogram=config.plotType==='Particle Histogram';
   const visibleSeries=xpsFit || histogram?config.series.slice(0,1):config.series;
@@ -817,6 +820,8 @@ function changed() {
 
 async function renderPreview() {
   if (!engineReady || !metadata || loading || exporting || renderRunning || !renderWanted) return;
+  await loadCurrentLocalFonts();
+  if (loading || exporting || renderRunning || !renderWanted) return;
   renderWanted = false;
   renderRunning = true;
   const snapshot = structuredClone(config), targetRevision = revision;
@@ -1135,6 +1140,7 @@ function applyControlInput(event) {
   }
   if (input.dataset.axis) {
     const key = input.dataset.axis;
+    if (key === 'fontFamily' || key === 'japaneseFontFamily') return selectLocalFont(input);
     config.axes[key] = input.type === "checkbox" ? (input.dataset.invert === "true" ? !input.checked : input.checked) :
       input.dataset.axisBoolean === 'true' ? input.value === 'true' : axisConfigValue(key,input.value);
     if (/^(x|y|y2)Scale$/.test(key) && input.value === 'log') {
@@ -1257,7 +1263,7 @@ async function readProject(file, saved) {
     $('#save-destination').value=folderSupported?'source':'download'; refreshSaveDestination(); loadedHeader=metadata.headerRow;
     importedFonts.clear(); retainedFonts.forEach(font=>importedFonts.set(font.name,font));
     loadedFonts.clear(); ['Liberation Sans','Noto Sans JP','DejaVu Sans',...result.families].forEach(family=>loadedFonts.add(family));
-    for(const selector of ['#font-family','#japanese-font-family'])$(selector).replaceChildren(...[...loadedFonts].map(family=>new Option(family,family)));
+    failedLocalFonts.clear(); localFontAliases.clear();
     clearTimeout(renderTimer); ++revision; selected.clear(); history=[]; future=[]; lastState=structuredClone(config);
     $("#undo").disabled=$("#redo").disabled=true;
     view={...project.workspace.view}; $("#save-name").value=project.workspace.saveName; $("#png-dpi").value=String(project.workspace.pngDpi);
@@ -1382,7 +1388,7 @@ $('#user-preset-select').addEventListener('change',event=>{
   try {
     const next = applyUserPreset(entry,metadata);
     const fonts = [next.axes.fontFamily,next.axes.japaneseFontFamily,...(next.annotations || []).filter(item=>item.type === 'text' && item.visible !== false).map(item=>item.font_family)].filter(Boolean);
-    const missing = [...new Set(fonts.filter(font=>font!=='Arial' && !loadedFonts.has(font)))];
+    const missing = [...new Set(fonts.filter(font=>font!=='Arial' && !loadedFonts.has(font) && !localFontChoices.some(item=>item.family===font)))];
     if (missing.length) throw new Error(`先にフォント「${missing.join('、')}」を読み込んでください。プリセットにはフォントファイルを含みません。`);
     config = next; selected.clear(); drawControls(); changed();
     presetMessage('#user-preset-message',`「${entry.name}」を適用しました。`);
@@ -1485,7 +1491,7 @@ function chooseFontOS() {
   $('#font-folder').replaceChildren(...folders.map(([label], index) => new Option(label, String(index))));
   $('#font-folder').value = '0'; syncFontFolder();
 }
-function openFontSettings(installed = false) {
+function openFontSettings() {
   if (!engineReady || loading || exporting) return;
   if (!$('#font-os').value) {
     const platform = navigator.userAgentData?.platform || navigator.platform || '';
@@ -1493,20 +1499,20 @@ function openFontSettings(installed = false) {
     chooseFontOS();
   }
   $('#browse-local-fonts').hidden = typeof window.queryLocalFonts !== 'function';
-  $('#font-load-title').textContent = installed ? 'インストール済みフォントから選ぶ' : 'フォントの詳細設定';
-  $('#font-advanced-fields').open = !installed || typeof window.queryLocalFonts !== 'function';
+  $('#font-advanced-fields').open = true;
+  $('#local-font-list').hidden = !localFontChoices.length;
+  if (localFontChoices.length) drawLocalFonts();
   fontMessage(''); updateButtons(); $('#font-load-dialog').showModal();
 }
 $('#load-font').addEventListener('click', () => openFontSettings());
-$('#choose-installed-fonts').addEventListener('click', () => {
-  openFontSettings(true);
-  if (typeof window.queryLocalFonts === 'function') return browseLocalFonts();
-  fontMessage('このブラウザではフォント一覧を取得できません。詳細設定からArialのファイルを読み込んでください。');
+// Use the normal font controls for the first permission gesture; no extra picker.
+for (const event of ['pointerdown','keydown']) $('#font-settings').addEventListener(event, () => {
+  if (!fontQueryRunning && ['idle','prompt'].includes(fontAccess)) return browseLocalFonts({automatic:true});
 });
 $('#font-os').addEventListener('change', chooseFontOS);
 $('#font-folder').addEventListener('change', syncFontFolder);
 $('#close-font-load').addEventListener('click', () => $('#font-load-dialog').close());
-$('#font-load-dialog').addEventListener('close', () => { fontQueryID++; fontQueryRunning = false; updateButtons(); });
+$('#font-load-dialog').addEventListener('close', () => { fontQueryID++; fontQueryRunning = false; if(fontAccess === 'checking')fontAccess='prompt'; fontAccessMessage=''; updateButtons(); });
 $('#copy-font-folder').addEventListener('click', async () => {
   try {
     if (!navigator.clipboard?.writeText) throw new Error('パス欄を選択してコピーしてください。');
@@ -1532,20 +1538,95 @@ function drawLocalFonts() {
   }));
   fontMessage(`${items.length}件のフォント。通常・太字・斜体は別々に選択できます。`); updateButtons();
 }
-async function browseLocalFonts() {
+function syncFontChoices() {
+  const names = [...new Set(['Arial',...loadedFonts,...localFontChoices.map(font=>font.family),config.axes.fontFamily,config.axes.japaneseFontFamily].filter(Boolean))];
+  names.sort((a,b)=>a==='Arial'?-1:b==='Arial'?1:a.localeCompare(b));
+  for (const [selector,key] of [['#font-family','fontFamily'],['#japanese-font-family','japaneseFontFamily']]) {
+    const field=$(selector);
+    field.replaceChildren(...names.map(name=>new Option(name,name)));
+    field.value=config.axes[key];
+  }
+}
+async function registerFontFile(file, automatic = false) {
+  if (file.size > 20 * 1024 * 1024) throw new Error('フォントは20 MB以内にしてください。');
+  const bytes=await file.arrayBuffer(), originalBytes=bytes.slice(0);
+  const result=await request('font',{bytes});
+  importedFonts.set(file.name,{name:file.name,family:result.family,bytes:originalBytes,automatic});
+  loadedFonts.add(result.family);
+  return result.family;
+}
+async function loadLocalFontFamilies(families) {
+  if (!engineReady || loading || exporting) return false;
+  const pending=[...new Set(families)].filter(family=>!loadedFonts.has(family) && !localFontAliases.has(family) && localFontChoices.some(font=>font.family===family));
+  if (!pending.length) return true;
+  loading=true; fontAccessMessage='フォントを読み込んでいます…'; updateButtons();
+  try {
+    for (const family of pending) {
+      const faces=localFontChoices.filter(font=>font.family===family);
+      // Ordinary labels use the regular face; additional faces remain in advanced settings.
+      const font=faces.find(font=>/^(regular|normal|book|roman|標準)$/i.test(font.style || 'Regular')) || faces[0];
+      const blob=await font.blob();
+      const actual=await registerFontFile(new File([blob],`local-${safeStem(font.postscriptName || font.fullName || family)}.ttf`,{type:'font/ttf'}),true);
+      localFontAliases.set(family,actual); failedLocalFonts.delete(family);
+    }
+    fontAccessMessage=''; return true;
+  } catch(error) {
+    pending.forEach(family=>failedLocalFonts.add(family));
+    fontAccessMessage=`フォントを読み込めませんでした。詳細設定からも読み込めます。`;
+    fontMessage(error.message,true); return false;
+  } finally {loading=false;syncFontChoices();updateButtons();}
+}
+async function loadCurrentLocalFonts() {
+  const families=[config.axes.fontFamily,config.axes.japaneseFontFamily,...(config.annotations || []).filter(item=>item.type==='text' && item.visible!==false).map(item=>item.font_family)];
+  const missing=[...new Set(families)].filter(family=>family && !loadedFonts.has(family) && !failedLocalFonts.has(family) && localFontChoices.some(font=>font.family===family));
+  if (!missing.length || loading || exporting) return;
+  const current=config, before=importedFonts.size;
+  await loadLocalFontFamilies(missing);
+  if (config!==current) return;
+  for (const key of ['fontFamily','japaneseFontFamily']) config.axes[key]=localFontAliases.get(config.axes[key]) || config.axes[key];
+  for (const item of config.annotations || []) if(item.type==='text')item.font_family=localFontAliases.get(item.font_family) || item.font_family;
+  syncFontChoices();
+  if(metadata && importedFonts.size!==before){++revision;renderWanted=true;}
+}
+async function selectLocalFont(input) {
+  const key=input.dataset.axis, previous=config.axes[key], requested=input.value;
+  if(loading || exporting){input.value=previous;return;}
+  failedLocalFonts.delete(requested);
+  if (!loadedFonts.has(requested) && !await loadLocalFontFamilies([requested])) {input.value=previous;return;}
+  config.axes[key]=localFontAliases.get(requested) || requested;
+  drawControls();changed();
+}
+async function browseLocalFonts({automatic = false} = {}) {
   if (!engineReady || loading || exporting || fontQueryRunning || typeof window.queryLocalFonts !== 'function') return;
   const queryID = ++fontQueryID;
-  fontQueryRunning = true; updateButtons(); fontMessage('フォントへのアクセスを確認しています…');
+  fontQueryRunning = true; fontAccess='checking'; updateButtons(); fontMessage('フォントへのアクセスを確認しています…');
+  const waiting=setTimeout(()=>{
+    if(queryID===fontQueryID && fontQueryRunning){fontAccessMessage='ブラウザのフォント許可を待っています。ほかの操作は続けられます。';updateButtons();}
+  },15000);
   try {
+    if(automatic && navigator.permissions?.query && !navigator.userActivation?.isActive) {
+      let permission;
+      try {permission=await navigator.permissions.query({name:'local-fonts'});} catch {}
+      if(queryID!==fontQueryID)return;
+      if(permission?.state==='prompt'){fontAccess='prompt';return;}
+      if(permission?.state==='denied')throw Object.assign(new Error('denied'),{name:'NotAllowedError'});
+    }
     const fonts = await window.queryLocalFonts();
     if (queryID !== fontQueryID) return;
     localFontChoices = [...fonts].sort((a,b) => (a.fullName || a.family).localeCompare(b.fullName || b.family));
+    fontAccess='ready'; fontAccessMessage=''; failedLocalFonts.clear(); syncFontChoices();
     $('#local-font-list').hidden = false; $('#local-font-search').value = ''; drawLocalFonts();
     if (!localFontChoices.length) fontMessage('利用できるフォントがありません。「フォントファイルを選ぶ」から読み込めます。');
-  } catch (error) { if (queryID === fontQueryID) fontMessage(error.name === 'NotAllowedError' ? 'フォントへのアクセスが許可されませんでした。「フォントファイルを選ぶ」からも読み込めます。' : `フォントを取得できませんでした：${error.message}`, true); }
-  finally { if (queryID === fontQueryID) {fontQueryRunning = false; updateButtons();} }
+    await loadCurrentLocalFonts();if(renderWanted)renderPreview();
+  } catch (error) {
+    if (queryID === fontQueryID) {
+      fontAccess=error.name==='SecurityError'?'prompt':'denied';
+      fontAccessMessage=error.name==='SecurityError'?'':'PCフォントにアクセスできません。ブラウザで許可するか、詳細設定から読み込めます。';
+      fontMessage(error.name==='NotAllowedError'?'フォントへのアクセスが許可されませんでした。「フォントファイルを選ぶ」からも読み込めます。':`フォントを取得できませんでした：${error.message}`,true);
+    }
+  } finally {clearTimeout(waiting);if (queryID === fontQueryID) {fontQueryRunning = false; updateButtons();} }
 }
-$('#browse-local-fonts').addEventListener('click', browseLocalFonts);
+$('#browse-local-fonts').addEventListener('click', () => browseLocalFonts());
 $('#local-font-search').addEventListener('input', drawLocalFonts);
 $('#local-font-select').addEventListener('change', updateButtons);
 $('#import-local-fonts').addEventListener('click', async () => {
@@ -1573,18 +1654,9 @@ async function loadFontFiles(files) {
   loading = true; updateButtons();
   try {
     for (const file of files) {
-      if (file.size > 20 * 1024 * 1024) throw new Error("フォントは20 MB以内にしてください。");
-      const bytes=await file.arrayBuffer(), originalBytes=bytes.slice(0);
-      const result = await request("font", { bytes });
-      importedFonts.set(file.name,{name:file.name,family:result.family,bytes:originalBytes});
-      for (const selector of ["#font-family", "#japanese-font-family"]) {
-        const field=$(selector), option=[...field.options].find(option=>option.value===result.family);
-        if(option) option.textContent=result.family;
-        else field.add(new Option(result.family, result.family));
-      }
-      loadedFonts.add(result.family);
-      config.axes.fontFamily = result.family;
+      config.axes.fontFamily = await registerFontFile(file);
     }
+    fontAccessMessage='';
     drawControls(); changed(); return true;
   } catch (error) { status(error.message, "error"); fontMessage(error.message, true); return false; }
   finally { loading = false; updateButtons(); if (renderWanted) renderPreview(); }
