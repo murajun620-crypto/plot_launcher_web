@@ -1,5 +1,5 @@
-import { resetPresetUnitScales, unitConversion } from "./units.js?v=d8ff25173cf6";
-export const APP_VERSION = "2.3.0";
+import { resetPresetUnitScales, unitConversion } from "./units.js?v=ae3d43d96648";
+export const APP_VERSION = "2.3.1";
 
 // Labels are readable in the picker; values retain the existing unit syntax.
 export const UNIT_GROUPS = [
@@ -68,7 +68,7 @@ export function defaultAxes() {
     xLabelX: "", xLabelY: "", yLabelX: "", yLabelY: "", y2LabelX: "", y2LabelY: "",
     xLabel: "", yLabel: "", xUnit: "auto", yUnit: "auto", xScale: "linear", yScale: "linear",
     xMin: "", xMax: "", yMin: "", yMax: "", xStep: "", yStep: "", width: 4, height: 3,
-    xFitData: false, yFitData: false, y2FitData: false,
+    xFitData: true, yFitData: true, y2FitData: true,
     xMinorStep: "", yMinorStep: "",
     yColor: "auto", y2Color: "auto", y2Label: "", y2Unit: "auto", y2Scale: "linear",
     y2Min: "", y2Max: "", y2Step: "", y2MinorStep: "", y2LogFormat: "power", y2LabelPad: 2, y2TickPad: 0,
@@ -118,7 +118,7 @@ export function makeSettings(config, metadata, headerRow) {
   if (options.diameterColumn !== undefined) options.diameterColumnName = metadata.columns[Number(options.diameterColumn)]?.name;
   for (const fill of options.fills || []) for (const key of ["x", "upper", "lower"]) fill[`${key}Name`] = metadata.columns[Number(fill[key])]?.name;
   return {
-    format: "plotlauncher-web", version: 1,
+    format: "plotlauncher-web", version: 1, rangeDefaultsVersion: 1,
     data: { filename: metadata.filename, sheet: metadata.sheets[metadata.sheetIndex], headerRow },
     plotType: config.plotType || "General", options,
     axes: structuredClone(config.axes), annotations: structuredClone(config.annotations || []),
@@ -215,6 +215,11 @@ export function restoreSettings(document, metadata) {
       if (expected === "boolean" ? typeof value !== "boolean" : expected === "string" ? typeof value !== "string" : !["number", "string"].includes(typeof value)) throw new Error("設定JSONの軸設定を確認してください。");
       axes[key] = value;
     }
+  }
+  // Earlier automatic ranges saved the then-default false flag. Upgrade only
+  // automatic endpoints; numeric limits remain authoritative in the renderer.
+  if(document.rangeDefaultsVersion===undefined)for(const axis of ['x','y','y2']){
+    if(axes[axis+'Min']==='' || axes[axis+'Max']==='')axes[axis+'FitData']=true;
   }
   for (const key of ['hideXMinorTicks','hideYMinorTicks','hideY2MinorTicks']) {
     if (!Object.hasOwn(document.axes, key)) axes[key] = axes.hideMinorTicks;

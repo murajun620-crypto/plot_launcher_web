@@ -1,9 +1,9 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=d8ff25173cf6";
-import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=d8ff25173cf6";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=d8ff25173cf6";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=d8ff25173cf6";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=d8ff25173cf6";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=d8ff25173cf6";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=ae3d43d96648";
+import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=ae3d43d96648";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=ae3d43d96648";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=ae3d43d96648";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=ae3d43d96648";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=ae3d43d96648";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -268,7 +268,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=d8ff25173cf6", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=ae3d43d96648", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -459,6 +459,7 @@ function syncAxisAutomaticControls() {
 }
 function setAxisAutomatic(input, axis = input.dataset.axisName || $('#axis-editor-fields').dataset.axisName) {
   const mode = input.dataset.axisAuto, keys = mode === 'range' ? ['Min','Max'] : mode === 'minor' ? ['MinorStep'] : ['Step'];
+  if(mode==='range' && input.checked){config.axes[axis+'FitData']=true;$$(`[data-axis="${axis}FitData"]`).forEach(field=>field.checked=true);}
   const range = figureResult?.[`${axis}Range`] || [0,1];
   const spacing = figureResult?.tickSteps?.[axis];
   keys.forEach((key,index) => {
