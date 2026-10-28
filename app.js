@@ -1,9 +1,9 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=0e4061b155f0";
-import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=0e4061b155f0";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=0e4061b155f0";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=0e4061b155f0";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=0e4061b155f0";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=0e4061b155f0";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=d8ff25173cf6";
+import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=d8ff25173cf6";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=d8ff25173cf6";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=d8ff25173cf6";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=d8ff25173cf6";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=d8ff25173cf6";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -268,7 +268,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=0e4061b155f0", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=d8ff25173cf6", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -411,6 +411,7 @@ function openAxisEditor(axis, kind) {
     html = `<div class="field-grid"><label>軸の種類<select data-axis="${axis}Scale">${choiceOptions([['linear','線形'],['log','対数']],config.axes[`${axis}Scale`])}</select></label>${label('tickFontScale','フォントサイズ (pt)','number',`min="${axisControlValue('tickFontScale',.2)}" max="${axisControlValue('tickFontScale',3)}" step="0.1"`)}</div>` + tickLineControls(axis) +
       `<details class="settings-panel"><summary>範囲・目盛り間隔</summary><label class="log-format-field" data-log-format-for="${axis}">目盛りの表記<select data-axis="${axis}LogFormat" aria-label="${axisName(axis)}軸の対数目盛り表記">${choiceOptions([['power','累乗（10ⁿ）'],['decimal','数値（0.1、1、10）']],config.axes[`${axis}LogFormat`])}</select></label>` +
       `<label><input type="checkbox" data-axis-auto="range" ${automatic?'checked':''}>範囲を自動設定</label><div class="field-grid">${label(`${axis}Min`,'最小','number','step="any" placeholder="自動"')}${label(`${axis}Max`,'最大','number','step="any" placeholder="自動"')}</div>` +
+      `<label title="${axis==='x'?'両端をデータ範囲に合わせます。':'下端をデータ範囲に合わせ、上端にデータ幅の5%の余裕を付けます。対数軸は対数の幅を使います。'}誤差棒・近似線を含みます。オンで最小・最大の指定を解除し、その後の手動指定は優先します。"><input type="checkbox" data-axis="${axis}FitData" ${config.axes[`${axis}FitData`]?'checked':''}>データ範囲にフィット</label>` +
       `<label><input type="checkbox" data-axis-auto="ticks" data-axis-name="${axis}">主目盛りを自動設定</label>` +
       label(`${axis}Step`,'主目盛り間隔','number','step="any" placeholder="自動"') +
       `<label><input type="checkbox" data-axis-auto="minor" data-axis-name="${axis}">副目盛りを自動設定</label>` +
@@ -440,7 +441,7 @@ function syncAxisEditor() {
 function syncAxisAutomaticControls() {
   for (const axis of ['x','y','y2']) {
     const manual = ['Min','Max','Step','MinorStep'].some(key=>config.axes[`${axis}${key}`] !== '');
-    $(`#${axis}-settings-summary`).textContent = `${config.axes[`${axis}Scale`] === 'log' ? '対数' : '線形'}・${manual ? '指定あり' : '自動'}`;
+    $(`#${axis}-settings-summary`).textContent = `${config.axes[`${axis}Scale`] === 'log' ? '対数' : '線形'}・${manual ? '指定あり' : config.axes[`${axis}FitData`] ? 'フィット' : '自動'}`;
   }
   for (const field of $$('[data-log-format-for]')) field.hidden = config.axes[`${field.dataset.logFormatFor}Scale`] !== 'log';
   for (const input of $$('[data-axis-auto]')) {
@@ -632,17 +633,15 @@ function drawControls() {
 
 function processingControls(item) {
   const num=(key,label,extra='')=>`<label>${label}<input data-series-field="${key}" type="number" ${key==='referencePoint'?'step="1"':'step="any"'} value="${escapeHTML(item[key] ?? '')}" ${extra}></label>`;
+  const referenceMode=item.referenceMode || 'max';
+  const legacyReference=!['max','manual'].includes(referenceMode)?`<option value="${escapeHTML(referenceMode)}" selected hidden>保存時の基準</option>`:'';
   return `<details class="series-processing settings-panel"><summary>データ補正</summary>
-    <div class="field-grid" title="元データを保持し、Yは傾き補正→係数→電流密度→規格化→単位表示・Yオフセットの順に適用します。誤差棒も同じ倍率で変換します。"><label>Xに掛ける係数<input data-series-field="xFactor" type="number" step="0.1" value="${escapeHTML(item.xFactor ?? 1)}"></label><label>Yに掛ける係数<input data-series-field="yFactor" type="number" step="0.1" value="${escapeHTML(item.yFactor ?? 1)}"></label></div>
+    <div class="field-grid" title="元データを保持し、Yは傾き補正→係数→規格化→単位表示・Yオフセットの順に適用します。誤差棒も同じ倍率で変換します。面積で割る場合は、面積の逆数をY係数に入力します。"><label>Xに掛ける係数<input data-series-field="xFactor" type="number" step="0.1" value="${escapeHTML(item.xFactor ?? 1)}"></label><label>Yに掛ける係数<input data-series-field="yFactor" type="number" step="0.1" value="${escapeHTML(item.yFactor ?? 1)}"></label></div>
     <label><input data-series-field="detrend" type="checkbox" ${item.detrend?'checked':''}>傾きを補正</label>
     <div data-processing-for="detrend" title="空欄は全範囲。指定範囲で直線を当てはめ、先頭の有効点の高さを保って傾きだけを除きます。範囲は表示中のX値です。"><div class="field-grid">${num('detrendMin','補正範囲 X最小','placeholder="全範囲"')}${num('detrendMax','X最大','placeholder="全範囲"')}</div></div>
-    <label><input data-series-field="density" type="checkbox" ${item.density?'checked':''}>電流を電流密度へ変換</label>
-    <div data-processing-for="density"><label>元データの電流単位<select data-series-field="currentUnit">${choiceOptions(['A','mA','μA','nA','pA'].map(v=>[v,v]),item.currentUnit || 'A')}</select></label><div class="field-grid">${num('area','試料面積','min="1e-30"')}<label>面積の単位<select data-series-field="areaUnit">${choiceOptions([['cm2','cm²'],['mm2','mm²'],['m2','m²']],item.areaUnit || 'cm2')}</select></label></div></div>
     <label>規格化<select data-series-field="normalization">${choiceOptions([['none','なし'],['ratio','基準値で割る（Y/Y₀）'],['relative','相対変化（(Y−Y₀)/Y₀）']],item.normalization || 'none')}</select></label>
-    <div data-processing-for="normalization"><label>基準値の選び方<select data-series-field="referenceMode">${choiceOptions([['first','先頭の有効値'],['point','指定したデータ点'],['range','指定X範囲の平均'],['manual','値を入力']],item.referenceMode || 'first')}</select></label>
-    <div data-processing-for="point">${num('referencePoint','基準データ点（先頭=1）','min="1"')}</div>
-    <div data-processing-for="range" class="field-grid">${num('referenceMin','基準範囲 X最小')}${num('referenceMax','X最大')}</div>
-    <div data-processing-for="manual" title="傾き・係数・電流密度の補正後、単位表示倍率とYオフセットを加える前の基準値です。">${num('referenceValue','基準値 Y₀')}</div></div>
+    <div data-processing-for="normalization"><label title="最大値は、傾き補正・Y係数を適用した後の各系列から別々に求めます。">規格化の基準<select data-series-field="referenceMode">${legacyReference}${choiceOptions([['max','各系列の最大値'],['manual','値を入力']],referenceMode)}</select></label>
+    <div data-processing-for="manual" title="傾き補正・Y係数を掛けた後、表示単位とYオフセットを適用する前の基準値です。系列ごとに指定できます。">${num('referenceValue','基準値 Y₀')}</div></div>
   </details>`;
 }
 
@@ -664,7 +663,7 @@ function syncProcessingAxes() {
   for(const axis of ['y','y2']) {
     const items=config.series.filter(item=>(item.yAxis==='right'?'y2':'y')===axis);
     const kinds=new Set(items.map(item=>item.normalization && item.normalization!=='none'?'normalized':item.density?'density':'raw'));
-    const kind=kinds.size===1?[...kinds][0]:'raw';
+    const kind=kinds.has('normalized')?'normalized':kinds.size===1?[...kinds][0]:'raw';
     if(kind==='raw' || !items.length) {
       if(saved[axis]){Object.assign(config.axes,saved[axis].original);delete saved[axis];}
       continue;
@@ -1320,6 +1319,10 @@ function applyControlInput(event) {
     if (key === 'fontFamily' || key === 'japaneseFontFamily') return selectLocalFont(input);
     config.axes[key] = input.type === "checkbox" ? (input.dataset.invert === "true" ? !input.checked : input.checked) :
       input.dataset.axisBoolean === 'true' ? input.value === 'true' : axisConfigValue(key,input.type === 'range' ? Number(input.value) : input.value);
+    if (/^(x|y|y2)FitData$/.test(key) && input.checked) {
+      const axis=key.replace(/FitData$/,'');
+      for(const suffix of ['Min','Max']) {config.axes[axis+suffix]='';$$(`[data-axis="${axis}${suffix}"]`).forEach(field=>field.value='');}
+    }
     if (/^(x|y|y2)Scale$/.test(key) && input.value === 'log') {
       const axis=key.replace(/Scale$/,'');
       config.axes[`${axis}Step`] = config.axes[`${axis}MinorStep`] = '';
@@ -1874,7 +1877,7 @@ function openElementEditor(part,index=0) {
   const fields=$('#element-editor-fields');let sources=[],title='';
   if(part==='seriesAll') {
     if(!editableXY(config.plotType) || !config.series[index])return;
-    title='全系列の見た目';
+    title='全系列の設定';
   } else if(part==='trend') {
     const series=config.series[index];if(!series)return;
     title=`系列${index+1}「${series.name}」の近似線`;
@@ -1907,7 +1910,7 @@ function openElementEditor(part,index=0) {
     fields.innerHTML=`<div data-series-index="${index}" data-series-all-root><div class="field-grid">${SERIES_APPEARANCE_FIELDS.slice(0,3).map(control).join('')}</div><details class="settings-panel"><summary>線・点の詳細</summary><div class="field-grid">${SERIES_APPEARANCE_FIELDS.slice(3).map(control).join('')}</div></details>${processingControls(config.series[index])}</div>`;
   }
   fields.dataset.seriesEditorIndex=String(index);
-  if(['series','seriesAll'].includes(part) && editableXY(config.plotType))fields.innerHTML=`<label class="series-scope">見た目の適用先<select data-series-scope title="全系列では変更した項目だけをまとめて反映します。データ列・系列名・系列色は保持します。">${choiceOptions([['one',`この系列（${config.series[index].name}）`],['all',`全系列（${config.series.length}系列）`]],part==='seriesAll'?'all':'one')}</select></label>`+fields.innerHTML;
+  if(['series','seriesAll'].includes(part) && editableXY(config.plotType))fields.innerHTML=`<label class="series-scope">設定の適用先<select data-series-scope title="全系列では変更した項目だけをまとめて反映します。データ列・系列名・系列色は保持します。">${choiceOptions([['one',`この系列（${config.series[index].name}）`],['all',`全系列（${config.series.length}系列）`]],part==='seriesAll'?'all':'one')}</select></label>`+fields.innerHTML;
   if(part==='legend')fields.innerHTML=`<label><input data-axis="legend" type="checkbox" ${config.axes.legend?'checked':''}>凡例を表示</label><label>フォントサイズ (pt)<input data-axis="legendFontScale" type="number" min="${axisControlValue('legendFontScale',.2)}" max="${axisControlValue('legendFontScale',3)}" step="0.1" value="${axisControlValue('legendFontScale',config.axes.legendFontScale)}"></label><button type="button" class="button quiet" data-reset-legend>標準位置に戻す</button><details class="settings-panel"><summary>線・点の大きさ</summary><label>大きさ（標準比）<input data-axis="legendScale" type="number" min=".2" max="3" step="0.1" value="${config.axes.legendScale}"></label></details>`;
   if(part==='figureBackground')fields.innerHTML+=`<details class="settings-panel"><summary>グラフの種類・サイズ</summary><label>グラフのプリセット<select data-preview-preset>${choiceOptions(presets.map(item=>[item.id,item.label]),config.plotType)}</select></label><div class="field-grid">${['width','height'].map((key,i)=>`<label>${['軸領域の幅 (cm)','軸領域の高さ (cm)'][i]}<input data-axis="${key}" type="number" min=".5" max="24" step="0.1" value="${config.axes[key]}"></label>`).join('')}</div></details>`+$('#font-settings').outerHTML;
   if(part==='plotBackground')fields.innerHTML+=`<details class="settings-panel"><summary>グリッド</summary><label><input data-axis="grid" type="checkbox" ${config.axes.grid?'checked':''}>グリッドを表示</label></details>`;

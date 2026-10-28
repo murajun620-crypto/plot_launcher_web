@@ -433,8 +433,11 @@ class PlotEngine:
             raise ValueError("規格化の種類を確認してください。")
         if mode != "none":
             y = gain * raw_y + bias
-            reference_mode = item.get("referenceMode", "first")
-            if reference_mode == "first":
+            reference_mode = item.get("referenceMode", "max")
+            if reference_mode == "max":
+                if not valid.any(): raise ValueError("規格化の基準となる有効な点がありません。")
+                reference = float(np.max(y[valid]))
+            elif reference_mode == "first":
                 if not valid.any(): raise ValueError("規格化の基準となる有効な点がありません。")
                 reference = y[np.flatnonzero(valid)[0]]
             elif reference_mode == "point":
@@ -477,9 +480,6 @@ class PlotEngine:
         corrected = any(item.get("detrend") or item.get("density") or item.get("normalization", "none") != "none" or float(item.get("yFactor", 1)) != 1 or float(item.get("xFactor", 1)) != 1 for item in series)
         if corrected and preset in {"XPS Fit", "Particle Histogram", "bar_graph_general", "Raman 3D"}:
             raise ValueError("この専用グラフではデータ補正を解除してください。通常のXYグラフで補正できます。")
-        quantities = {"normalized" if item.get("normalization", "none") != "none" else "density" if item.get("density") else "raw" for item in series}
-        if len(quantities) > 1:
-            raise ValueError("同じY軸に元データと規格化・電流密度を混在できません。全系列へ適用するか、変換する系列を右Y軸へ移してください。")
         options = config.get("options", {})
         if not isinstance(options, dict):
             raise ValueError("専用プロットの設定を確認してください。")
@@ -614,7 +614,6 @@ class PlotEngine:
             processed_unit = None
             if item.get("normalization", "none") != "none":
                 processed_unit = str(axes.get("yUnit", "auto"))
-                if processed_unit not in {"auto", "", "%"}: raise ValueError("規格化したY軸の単位は「単位なし」または%を選んでください。")
                 processed_unit = "%" if processed_unit == "%" else ""
                 display_scale = 100 if processed_unit == "%" else 1
             elif item.get("density", False):
@@ -1043,6 +1042,50 @@ class PlotEngine:
             result.append(entry)
         return result
 
+    @staticmethod
+    def _fit_data_limits(axes, right_axes, config, primary_name):
+        """Fit X tightly; leave 5% headroom above Y data, errors and fits."""
+        settings = config.get("axes", {})
+        three_d = axes.name == "3d"
+        targets = [("x", axes, "x"), (primary_name, axes, "z" if three_d else "y")]
+        if right_axes is not None:
+            targets.append(("y2", right_axes, "y"))
+        for name, target, dimension in targets:
+            enabled = settings.get(name + "FitData", False)
+            if not isinstance(enabled, bool):
+                raise ValueError("データ範囲へのフィット設定を確認してください。")
+            if not enabled:
+                continue
+            sources = [axes, right_axes] if name == "x" and right_axes is not None else [target]
+            bounds = []
+            logarithmic = getattr(target, f"get_{dimension}scale")() == "log"
+            for source in sources:
+                box = source.zz_dataLim if dimension == "z" else source.xy_dataLim if three_d else source.dataLim
+                component = "x" if dimension == "z" else dimension
+                lo, hi = getattr(box, "interval" + component)
+                if logarithmic and lo <= 0:
+                    lo = getattr(box, "minpos" + component)
+                if np.isfinite([lo, hi]).all() and lo <= hi:
+                    bounds.append((float(lo), float(hi)))
+            if not bounds:
+                continue
+            lo, hi = min(pair[0] for pair in bounds), max(pair[1] for pair in bounds)
+            if lo == hi:
+                continue  # A constant value still needs a nonzero visible span.
+            if name != "x":
+                if logarithmic:
+                    log_upper = math.log(hi) + .05 * (math.log(hi) - math.log(lo))
+                    hi = math.exp(log_upper) if log_upper < math.log(np.finfo(float).max) else np.finfo(float).max
+                else:
+                    hi = min(hi + (.05 * hi - .05 * lo), np.finfo(float).max)
+            current = getattr(target, f"get_{dimension}lim")()
+            lower = number(settings.get(name + "Min", ""), "軸の最小値", optional=True)
+            upper = number(settings.get(name + "Max", ""), "軸の最大値", optional=True)
+            limits = (lo if lower is None else lower, hi if upper is None else upper)
+            if current[0] > current[1]:
+                limits = limits[::-1]
+            getattr(target, f"set_{dimension}lim")(limits)
+
     @micro_text_rendering()
     def render(self, config):
         preset = config.get("plotType", "General")
@@ -1162,6 +1205,7 @@ class PlotEngine:
                         fits += right_fits; equation_specs += right_equations
                         # Right-side fits may extend the shared X range.
                         plot_utils.ensure_axis_limits_include_data(axes)
+                self._fit_data_limits(axes, right_axes, config, primary_name)
                 if preset == "Raman 3D":
                     options = config.get("options", {})
                     axes.view_init(elev=number(options.get("elevation", 24), "仰角", minimum=-180, maximum=180), azim=number(options.get("azimuth", -66), "方位角", minimum=-360, maximum=360))

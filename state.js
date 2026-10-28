@@ -1,5 +1,5 @@
-import { resetPresetUnitScales } from "./units.js?v=0e4061b155f0";
-export const APP_VERSION = "2.2.0";
+import { resetPresetUnitScales, unitConversion } from "./units.js?v=d8ff25173cf6";
+export const APP_VERSION = "2.3.0";
 
 // Labels are readable in the picker; values retain the existing unit syntax.
 export const UNIT_GROUPS = [
@@ -68,6 +68,7 @@ export function defaultAxes() {
     xLabelX: "", xLabelY: "", yLabelX: "", yLabelY: "", y2LabelX: "", y2LabelY: "",
     xLabel: "", yLabel: "", xUnit: "auto", yUnit: "auto", xScale: "linear", yScale: "linear",
     xMin: "", xMax: "", yMin: "", yMax: "", xStep: "", yStep: "", width: 4, height: 3,
+    xFitData: false, yFitData: false, y2FitData: false,
     xMinorStep: "", yMinorStep: "",
     yColor: "auto", y2Color: "auto", y2Label: "", y2Unit: "auto", y2Scale: "linear",
     y2Min: "", y2Max: "", y2Step: "", y2MinorStep: "", y2LogFormat: "power", y2LabelPad: 2, y2TickPad: 0,
@@ -89,7 +90,7 @@ export function defaultAxes() {
 }
 
 export function createSeries(x, y, name, index = 0, plotType = "General") {
-  return { x, y, name, yAxis: "left", visible: true, color: plotType === "Polishing Rate" && index === 2 ? "#000000" : COLORS[index % COLORS.length], scatterColor: "auto", mode: ['Polishing Rate','Waviness'].includes(plotType) ? "line+scatter" : "line", lineWidth: 1, lineStyle: "-", lineAlpha: 1, marker: "o", markerSize: 18, markerEdgeColor: "auto", markerFaceColor: "auto", markerEdgeAlpha: 0.8, markerFaceAlpha: 0.8, xOffset: 0, yOffset: 0, error: "", errorMode: "auto", errorMin: "", errorMax: "", errorPlus: "", errorMinus: "", trendType: "none", trendOrigin: false, trendDegree: 2, trendEquation: true, trendColor: "auto", trendStyle: "--", trendWidth: 1, trendFontSize: 6, trendDigits: 4, trendX: "", trendY: "", xFactor:1, yFactor:1, detrend:false, detrendMin:'', detrendMax:'', density:false, currentUnit:'A', area:1, areaUnit:'cm2', normalization:'none', referenceMode:'first', referencePoint:1, referenceMin:'', referenceMax:'', referenceValue:1 };
+  return { x, y, name, yAxis: "left", visible: true, color: plotType === "Polishing Rate" && index === 2 ? "#000000" : COLORS[index % COLORS.length], scatterColor: "auto", mode: ['Polishing Rate','Waviness'].includes(plotType) ? "line+scatter" : "line", lineWidth: 1, lineStyle: "-", lineAlpha: 1, marker: "o", markerSize: 18, markerEdgeColor: "auto", markerFaceColor: "auto", markerEdgeAlpha: 0.8, markerFaceAlpha: 0.8, xOffset: 0, yOffset: 0, error: "", errorMode: "auto", errorMin: "", errorMax: "", errorPlus: "", errorMinus: "", trendType: "none", trendOrigin: false, trendDegree: 2, trendEquation: true, trendColor: "auto", trendStyle: "--", trendWidth: 1, trendFontSize: 6, trendDigits: 4, trendX: "", trendY: "", xFactor:1, yFactor:1, detrend:false, detrendMin:'', detrendMax:'', density:false, currentUnit:'A', area:1, areaUnit:'cm2', normalization:'none', referenceMode:'max', referencePoint:1, referenceMin:'', referenceMax:'', referenceValue:1 };
 }
 
 export function initialSeries(columns, plotType = 'General') {
@@ -230,7 +231,7 @@ export function restoreSettings(document, metadata) {
         }
         if (key === 'yAxis' && !['left','right'].includes(item[key])) throw new Error("設定JSONのY軸を確認してください。");
         if (key === 'trendType' && !['none','linear','polynomial','exponential','logarithmic','power'].includes(item[key])) throw new Error("設定JSONの近似線を確認してください。");
-        if (key === 'normalization' && !['none','ratio','relative'].includes(item[key]) || key === 'referenceMode' && !['first','point','range','manual'].includes(item[key]) || key === 'currentUnit' && !['A','mA','μA','nA','pA'].includes(item[key]) || key === 'areaUnit' && !['cm2','mm2','m2'].includes(item[key])) throw new Error('設定JSONのデータ補正を確認してください。');
+        if (key === 'normalization' && !['none','ratio','relative'].includes(item[key]) || key === 'referenceMode' && !['max','manual','first','point','range'].includes(item[key]) || key === 'currentUnit' && !['A','mA','μA','nA','pA'].includes(item[key]) || key === 'areaUnit' && !['cm2','mm2','m2'].includes(item[key])) throw new Error('設定JSONのデータ補正を確認してください。');
         if (!["string", "number"].includes(typeof item[key])) throw new Error("設定JSONの系列設定を確認してください。");
         result[key] = item[key];
       }
@@ -261,6 +262,22 @@ export function restoreSettings(document, metadata) {
     if (!Array.isArray(document.annotations) || document.annotations.length > 200) throw new Error("設定JSONの注釈を確認してください。");
     restored.annotations = structuredClone(document.annotations);
   }
+  // Preserve older density projects as the equivalent, visible Y multiplier.
+  for (const item of series) if (item.density) {
+    const axis=item.yAxis==='right'?'y2':'y', normalized=item.normalization!=='none';
+    const area=Number(item.area)*({cm2:1,mm2:.01,m2:1e4})[item.areaUnit];
+    let factor=Number(item.yFactor)*unitConversion(item.currentUnit,'A')/area;
+    if(!normalized) {
+      const unit=axes[axis+'Unit']==='auto'?'mA/cm$^2$':axes[axis+'Unit'];
+      const display=unitConversion('A/cm$^2$',unit);
+      if(!display)throw new Error('保存済みの電流密度の単位を確認してください。');
+      factor*=display/Number(axes[axis+'UnitScale']);axes[axis+'Unit']=unit;
+    }
+    if(!(area>0)||!Number.isFinite(factor))throw new Error('保存済みの係数・面積を確認してください。');
+    item.yFactor=Number(factor.toPrecision(15));item.density=false;
+    if(!axes[axis+'Label'])axes[axis+'Label']=normalized?'Normalized value':'Current density';
+  }
+  for(const [axis,snapshot] of Object.entries(restored.options.processingAxes || {}))if(snapshot.kind==='density')delete restored.options.processingAxes[axis];
   return restored;
 }
 
