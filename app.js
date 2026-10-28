@@ -1,9 +1,9 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=d874195515b6";
-import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=d874195515b6";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=d874195515b6";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=d874195515b6";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=d874195515b6";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=d874195515b6";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=40aa52a14f75";
+import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=40aa52a14f75";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=40aa52a14f75";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=40aa52a14f75";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=40aa52a14f75";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=40aa52a14f75";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -268,7 +268,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=d874195515b6", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=40aa52a14f75", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -411,7 +411,7 @@ function openAxisEditor(axis, kind) {
     html = `<div class="field-grid"><label>軸の種類<select data-axis="${axis}Scale">${choiceOptions([['linear','線形'],['log','対数']],config.axes[`${axis}Scale`])}</select></label>${label('tickFontScale','フォントサイズ (pt)','number',`min="${axisControlValue('tickFontScale',.2)}" max="${axisControlValue('tickFontScale',3)}" step="0.1"`)}</div>` + tickLineControls(axis) +
       `<details class="settings-panel"><summary>範囲・目盛り間隔</summary><label class="log-format-field" data-log-format-for="${axis}">目盛りの表記<select data-axis="${axis}LogFormat" aria-label="${axisName(axis)}軸の対数目盛り表記">${choiceOptions([['power','累乗（10ⁿ）'],['decimal','数値（0.1、1、10）']],config.axes[`${axis}LogFormat`])}</select></label>` +
       `<label><input type="checkbox" data-axis-auto="range" ${automatic?'checked':''}>範囲を自動設定</label><div class="field-grid">${label(`${axis}Min`,'最小','number','step="any" placeholder="自動"')}${label(`${axis}Max`,'最大','number','step="any" placeholder="自動"')}</div>` +
-      `<label title="${axis==='x'?'両端をデータ範囲に合わせます。':'下端をデータ範囲に合わせ、上端にデータ幅の5%の余裕を付けます。対数軸は対数の幅を使います。'}誤差棒・近似線を含みます。オンで最小・最大の指定を解除し、その後の手動指定は優先します。"><input type="checkbox" data-axis="${axis}FitData" ${config.axes[`${axis}FitData`]?'checked':''}>データ範囲にフィット</label>` +
+      `<label title="${axis==='x'?'両端をデータ範囲に合わせます。':'線形軸は下端を0（負の値がある場合は最小値）に合わせ、上端にデータ幅の5%の余裕を付けます。対数軸は正のデータ範囲と対数幅を使います。'}誤差棒・近似線を含みます。オンで最小・最大の指定を解除し、その後の手動指定は優先します。"><input type="checkbox" data-axis="${axis}FitData" ${config.axes[`${axis}FitData`]?'checked':''}>データ範囲にフィット</label>` +
       `<label><input type="checkbox" data-axis-auto="ticks" data-axis-name="${axis}">主目盛りを自動設定</label>` +
       label(`${axis}Step`,'主目盛り間隔','number','step="any" placeholder="自動"') +
       `<label><input type="checkbox" data-axis-auto="minor" data-axis-name="${axis}">副目盛りを自動設定</label>` +

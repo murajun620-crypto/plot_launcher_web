@@ -1047,7 +1047,7 @@ class PlotEngine:
 
     @staticmethod
     def _fit_data_limits(axes, right_axes, config, primary_name):
-        """Fit X tightly; leave 5% headroom above Y data, errors and fits."""
+        """Fit X tightly; start nonnegative linear Y at zero with 5% headroom."""
         settings = config.get("axes", {})
         three_d = axes.name == "3d"
         targets = [("x", axes, "x"), (primary_name, axes, "z" if three_d else "y")]
@@ -1073,15 +1073,19 @@ class PlotEngine:
             if not bounds:
                 continue
             lo, hi = min(pair[0] for pair in bounds), max(pair[1] for pair in bounds)
+            current = getattr(target, f"get_{dimension}lim")()
             if lo == hi:
-                continue  # A constant value still needs a nonzero visible span.
-            if name != "x":
+                if name == "x" or logarithmic or lo < 0:
+                    continue  # Keep a nonzero span for constant X/log/negative data.
+                hi = min(hi * 1.05, np.finfo(float).max) if hi > 0 else max(current)
+                lo = 0.0
+            elif name != "x":
                 if logarithmic:
                     log_upper = math.log(hi) + .05 * (math.log(hi) - math.log(lo))
                     hi = math.exp(log_upper) if log_upper < math.log(np.finfo(float).max) else np.finfo(float).max
                 else:
                     hi = min(hi + (.05 * hi - .05 * lo), np.finfo(float).max)
-            current = getattr(target, f"get_{dimension}lim")()
+                    lo = min(lo, 0.0)
             lower = number(settings.get(name + "Min", ""), "軸の最小値", optional=True)
             upper = number(settings.get(name + "Max", ""), "軸の最大値", optional=True)
             limits = (lo if lower is None else lower, hi if upper is None else upper)
