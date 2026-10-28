@@ -1,9 +1,9 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=ae3d43d96648";
-import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=ae3d43d96648";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=ae3d43d96648";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=ae3d43d96648";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=ae3d43d96648";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=ae3d43d96648";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=682a1adffd5b";
+import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=682a1adffd5b";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=682a1adffd5b";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=682a1adffd5b";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=682a1adffd5b";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=682a1adffd5b";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -268,7 +268,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=ae3d43d96648", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=682a1adffd5b", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {

@@ -1,5 +1,5 @@
-import { resetPresetUnitScales, unitConversion } from "./units.js?v=ae3d43d96648";
-export const APP_VERSION = "2.3.1";
+import { resetPresetUnitScales, unitConversion } from "./units.js?v=682a1adffd5b";
+export const APP_VERSION = "2.3.2";
 
 // Labels are readable in the picker; values retain the existing unit syntax.
 export const UNIT_GROUPS = [
@@ -375,10 +375,11 @@ function fromDesktopSettings(saved, metadata) {
 export function sampleCSV() {
   const rows = ["Potential/V,Sample A,Sample B,Sample C"];
   for (let index = 0; index <= 180; index++) {
-    const x = -0.3 + index / 150;
+    const x = index / 150;
     const values = [0, 1, 2].map(series => {
-      const center = 0.32 + series * 0.07;
-      return 0.012 + (0.22 + series * 0.045) * Math.exp(-(((x - center) / (0.16 + series * 0.01)) ** 2)) + 0.008 * x;
+      const center = 0.62 + series * 0.07;
+      const onset = 1 - Math.exp(-x / 0.04);
+      return (0.22 + series * 0.045) * Math.exp(-(((x - center) / (0.16 + series * 0.01)) ** 2)) * onset + 0.008 * x;
     });
     rows.push([x.toFixed(5), ...values.map(value => value.toFixed(7))].join(","));
   }
