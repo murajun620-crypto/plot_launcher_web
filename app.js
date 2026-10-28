@@ -1,9 +1,9 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=682a1adffd5b";
-import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=682a1adffd5b";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=682a1adffd5b";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=682a1adffd5b";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=682a1adffd5b";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=682a1adffd5b";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=2536fde5e701";
+import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=2536fde5e701";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=2536fde5e701";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=2536fde5e701";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=2536fde5e701";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=2536fde5e701";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -268,7 +268,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=682a1adffd5b", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=2536fde5e701", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -634,10 +634,11 @@ function drawControls() {
 
 function processingControls(item) {
   const num=(key,label,extra='')=>`<label>${label}<input data-series-field="${key}" type="number" ${key==='referencePoint'?'step="1"':'step="any"'} value="${escapeHTML(item[key] ?? '')}" ${extra}></label>`;
+  const factor=(key,label)=>`<label title="数値または分数を入力できます（例：0.5、1/2、1/0.25）。">${label}<input data-series-field="${key}" type="text" spellcheck="false" placeholder="例：1/2" value="${escapeHTML(item[key] ?? 1)}"></label>`;
   const referenceMode=item.referenceMode || 'max';
   const legacyReference=!['max','manual'].includes(referenceMode)?`<option value="${escapeHTML(referenceMode)}" selected hidden>保存時の基準</option>`:'';
   return `<details class="series-processing settings-panel"><summary>データ補正</summary>
-    <div class="field-grid" title="元データを保持し、Yは傾き補正→係数→規格化→単位表示・Yオフセットの順に適用します。誤差棒も同じ倍率で変換します。面積で割る場合は、面積の逆数をY係数に入力します。"><label>Xに掛ける係数<input data-series-field="xFactor" type="number" step="0.1" value="${escapeHTML(item.xFactor ?? 1)}"></label><label>Yに掛ける係数<input data-series-field="yFactor" type="number" step="0.1" value="${escapeHTML(item.yFactor ?? 1)}"></label></div>
+    <div class="field-grid" title="元データを保持し、Yは傾き補正→係数→規格化→単位表示・Yオフセットの順に適用します。誤差棒も同じ倍率で変換します。面積で割る場合は、面積の逆数をY係数に入力します。">${factor('xFactor','Xに掛ける係数')}${factor('yFactor','Yに掛ける係数')}</div>
     <label><input data-series-field="detrend" type="checkbox" ${item.detrend?'checked':''}>傾きを補正</label>
     <div data-processing-for="detrend" title="空欄は全範囲。指定範囲で直線を当てはめ、先頭の有効点の高さを保って傾きだけを除きます。範囲は表示中のX値です。"><div class="field-grid">${num('detrendMin','補正範囲 X最小','placeholder="全範囲"')}${num('detrendMax','X最大','placeholder="全範囲"')}</div></div>
     <label>規格化<select data-series-field="normalization">${choiceOptions([['none','なし'],['ratio','基準値で割る（Y/Y₀）'],['relative','相対変化（(Y−Y₀)/Y₀）']],item.normalization || 'none')}</select></label>
@@ -1361,10 +1362,16 @@ function applyControlInput(event) {
   }
   else if (input.dataset.seriesField) {
     const key=input.dataset.seriesField,index=Number(input.closest('[data-series-index]').dataset.seriesIndex);
+    const coefficient=['xFactor','yFactor'].includes(key) ? parseCoefficient(input.value) : undefined;
+    if (coefficient !== undefined) {
+      input.setCustomValidity?.(coefficient === null ? '数値または分数（例：1/2）を入力してください。分母を0にはできません。' : '');
+      input.setAttribute('aria-invalid',String(coefficient === null));
+      if (coefficient === null) return;
+    }
     const indices=input.dataset.seriesAll==='true' && [...SERIES_APPEARANCE_FIELDS,...PROCESSING_FIELDS].includes(key)?config.series.map((_,i)=>i):[index];
     for(const index of indices) {
-      config.series[index][key] = input.type==='checkbox'?input.checked:key==='trendFontSize'?Number((Number(input.value)/Number(config.axes.fontScale)).toPrecision(12)):input.type==='range'?Number(input.value):input.value;
-      $$(`[data-series-index="${index}"] [data-series-field="${key}"]`).forEach(field=>{if(field!==input){field.value=input.value;field.checked=input.checked;}});
+      config.series[index][key] = coefficient ?? (input.type==='checkbox'?input.checked:key==='trendFontSize'?Number((Number(input.value)/Number(config.axes.fontScale)).toPrecision(12)):input.type==='range'?Number(input.value):input.value);
+      $$(`[data-series-index="${index}"] [data-series-field="${key}"]`).forEach(field=>{if(field!==input){field.value=coefficient ?? input.value;field.checked=input.checked;if(coefficient!==undefined){field.setCustomValidity?.('');field.setAttribute('aria-invalid','false');}}});
     }
     if (input.dataset.seriesField === 'errorMode') syncSeriesErrorControls();
     if (input.dataset.seriesField === 'yAxis') syncYAxesControls();

@@ -1,5 +1,17 @@
-import { resetPresetUnitScales, unitConversion } from "./units.js?v=682a1adffd5b";
-export const APP_VERSION = "2.3.2";
+import { resetPresetUnitScales, unitConversion } from "./units.js?v=2536fde5e701";
+export const APP_VERSION = "2.3.3";
+
+// Accept one numeric value or fraction without evaluating JavaScript expressions.
+export function parseCoefficient(value) {
+  const text = String(value).trim();
+  const numeric = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i;
+  const parts = text.split('/').map(part => part.trim());
+  if (text.length > 100 || parts.length > 2 || parts.some(part => !numeric.test(part) || !Number.isFinite(Number(part)))) return null;
+  if (parts.length === 1) return parts[0];
+  if (Number(parts[1]) === 0) return null;
+  const result = Number(parts[0]) / Number(parts[1]);
+  return Number.isFinite(result) ? String(result) : null;
+}
 
 // Labels are readable in the picker; values retain the existing unit syntax.
 export const UNIT_GROUPS = [
