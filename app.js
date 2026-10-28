@@ -1,9 +1,9 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=cd41c82c9af6";
-import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=cd41c82c9af6";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=cd41c82c9af6";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=cd41c82c9af6";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=cd41c82c9af6";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=cd41c82c9af6";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=0e4061b155f0";
+import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=0e4061b155f0";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=0e4061b155f0";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=0e4061b155f0";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=0e4061b155f0";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint } from "./state.js?v=0e4061b155f0";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -19,6 +19,7 @@ const axisConfigValue = (key, value) => isLabelPadding(key) ? Number((Number(val
 const editableXY = type => !['XPS Fit','Particle Histogram','bar_graph_general','Raman 3D'].includes(type);
 const seriesControlValue = (key,value) => key==='trendFontSize' ? Number((Number(value || 6)*Number(config.axes.fontScale)).toPrecision(12)) : value;
 const SERIES_APPEARANCE_FIELDS = ['mode','lineWidth','markerSize','lineStyle','marker','lineAlpha','scatterColor','markerEdgeColor','markerFaceColor','markerEdgeAlpha','markerFaceAlpha'];
+const PROCESSING_FIELDS = ['xFactor','yFactor','detrend','detrendMin','detrendMax','density','currentUnit','area','areaUnit','normalization','referenceMode','referencePoint','referenceMin','referenceMax','referenceValue'];
 const opacityPercent = value => `${Number((Number(value) * 100).toFixed(2))}%`;
 const opacityControl = (attributes, label, value = 1) => `<label class="opacity-control" title="0%は透明、100%は不透明。←／→キーで1%ずつ調整できます。"><span class="opacity-caption">${escapeHTML(label)}<output aria-hidden="true">${opacityPercent(value)}</output></span><input ${attributes} data-opacity type="range" min="0" max="1" step="0.01" value="${escapeHTML(value)}" aria-label="${escapeHTML(label)}" aria-valuetext="${opacityPercent(value)}"></label>`;
 const UNIT_HINT = '互換性のある単位をリストから選ぶと数値も換算します。自由入力は表記のみを変更します。元データは保持します。';
@@ -196,6 +197,8 @@ function updateButtons() {
   $("#drop-zone").disabled = !engineReady || busy;
   $("#data-drop-area").setAttribute("aria-disabled", String(!engineReady || busy));
   $("#sample-data").disabled = !engineReady || busy;
+  $('#add-data').hidden=!sourceData;
+  $('#add-data').disabled=!engineReady || busy;
   $("#paste-data").disabled = !engineReady || busy;
   $("#plot-fields").disabled = !engineReady || !metadata || busy;
   $('#preset-fields').disabled = !engineReady || !metadata || busy;
@@ -247,7 +250,7 @@ function request(operation, args) {
   return new Promise((resolve, reject) => {
     const id = ++requestID;
     requests.set(id, { resolve, reject });
-    worker.postMessage({ id, operation, args }, [args.bytes, ...(args.fonts || []).map(font => font.bytes)].filter(Boolean));
+    worker.postMessage({ id, operation, args }, [...new Set([args.bytes, ...(args.files || []).map(file=>file.bytes), ...(args.fonts || []).map(font => font.bytes)].filter(Boolean))]);
   });
 }
 
@@ -265,7 +268,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=cd41c82c9af6", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=0e4061b155f0", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -526,12 +529,15 @@ function drawPresetOptions() {
 }
 
 function changePlotType(type) {
+  if(metadata?.sources && !editableXY(type)){status('複数ファイルの重ね描きでは通常のXYグラフを選んでください。','error');$('#plot-type').value=config.plotType;return;}
   applyPreset(config,presets.find(item=>item.id===type));
+  delete config.options.processingAxes;
+  if(!editableXY(config.plotType))for(const item of config.series)for(const key of PROCESSING_FIELDS)item[key]=createSeries(item.x,item.y,item.name)[key];
   if(!editableXY(config.plotType))config.series.forEach(item=>{item.mode='line';item.errorMode='none';item.yAxis='left';});
   if(['XPS Fit','Particle Histogram','bar_graph_general','Raman 3D'].includes(config.plotType))config.series.forEach(item=>item.trendType='none');
   if(config.plotType==='Raman 3D') config.series=initialSeries(metadata.columns, config.plotType);
   if(config.plotType==='Particle Histogram')config.options.diameterColumn=Math.min(2,metadata.columns.length-1);
-  drawControls();changed();
+  drawControls();syncProcessingAxes();changed();
 }
 $("#plot-type").addEventListener("change",event=>changePlotType(event.target.value));
 $("#preset-options").addEventListener('click',event=>{
@@ -558,6 +564,7 @@ $("#apply-offsets").addEventListener('click',()=>{
 
 function drawControls() {
   $("#plot-type").value = config.plotType || "General";
+  for(const option of $('#plot-type').options)option.disabled=!!metadata?.sources && !editableXY(option.value);
   drawPresetOptions();
   syncFontChoices();
   const xpsFit=config.plotType==='XPS Fit';
@@ -592,7 +599,7 @@ function drawControls() {
           <div class="field-grid">${input('trendX','数式の横位置（左0・右1）','min="-10" max="10" step="0.01" placeholder="自動"')}${input('trendY','数式の縦位置（下0・上1）','min="-10" max="10" step="0.01" placeholder="自動"')}</div>
           <button type="button" class="button quiet" data-reset-trend="${index}">数式の位置を自動に戻す</button>
         </details>
-      </details></div>`;
+      </details>${processingControls(series)}</div>`;
   }).join("") || '<p class="empty-series">「系列を追加」でX列とY列を選んでください。</p>';
   $$('[data-axis]').forEach(input => {
     const value = config.axes[input.dataset.axis];
@@ -606,6 +613,7 @@ function drawControls() {
   syncSeriesErrorControls();
   syncYAxesControls();
   syncTrendControls();
+  syncProcessingControls();
   const seriesSection=$('#series-list').closest('.control-section');if(seriesSection)seriesSection.hidden=false;
   $('#add-series').hidden=xpsFit || histogram;
   $('#series-colormap').hidden=xpsFit || histogram;
@@ -620,6 +628,58 @@ function drawControls() {
   $$('[data-axis="xLabel"],[data-axis="yLabel"],[data-axis="y2Label"],[data-axis="xUnit"],[data-axis="yUnit"],[data-axis="y2Unit"],.series-label').forEach(input=>input.title=MICRO_HINT);
   enhanceColorInputs();
   $$('[data-preview-preset]').forEach(input=>input.value=config.plotType);
+}
+
+function processingControls(item) {
+  const num=(key,label,extra='')=>`<label>${label}<input data-series-field="${key}" type="number" ${key==='referencePoint'?'step="1"':'step="any"'} value="${escapeHTML(item[key] ?? '')}" ${extra}></label>`;
+  return `<details class="series-processing settings-panel"><summary>データ補正</summary>
+    <div class="field-grid" title="元データを保持し、Yは傾き補正→係数→電流密度→規格化→単位表示・Yオフセットの順に適用します。誤差棒も同じ倍率で変換します。"><label>Xに掛ける係数<input data-series-field="xFactor" type="number" step="0.1" value="${escapeHTML(item.xFactor ?? 1)}"></label><label>Yに掛ける係数<input data-series-field="yFactor" type="number" step="0.1" value="${escapeHTML(item.yFactor ?? 1)}"></label></div>
+    <label><input data-series-field="detrend" type="checkbox" ${item.detrend?'checked':''}>傾きを補正</label>
+    <div data-processing-for="detrend" title="空欄は全範囲。指定範囲で直線を当てはめ、先頭の有効点の高さを保って傾きだけを除きます。範囲は表示中のX値です。"><div class="field-grid">${num('detrendMin','補正範囲 X最小','placeholder="全範囲"')}${num('detrendMax','X最大','placeholder="全範囲"')}</div></div>
+    <label><input data-series-field="density" type="checkbox" ${item.density?'checked':''}>電流を電流密度へ変換</label>
+    <div data-processing-for="density"><label>元データの電流単位<select data-series-field="currentUnit">${choiceOptions(['A','mA','μA','nA','pA'].map(v=>[v,v]),item.currentUnit || 'A')}</select></label><div class="field-grid">${num('area','試料面積','min="1e-30"')}<label>面積の単位<select data-series-field="areaUnit">${choiceOptions([['cm2','cm²'],['mm2','mm²'],['m2','m²']],item.areaUnit || 'cm2')}</select></label></div></div>
+    <label>規格化<select data-series-field="normalization">${choiceOptions([['none','なし'],['ratio','基準値で割る（Y/Y₀）'],['relative','相対変化（(Y−Y₀)/Y₀）']],item.normalization || 'none')}</select></label>
+    <div data-processing-for="normalization"><label>基準値の選び方<select data-series-field="referenceMode">${choiceOptions([['first','先頭の有効値'],['point','指定したデータ点'],['range','指定X範囲の平均'],['manual','値を入力']],item.referenceMode || 'first')}</select></label>
+    <div data-processing-for="point">${num('referencePoint','基準データ点（先頭=1）','min="1"')}</div>
+    <div data-processing-for="range" class="field-grid">${num('referenceMin','基準範囲 X最小')}${num('referenceMax','X最大')}</div>
+    <div data-processing-for="manual" title="傾き・係数・電流密度の補正後、単位表示倍率とYオフセットを加える前の基準値です。">${num('referenceValue','基準値 Y₀')}</div></div>
+  </details>`;
+}
+
+function syncProcessingControls() {
+  $$('.series-processing').forEach(panel=>{
+    panel.hidden=!editableXY(config.plotType);
+    const all=!!panel.closest('[data-series-all-root]');
+    const items=all?config.series:[config.series[Number(panel.closest('[data-series-index]')?.dataset.seriesIndex)]];
+    panel.querySelectorAll('[data-processing-for]').forEach(group=>{
+      const key=group.dataset.processingFor;
+      group.hidden=!items.some(item=>item && (key==='detrend'||key==='density'?item[key]:key==='normalization'?item.normalization!=='none':item.normalization!=='none'&&item.referenceMode===key));
+    });
+  });
+}
+
+function syncProcessingAxes() {
+  config.options ||= {};
+  const saved=config.options.processingAxes ||= {};
+  for(const axis of ['y','y2']) {
+    const items=config.series.filter(item=>(item.yAxis==='right'?'y2':'y')===axis);
+    const kinds=new Set(items.map(item=>item.normalization && item.normalization!=='none'?'normalized':item.density?'density':'raw'));
+    const kind=kinds.size===1?[...kinds][0]:'raw';
+    if(kind==='raw' || !items.length) {
+      if(saved[axis]){Object.assign(config.axes,saved[axis].original);delete saved[axis];}
+      continue;
+    }
+    if(saved[axis]?.kind===kind)continue;
+    const original=saved[axis]?.original || Object.fromEntries(['Label','Unit','UnitScale','Min','Max','Step','MinorStep'].map(key=>[axis+key,config.axes[axis+key]]));
+    saved[axis]={kind,original};
+    config.axes[axis+'Label']=kind==='density'?'Current density':'Normalized value';
+    config.axes[axis+'Unit']=kind==='density'?'mA/cm$^2$':'';
+    config.axes[axis+'UnitScale']=1;
+    for(const suffix of ['Min','Max','Step','MinorStep'])config.axes[axis+suffix]='';
+  }
+  if(!Object.keys(saved).length)delete config.options.processingAxes;
+  $$('[data-axis]').forEach(input=>{if(['y','y2'].some(axis=>['Label','Unit','Min','Max','Step','MinorStep'].some(suffix=>input.dataset.axis===axis+suffix)))input.value=config.axes[input.dataset.axis];});
+  syncUnitControls();syncAxisAutomaticControls();
 }
 
 function syncYAxesControls() {
@@ -669,6 +729,7 @@ function drawAnnotations() {
 }
 
 function drawMetadata() {
+  drawSources();
   $("#file-summary").hidden = false;
   $("#file-name").textContent = metadata.filename;
   $("#file-stats").textContent = `${metadata.rowCount.toLocaleString()} 行 · ${metadata.columns.length} 列`;
@@ -707,7 +768,66 @@ function initialSheetConfig(data) {
   if (inferred==='XPS Fit') result.series=[createSeries(0,1,data.columns[1]?.name || 'Raw')];
   if (inferred==='Roughness') result.series.forEach(item=>item.mode='line+scatter');
   if (inferred==='Particle Histogram') result.options.diameterColumn=Math.min(2,data.columns.length-1);
+  if(data.groups){
+    result.series=data.groups.flatMap(group=>initialSeries(group.columns.map(column=>({...column,name:column.originalName})),editableXY(group.plotType)?group.plotType:'General').map(item=>({...item,name:`${safeStem(group.filename)} · ${item.name}`}))).slice(0,32);
+    for(const [i,item] of result.series.entries())item.color=COLORS[i%COLORS.length];
+    const first=result.series[0];
+    if(first)for(const axis of ['x','y']){
+      const column=data.columns[first[axis]].originalName,split=column.lastIndexOf('/');
+      result.axes[axis+'Label']=split<0?column:column.slice(0,split);
+      result.axes[axis+'Unit']=split<0?'':column.slice(split+1);
+    }
+  }
+  for(const item of result.series){const name=data.columns[item.y]?.originalName || data.columns[item.y]?.name || '';const unit=name.match(/(?:\/|\()\s*(pA|nA|μA|µA|uA|mA|A)\s*\)?$/)?.[1];if(unit)item.currentUnit=unit.replace(/µ|u/,'μ');}
   return result;
+}
+
+function combinedConfig(data, previousMetadata, previousConfig) {
+  const next=initialSheetConfig(data);
+  if(!previousMetadata || !editableXY(previousConfig.plotType))return next;
+  next.axes=structuredClone(previousConfig.axes);next.options=structuredClone(previousConfig.options || {});next.annotations=structuredClone(previousConfig.annotations || []);next.plotType=previousConfig.plotType;
+  const match=index=>data.columns.find(column=>column.name===previousMetadata.columns[index]?.name || !previousMetadata.sources && column.sourceIndex===0 && column.originalName===previousMetadata.columns[index]?.name)?.index;
+  for(const item of next.series){
+    const old=previousConfig.series.find(series=>match(series.y)===item.y);
+    if(old){const x=item.x,y=item.y;Object.assign(item,structuredClone(old),{x:match(old.x) ?? x,y});for(const key of ['error','errorPlus','errorMinus','errorMin','errorMax'])item[key]=old[key]===''?'':match(old[key]) ?? '';if(['error','errorPlus','errorMinus','errorMin','errorMax'].some(key=>old[key]!=='' && item[key]===''))item.errorMode='none';}
+    else for(const key of [...SERIES_APPEARANCE_FIELDS,...PROCESSING_FIELDS])if(key!=='currentUnit' && previousConfig.series.length && previousConfig.series.every(series=>String(series[key])===String(previousConfig.series[0][key])))item[key]=previousConfig.series[0][key];
+  }
+  return next;
+}
+
+function drawSources() {
+  $('#source-files').hidden=!metadata?.sources;
+  $('#header-row').closest('details')?.toggleAttribute('hidden',!!metadata?.sources);
+  $('#source-list').innerHTML=(metadata?.sources || []).map((source,index)=>`<div class="source-file" data-source-index="${index}"><strong title="${escapeHTML(source.filename)}">${escapeHTML(source.filename)}</strong><div class="field-grid"><label>シート<select data-source-sheet aria-label="${escapeHTML(source.filename)}のシート">${choiceOptions(source.sheets.map((name,index)=>[String(index),name]),String(source.sheetIndex))}</select></label><label>ヘッダー行<input data-source-header type="number" min="1" max="1000" step="1" value="${source.headerRow}"></label></div></div>`).join('');
+}
+
+async function loadDataFiles(files, append=false, selection=null) {
+  if(!engineReady || loading || exporting)return;
+  files=[...files];
+  if(!selection && files.length===1 && !append)return loadFile(files[0]);
+  const oldMetadata=metadata,oldConfig=structuredClone(config);
+  const existing=append && sourceData?(sourceData.files || [{...sourceData,sheetIndex:metadata.sheetIndex,headerRow:loadedHeader}]):[];
+  if(!selection && (files.length+existing.length>16 || files.some(file=>!/\.(xlsx|xlsm|xls|csv)$/i.test(file.name)) || files.reduce((sum,file)=>sum+file.size,0)+existing.reduce((sum,file)=>sum+file.bytes.byteLength,0)>30*1024*1024)){status('Excel / CSVは16ファイル・合計30 MB以内で選んでください。','error');return;}
+  let originals;
+  try{originals=selection?sourceData.files:[...existing,...await Promise.all(files.map(async file=>({filename:file.name,bytes:await file.arrayBuffer(),sheetIndex:0,headerRow:1})))];}
+  catch(error){status(`ファイルを読み込めませんでした: ${error.message}`,'error');return false;}
+  if(!originals.length || originals.length>16 || originals.some(file=>!/\.(xlsx|xlsm|xls|csv)$/i.test(file.filename)) || originals.reduce((sum,file)=>sum+file.bytes.byteLength,0)>30*1024*1024){status('Excel / CSVは16ファイル・合計30 MB以内で選んでください。','error');return;}
+  const filename=selection?sourceData.filename:`${safeStem(originals[0].filename).slice(0,80)}_combined.csv`;
+  loading=true;clearTimeout(renderTimer);++revision;updateButtons();status('複数ファイルを読み込んでいます…');
+  try{
+    const args={filename,...(selection?{sources:selection}:{files:originals.map(file=>({...file,bytes:file.bytes.slice(0)}))})};
+    const data=await request('load-many',args);
+    config=combinedConfig(data,append || selection?oldMetadata:null,oldConfig);metadata=data;loadedHeader=1;
+    sourceData={filename,files:originals.map((file,index)=>({...file,sheetIndex:data.sources[index].sheetIndex,headerRow:data.sources[index].headerRow}))};
+    if(!append && !selection){sourceHandle=sourceHandles.get(files[0]) || null;sourceDirectory=null;$('#save-destination').value=folderSupported?'source':'download';}
+    sample=false;sheetMode='shared';sharedSettings=null;sheetSettings.clear();
+    if(config.series.length){sharedSettings=makeSettings(config,metadata,1);sheetSettings.set(0,sharedSettings);}
+    selected.clear();history=[];future=[];lastState=structuredClone(config);view={zoom:1,x:0,y:0};
+    $('#save-name').value=safeStem(filename);resetPreview();drawMetadata();drawControls();refreshSaveDestination();renderWanted=!!config.series.length;
+    if(!renderWanted)status('描画できる列がありません。各ファイルのシート・ヘッダー行を選んでください。','error');
+    return true;
+  }catch(error){status(`読み込みに失敗しました: ${error.message}`,'error');drawSources();renderWanted=!!config.series.length;return false;}
+  finally{loading=false;updateButtons();if(renderWanted)renderPreview();}
 }
 
 function configurationForSheet(data, setting, template) {
@@ -880,8 +1000,9 @@ async function renderPreview() {
     $("#preview-state").className = "preview-state ready";
     $("#preview-state").textContent = "更新済み";
     $("#figure-size").textContent = `軸領域 ${snapshot.axes.width} × ${snapshot.axes.height} cm`;
-    $("#warning-list").replaceChildren(...result.warnings.map(text => { const item = document.createElement("li"); item.textContent = text; return item; }));
-    $("#plot-warnings").hidden = !result.warnings.length;
+    const checks=[...result.warnings,...result.series.filter(item=>item.processing && Object.keys(item.processing).length).map(item=>`${item.name}: ${Object.entries(item.processing).map(([key,value])=>`${({slope:'補正した傾き',reference:'基準値Y₀（表示単位変換前）',areaCm2:'試料面積（cm²）',factor:'Y係数'})[key] || key} = ${Number(value.toPrecision(8))}`).join('、')}`)];
+    $("#warning-list").replaceChildren(...checks.map(text => { const item = document.createElement("li"); item.textContent = text; return item; }));
+    $("#plot-warnings").hidden = !checks.length;
     status(`${result.series.length} 系列を描画しました · ${result.series.map(series => `${series.points.toLocaleString()} 点`).join(" / ")}`, "ready");
     renderedRevision = revision;
     showUnitAdvice();
@@ -902,6 +1023,7 @@ function showUnitAdvice() {
   if (unitAdviceSource !== sourceData) {unitAdviceSource = sourceData; declinedUnits.clear();}
   unitAdvice = null;
   for (const axis of ['x','y','y2']) {
+    if (axis !== 'x' && config.options?.processingAxes?.[axis]?.kind === 'normalized') continue;
     const suggestion = unitSuggestion(axis, figureResult?.axisInfo?.[axis]);
     if (suggestion && !declinedUnits.has(`${metadata?.sheetIndex}:${axis}:${suggestion.from}`)) {unitAdvice=suggestion;break;}
   }
@@ -992,7 +1114,8 @@ $('#choose-save-folder').addEventListener('click',async()=>{
   finally{exporting=false;updateButtons();}
 });
 for(const [selector,description,accept,open] of [
-  ['#data-file','Excel / CSV',{'application/octet-stream':['.xlsx','.xlsm','.xls','.csv']},loadFile],
+  ['#data-file','Excel / CSV',{'application/octet-stream':['.xlsx','.xlsm','.xls','.csv']},loadDataFiles],
+  ['#add-data-files','Excel / CSV',{'application/octet-stream':['.xlsx','.xlsm','.xls','.csv']},files=>loadDataFiles(files,true)],
   ['#project-file','PlotLauncherプロジェクト',{'application/json':['.plotproject','.json']},readProject],
   ['#settings-file','設定JSON',{'application/json':['.json']},readSettings],
   ['#user-presets-file','マイプリセットJSON',{'application/json':['.json']},importUserPresetsFile]
@@ -1000,8 +1123,10 @@ for(const [selector,description,accept,open] of [
   if(typeof window.showOpenFilePicker!=='function')return;
   event.preventDefault();if(loading||exporting||(!engineReady && selector!=='#user-presets-file'))return;
   try {
-    const [handle]=await window.showOpenFilePicker({...filePickerOptions('plotlauncher-files',description,accept,saveDirectory||sourceDirectory||sourceHandle),multiple:false});
-    const file=await handle.getFile();sourceHandles.set(file,handle);await open(file);
+    const multi=['#data-file','#add-data-files'].includes(selector);
+    const handles=await window.showOpenFilePicker({...filePickerOptions('plotlauncher-files',description,accept,saveDirectory||sourceDirectory||sourceHandle),multiple:multi});
+    const files=await Promise.all(handles.map(async handle=>{const file=await handle.getFile();sourceHandles.set(file,handle);return file;}));
+    if(files.length)await open(multi?files:files[0]);
   } catch(error){if(error.name!=='AbortError'){if(selector==='#user-presets-file')presetMessage('#manage-presets-message',error.message,true);else status(error.message,'error');}}
 });
 refreshSaveDestination();
@@ -1126,12 +1251,21 @@ async function prepareDocumentSaver(name, description, extension) {
   return documentSaver({name, id:'plotlauncher-files', description, accept:{'application/json':[extension]}, startIn:saveDirectory||sourceDirectory||sourceHandle, fallback});
 }
 
-$("#data-file").addEventListener("change", event => { const file = event.target.files[0]; event.target.value = ""; if (file) loadFile(file); });
+$("#data-file").addEventListener("change", event => { const files=[...event.target.files];event.target.value="";if(files.length)loadDataFiles(files); });
+$('#add-data-files').addEventListener('change',event=>{const files=[...event.target.files];event.target.value='';if(files.length)loadDataFiles(files,true);});
+$('#add-data').addEventListener('click',()=>$('#add-data-files').click());
+$('#source-list').addEventListener('change',event=>{
+  const input=event.target;if(input.dataset.sourceSheet===undefined && input.dataset.sourceHeader===undefined || loading || exporting)return;
+  const index=Number(input.closest('[data-source-index]').dataset.sourceIndex),sources=metadata.sources.map((source,index)=>({index,sheetIndex:source.sheetIndex,headerRow:source.headerRow}));
+  const value=Number(input.value),header=input.dataset.sourceHeader!==undefined;
+  if(!Number.isInteger(value)||value<(header?1:0)||header&&value>1000){status('ヘッダー行は1〜1000の整数で指定してください。','error');drawSources();return;}
+  sources[index][header?'headerRow':'sheetIndex']=value;void loadDataFiles([],false,sources);
+});
 $("#drop-zone").addEventListener("click", () => $("#data-file").click());
 for (const zone of [$("#drop-zone"), $("#data-drop-area")]) {
   for (const type of ["dragenter", "dragover"]) zone.addEventListener(type, event => { event.preventDefault(); if (engineReady && !loading && !exporting) event.currentTarget.classList.add("drag-over"); });
   zone.addEventListener("dragleave", event => event.currentTarget.classList.remove("drag-over"));
-  zone.addEventListener("drop", event => { event.preventDefault();event.stopPropagation();event.currentTarget.classList.remove("drag-over"); const file=event.dataTransfer.files[0];if(engineReady && !loading && !exporting && file){openDroppedFile(file);} });
+  zone.addEventListener("drop", event => { event.preventDefault();event.stopPropagation();event.currentTarget.classList.remove("drag-over"); const files=[...event.dataTransfer.files];if(engineReady && !loading && !exporting && files.length){files.length===1?openDroppedFile(files[0]):loadDataFiles(files);} });
 }
 // Dropping a file elsewhere must not navigate away and discard the settings.
 window.addEventListener("dragover", event => event.preventDefault());
@@ -1153,6 +1287,7 @@ function incompleteNumberInput(input) {
   if (input.validity?.badInput) return true;
   if (input.value !== '') return !Number.isFinite(Number(input.value));
   if (['trendX','trendY'].includes(input.dataset.seriesField)) return false;
+  if (['detrendMin','detrendMax','referenceMin','referenceMax'].includes(input.dataset.seriesField)) return false;
   return !['xMin','xMax','yMin','yMax','y2Min','y2Max','xStep','yStep','y2Step','xMinorStep','yMinorStep','y2MinorStep','legendX','legendY','xLabelX','xLabelY','yLabelX','yLabelY','y2LabelX','y2LabelY'].includes(input.dataset.axis);
 }
 
@@ -1222,7 +1357,7 @@ function applyControlInput(event) {
   }
   else if (input.dataset.seriesField) {
     const key=input.dataset.seriesField,index=Number(input.closest('[data-series-index]').dataset.seriesIndex);
-    const indices=input.dataset.seriesAll==='true' && SERIES_APPEARANCE_FIELDS.includes(key)?config.series.map((_,i)=>i):[index];
+    const indices=input.dataset.seriesAll==='true' && [...SERIES_APPEARANCE_FIELDS,...PROCESSING_FIELDS].includes(key)?config.series.map((_,i)=>i):[index];
     for(const index of indices) {
       config.series[index][key] = input.type==='checkbox'?input.checked:key==='trendFontSize'?Number((Number(input.value)/Number(config.axes.fontScale)).toPrecision(12)):input.type==='range'?Number(input.value):input.value;
       $$(`[data-series-index="${index}"] [data-series-field="${key}"]`).forEach(field=>{if(field!==input){field.value=input.value;field.checked=input.checked;}});
@@ -1230,6 +1365,10 @@ function applyControlInput(event) {
     if (input.dataset.seriesField === 'errorMode') syncSeriesErrorControls();
     if (input.dataset.seriesField === 'yAxis') syncYAxesControls();
     if (['trendType','trendEquation'].includes(input.dataset.seriesField)) syncTrendControls();
+    if (PROCESSING_FIELDS.includes(key) || key==='yAxis') {
+      if(['density','normalization','yAxis'].includes(key))syncProcessingAxes();
+      syncProcessingControls();
+    }
   } else if (input.dataset.annotationField) {
     const item = config.annotations[Number(input.closest("[data-annotation-index]").dataset.annotationIndex)];
     item[input.dataset.annotationField] = input.type === "checkbox" ? input.checked : ['number','range'].includes(input.type) ? Number(input.value) : input.value;
@@ -1300,9 +1439,9 @@ async function readProject(file, saved) {
   try {
     if(file.size>PROJECT_MAX_SIZE)throw new Error('プロジェクトは130 MB以内のファイルを選んでください。');
     const project=parseProject(saved || JSON.parse(await file.text()));
-    const retainedData={filename:project.data.filename,bytes:project.data.bytes.slice(0)};
+    const retainedData={filename:project.data.filename,...(project.data.files?{files:project.data.files.map(file=>({...file,bytes:file.bytes.slice(0)}))}:{bytes:project.data.bytes.slice(0)})};
     const retainedFonts=project.fonts.map(font=>({...font,bytes:font.bytes.slice(0)}));
-    const result=await request('project',{filename:project.data.filename,bytes:project.data.bytes,sheetIndex:project.data.sheetIndex,headerRow:project.data.headerRow,settings:project.settings,fonts:project.fonts,sheetSettings:project.workspace.sheetSettings || [],sharedSettings:project.workspace.sharedSettings});
+    const result=await request('project',{filename:project.data.filename,bytes:project.data.bytes,...(project.data.files?{files:project.data.files}:{}),sheetIndex:project.data.sheetIndex,headerRow:project.data.headerRow,settings:project.settings,fonts:project.fonts,sheetSettings:project.workspace.sheetSettings || [],sharedSettings:project.workspace.sharedSettings});
     metadata=result.metadata; config=result.config; sourceData=retainedData; sample=project.data.sample;
     sheetSettings=new Map((project.workspace.sheetSettings || []).map(item=>[item.sheetIndex,item.settings]));
     // Older projects may contain distinct sheet styles; keep those individual.
@@ -1765,7 +1904,7 @@ function openElementEditor(part,index=0) {
   fields.innerHTML=sources.filter(Boolean).map(source=>source.outerHTML).join('');
   if(part==='seriesAll') {
     const control=key=>$(`#series-list [data-series-index="${index}"] [data-series-field="${key}"]`)?.closest('label')?.outerHTML || '';
-    fields.innerHTML=`<div data-series-index="${index}"><div class="field-grid">${SERIES_APPEARANCE_FIELDS.slice(0,3).map(control).join('')}</div><details class="settings-panel"><summary>線・点の詳細</summary><div class="field-grid">${SERIES_APPEARANCE_FIELDS.slice(3).map(control).join('')}</div></details></div>`;
+    fields.innerHTML=`<div data-series-index="${index}" data-series-all-root><div class="field-grid">${SERIES_APPEARANCE_FIELDS.slice(0,3).map(control).join('')}</div><details class="settings-panel"><summary>線・点の詳細</summary><div class="field-grid">${SERIES_APPEARANCE_FIELDS.slice(3).map(control).join('')}</div></details>${processingControls(config.series[index])}</div>`;
   }
   fields.dataset.seriesEditorIndex=String(index);
   if(['series','seriesAll'].includes(part) && editableXY(config.plotType))fields.innerHTML=`<label class="series-scope">見た目の適用先<select data-series-scope title="全系列では変更した項目だけをまとめて反映します。データ列・系列名・系列色は保持します。">${choiceOptions([['one',`この系列（${config.series[index].name}）`],['all',`全系列（${config.series.length}系列）`]],part==='seriesAll'?'all':'one')}</select></label>`+fields.innerHTML;
@@ -1794,10 +1933,11 @@ function openElementEditor(part,index=0) {
     input.dataset.seriesAll='true';
     const key=input.dataset.seriesField,mixed=config.series.some(item=>String(item[key])!==String(config.series[index][key]));
     if(!mixed)return;
-    if(input.tagName==='SELECT'){const option=new Option('混在','');option.disabled=true;input.add(option,0);input.value='';}
+    if(input.type==='checkbox'){input.indeterminate=true;}
+    else if(input.tagName==='SELECT'){const option=new Option('混在','');option.disabled=true;input.add(option,0);input.value='';}
     else if(input.type!=='range'){input.value='';input.placeholder='混在';}
   });
-  $('#element-editor').showModal();enhanceColorInputs();syncAxisAutomaticControls();syncUnitControls();syncOpacityControls();
+  $('#element-editor').showModal();enhanceColorInputs();syncAxisAutomaticControls();syncUnitControls();syncOpacityControls();syncProcessingControls();
 }
 $('#element-editor-fields').addEventListener('input',applyControlInput);
 $('#edit-all-series').addEventListener('click',()=>openElementEditor('seriesAll'));

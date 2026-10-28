@@ -345,8 +345,40 @@ class PlotEngine:
         ]
         rows = [[None if pd.isna(value) else str(value)[:140] for value in row] for row in frame.head(8).itertuples(index=False, name=None)]
         self.frame, self.filename, self.sheet_name = frame, filename, sheet_name
+        self.column_labels = dict(zip(names, names))
+        self.multi_source = False
         self.xps_csv = suffix == ".csv" and bool(xps_header)
         return {"filename": filename, "sheets": sheets, "sheetIndex": sheets.index(sheet_name), "columns": columns, "rowCount": len(frame), "rows": rows, "headerRow": int(header), "xpsCSV": self.xps_csv, "plotType": "XPS Fit" if self.xps_csv else self.infer_plot_type(filename)}
+
+    def load_many(self, sources, filename="combined.csv", **unused):
+        if not isinstance(sources, list) or not 1 <= len(sources) <= 16:
+            raise ValueError("同時に読み込めるファイルは16個までです。")
+        previous = dict(self.__dict__)
+        frames, groups, columns, source_info = [], [], [], []
+        try:
+            for source_index, source in enumerate(sources):
+                info = self.load(source["path"], source["filename"], source.get("sheetIndex", 0), source.get("headerRow", 1))
+                frame = self.frame.copy()
+                start = len(columns)
+                group = []
+                for local, column in enumerate(info["columns"]):
+                    name = f"{source_index+1}:{Path(source['filename']).stem[:40]}:{column['name'][:140]} [{local+1}]"
+                    item = {**column, "index":start+local, "name":name, "originalName":column["name"], "sourceIndex":source_index}
+                    columns.append(item); group.append(item)
+                frame.columns = [item["name"] for item in group]
+                frames.append(frame.reset_index(drop=True))
+                groups.append({"columns":group, "filename":source["filename"], "plotType":info["plotType"]})
+                source_info.append({"filename":source["filename"], "sheets":info["sheets"], "sheetIndex":info["sheetIndex"], "headerRow":info["headerRow"]})
+            if len(columns) > MAX_COLUMNS: raise ValueError(f"複数ファイルの合計は{MAX_COLUMNS}列以内にしてください。")
+            frame = pd.concat(frames, axis=1)
+            self.frame, self.filename, self.sheet_name, self.xps_csv = frame, filename, "重ね描き", False
+            self.multi_source = True
+            self.column_labels = {column['name']:column['originalName'] for column in columns}
+            rows = [[None if pd.isna(value) else str(value)[:140] for value in row] for row in frame.head(8).itertuples(index=False, name=None)]
+            return {"filename":filename, "sheets":["重ね描き"], "sheetIndex":0, "headerRow":1, "columns":columns, "rowCount":len(frame), "rows":rows, "plotType":"General", "groups":groups, "sources":source_info}
+        except Exception:
+            self.__dict__.clear(); self.__dict__.update(previous)
+            raise
 
     @contextmanager
     def sheet_data(self, path, filename, sheet_index, header_row):
@@ -361,13 +393,93 @@ class PlotEngine:
             self.__dict__.clear()
             self.__dict__.update(previous)
 
+    def process_series(self, x, raw_y, item):
+        """Affine corrections; raw data and reference estimates stay unchanged."""
+        gain = 1.0
+        bias = np.zeros_like(raw_y)
+        details = {}
+        valid = np.isfinite(x) & np.isfinite(raw_y)
+        def region(prefix):
+            lo = number(item.get(prefix + "Min", ""), "補正範囲の最小", optional=True)
+            hi = number(item.get(prefix + "Max", ""), "補正範囲の最大", optional=True)
+            if lo is not None and hi is not None and lo > hi:
+                raise ValueError("補正範囲の最小値は最大値以下にしてください。")
+            return valid & (x >= (-np.inf if lo is None else lo)) & (x <= (np.inf if hi is None else hi))
+        if not isinstance(item.get("detrend", False), bool) or not isinstance(item.get("density", False), bool):
+            raise ValueError("データ補正のオン・オフを確認してください。")
+        if item.get("detrend", False):
+            mask = region("detrend")
+            if mask.sum() < 2 or np.ptp(x[mask]) == 0:
+                raise ValueError("傾き補正には異なるX値の有効な点が2点以上必要です。")
+            xx = x[mask] - np.mean(x[mask])
+            slope = float(np.dot(xx, raw_y[mask] - np.mean(raw_y[mask])) / np.dot(xx, xx))
+            anchor = x[np.flatnonzero(valid)[0]]
+            bias = -slope * (x - anchor)
+            details["slope"] = slope
+        factor = number(item.get("yFactor", 1), "Yに掛ける係数")
+        if factor != 1: details["factor"] = factor
+        gain *= factor; bias *= factor
+        if item.get("density", False):
+            currents = {"A":1, "mA":1e-3, "μA":1e-6, "nA":1e-9, "pA":1e-12}
+            areas = {"cm2":1, "mm2":.01, "m2":1e4}
+            if item.get("currentUnit", "A") not in currents or item.get("areaUnit", "cm2") not in areas:
+                raise ValueError("電流と面積の単位を確認してください。")
+            area = number(item.get("area", 1), "試料面積", minimum=1e-30)
+            factor = currents[item.get("currentUnit", "A")] / (area * areas[item.get("areaUnit", "cm2")])
+            gain *= factor; bias *= factor
+            details["areaCm2"] = area * areas[item.get("areaUnit", "cm2")]
+        mode = item.get("normalization", "none")
+        if mode not in {"none", "ratio", "relative"}:
+            raise ValueError("規格化の種類を確認してください。")
+        if mode != "none":
+            y = gain * raw_y + bias
+            reference_mode = item.get("referenceMode", "first")
+            if reference_mode == "first":
+                if not valid.any(): raise ValueError("規格化の基準となる有効な点がありません。")
+                reference = y[np.flatnonzero(valid)[0]]
+            elif reference_mode == "point":
+                point = number(item.get("referencePoint", 1), "基準データ点", minimum=1, maximum=len(y))
+                if not point.is_integer() or not valid[int(point)-1]:
+                    raise ValueError("基準データ点は有効な数値のある行番号を指定してください（先頭=1）。")
+                reference = y[int(point)-1]
+            elif reference_mode == "range":
+                if item.get("referenceMin", "") == "" or item.get("referenceMax", "") == "":
+                    raise ValueError("規格化の基準範囲の最小・最大X値を指定してください。")
+                mask = region("reference")
+                if not mask.any(): raise ValueError("規格化の基準範囲に有効な点がありません。")
+                reference = float(np.mean(y[mask]))
+            elif reference_mode == "manual":
+                reference = number(item.get("referenceValue", 1), "規格化の基準値")
+            else:
+                raise ValueError("規格化の基準の選び方を確認してください。")
+            if not np.isfinite(reference) or reference == 0:
+                raise ValueError("規格化の基準値は0以外の有限な数値にしてください。")
+            gain /= reference; bias /= reference
+            if mode == "relative": bias -= 1
+            details["reference"] = float(reference)
+        result = gain * raw_y + bias
+        if mode == "relative":
+            # Remove cancellation noise below the precision of the baseline.
+            result = np.where(np.abs(result) <= 8*np.finfo(float).eps*np.maximum(1, np.abs(gain*raw_y)), 0., result)
+        if not np.isfinite(gain) or np.any(valid & ~np.isfinite(result)):
+            raise ValueError("補正結果が数値の範囲を超えました。係数・面積・基準値を確認してください。")
+        return result, gain, bias, details
+
     def _prepare(self, config):
         preset = config.get("plotType", "General")
+        if getattr(self,'multi_source',False) and preset in {'XPS Fit','Particle Histogram','bar_graph_general','Raman 3D'}:
+            raise ValueError('複数ファイルの重ね描きでは通常のXYグラフを選んでください。専用グラフは単一ファイルで使用できます。')
         if preset not in self.presets:
             raise ValueError("プロット種別を選び直してください。")
         if self.frame is None:
             raise ValueError("先にExcel/CSVファイルを読み込んでください。")
         series = config.get("series", [])
+        corrected = any(item.get("detrend") or item.get("density") or item.get("normalization", "none") != "none" or float(item.get("yFactor", 1)) != 1 or float(item.get("xFactor", 1)) != 1 for item in series)
+        if corrected and preset in {"XPS Fit", "Particle Histogram", "bar_graph_general", "Raman 3D"}:
+            raise ValueError("この専用グラフではデータ補正を解除してください。通常のXYグラフで補正できます。")
+        quantities = {"normalized" if item.get("normalization", "none") != "none" else "density" if item.get("density") else "raw" for item in series}
+        if len(quantities) > 1:
+            raise ValueError("同じY軸に元データと規格化・電流密度を混在できません。全系列へ適用するか、変換する系列を右Y軸へ移してください。")
         options = config.get("options", {})
         if not isinstance(options, dict):
             raise ValueError("専用プロットの設定を確認してください。")
@@ -495,8 +607,24 @@ class PlotEngine:
                 raise ValueError("誤差（±）の列を指定してください。")
             xoff = number(item.get("xOffset", 0), "Xオフセット")
             yoff = number(item.get("yOffset", 0), "Yオフセット")
-            x = pd.to_numeric(frame.iloc[:, xi], errors="coerce").to_numpy(dtype=float) * unit_scales["x"] + xoff
-            y = pd.to_numeric(frame.iloc[:, yi], errors="coerce").to_numpy(dtype=float) * unit_scales["y"] + yoff
+            x = pd.to_numeric(frame.iloc[:, xi], errors="coerce").to_numpy(dtype=float) * number(item.get('xFactor', 1), 'Xに掛ける係数') * unit_scales["x"] + xoff
+            raw_y = pd.to_numeric(frame.iloc[:, yi], errors="coerce").to_numpy(dtype=float)
+            processed, gain, bias, processing = self.process_series(x, raw_y, item)
+            display_scale = unit_scales["y"]
+            processed_unit = None
+            if item.get("normalization", "none") != "none":
+                processed_unit = str(axes.get("yUnit", "auto"))
+                if processed_unit not in {"auto", "", "%"}: raise ValueError("規格化したY軸の単位は「単位なし」または%を選んでください。")
+                processed_unit = "%" if processed_unit == "%" else ""
+                display_scale = 100 if processed_unit == "%" else 1
+            elif item.get("density", False):
+                processed_unit = str(axes.get("yUnit", "auto"))
+                if processed_unit == "auto": processed_unit = "mA/cm$^2$"
+                token = processed_unit.replace("$", "").replace("{", "").replace("}", "").replace("²", "^2").replace("µ", "μ").replace(" ", "")
+                density_scales = {"A/cm^2":1, "mA/cm^2":1e3, "μA/cm^2":1e6, "nA/cm^2":1e9, "pA/cm^2":1e12}
+                if token not in density_scales: raise ValueError("電流密度のY軸単位はA/cm²、mA/cm²などを選んでください。")
+                display_scale = density_scales[token]
+            y = processed * display_scale + yoff
             categorical = preset == "bar_graph_general" and not np.isfinite(x).all()
             if categorical:
                 x = np.arange(len(frame), dtype=float)
@@ -512,26 +640,32 @@ class PlotEngine:
             if not valid.any():
                 raise ValueError(f"「{name}」に描画できる数値の組がありません。列・軸・オフセットを確認してください。")
             if error_mode == "symmetric":
-                error_values = pd.to_numeric(frame.iloc[:, ei], errors="coerce").to_numpy(dtype=float) * unit_scales["y"]
+                error_values = pd.to_numeric(frame.iloc[:, ei], errors="coerce").to_numpy(dtype=float)
                 if np.any(valid & np.isfinite(error_values) & (error_values < 0)):
                     raise ValueError(f"「{name}」の誤差には0以上の値を使用してください。")
+                error_values = error_values * abs(gain * display_scale)
                 missing_errors = int((valid & ~np.isfinite(error_values)).sum())
                 if missing_errors:
                     warnings.append(f"{name}: 空欄・非数値の誤差{missing_errors:,}点には誤差棒を描画しません")
             if error_mode == "minmax":
                 mini = column_index(item.get("errorMin"), count, "誤差の最小値")
                 maxi = column_index(item.get("errorMax"), count, "誤差の最大値")
-                min_values = pd.to_numeric(frame.iloc[:, mini], errors="coerce").to_numpy(dtype=float) * unit_scales["y"] + yoff
-                max_values = pd.to_numeric(frame.iloc[:, maxi], errors="coerce").to_numpy(dtype=float) * unit_scales["y"] + yoff
-                if np.any(valid & np.isfinite(min_values) & (min_values > y)) or np.any(valid & np.isfinite(max_values) & (max_values < y)):
+                min_values = pd.to_numeric(frame.iloc[:, mini], errors="coerce").to_numpy(dtype=float)
+                max_values = pd.to_numeric(frame.iloc[:, maxi], errors="coerce").to_numpy(dtype=float)
+                if np.any(valid & np.isfinite(min_values) & (min_values > raw_y)) or np.any(valid & np.isfinite(max_values) & (max_values < raw_y)):
                     raise ValueError(f"「{name}」の誤差最小値 ≤ Y ≤ 誤差最大値にしてください。")
+                lower = (gain * min_values + bias) * display_scale + yoff
+                upper = (gain * max_values + bias) * display_scale + yoff
+                min_values, max_values = np.minimum(lower, upper), np.maximum(lower, upper)
             if error_mode == "asymmetric":
                 plus_index = column_index(item.get("errorPlus"), count, "正の誤差幅")
                 minus_index = column_index(item.get("errorMinus"), count, "負の誤差幅")
-                plus_values = pd.to_numeric(frame.iloc[:, plus_index], errors="coerce").to_numpy(dtype=float) * unit_scales["y"]
-                minus_values = pd.to_numeric(frame.iloc[:, minus_index], errors="coerce").to_numpy(dtype=float) * unit_scales["y"]
+                plus_values = pd.to_numeric(frame.iloc[:, plus_index], errors="coerce").to_numpy(dtype=float)
+                minus_values = pd.to_numeric(frame.iloc[:, minus_index], errors="coerce").to_numpy(dtype=float)
                 if np.any(valid & np.isfinite(plus_values) & (plus_values < 0)) or np.any(valid & np.isfinite(minus_values) & (minus_values < 0)):
                     raise ValueError(f"「{name}」の正・負の誤差幅には、どちらも0以上の値を使用してください。")
+                plus_values = plus_values * abs(gain * display_scale); minus_values = minus_values * abs(gain * display_scale)
+                if gain < 0: plus_values, minus_values = minus_values, plus_values
                 # The renderer accepts absolute endpoints. Offsets move the
                 # centre and endpoints together; error widths stay unchanged.
                 min_values = y - minus_values
@@ -545,7 +679,7 @@ class PlotEngine:
                 warnings.append(f"{name}: 空欄・非数値・対数軸の0以下の値を含む{excluded:,}点を除外")
             extents["x"].extend((float(x[valid].min()), float(x[valid].max())))
             extents["y"].extend((float(y[valid].min()), float(y[valid].max())))
-            diagnostics.append({"name": name, "points": int(valid.sum()), "visible": item.get("visible", True)})
+            diagnostics.append({"name": name, "points": int(valid.sum()), "visible": item.get("visible", True), **({"processing":processing} if processing else {})})
             color = str(item.get("color", plot_utils.COLORS["blue"][7]))
             if not is_color_like(color):
                 raise ValueError("系列の色を選び直してください。")
@@ -600,12 +734,15 @@ class PlotEngine:
                 keys[target].append(str(number(item.get(key, default), "系列の不透明度", minimum=0, maximum=1)))
             if index == 0:
                 for axis, ci in (("X", xi), ("Y", yi)):
-                    label = str(frame.columns[ci])
+                    label = str(getattr(self,'column_labels',{}).get(frame.columns[ci],frame.columns[ci]))
                     text, unit = label.rsplit("/", 1) if "/" in label else (label, "")
                     manual_text = str(axes.get(f"{axis.lower()}Label", "")).strip()
                     manual_unit = str(axes.get(f"{axis.lower()}Unit", "auto")).strip()
                     values[f"PLOT_{axis}LABEL_TEXT"] = manual_text or text.strip()
                     values[f"PLOT_{axis}UNIT"] = expand_micro(unit.strip() if manual_unit.lower() == "auto" else manual_unit, plain=True)
+                    if axis == "Y" and processed_unit is not None:
+                        values["PLOT_YUNIT"] = expand_micro(processed_unit, plain=True)
+                        if not manual_text: values["PLOT_YLABEL_TEXT"] = "Normalized value" if item.get("normalization", "none") != "none" else "Current density"
         if preset == "Particle Histogram":
             diameter = column_index(options.get("diameterColumn", series[0]["y"]), count, "粒径")
             histogram_data = pd.to_numeric(self.frame.iloc[:, diameter], errors="coerce").replace([np.inf, -np.inf], np.nan)
@@ -1356,7 +1493,9 @@ class PlotEngine:
 
     def dispatch(self, operation, payload):
         args = json.loads(payload)
-        if operation == "load":
+        if operation == "load-many":
+            result = self.load_many(**args)
+        elif operation == "load":
             result = self.load(**args)
         elif operation in {"sheet-info", "sheet-export"}:
             with self.sheet_data(args["path"], args["filename"], args["sheet_index"], args["header_row"]) as metadata:

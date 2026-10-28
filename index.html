@@ -6,8 +6,8 @@
   <meta name="description" content="Excel・CSVの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=cd41c82c9af6">
-  <script type="module" src="./app.js?v=cd41c82c9af6"></script>
+  <link rel="stylesheet" href="./style.css?v=0e4061b155f0">
+  <script type="module" src="./app.js?v=0e4061b155f0"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -44,7 +44,8 @@
       <details class="control-section data-section" open>
         <summary class="section-heading"><h2><span class="step">01</span>データ</h2><span class="section-note">Excel / CSV</span></summary>
         <button id="drop-zone" class="button primary drop-zone" disabled title="Excel / CSVを開きます。ドラッグ＆ドロップでも開けます（Ctrl/Cmd＋Alt＋O）">＋ データを開く</button>
-        <input id="data-file" type="file" accept=".xlsx,.xlsm,.xls,.csv" hidden>
+        <input id="data-file" type="file" accept=".xlsx,.xlsm,.xls,.csv" multiple hidden>
+        <button id="add-data" class="button quiet" disabled hidden title="別のExcel / CSVを読み込み、現在のグラフへ系列を追加します。">ファイルを追加</button><input id="add-data-files" type="file" accept=".xlsx,.xlsm,.xls,.csv" multiple hidden>
         <button id="paste-data" class="button paste-data" disabled title="Excelでセル範囲をコピーし、Ctrl/Command＋Vで貼り付けます（Ctrl/Command＋Alt＋Vでこの画面を開く）">データを貼り付け</button>
         <div id="data-drop-area" class="data-drop-area" role="region" aria-label="データファイルのドロップ先" aria-disabled="true">ここにデータをドロップ</div>
         <button id="sample-data" class="sample-button" disabled>サンプルを使う</button>
@@ -52,6 +53,7 @@
           <svg><use href="#i-file"/></svg><div><strong id="file-name"></strong><span id="file-stats"></span></div><span id="sample-badge" class="badge" hidden>サンプル</span>
         </div>
         <div id="data-options" class="data-options" hidden>
+          <details id="source-files" class="settings-panel" hidden><summary>ファイル別のシート・読み込み設定</summary><div id="source-list"></div></details>
           <label id="sheet-select-field">シート<select id="sheet-select" disabled><option>未読み込み</option></select></label>
           <details class="settings-panel"><summary>読み込み設定</summary><label>ヘッダー行<input id="header-row" type="number" min="1" max="1000" step="1" value="1" disabled></label></details>
         </div>

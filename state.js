@@ -1,5 +1,5 @@
-import { resetPresetUnitScales } from "./units.js?v=cd41c82c9af6";
-export const APP_VERSION = "2.1.0";
+import { resetPresetUnitScales } from "./units.js?v=0e4061b155f0";
+export const APP_VERSION = "2.2.0";
 
 // Labels are readable in the picker; values retain the existing unit syntax.
 export const UNIT_GROUPS = [
@@ -89,7 +89,7 @@ export function defaultAxes() {
 }
 
 export function createSeries(x, y, name, index = 0, plotType = "General") {
-  return { x, y, name, yAxis: "left", visible: true, color: plotType === "Polishing Rate" && index === 2 ? "#000000" : COLORS[index % COLORS.length], scatterColor: "auto", mode: ['Polishing Rate','Waviness'].includes(plotType) ? "line+scatter" : "line", lineWidth: 1, lineStyle: "-", lineAlpha: 1, marker: "o", markerSize: 18, markerEdgeColor: "auto", markerFaceColor: "auto", markerEdgeAlpha: 0.8, markerFaceAlpha: 0.8, xOffset: 0, yOffset: 0, error: "", errorMode: "auto", errorMin: "", errorMax: "", errorPlus: "", errorMinus: "", trendType: "none", trendOrigin: false, trendDegree: 2, trendEquation: true, trendColor: "auto", trendStyle: "--", trendWidth: 1, trendFontSize: 6, trendDigits: 4, trendX: "", trendY: "" };
+  return { x, y, name, yAxis: "left", visible: true, color: plotType === "Polishing Rate" && index === 2 ? "#000000" : COLORS[index % COLORS.length], scatterColor: "auto", mode: ['Polishing Rate','Waviness'].includes(plotType) ? "line+scatter" : "line", lineWidth: 1, lineStyle: "-", lineAlpha: 1, marker: "o", markerSize: 18, markerEdgeColor: "auto", markerFaceColor: "auto", markerEdgeAlpha: 0.8, markerFaceAlpha: 0.8, xOffset: 0, yOffset: 0, error: "", errorMode: "auto", errorMin: "", errorMax: "", errorPlus: "", errorMinus: "", trendType: "none", trendOrigin: false, trendDegree: 2, trendEquation: true, trendColor: "auto", trendStyle: "--", trendWidth: 1, trendFontSize: 6, trendDigits: 4, trendX: "", trendY: "", xFactor:1, yFactor:1, detrend:false, detrendMin:'', detrendMax:'', density:false, currentUnit:'A', area:1, areaUnit:'cm2', normalization:'none', referenceMode:'first', referencePoint:1, referenceMin:'', referenceMax:'', referenceValue:1 };
 }
 
 export function initialSeries(columns, plotType = 'General') {
@@ -144,7 +144,7 @@ function projectBase64(bytes) {
 
 export function makeProject(settings, data, fonts = [], workspace = {}) {
   const saved = {format:'plotlauncher-project', version:1, settings:structuredClone(settings),
-    data:{filename:data.filename, base64:projectBase64(data.bytes), sheetIndex:data.sheetIndex, headerRow:data.headerRow, sample:!!data.sample},
+    data:{filename:data.filename, base64:data.files?'':projectBase64(data.bytes), ...(data.files?{files:data.files.map(file=>({filename:file.filename,base64:projectBase64(file.bytes),sheetIndex:file.sheetIndex,headerRow:file.headerRow}))}:{}), sheetIndex:data.sheetIndex, headerRow:data.headerRow, sample:!!data.sample},
     fonts:fonts.map(font => ({name:font.name, family:font.family, base64:projectBase64(font.bytes)})), workspace:structuredClone(workspace)};
   parseProject(saved);
   return saved;
@@ -179,7 +179,18 @@ export function parseProject(saved) {
     }
     if (workspace.sheetSettings.some(item=>item.settings.inheritFirstSheet) && !indexes.has(0)) throw new Error('プロジェクトの先頭シート設定を確認してください。');
   }
-  return {settings:structuredClone(settings), data:{...data, bytes:projectBytes(data.base64,30 * MB)}, fonts, workspace:structuredClone(workspace)};
+  let files;
+  if(data.files!==undefined){
+    if(!Array.isArray(data.files)||!data.files.length||data.files.length>16)throw new Error('プロジェクトの複数ファイルを確認してください。');
+    let size=0;
+    files=data.files.map(file=>{
+      if(typeof file?.filename!=='string'||file.filename.length>255||!/\.(xlsx|xlsm|xls|csv)$/i.test(file.filename)||!Number.isInteger(file.sheetIndex)||file.sheetIndex<0||file.sheetIndex>1000||!Number.isInteger(file.headerRow)||file.headerRow<1||file.headerRow>1000)throw new Error('プロジェクトの元ファイル・シート・ヘッダー行を確認してください。');
+      const bytes=projectBytes(file.base64,30*MB);size+=bytes.byteLength;
+      if(size>30*MB)throw new Error('元データは合計30 MB以内にしてください。');
+      return {filename:file.filename,sheetIndex:file.sheetIndex,headerRow:file.headerRow,bytes};
+    });
+  }
+  return {settings:structuredClone(settings), data:{...data,...(files?{files}:{bytes:projectBytes(data.base64,30 * MB)})}, fonts, workspace:structuredClone(workspace)};
 }
 
 export function restoreSettings(document, metadata) {
@@ -213,12 +224,13 @@ export function restoreSettings(document, metadata) {
     for (const key of Object.keys(result)) {
       if (["x", "y", "error", "errorMin", "errorMax", "errorPlus", "errorMinus"].includes(key)) continue;
       if (Object.hasOwn(item, key)) {
-        if (['visible','trendOrigin','trendEquation'].includes(key)) {
+        if (['visible','trendOrigin','trendEquation','detrend','density'].includes(key)) {
           if (typeof item[key] !== 'boolean') throw new Error("設定JSONの系列表示を確認してください。");
           result[key] = item[key]; continue;
         }
         if (key === 'yAxis' && !['left','right'].includes(item[key])) throw new Error("設定JSONのY軸を確認してください。");
         if (key === 'trendType' && !['none','linear','polynomial','exponential','logarithmic','power'].includes(item[key])) throw new Error("設定JSONの近似線を確認してください。");
+        if (key === 'normalization' && !['none','ratio','relative'].includes(item[key]) || key === 'referenceMode' && !['first','point','range','manual'].includes(item[key]) || key === 'currentUnit' && !['A','mA','μA','nA','pA'].includes(item[key]) || key === 'areaUnit' && !['cm2','mm2','m2'].includes(item[key])) throw new Error('設定JSONのデータ補正を確認してください。');
         if (!["string", "number"].includes(typeof item[key])) throw new Error("設定JSONの系列設定を確認してください。");
         result[key] = item[key];
       }
@@ -234,6 +246,14 @@ export function restoreSettings(document, metadata) {
   const plotType = document.plotType || "General";
   if (!PLOT_TYPES.includes(plotType)) throw new Error("設定JSONのプロット種別を確認してください。");
   const restored = { axes, series, plotType, options: structuredClone(document.options || {}) };
+  if(restored.options.processingAxes!==undefined){
+    const snapshots=restored.options.processingAxes;
+    if(!snapshots || Array.isArray(snapshots) || typeof snapshots!=='object' || Object.keys(snapshots).some(key=>!['y','y2'].includes(key)))throw new Error('補正前の軸設定を確認してください。');
+    for(const [axis,snapshot] of Object.entries(snapshots)){
+      const allowed=['Label','Unit','UnitScale','Min','Max','Step','MinorStep'].map(suffix=>axis+suffix);
+      if(!snapshot || !['density','normalized'].includes(snapshot.kind) || !snapshot.original || Object.keys(snapshot.original).some(key=>!allowed.includes(key) || !['string','number'].includes(typeof snapshot.original[key])) || !Number.isFinite(Number(snapshot.original[axis+'UnitScale'])) || Number(snapshot.original[axis+'UnitScale'])<=0)throw new Error('補正前の軸設定を確認してください。');
+    }
+  }
   const optionColumn = key => { if (restored.options[`${key}Name`]) restored.options[key] = find(restored.options[`${key}Name`]); };
   optionColumn("diameterColumn");
   for (const fill of restored.options.fills || []) for (const key of ["x", "upper", "lower"]) if (fill[`${key}Name`]) fill[key] = find(fill[`${key}Name`]);

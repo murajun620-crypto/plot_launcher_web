@@ -1,8 +1,9 @@
-import { restoreSettings } from "./state.js?v=cd41c82c9af6";
+import { restoreSettings } from "./state.js?v=0e4061b155f0";
 // All user data stays in this worker's in-memory filesystem.
 const PYODIDE_VERSION = "0.29.3";
 const INDEX_URL = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
 let pyodide, dispatch, currentPath = "", uploadNumber = 0;
+let currentSources = [];
 
 function progress(text) { self.postMessage({ type: "progress", text }); }
 async function fetchAsset(relative, binary = false) {
@@ -54,16 +55,30 @@ let queue = Promise.resolve();
 self.onmessage = ({ data }) => {
   queue = queue.catch(() => {}).then(async () => {
     const { id, operation, args } = data;
-    let uploadPath, projectSnapshot = false;
+    let uploadPath, projectSnapshot = false, nextSources;
+    const uploadedPaths=[];
     const projectFonts = [];
     try {
       await ready;
       let payload = args;
+      let dispatchOperation=operation==='project'?'load':operation;
       if (operation === "project") {
         pyodide.runPython("from matplotlib import font_manager\n_project_previous = dict(_engine.__dict__)\n_project_previous['font_families'] = set(_engine.font_families)\n_project_fonts = list(font_manager.fontManager.ttflist)");
         projectSnapshot = true;
       }
-      if (operation === "load" || operation === "project") {
+      if (operation === 'load-many' || operation === 'project' && args.files) {
+        if(args.files){
+          if(!Array.isArray(args.files) || !args.files.length || args.files.length>16 || args.files.reduce((sum,file)=>sum+(file.bytes?.byteLength || 0),0)>30*1024*1024)throw new Error('複数ファイルは16個・合計30 MB以内にしてください。');
+          nextSources=args.files.map(file=>{
+            const extension=file.filename.split('.').pop().toLowerCase();
+            if(!['xlsx','xlsm','xls','csv'].includes(extension))throw new Error('ExcelまたはCSVファイルを選んでください。');
+            const path=`/data/upload-${++uploadNumber}.${extension}`;uploadedPaths.push(path);
+            pyodide.FS.writeFile(path,new Uint8Array(file.bytes));
+            return {path,filename:file.filename,sheetIndex:file.sheetIndex ?? 0,headerRow:file.headerRow ?? 1};
+          });
+        }else nextSources=args.sources.map(item=>{if(!Number.isInteger(item.index)||!currentSources[item.index])throw new Error('元ファイルが見つかりません。');return {...currentSources[item.index],sheetIndex:item.sheetIndex,headerRow:item.headerRow};});
+        payload={sources:nextSources,filename:args.filename};dispatchOperation='load-many';
+      } else if (operation === "load" || operation === "project") {
         const extension = args.filename.split(".").pop().toLowerCase();
         if (!["xlsx", "xlsm", "xls", "csv"].includes(extension)) throw new Error("ExcelまたはCSVファイルを選んでください。");
         if (args.bytes) {
@@ -80,7 +95,7 @@ self.onmessage = ({ data }) => {
       if (operation === 'sheet-info' || operation === 'sheet-export') {
         payload = {path:currentPath, filename:args.filename, sheet_index:args.sheetIndex, header_row:args.headerRow, config:args.config, format:args.format, dpi:args.dpi};
       }
-      let result = JSON.parse(dispatch(operation === "project" ? "load" : operation, JSON.stringify(payload)));
+      let result = JSON.parse(dispatch(dispatchOperation, JSON.stringify(payload)));
       if (operation === "project") {
         if (result.sheets[result.sheetIndex] !== args.settings.data.sheet) throw new Error("プロジェクトのシートが設定と一致しません。");
         if (args.sharedSettings && !result.sheets.includes(args.sharedSettings.data.sheet)) throw new Error('プロジェクトの共通設定がデータと一致しません。');
@@ -95,15 +110,18 @@ self.onmessage = ({ data }) => {
         }
         result = {metadata:result, config, families};
       }
-      if (uploadPath) {
-        if (currentPath) pyodide.FS.unlink(currentPath);
-        currentPath = uploadPath;
+      if (nextSources || uploadPath) {
+        const oldPaths=new Set([currentPath,...currentSources.map(source=>source.path)].filter(Boolean));
+        const keep=new Set(nextSources?nextSources.map(source=>source.path):[uploadPath]);
+        for(const path of oldPaths)if(!keep.has(path))try{pyodide.FS.unlink(path);}catch{}
+        currentSources=nextSources || [];currentPath=uploadPath || '';
       }
       self.postMessage({ type: "result", id, result });
     } catch (error) {
       if (projectSnapshot) pyodide.runPython("_engine.__dict__.clear()\n_engine.__dict__.update(_project_previous)\nfont_manager.fontManager.ttflist = _project_fonts\nfont_manager.fontManager._findfont_cached.cache_clear()");
       for (const path of projectFonts) { try { pyodide.FS.unlink(path); } catch {} }
       if (uploadPath) { try { pyodide.FS.unlink(uploadPath); } catch {} }
+      for(const path of uploadedPaths)try{pyodide.FS.unlink(path);}catch{}
       const text = String(error);
       const message = text.split("\n").filter(Boolean).pop().replace(/^(ValueError|RuntimeError|IndexError|EmptyDataError|ParserError):\s*/, "");
       self.postMessage({ type: "error", id, error: message, detail: text });
