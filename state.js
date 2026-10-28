@@ -1,5 +1,5 @@
-import { resetPresetUnitScales, unitConversion } from "./units.js?v=2536fde5e701";
-export const APP_VERSION = "2.3.3";
+import { resetPresetUnitScales, unitConversion } from "./units.js?v=d874195515b6";
+export const APP_VERSION = "2.3.4";
 
 // Accept one numeric value or fraction without evaluating JavaScript expressions.
 export function parseCoefficient(value) {
@@ -102,7 +102,7 @@ export function defaultAxes() {
 }
 
 export function createSeries(x, y, name, index = 0, plotType = "General") {
-  return { x, y, name, yAxis: "left", visible: true, color: plotType === "Polishing Rate" && index === 2 ? "#000000" : COLORS[index % COLORS.length], scatterColor: "auto", mode: ['Polishing Rate','Waviness'].includes(plotType) ? "line+scatter" : "line", lineWidth: 1, lineStyle: "-", lineAlpha: 1, marker: "o", markerSize: 18, markerEdgeColor: "auto", markerFaceColor: "auto", markerEdgeAlpha: 0.8, markerFaceAlpha: 0.8, xOffset: 0, yOffset: 0, error: "", errorMode: "auto", errorMin: "", errorMax: "", errorPlus: "", errorMinus: "", trendType: "none", trendOrigin: false, trendDegree: 2, trendEquation: true, trendColor: "auto", trendStyle: "--", trendWidth: 1, trendFontSize: 6, trendDigits: 4, trendX: "", trendY: "", xFactor:1, yFactor:1, detrend:false, detrendMin:'', detrendMax:'', density:false, currentUnit:'A', area:1, areaUnit:'cm2', normalization:'none', referenceMode:'max', referencePoint:1, referenceMin:'', referenceMax:'', referenceValue:1 };
+  return { x, y, name, yAxis: "left", visible: true, color: plotType === "Polishing Rate" && index === 2 ? "#000000" : COLORS[index % COLORS.length], scatterColor: "auto", mode: ['Polishing Rate','Waviness'].includes(plotType) ? "line+scatter" : "line", lineWidth: 1, lineStyle: "-", lineAlpha: 1, marker: "o", markerSize: 18, markerEdgeColor: "auto", markerFaceColor: "auto", markerEdgeAlpha: 0.8, markerFaceAlpha: 0.8, xOffset: 0, yOffset: 0, error: "", errorMode: "auto", errorMin: "", errorMax: "", errorPlus: "", errorMinus: "", trendType: "none", trendOrigin: false, trendDegree: 2, trendEquation: true, trendColor: "auto", trendStyle: "--", trendWidth: 1, trendFontSize: 6, trendDigits: 4, trendX: "", trendY: "", xFactor:1, yFactor:1, detrend:false, detrendMin:'', detrendMax:'', detrendSlope:'', density:false, currentUnit:'A', area:1, areaUnit:'cm2', normalization:'none', referenceMode:'max', referencePoint:1, referenceMin:'', referenceMax:'', referenceValue:1 };
 }
 
 export function initialSeries(columns, plotType = 'General') {

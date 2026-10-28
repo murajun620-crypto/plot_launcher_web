@@ -47,7 +47,7 @@ export function scaleAxis(config, axis, factor) {
     if (axes[key]!=='' && axes[key]!==undefined) axes[key]=String(scaled(axes[key],factor));
   }
   for (const series of next.series) {
-    if (axis==='x') {series.xOffset=scaled(series.xOffset ?? 0,factor);for(const key of ['detrendMin','detrendMax','referenceMin','referenceMax'])if(series[key]!==undefined)series[key]=scaled(series[key],factor);}
+    if (axis==='x') {series.xOffset=scaled(series.xOffset ?? 0,factor);for(const key of ['detrendMin','detrendMax','referenceMin','referenceMax'])if(series[key]!==undefined)series[key]=scaled(series[key],factor);if(series.detrendSlope!==undefined && series.detrendSlope!=='')series.detrendSlope=scaled(series.detrendSlope,1/factor);}
     else if ((series.yAxis==='right'?'y2':'y')===axis) series.yOffset=scaled(series.yOffset ?? 0,factor);
   }
   const annotationY=next.series.some(series=>series.yAxis!=='right')?'y':'y2';

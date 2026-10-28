@@ -1,9 +1,9 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=2536fde5e701";
-import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=2536fde5e701";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=2536fde5e701";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=2536fde5e701";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=2536fde5e701";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=2536fde5e701";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=d874195515b6";
+import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=d874195515b6";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=d874195515b6";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=d874195515b6";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=d874195515b6";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=d874195515b6";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -19,7 +19,7 @@ const axisConfigValue = (key, value) => isLabelPadding(key) ? Number((Number(val
 const editableXY = type => !['XPS Fit','Particle Histogram','bar_graph_general','Raman 3D'].includes(type);
 const seriesControlValue = (key,value) => key==='trendFontSize' ? Number((Number(value || 6)*Number(config.axes.fontScale)).toPrecision(12)) : value;
 const SERIES_APPEARANCE_FIELDS = ['mode','lineWidth','markerSize','lineStyle','marker','lineAlpha','scatterColor','markerEdgeColor','markerFaceColor','markerEdgeAlpha','markerFaceAlpha'];
-const PROCESSING_FIELDS = ['xFactor','yFactor','detrend','detrendMin','detrendMax','density','currentUnit','area','areaUnit','normalization','referenceMode','referencePoint','referenceMin','referenceMax','referenceValue'];
+const PROCESSING_FIELDS = ['xFactor','yFactor','xOffset','yOffset','detrend','detrendMin','detrendMax','detrendSlope','density','currentUnit','area','areaUnit','normalization','referenceMode','referencePoint','referenceMin','referenceMax','referenceValue'];
 const opacityPercent = value => `${Number((Number(value) * 100).toFixed(2))}%`;
 const opacityControl = (attributes, label, value = 1) => `<label class="opacity-control" title="0%は透明、100%は不透明。←／→キーで1%ずつ調整できます。"><span class="opacity-caption">${escapeHTML(label)}<output aria-hidden="true">${opacityPercent(value)}</output></span><input ${attributes} data-opacity type="range" min="0" max="1" step="0.01" value="${escapeHTML(value)}" aria-label="${escapeHTML(label)}" aria-valuetext="${opacityPercent(value)}"></label>`;
 const UNIT_HINT = '互換性のある単位をリストから選ぶと数値も換算します。自由入力は表記のみを変更します。元データは保持します。';
@@ -268,7 +268,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=2536fde5e701", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=d874195515b6", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -579,7 +579,7 @@ function drawControls() {
     return `<div class="series-card" data-series-index="${index}">
       <label class="series-visibility"><input data-series-field="visible" type="checkbox" ${series.visible!==false?'checked':''}>系列${index+1}を描画</label><div class="series-heading">${xpsFit?'実測点の列':`<input data-series-field="color" type="color" value="${escapeHTML(series.color)}" aria-label="系列${index + 1}の色"><input class="series-label" data-series-field="name" value="${escapeHTML(series.name)}" maxlength="200" aria-label="系列${index + 1}の名前"><button type="button" class="icon-button" data-remove="${index}" aria-label="系列${index + 1}を削除"><svg><use href="#i-close"/></svg></button>`}</div>
       <div class="field-grid"><label>グラフの種類<select data-series-field="mode">${choiceOptions([["line", "線"], ["scatter", "点"], ["line+scatter", "線＋点"]], series.mode)}</select></label><label title="右軸を選ぶと右側に独立したY軸を表示します。">使用するY軸<select data-series-field="yAxis">${choiceOptions([['left','左軸'],['right','右軸']],series.yAxis || 'left')}</select></label></div>
-      <details class="series-columns settings-panel"><summary>データ列・オフセット</summary><div class="field-grid"><label>X列<select data-series-field="x">${columnOptions(series.x)}</select></label><label>Y列<select data-series-field="y">${columnOptions(series.y)}</select></label></div><div class="field-grid">${input("xOffset", "Xオフセット", 'step="any"')}${input("yOffset", "Yオフセット", 'step="any"')}</div></details>
+      <details class="series-columns settings-panel"><summary>${editableXY(config.plotType)?'データ列':'データ列・オフセット'}</summary><div class="field-grid"><label>X列<select data-series-field="x">${columnOptions(series.x)}</select></label><label>Y列<select data-series-field="y">${columnOptions(series.y)}</select></label></div>${editableXY(config.plotType)?'':`<div class="field-grid">${input("xOffset", "Xオフセット", 'step="any"')}${input("yOffset", "Yオフセット", 'step="any"')}</div>`}</details>
       <div class="annotation-buttons"><button type="button" class="button quiet" data-series-up="${index}" ${index===0?'disabled':''}>↑</button><button type="button" class="button quiet" data-series-down="${index}" ${index===config.series.length-1?'disabled':''}>↓</button><button type="button" class="button quiet" data-series-copy="${index}">複製</button></div><details class="series-advanced settings-panel"><summary>線・点の見た目</summary>
         <div class="field-grid">${input("lineWidth", "線幅 (pt)", 'min="0" max="6" step="0.1"')}<label>線種<select data-series-field="lineStyle">${choiceOptions([["-", "実線"], ["--", "破線"], ["-.", "一点鎖線"], [":", "点線"]], series.lineStyle)}</select></label></div>
         <div class="field-grid"><label>マーカー<select data-series-field="marker">${choiceOptions([["o", "丸"], ["s", "四角"], ["^", "三角 ▲"], ["v", "三角 ▼"], ["D", "ひし形"], ["+", "+"], ["x", "×"], ["*", "星"], ["p", "五角形"], ["h", "六角形"]], series.marker)}</select></label>${input("markerSize", "マーカー面積 (pt²)", 'min="1" max="200" step="0.1"')}</div>
@@ -640,10 +640,12 @@ function processingControls(item) {
   return `<details class="series-processing settings-panel"><summary>データ補正</summary>
     <div class="field-grid" title="元データを保持し、Yは傾き補正→係数→規格化→単位表示・Yオフセットの順に適用します。誤差棒も同じ倍率で変換します。面積で割る場合は、面積の逆数をY係数に入力します。">${factor('xFactor','Xに掛ける係数')}${factor('yFactor','Yに掛ける係数')}</div>
     <label><input data-series-field="detrend" type="checkbox" ${item.detrend?'checked':''}>傾きを補正</label>
-    <div data-processing-for="detrend" title="空欄は全範囲。指定範囲で直線を当てはめ、先頭の有効点の高さを保って傾きだけを除きます。範囲は表示中のX値です。"><div class="field-grid">${num('detrendMin','補正範囲 X最小','placeholder="全範囲"')}${num('detrendMax','X最大','placeholder="全範囲"')}</div></div>
+    <div data-processing-for="detrend"><div class="field-grid" title="空欄は全範囲。指定範囲で直線を当てはめ、先頭の有効点の高さを保って傾きだけを除きます。範囲は表示中のX値です。">${num('detrendMin','補正範囲 X最小','placeholder="全範囲"')}${num('detrendMax','X最大','placeholder="全範囲"')}</div>
+    <div class="slope-control"><label title="自動計算した直線の傾きを表示します。手入力や▲▼で微調整できます。Y係数・規格化・表示単位の変換前のY値を、表示中のX値で割った傾きです。">補正する傾き<input data-series-field="detrendSlope" type="number" step="0.001" value="${escapeHTML(item.detrendSlope ?? '')}" placeholder="自動計算中"></label><button type="button" class="button quiet" data-reset-slope title="指定範囲の近似直線から求めた傾きに戻します。">自動に戻す</button></div></div>
     <label>規格化<select data-series-field="normalization">${choiceOptions([['none','なし'],['ratio','基準値で割る（Y/Y₀）'],['relative','相対変化（(Y−Y₀)/Y₀）']],item.normalization || 'none')}</select></label>
     <div data-processing-for="normalization"><label title="最大値は、傾き補正・Y係数を適用した後の各系列から別々に求めます。">規格化の基準<select data-series-field="referenceMode">${legacyReference}${choiceOptions([['max','各系列の最大値'],['manual','値を入力']],referenceMode)}</select></label>
     <div data-processing-for="manual" title="傾き補正・Y係数を掛けた後、表示単位とYオフセットを適用する前の基準値です。系列ごとに指定できます。">${num('referenceValue','基準値 Y₀')}</div></div>
+    <div class="field-grid" title="表示中の単位で位置をずらします。XはX係数・単位換算の後、Yは傾き補正・Y係数・規格化・単位換算の後に加算します。">${num('xOffset','Xオフセット')}${num('yOffset','Yオフセット')}</div>
   </details>`;
 }
 
@@ -656,7 +658,31 @@ function syncProcessingControls() {
       const key=group.dataset.processingFor;
       group.hidden=!items.some(item=>item && (key==='detrend'||key==='density'?item[key]:key==='normalization'?item.normalization!=='none':item.normalization!=='none'&&item.referenceMode===key));
     });
+    const input=panel.querySelector('[data-series-field="detrendSlope"]'),reset=panel.querySelector('[data-reset-slope]');
+    if(!input)return;
+    const values=items.map(item=>{
+      if(item?.detrendSlope!==undefined && item.detrendSlope!=='')return item.detrendSlope;
+      const index=config.series.indexOf(item);
+      return renderedRevision===revision ? figureResult?.seriesProcessing?.[index]?.slope : undefined;
+    });
+    const available=values.length && values.every(value=>value!==undefined && Number.isFinite(Number(value)));
+    const same=available && values.every(value=>Number(value)===Number(values[0]));
+    const automatic=items.every(item=>item?.detrendSlope===undefined || item.detrendSlope==='');
+    if(document.activeElement!==input){input.value=same?String(automatic?Number(Number(values[0]).toPrecision(8)):values[0]):'';input.setAttribute('value',input.value);}
+    input.placeholder=available?'系列ごとに異なる傾き':'自動計算中';
+    const magnitude=Math.abs(Number(same?values[0]:0));
+    input.step=String(magnitude?Math.max(Number.MIN_VALUE,10**(Math.floor(Math.log10(magnitude))-2)):.001);
+    reset.disabled=automatic;
   });
+}
+
+function resetProcessingSlope(event) {
+  const button=event.target.closest('[data-reset-slope]');
+  if(!button)return false;
+  const panel=button.closest('.series-processing');
+  const items=panel.closest('[data-series-all-root]')?config.series:[config.series[Number(panel.closest('[data-series-index]').dataset.seriesIndex)]];
+  items.forEach(item=>item.detrendSlope='');
+  changed();syncProcessingControls();return true;
 }
 
 function syncProcessingAxes() {
@@ -1001,11 +1027,12 @@ async function renderPreview() {
     $("#preview-state").className = "preview-state ready";
     $("#preview-state").textContent = "更新済み";
     $("#figure-size").textContent = `軸領域 ${snapshot.axes.width} × ${snapshot.axes.height} cm`;
-    const checks=[...result.warnings,...result.series.filter(item=>item.processing && Object.keys(item.processing).length).map(item=>`${item.name}: ${Object.entries(item.processing).map(([key,value])=>`${({slope:'補正した傾き',reference:'基準値Y₀（表示単位変換前）',areaCm2:'試料面積（cm²）',factor:'Y係数'})[key] || key} = ${Number(value.toPrecision(8))}`).join('、')}`)];
+    const checks=[...result.warnings,...result.series.filter(item=>item.processing && Object.keys(item.processing).length).map(item=>`${item.name}: ${Object.entries(item.processing).map(([key,value])=>`${({slope:'補正した傾き',fittedSlope:'自動計算の傾き',reference:'基準値Y₀（表示単位変換前）',areaCm2:'試料面積（cm²）',factor:'Y係数'})[key] || key} = ${Number(value.toPrecision(8))}`).join('、')}`)];
     $("#warning-list").replaceChildren(...checks.map(text => { const item = document.createElement("li"); item.textContent = text; return item; }));
     $("#plot-warnings").hidden = !checks.length;
     status(`${result.series.length} 系列を描画しました · ${result.series.map(series => `${series.points.toLocaleString()} 点`).join(" / ")}`, "ready");
     renderedRevision = revision;
+    syncProcessingControls();
     showUnitAdvice();
   } catch (error) {
     if (targetRevision !== revision) return;
@@ -1288,7 +1315,7 @@ function incompleteNumberInput(input) {
   if (input.validity?.badInput) return true;
   if (input.value !== '') return !Number.isFinite(Number(input.value));
   if (['trendX','trendY'].includes(input.dataset.seriesField)) return false;
-  if (['detrendMin','detrendMax','referenceMin','referenceMax'].includes(input.dataset.seriesField)) return false;
+  if (['detrendMin','detrendMax','detrendSlope','referenceMin','referenceMax'].includes(input.dataset.seriesField)) return false;
   return !['xMin','xMax','yMin','yMax','y2Min','y2Max','xStep','yStep','y2Step','xMinorStep','yMinorStep','y2MinorStep','legendX','legendY','xLabelX','xLabelY','yLabelX','yLabelY','y2LabelX','y2LabelY'].includes(input.dataset.axis);
 }
 
@@ -1368,6 +1395,7 @@ function applyControlInput(event) {
       input.setAttribute('aria-invalid',String(coefficient === null));
       if (coefficient === null) return;
     }
+    if(key==='detrendSlope')input.setAttribute('value',input.value);
     const indices=input.dataset.seriesAll==='true' && [...SERIES_APPEARANCE_FIELDS,...PROCESSING_FIELDS].includes(key)?config.series.map((_,i)=>i):[index];
     for(const index of indices) {
       config.series[index][key] = coefficient ?? (input.type==='checkbox'?input.checked:key==='trendFontSize'?Number((Number(input.value)/Number(config.axes.fontScale)).toPrecision(12)):input.type==='range'?Number(input.value):input.value);
@@ -1395,6 +1423,7 @@ function applyControlInput(event) {
 $("#plot-form").addEventListener("input", applyControlInput);
 $('#preset-options').addEventListener('input', applyControlInput);
 $("#series-list").addEventListener("click", event => {
+  if(resetProcessingSlope(event))return;
   const reset=event.target.closest('[data-reset-trend]');
   if(reset){const index=Number(reset.dataset.resetTrend);config.series[index].trendX=config.series[index].trendY='';for(const key of ['trendX','trendY'])$$(`[data-series-index="${index}"] [data-series-field="${key}"]`).forEach(input=>input.value='');changed();return;}
   const reorder=event.target.closest('[data-series-up],[data-series-down],[data-series-copy]');
@@ -1927,7 +1956,7 @@ function openElementEditor(part,index=0) {
   // Reuse the sidebar controls, restoring live values and color-picker handlers.
   fields.querySelectorAll('.color-control').forEach(wrapper=>{const input=wrapper.querySelector('input');if(input){input.hidden=false;delete input.dataset.paletteEnhanced;wrapper.replaceWith(input);}});
   fields.querySelectorAll('[id]').forEach(element=>element.removeAttribute('id'));
-  fields.querySelectorAll('button').forEach(element=>{if(element.dataset.resetTrend===undefined&&element.dataset.resetLegend===undefined)element.remove();});
+  fields.querySelectorAll('button').forEach(element=>{if(element.dataset.resetTrend===undefined&&element.dataset.resetLegend===undefined&&element.dataset.resetSlope===undefined)element.remove();});
   // Position is edited by dragging; retain numeric coordinates in the sidebar only.
   fields.querySelectorAll('[data-axis="legendX"],[data-axis="legendY"],[data-series-field="trendX"],[data-series-field="trendY"],[data-annotation-field="x"],[data-annotation-field="y"],[data-annotation-field="x1"],[data-annotation-field="y1"],[data-annotation-field="x2"],[data-annotation-field="y2"],[data-annotation-field="coordinate_system"]').forEach(input=>input.closest('label')?.remove());
   fields.querySelectorAll('.annotation-card > summary').forEach(element=>element.remove());
@@ -1951,8 +1980,10 @@ function openElementEditor(part,index=0) {
   $('#element-editor').showModal();enhanceColorInputs();syncAxisAutomaticControls();syncUnitControls();syncOpacityControls();syncProcessingControls();
 }
 $('#element-editor-fields').addEventListener('input',applyControlInput);
+for(const root of [$('#plot-form'),$('#element-editor-fields')])root.addEventListener('focusout',event=>{if(event.target.dataset.seriesField==='detrendSlope')syncProcessingControls();});
 $('#edit-all-series').addEventListener('click',()=>openElementEditor('seriesAll'));
 $('#element-editor-fields').addEventListener('click',event=>{
+  if(resetProcessingSlope(event))return;
   if(event.target.closest('[data-reset-legend]')){config.axes.legendX=config.axes.legendY='';config.axes.legendPosition='best';drawControls();changed();return;}
   const reset=event.target.closest('[data-reset-trend]');if(reset){const item=config.series[Number(reset.dataset.resetTrend)];item.trendX=item.trendY='';$$(`[data-series-index="${reset.dataset.resetTrend}"] [data-series-field="trendX"],[data-series-index="${reset.dataset.resetTrend}"] [data-series-field="trendY"]`).forEach(input=>input.value='');changed();}
 });

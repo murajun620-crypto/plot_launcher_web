@@ -412,10 +412,13 @@ class PlotEngine:
             if mask.sum() < 2 or np.ptp(x[mask]) == 0:
                 raise ValueError("傾き補正には異なるX値の有効な点が2点以上必要です。")
             xx = x[mask] - np.mean(x[mask])
-            slope = float(np.dot(xx, raw_y[mask] - np.mean(raw_y[mask])) / np.dot(xx, xx))
+            fitted_slope = float(np.dot(xx, raw_y[mask] - np.mean(raw_y[mask])) / np.dot(xx, xx))
+            manual_slope = number(item.get("detrendSlope", ""), "補正する傾き", optional=True)
+            slope = fitted_slope if manual_slope is None else manual_slope
             anchor = x[np.flatnonzero(valid)[0]]
             bias = -slope * (x - anchor)
             details["slope"] = slope
+            if manual_slope is not None: details["fittedSlope"] = fitted_slope
         factor = number(item.get("yFactor", 1), "Yに掛ける係数")
         if factor != 1: details["factor"] = factor
         gain *= factor; bias *= factor
@@ -1404,7 +1407,7 @@ class PlotEngine:
                 axis_info[name] = {"unit": prepared.get(f"PLOT_{'X' if name == 'x' else 'Y'}UNIT", ""), "tickMax": max(ticks, default=0),
                     "hidden": bool(config.get("axes", {}).get(f"hide{name.upper()}TickLabels", False)),
                     "categorical": name == "x" and preset == "bar_graph_general" and not namespace.get("is_numeric_x", True)}
-            return {"svg": image.getvalue().decode("utf-8"), "series": [item for item in diagnostics if item["visible"]], "fits": sorted(fits, key=lambda item: item["index"]), "warnings": warnings, "statistics": statistics, "xRange": list(annotation_axes.get_xlim()), "yRange": list(annotation_axes.get_ylim()), "y2Range": list((right_axes or axes).get_ylim()) if right_indices else None, "yDataScale": annotation_axes.get_yscale(), "tickSteps": tick_steps, "axisInfo": axis_info, "geometry": geometry, "fontFamily": values["PLOT_FONT_FAMILY"].split(",")[0]}
+            return {"svg": image.getvalue().decode("utf-8"), "series": [item for item in diagnostics if item["visible"]], "seriesProcessing": [item.get("processing", {}) for item in diagnostics], "fits": sorted(fits, key=lambda item: item["index"]), "warnings": warnings, "statistics": statistics, "xRange": list(annotation_axes.get_xlim()), "yRange": list(annotation_axes.get_ylim()), "y2Range": list((right_axes or axes).get_ylim()) if right_indices else None, "yDataScale": annotation_axes.get_yscale(), "tickSteps": tick_steps, "axisInfo": axis_info, "geometry": geometry, "fontFamily": values["PLOT_FONT_FAMILY"].split(",")[0]}
         except Exception:
             for figure_number in set(plt.get_fignums()) - previous_figures:
                 plt.close(figure_number)
