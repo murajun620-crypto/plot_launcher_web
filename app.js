@@ -1,9 +1,9 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=40aa52a14f75";
-import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=40aa52a14f75";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=40aa52a14f75";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=40aa52a14f75";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=40aa52a14f75";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=40aa52a14f75";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=94312791d8d3";
+import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=94312791d8d3";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=94312791d8d3";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=94312791d8d3";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=94312791d8d3";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=94312791d8d3";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -41,6 +41,7 @@ const sourceHandles = new WeakMap();
 const folderSupported = typeof window.showDirectoryPicker === 'function';
 const importedFonts = new Map();
 let savedProjectState = null;
+let sampleCatalog = null, sampleCatalogPromise = null, sampleGroup = 'all', pendingSampleId = null;
 let sheetSettings = new Map(), cancelBatch = false;
 let sheetMode = 'shared', sharedSettings = null;
 let myPresets = [];
@@ -197,6 +198,7 @@ function updateButtons() {
   $("#drop-zone").disabled = !engineReady || busy;
   $("#data-drop-area").setAttribute("aria-disabled", String(!engineReady || busy));
   $("#sample-data").disabled = !engineReady || busy;
+  $$('#sample-list button,#sample-groups button').forEach(button=>button.disabled=busy||pendingSampleId!==null);
   $('#add-data').hidden=!sourceData;
   $('#add-data').disabled=!engineReady || busy;
   $("#paste-data").disabled = !engineReady || busy;
@@ -268,7 +270,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=40aa52a14f75", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=94312791d8d3", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -862,7 +864,7 @@ function configurationForSheet(data, setting, template) {
   return inherited ? configForSheet(inherited, data) : setting ? restoreSettings(setting, data) : initialSheetConfig(data);
 }
 
-async function loadFile(file, isSample = false, reload = false, fromClipboard = false) {
+async function loadFile(file, isSample = false, reload = false, fromClipboard = false, sampleSettings = null) {
   if (loading || exporting || !engineReady) return;
   if (!reload && (!/\.(xlsx|xlsm|xls|csv)$/i.test(file.name) || file.size > 30 * 1024 * 1024)) {
     status("30 MB以内のExcel（.xlsx / .xlsm / .xls）またはCSVを選んでください。", "error");
@@ -912,9 +914,12 @@ async function loadFile(file, isSample = false, reload = false, fromClipboard = 
     }
     config = retained || initialSheetConfig(metadata);
     if (sample && !reload) {
-      config.series = metadata.columns.slice(1).map((column, index) => createSeries(0, column.index, column.name, index, config.plotType));
-      config.axes.xLabel = "Potential"; config.axes.xUnit = "V";
-      config.axes.yLabel = "Current density"; config.axes.yUnit = "mA/cm^2";
+      if (sampleSettings) config = restoreSettings(sampleSettings, metadata);
+      else {
+        config.series = metadata.columns.slice(1).map((column, index) => createSeries(0, column.index, column.name, index, config.plotType));
+        config.axes.xLabel = "Potential"; config.axes.xUnit = "V";
+        config.axes.yLabel = "Current density"; config.axes.yUnit = "mA/cm^2";
+      }
     }
     if (config.series.length) {
       const current = makeSettings(config, metadata, loadedHeader);
@@ -947,8 +952,64 @@ async function loadFile(file, isSample = false, reload = false, fromClipboard = 
   }
 }
 
-function loadSample() {
-  return loadFile(new File([sampleCSV()], "sample.csv", { type: "text/csv" }), true);
+function validateSampleCatalog(value) {
+  const validId=id=>typeof id==='string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id) && id.length<=60;
+  const text=(value,limit)=>typeof value==='string' && value.trim().length>0 && value.length<=limit;
+  if(value?.version!==1 || !Array.isArray(value.groups) || !value.groups.length || value.groups.length>10 || !Array.isArray(value.samples) || !value.samples.length || value.samples.length>100)throw new Error('サンプルの一覧を確認してください。');
+  const groups=new Set(),ids=new Set();
+  for(const group of value.groups){if(!validId(group.id)||group.id==='all'||groups.has(group.id)||!text(group.title,40))throw new Error('サンプルの分類を確認してください。');groups.add(group.id);}
+  for(const item of value.samples){if(!validId(item.id)||ids.has(item.id)||!groups.has(item.group)||!text(item.title,100)||!text(item.description,200))throw new Error('サンプルの一覧を確認してください。');ids.add(item.id);}
+  return value;
+}
+
+function drawSamplePicker() {
+  if(!sampleCatalog)return;
+  $('#sample-groups').innerHTML=[{id:'all',title:'すべて'},...sampleCatalog.groups].map(group=>`<button type="button" class="sample-group" data-sample-group="${group.id}" aria-pressed="${sampleGroup===group.id}">${escapeHTML(group.title)}</button>`).join('');
+  $('#sample-list').innerHTML=sampleCatalog.samples.filter(item=>sampleGroup==='all'||item.group===sampleGroup).map(item=>`<button type="button" class="sample-card" data-sample-id="${item.id}" aria-label="${escapeHTML(item.title)}のサンプルを使う" title="${escapeHTML(item.description)}"><img src="${escapeHTML(new URL(`samples/${item.id}.svg${new URL(import.meta.url).search}`,import.meta.url).href)}" alt="" loading="lazy"><strong>${escapeHTML(item.title)}</strong><span>${escapeHTML(item.description)}</span></button>`).join('');
+  $$('#sample-list button,#sample-groups button').forEach(button=>button.disabled=loading||exporting||pendingSampleId!==null);
+}
+
+async function openSamplePicker() {
+  if(!engineReady || loading || exporting)return;
+  clearSampleConfirmation();
+  $('#sample-dialog').showModal();
+  $('#sample-picker-status').textContent=sampleCatalog?'':'サンプルを読み込んでいます…';
+  try {
+    if(!sampleCatalog){
+      sampleCatalogPromise ||= fetch(new URL(`samples/catalog.json${new URL(import.meta.url).search}`,import.meta.url)).then(async response=>{
+        if(!response.ok)throw new Error('サンプルの一覧を読み込めませんでした。もう一度開いてください。');
+        return validateSampleCatalog(await response.json());
+      }).catch(error=>{sampleCatalogPromise=null;throw error;});
+      sampleCatalog=await sampleCatalogPromise;
+    }
+    drawSamplePicker();$('#sample-picker-status').textContent='';
+  } catch(error){$('#sample-picker-status').textContent=error.message;}
+}
+
+function clearSampleConfirmation() {
+  pendingSampleId=null;$('#sample-confirm').hidden=true;updateButtons();
+}
+
+async function loadSample(id, confirmed=false) {
+  if(!engineReady || loading || exporting || !sampleCatalog?.samples.some(item=>item.id===id))return false;
+  if(!confirmed && hasUnsavedChanges()){
+    pendingSampleId=id;
+    $('#sample-confirm-message').textContent=`未保存の変更があります。「${sampleCatalog.samples.find(item=>item.id===id).title}」に切り替えますか？`;
+    $('#sample-confirm').hidden=false;updateButtons();$('#sample-confirm-cancel').focus();return false;
+  }
+  clearSampleConfirmation();
+  loading=true;updateButtons();$('#sample-picker-status').textContent='サンプルを読み込んでいます…';
+  try {
+    const response=await fetch(new URL(`samples/${id}.plotproject${new URL(import.meta.url).search}`,import.meta.url));
+    if(!response.ok)throw new Error('サンプルを読み込めませんでした。もう一度選んでください。');
+    const saved=await response.json(),project=parseProject(saved);
+    const file=new File([project.data.bytes],project.data.filename,{type:'text/csv'});
+    loading=false;
+    const opened=await loadFile(file,true,false,false,project.settings);
+    if(opened){$('#sample-dialog').close();$('#sample-picker-status').textContent='';return true;}
+    $('#sample-picker-status').textContent='サンプルを開けませんでした。もう一度選んでください。';return false;
+  } catch(error){$('#sample-picker-status').textContent=error.message;return false;}
+  finally{loading=false;updateButtons();}
 }
 
 let pastedTable = null, pasteHeaderAutomatic = true;
@@ -1298,7 +1359,19 @@ for (const zone of [$("#drop-zone"), $("#data-drop-area")]) {
 // Dropping a file elsewhere must not navigate away and discard the settings.
 window.addEventListener("dragover", event => event.preventDefault());
 window.addEventListener("drop", event => {event.preventDefault();const file=event.dataTransfer.files[0];if(file && /\.(json|plotproject)$/i.test(file.name))openDroppedFile(file);});
-$("#sample-data").addEventListener("click", loadSample);
+$("#sample-data").addEventListener("click", openSamplePicker);
+$('#close-sample-dialog').addEventListener('click',()=>{clearSampleConfirmation();$('#sample-dialog').close();});
+$('#sample-dialog').addEventListener('cancel',clearSampleConfirmation);
+$('#sample-confirm-cancel').addEventListener('click',clearSampleConfirmation);
+$('#sample-confirm-load').addEventListener('click',()=>{if(pendingSampleId!==null)return loadSample(pendingSampleId,true);});
+$('#sample-groups').addEventListener('click',event=>{
+  const button=event.target.closest('[data-sample-group]');
+  if(!button || !sampleCatalog || button.dataset.sampleGroup!=='all' && !sampleCatalog.groups.some(group=>group.id===button.dataset.sampleGroup))return;
+  sampleGroup=button.dataset.sampleGroup;drawSamplePicker();
+});
+$('#sample-list').addEventListener('click',event=>{
+  const button=event.target.closest('[data-sample-id]');if(button)return loadSample(button.dataset.sampleId);
+});
 $("#sheet-select").addEventListener("change", () => loadFile(null, false, true));
 async function changeSheet(index) {
   if (!engineReady || loading || exporting || !metadata || index < 0 || index >= metadata.sheets.length || index === metadata.sheetIndex) return;

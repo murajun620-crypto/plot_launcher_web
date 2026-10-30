@@ -6,8 +6,8 @@
   <meta name="description" content="Excel・CSVの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=40aa52a14f75">
-  <script type="module" src="./app.js?v=40aa52a14f75"></script>
+  <link rel="stylesheet" href="./style.css?v=94312791d8d3">
+  <script type="module" src="./app.js?v=94312791d8d3"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -218,6 +218,16 @@
       <p id="save-progress" class="save-progress" role="status" aria-live="polite"></p>
     </section>
     <div class="save-actions"><button id="confirm-save" class="button primary" disabled>保存</button><button id="cancel-batch" class="button" hidden title="処理中のファイルが完成したところで停止します。">中止</button></div>
+  </dialog>
+  <dialog id="sample-dialog" class="plot-dialog sample-dialog" aria-labelledby="sample-dialog-title">
+    <div class="sample-picker-heading">
+      <div class="dialog-heading"><strong id="sample-dialog-title">サンプルを選ぶ</strong><button id="close-sample-dialog" type="button" class="button quiet">閉じる</button></div>
+      <p class="sample-note">ダミーデータとグラフ設定を読み込みます。</p>
+      <div id="sample-groups" class="sample-groups" role="group" aria-label="サンプルの分類"></div>
+      <div id="sample-confirm" class="sample-confirm" role="alert" hidden><p id="sample-confirm-message"></p><div><button id="sample-confirm-cancel" type="button" class="button">戻る</button><button id="sample-confirm-load" type="button" class="button primary">切り替える</button></div></div>
+    </div>
+    <p id="sample-picker-status" class="sample-picker-status" role="status" aria-live="polite"></p>
+    <div id="sample-list" class="sample-list"></div>
   </dialog>
   <dialog id="color-panel" class="plot-dialog" aria-labelledby="color-panel-title">
     <div class="dialog-heading"><strong id="color-panel-title">色を選ぶ</strong><button type="button" class="button quiet" id="close-color-panel" aria-label="色パネルを閉じる">閉じる</button></div>

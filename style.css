@@ -237,6 +237,24 @@ button:focus-visible,summary:focus-visible,a:focus-visible{outline:2px solid #ab
 }
 .plot-dialog{width:min(360px,calc(100vw - 24px));max-height:85dvh;border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:0 12px 48px #202d3e40;color:var(--ink);overflow:auto}
 .plot-dialog::backdrop{background:#202d3e66}
+.sample-dialog{width:min(960px,calc(100vw - 32px))}
+.sample-picker-heading{position:sticky;top:-16px;background:#fff;z-index:1;padding:10px 0 12px}
+.sample-note{font-size:11px;color:#788395;margin:0 0 12px}
+.sample-groups{display:flex;flex-wrap:wrap;gap:7px}
+.sample-group{border:1px solid var(--border);border-radius:5px;background:#fff;color:var(--muted);font-size:12px;padding:7px 12px;cursor:pointer}
+.sample-group[aria-pressed=true]{background:var(--blue);border-color:var(--blue);color:#fff}
+.sample-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:12px}
+.sample-card{display:flex;flex-direction:column;gap:6px;min-width:0;padding:10px;border:1px solid var(--border);border-radius:8px;background:#fff;text-align:left;color:var(--ink);cursor:pointer}
+.sample-card:hover,.sample-card:focus-visible{border-color:var(--blue);outline:2px solid #abc8f3;outline-offset:1px}
+.sample-card:disabled{opacity:.5;cursor:progress}
+.sample-card img{display:block;width:100%;height:115px;object-fit:contain;background:#fff}
+.sample-card strong{font-size:12px;font-weight:600}
+.sample-card>span{font-size:10px;line-height:1.5;color:#788395}
+.sample-picker-status{font-size:12px;color:var(--muted);margin:0 0 12px}
+.sample-picker-status:empty{display:none}
+.sample-confirm{margin-top:12px;padding:12px;border:1px solid #d9c58a;border-radius:6px;background:#fff8e7}
+.sample-confirm p{font-size:12px;line-height:1.6;margin:0 0 10px}
+.sample-confirm>div{display:flex;justify-content:flex-end;gap:8px}
 .dialog-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
 .plot-dialog label{display:flex;flex-direction:column;gap:6px;margin:10px 0}
 .plot-dialog label:has(input[type=checkbox]){flex-direction:row;align-items:center}
