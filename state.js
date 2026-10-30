@@ -1,4 +1,4 @@
-import { resetPresetUnitScales, unitConversion } from "./units.js?v=94312791d8d3";
+import { resetPresetUnitScales, unitConversion } from "./units.js?v=a0baff2049e8";
 export const APP_VERSION = "2.4.0";
 
 // Accept one numeric value or fraction without evaluating JavaScript expressions.
