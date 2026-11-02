@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Excel・CSVの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
+  <meta name="description" content="Excel・CSV・TXTの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=a0baff2049e8">
-  <script type="module" src="./app.js?v=a0baff2049e8"></script>
+  <link rel="stylesheet" href="./style.css?v=c95adbe70b99">
+  <script type="module" src="./app.js?v=c95adbe70b99"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -42,10 +42,10 @@
   <div class="workspace">
     <aside id="controls-panel" class="controls" aria-label="グラフの設定">
       <details class="control-section data-section" open>
-        <summary class="section-heading"><h2><span class="step">01</span>データ</h2><span class="section-note">Excel / CSV</span></summary>
-        <button id="drop-zone" class="button primary drop-zone" disabled title="Excel / CSVを開きます。ドラッグ＆ドロップでも開けます（Ctrl/Cmd＋Alt＋O）">＋ データを開く</button>
-        <input id="data-file" type="file" accept=".xlsx,.xlsm,.xls,.csv" multiple hidden>
-        <button id="add-data" class="button quiet" disabled hidden title="別のExcel / CSVを読み込み、現在のグラフへ系列を追加します。">ファイルを追加</button><input id="add-data-files" type="file" accept=".xlsx,.xlsm,.xls,.csv" multiple hidden>
+        <summary class="section-heading"><h2><span class="step">01</span>データ</h2><span class="section-note">Excel / CSV / TXT</span></summary>
+        <button id="drop-zone" class="button primary drop-zone" disabled title="Excel / CSV / TXTを開きます。TXTは表題・列名・単位・区切りを自動判定します。ドラッグ＆ドロップでも開けます（Ctrl/Cmd＋Alt＋O）">＋ データを開く</button>
+        <input id="data-file" type="file" accept=".xlsx,.xlsm,.xls,.csv,.txt" multiple hidden>
+        <button id="add-data" class="button quiet" disabled hidden title="別のExcel / CSV / TXTを読み込み、現在のグラフへ系列を追加します。">ファイルを追加</button><input id="add-data-files" type="file" accept=".xlsx,.xlsm,.xls,.csv,.txt" multiple hidden>
         <button id="paste-data" class="button paste-data" disabled title="Excelでセル範囲をコピーし、Ctrl/Command＋Vで貼り付けます（Ctrl/Command＋Alt＋Vでこの画面を開く）">データを貼り付け</button>
         <div id="data-drop-area" class="data-drop-area" role="region" aria-label="データファイルのドロップ先" aria-disabled="true">ここにデータをドロップ</div>
         <button id="sample-data" class="sample-button" disabled>サンプルを使う</button>
@@ -55,7 +55,7 @@
         <div id="data-options" class="data-options" hidden>
           <details id="source-files" class="settings-panel" hidden><summary>ファイル別のシート・読み込み設定</summary><div id="source-list"></div></details>
           <label id="sheet-select-field">シート<select id="sheet-select" disabled><option>未読み込み</option></select></label>
-          <details class="settings-panel"><summary>読み込み設定</summary><label>ヘッダー行<input id="header-row" type="number" min="1" max="1000" step="1" value="1" disabled></label></details>
+          <details class="settings-panel"><summary>読み込み設定</summary><label title="列名の行を指定します。TXTは1で自動判定し、列名のない表も読み込めます。">ヘッダー行<input id="header-row" type="number" min="1" max="1000" step="1" value="1" disabled></label></details>
         </div>
         <p class="field-hint">列名が並ぶ行を指定してください。</p>
       </details>

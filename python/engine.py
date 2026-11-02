@@ -246,6 +246,90 @@ def plot_environment(values, frame, sheet_name, filename):
             sys.modules["df_utils"] = original_module
 
 
+def read_text_table(path, header_row):
+    """Detect a numeric instrument table, retaining its column names and units."""
+    import csv
+    raw = Path(path).read_bytes()
+    if len(raw) > 30 * 1024 * 1024:
+        raise ValueError("TXTファイルは30 MB以内にしてください。")
+    encodings = ["utf-16"] if raw.startswith((b"\xff\xfe", b"\xfe\xff")) else ["utf-8-sig", "cp932"]
+    for encoding in encodings:
+        try:
+            text = raw.decode(encoding)
+            break
+        except UnicodeDecodeError:
+            continue
+    else:
+        raise ValueError("TXTの文字コードを読み取れません。UTF-8またはShift_JISで保存してください。")
+    if "\x00" in text:
+        raise ValueError("数値の表を含むTXTファイルを選んでください。")
+    lines = text.splitlines()
+    start = int(header_row) - 1
+    def cells(line, delimiter):
+        if not line.strip() or line.lstrip().startswith(("#", "//")):
+            return []
+        return [cell.strip() for cell in next(csv.reader([line], delimiter=delimiter))] if delimiter else line.split()
+    def numeric(row):
+        if len(row) < 2 or not any(row):
+            return False
+        try:
+            for cell in row:
+                if cell and cell.lower() not in {"na", "n/a", "nan", "null", "--"}:
+                    float(cell)
+            return True
+        except ValueError:
+            return False
+    # Repeated numeric rows distinguish the table from numeric metadata.
+    best = None
+    for delimiter in ("\t", ",", ";", None):
+        preview = [cells(line, delimiter) for line in lines[start:1000]]
+        for offset, row in enumerate(preview):
+            if not numeric(row):
+                continue
+            following = [other for other in preview[offset + 1:offset + 5] if other]
+            run = 1
+            for other in following[:2]:
+                if len(other) != len(row) or not numeric(other):
+                    break
+                run += 1
+            score = (run, -offset)
+            if best is None or score > best[0]:
+                best = (score, delimiter, start + offset, len(row))
+    if best is None:
+        raise ValueError("TXTに数値の表が見つかりません。2列以上の空白・タブ・カンマ区切りデータを選んでください。")
+    _, delimiter, first, width = best
+    if width > MAX_COLUMNS:
+        raise ValueError(f"Web版では{MAX_COLUMNS}列以内のファイルを使用してください。")
+    names, units, detected_header = None, None, first + 1
+    for index in range(first - 1, start - 1, -1):
+        row = cells(lines[index], delimiter)
+        if not row:
+            continue
+        if len(row) != width:
+            break
+        if all(re.fullmatch(r"\[[^\[\]]+\]|\([^()]+\)|-", cell) for cell in row):
+            units = [cell[1:-1].strip() if cell != "-" else "" for cell in row]
+            continue
+        if not numeric(row):
+            names, detected_header = row, index + 1
+        break
+    names = names or [f"列 {index + 1}" for index in range(width)]
+    if units:
+        names = [f"{name}/{unit}" if unit else name for name, unit in zip(names, units)]
+    rows = []
+    for index in range(first, len(lines)):
+        row = cells(lines[index], delimiter)
+        if not row:
+            continue
+        if len(row) != width:
+            raise ValueError(f"TXTの{index + 1}行目の列数が一致しません。区切りとヘッダー行を確認してください。")
+        rows.append(row)
+        if len(rows) > MAX_ROWS:
+            raise ValueError(f"Web版では{MAX_ROWS:,}行以内のファイルを使用してください。")
+    frame = pd.DataFrame(rows, columns=names).apply(pd.to_numeric, errors="coerce")
+    return frame, detected_header
+
+
 class PlotEngine:
     def __init__(self, source_dir=None, font_path=None):
         self.source_dir = Path(source_dir or Path(__file__).parent)
@@ -315,6 +399,9 @@ class PlotEngine:
             except UnicodeDecodeError:
                 frame = pd.read_csv(path, encoding="cp932", header=int(header) - 1, nrows=MAX_ROWS + 1)
             sheet_name = "CSV"
+        elif suffix == ".txt":
+            frame, header = read_text_table(path, header)
+            sheets, sheet_name = ["TXT"], "TXT"
         elif suffix in {".xlsx", ".xlsm", ".xls"}:
             with pd.ExcelFile(path, engine="xlrd" if suffix == ".xls" else "openpyxl") as book:
                 sheets = book.sheet_names
@@ -322,7 +409,7 @@ class PlotEngine:
                 sheet_name = sheets[index]
                 frame = book.parse(sheet_name=sheet_name, header=int(header) - 1, nrows=MAX_ROWS + 1)
         else:
-            raise ValueError("Excel（.xlsx / .xlsm / .xls）またはCSVを選んでください。")
+            raise ValueError("Excel（.xlsx / .xlsm / .xls）、CSVまたはTXTを選んでください。")
         if len(frame) > MAX_ROWS or len(frame.columns) > MAX_COLUMNS:
             raise ValueError(f"Web版では{MAX_ROWS:,}行・{MAX_COLUMNS}列以内のファイルを使用してください。")
         # Empty Excel cover sheets still need their sheet selector in the UI.

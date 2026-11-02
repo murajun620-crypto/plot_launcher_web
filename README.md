@@ -1,5 +1,9 @@
 # PlotLauncher Web
 
+## TXTデータの読み込み（v2.4.1）
+
+「データを開く」またはドラッグ＆ドロップでTXTを読み込めます。空白・タブ・カンマ・セミコロン区切り、UTF-8・Shift_JIS・BOM付きUTF-16に対応します。表題・列名・別行の`[m]`などの単位を自動判定し、列名のない表も先頭の数値から読み込みます。TXTを含む複数ファイルの重ね描きとプロジェクト保存・復元にも対応しています。
+
 Excel / CSVの測定データをブラウザ内で処理し、17種類のプリセットで描画してSVG・PNG・PDF・PPTXで保存できます。
 
 [Webアプリを開く](https://murajun620-crypto.github.io/plot_launcher_web/)

@@ -1,4 +1,4 @@
-import { restoreSettings } from "./state.js?v=a0baff2049e8";
+import { restoreSettings } from "./state.js?v=c95adbe70b99";
 // All user data stays in this worker's in-memory filesystem.
 const PYODIDE_VERSION = "0.29.3";
 const INDEX_URL = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
@@ -71,7 +71,7 @@ self.onmessage = ({ data }) => {
           if(!Array.isArray(args.files) || !args.files.length || args.files.length>16 || args.files.reduce((sum,file)=>sum+(file.bytes?.byteLength || 0),0)>30*1024*1024)throw new Error('複数ファイルは16個・合計30 MB以内にしてください。');
           nextSources=args.files.map(file=>{
             const extension=file.filename.split('.').pop().toLowerCase();
-            if(!['xlsx','xlsm','xls','csv'].includes(extension))throw new Error('ExcelまたはCSVファイルを選んでください。');
+            if(!['xlsx','xlsm','xls','csv','txt'].includes(extension))throw new Error('Excel、CSVまたはTXTファイルを選んでください。');
             const path=`/data/upload-${++uploadNumber}.${extension}`;uploadedPaths.push(path);
             pyodide.FS.writeFile(path,new Uint8Array(file.bytes));
             return {path,filename:file.filename,sheetIndex:file.sheetIndex ?? 0,headerRow:file.headerRow ?? 1};
@@ -80,7 +80,7 @@ self.onmessage = ({ data }) => {
         payload={sources:nextSources,filename:args.filename};dispatchOperation='load-many';
       } else if (operation === "load" || operation === "project") {
         const extension = args.filename.split(".").pop().toLowerCase();
-        if (!["xlsx", "xlsm", "xls", "csv"].includes(extension)) throw new Error("ExcelまたはCSVファイルを選んでください。");
+        if (!["xlsx", "xlsm", "xls", "csv", "txt"].includes(extension)) throw new Error("Excel、CSVまたはTXTファイルを選んでください。");
         if (args.bytes) {
           uploadPath = `/data/upload-${++uploadNumber}.${extension}`;
           pyodide.FS.writeFile(uploadPath, new Uint8Array(args.bytes));

@@ -1,9 +1,9 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=a0baff2049e8";
-import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=a0baff2049e8";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=a0baff2049e8";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=a0baff2049e8";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=a0baff2049e8";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=a0baff2049e8";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=c95adbe70b99";
+import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=c95adbe70b99";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=c95adbe70b99";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=c95adbe70b99";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=c95adbe70b99";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=c95adbe70b99";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -270,7 +270,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=a0baff2049e8", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=c95adbe70b99", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -279,9 +279,9 @@ function startWorker() {
       updateButtons();
       $("#initial-message .spinner").hidden = true;
       $("#initial-message strong").textContent = "データを選んでください";
-      $("#initial-message p").textContent = "Excel / CSVを読み込むか、「サンプルデータを使う」を押してください。";
+      $("#initial-message p").textContent = "Excel / CSV / TXTを読み込むか、「サンプルを使う」を押してください。";
       $("#preview-state").textContent = "データ未選択";
-      status("Excel / CSVファイルを選んでください。", "ready");
+      status("Excel / CSV / TXTファイルを選んでください。", "ready");
       await openGalleryProject();
       // Permission waiting must never delay opening data or a gallery project.
       void browseLocalFonts({automatic:true});
@@ -836,11 +836,11 @@ async function loadDataFiles(files, append=false, selection=null) {
   if(!selection && files.length===1 && !append)return loadFile(files[0]);
   const oldMetadata=metadata,oldConfig=structuredClone(config);
   const existing=append && sourceData?(sourceData.files || [{...sourceData,sheetIndex:metadata.sheetIndex,headerRow:loadedHeader}]):[];
-  if(!selection && (files.length+existing.length>16 || files.some(file=>!/\.(xlsx|xlsm|xls|csv)$/i.test(file.name)) || files.reduce((sum,file)=>sum+file.size,0)+existing.reduce((sum,file)=>sum+file.bytes.byteLength,0)>30*1024*1024)){status('Excel / CSVは16ファイル・合計30 MB以内で選んでください。','error');return;}
+  if(!selection && (files.length+existing.length>16 || files.some(file=>!/\.(xlsx|xlsm|xls|csv|txt)$/i.test(file.name)) || files.reduce((sum,file)=>sum+file.size,0)+existing.reduce((sum,file)=>sum+file.bytes.byteLength,0)>30*1024*1024)){status('Excel / CSV / TXTは16ファイル・合計30 MB以内で選んでください。','error');return;}
   let originals;
   try{originals=selection?sourceData.files:[...existing,...await Promise.all(files.map(async file=>({filename:file.name,bytes:await file.arrayBuffer(),sheetIndex:0,headerRow:1})))];}
   catch(error){status(`ファイルを読み込めませんでした: ${error.message}`,'error');return false;}
-  if(!originals.length || originals.length>16 || originals.some(file=>!/\.(xlsx|xlsm|xls|csv)$/i.test(file.filename)) || originals.reduce((sum,file)=>sum+file.bytes.byteLength,0)>30*1024*1024){status('Excel / CSVは16ファイル・合計30 MB以内で選んでください。','error');return;}
+  if(!originals.length || originals.length>16 || originals.some(file=>!/\.(xlsx|xlsm|xls|csv|txt)$/i.test(file.filename)) || originals.reduce((sum,file)=>sum+file.bytes.byteLength,0)>30*1024*1024){status('Excel / CSV / TXTは16ファイル・合計30 MB以内で選んでください。','error');return;}
   const filename=selection?sourceData.filename:`${safeStem(originals[0].filename).slice(0,80)}_combined.csv`;
   loading=true;clearTimeout(renderTimer);++revision;updateButtons();status('複数ファイルを読み込んでいます…');
   try{
@@ -866,8 +866,8 @@ function configurationForSheet(data, setting, template) {
 
 async function loadFile(file, isSample = false, reload = false, fromClipboard = false, sampleSettings = null) {
   if (loading || exporting || !engineReady) return;
-  if (!reload && (!/\.(xlsx|xlsm|xls|csv)$/i.test(file.name) || file.size > 30 * 1024 * 1024)) {
-    status("30 MB以内のExcel（.xlsx / .xlsm / .xls）またはCSVを選んでください。", "error");
+  if (!reload && (!/\.(xlsx|xlsm|xls|csv|txt)$/i.test(file.name) || file.size > 30 * 1024 * 1024)) {
+    status("30 MB以内のExcel（.xlsx / .xlsm / .xls）、CSVまたはTXTを選んでください。", "error");
     return;
   }
   const sheetIndex = reload ? Number($('#sheet-select').value) : 0;
@@ -1203,8 +1203,8 @@ $('#choose-save-folder').addEventListener('click',async()=>{
   finally{exporting=false;updateButtons();}
 });
 for(const [selector,description,accept,open] of [
-  ['#data-file','Excel / CSV',{'application/octet-stream':['.xlsx','.xlsm','.xls','.csv']},loadDataFiles],
-  ['#add-data-files','Excel / CSV',{'application/octet-stream':['.xlsx','.xlsm','.xls','.csv']},files=>loadDataFiles(files,true)],
+  ['#data-file','Excel / CSV / TXT',{'application/octet-stream':['.xlsx','.xlsm','.xls','.csv','.txt']},loadDataFiles],
+  ['#add-data-files','Excel / CSV / TXT',{'application/octet-stream':['.xlsx','.xlsm','.xls','.csv','.txt']},files=>loadDataFiles(files,true)],
   ['#project-file','PlotLauncherプロジェクト',{'application/json':['.plotproject','.json']},readProject],
   ['#settings-file','設定JSON',{'application/json':['.json']},readSettings],
   ['#user-presets-file','マイプリセットJSON',{'application/json':['.json']},importUserPresetsFile]
@@ -1755,7 +1755,7 @@ window.addEventListener('storage',event=>{if(event.key === USER_PRESET_KEY || ev
 refreshUserPresets();
 $("#open-settings").addEventListener("click", () => $("#settings-file").click());
 async function readSettings(file) {
-  if(!metadata){status('設定を開く前にExcel/CSVを読み込んでください。','error');return;}
+  if(!metadata){status('設定を開く前にExcel/CSV/TXTを読み込んでください。','error');return;}
   if(loading||exporting)return;loading=true;updateButtons();
   try {
     if (file.size > 1024 * 1024) throw new Error("設定JSONは1 MB以内のファイルを選んでください。");

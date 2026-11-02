@@ -1,5 +1,5 @@
-import { resetPresetUnitScales, unitConversion } from "./units.js?v=a0baff2049e8";
-export const APP_VERSION = "2.4.0";
+import { resetPresetUnitScales, unitConversion } from "./units.js?v=c95adbe70b99";
+export const APP_VERSION = "2.4.1";
 
 // Accept one numeric value or fraction without evaluating JavaScript expressions.
 export function parseCoefficient(value) {
@@ -122,7 +122,7 @@ export function initialSeries(columns, plotType = 'General') {
 }
 
 export function safeStem(name) {
-  return String(name || "graph").replace(/(?:\.plot)?\.(xlsx|xlsm|xls|csv|svg|png|pdf|pptx|json)$/i, "").replace(/[\\/:*?"<>|\x00-\x1f]/g, "_").slice(0, 120).replace(/[. ]+$/, "") || "graph";
+  return String(name || "graph").replace(/(?:\.plot)?\.(xlsx|xlsm|xls|csv|txt|svg|png|pdf|pptx|json)$/i, "").replace(/[\\/:*?"<>|\x00-\x1f]/g, "_").slice(0, 120).replace(/[. ]+$/, "") || "graph";
 }
 
 export function makeSettings(config, metadata, headerRow) {
@@ -166,7 +166,7 @@ export function makeProject(settings, data, fonts = [], workspace = {}) {
 export function parseProject(saved) {
   if (saved?.format !== 'plotlauncher-project' || saved.version !== 1) throw new Error('PlotLauncher Webのプロジェクトファイルを選んでください。');
   const data = saved.data, settings = saved.settings, workspace = saved.workspace || {};
-  if (!data || typeof data.filename !== 'string' || data.filename.length > 255 || !/\.(xlsx|xlsm|xls|csv)$/i.test(data.filename) || !Number.isInteger(data.sheetIndex) || data.sheetIndex < 0 || data.sheetIndex > 1000 || !Number.isInteger(data.headerRow) || data.headerRow < 1 || data.headerRow > 1000 || typeof data.sample !== 'boolean') throw new Error('プロジェクトのデータ・シート・ヘッダー行を確認してください。');
+  if (!data || typeof data.filename !== 'string' || data.filename.length > 255 || !/\.(xlsx|xlsm|xls|csv|txt)$/i.test(data.filename) || !Number.isInteger(data.sheetIndex) || data.sheetIndex < 0 || data.sheetIndex > 1000 || !Number.isInteger(data.headerRow) || data.headerRow < 1 || data.headerRow > 1000 || typeof data.sample !== 'boolean') throw new Error('プロジェクトのデータ・シート・ヘッダー行を確認してください。');
   if (settings?.format !== 'plotlauncher-web' || settings.version !== 1 || settings.data?.filename !== data.filename || settings.data?.headerRow !== data.headerRow || !Array.isArray(settings.series) || !settings.series.length || !settings.axes) throw new Error('プロジェクトのグラフ設定を確認してください。');
   if (!Array.isArray(saved.fonts) || saved.fonts.length > 32) throw new Error('プロジェクトのフォントを確認してください。');
   let total = 0;
@@ -197,7 +197,7 @@ export function parseProject(saved) {
     if(!Array.isArray(data.files)||!data.files.length||data.files.length>16)throw new Error('プロジェクトの複数ファイルを確認してください。');
     let size=0;
     files=data.files.map(file=>{
-      if(typeof file?.filename!=='string'||file.filename.length>255||!/\.(xlsx|xlsm|xls|csv)$/i.test(file.filename)||!Number.isInteger(file.sheetIndex)||file.sheetIndex<0||file.sheetIndex>1000||!Number.isInteger(file.headerRow)||file.headerRow<1||file.headerRow>1000)throw new Error('プロジェクトの元ファイル・シート・ヘッダー行を確認してください。');
+      if(typeof file?.filename!=='string'||file.filename.length>255||!/\.(xlsx|xlsm|xls|csv|txt)$/i.test(file.filename)||!Number.isInteger(file.sheetIndex)||file.sheetIndex<0||file.sheetIndex>1000||!Number.isInteger(file.headerRow)||file.headerRow<1||file.headerRow>1000)throw new Error('プロジェクトの元ファイル・シート・ヘッダー行を確認してください。');
       const bytes=projectBytes(file.base64,30*MB);size+=bytes.byteLength;
       if(size>30*MB)throw new Error('元データは合計30 MB以内にしてください。');
       return {filename:file.filename,sheetIndex:file.sheetIndex,headerRow:file.headerRow,bytes};
