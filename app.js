@@ -1,9 +1,9 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=4d05427c347a";
-import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=4d05427c347a";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=4d05427c347a";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=4d05427c347a";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=4d05427c347a";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=4d05427c347a";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=24a6083da203";
+import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=24a6083da203";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=24a6083da203";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=24a6083da203";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=24a6083da203";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=24a6083da203";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -101,6 +101,7 @@ const sourceHandles = new WeakMap();
 const folderSupported = typeof window.showDirectoryPicker === 'function';
 const importedFonts = new Map();
 let savedProjectState = null;
+let projectHandle=null, projectFilename='';
 let sampleCatalog = null, sampleCatalogPromise = null, sampleGroup = 'all', pendingSampleId = null;
 let sheetSettings = new Map(), cancelBatch = false;
 let sheetMode = 'shared', sharedSettings = null;
@@ -255,6 +256,8 @@ function updateButtons() {
   $("#new-project").disabled = busy;
   $("#open-project").disabled = !engineReady || busy;
   $("#save-project").disabled = !engineReady || busy || !sourceData || !metadata || !config.series.length;
+  $('#save-project-as').disabled=$('#save-project').disabled;
+  $('#save-project').title=projectHandle?`${projectFilename} に上書き保存します（Ctrl/Command＋S）`:'データと設定をまとめて保存します（Ctrl/Command＋S）';
   $("#drop-zone").disabled = !engineReady || busy;
   $("#data-drop-area").setAttribute("aria-disabled", String(!engineReady || busy));
   $("#sample-data").disabled = !engineReady || busy;
@@ -330,7 +333,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=4d05427c347a", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=24a6083da203", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -908,7 +911,7 @@ async function loadDataFiles(files, append=false, selection=null) {
     const data=await request('load-many',args);
     config=combinedConfig(data,append || selection?oldMetadata:null,oldConfig);metadata=data;loadedHeader=1;
     sourceData={filename,files:originals.map((file,index)=>({...file,sheetIndex:data.sources[index].sheetIndex,headerRow:data.sources[index].headerRow}))};
-    if(!append && !selection){sourceHandle=sourceHandles.get(files[0]) || null;sourceDirectory=null;$('#save-destination').value=folderSupported?'source':'download';}
+    if(!append && !selection){projectHandle=null;projectFilename='';sourceHandle=sourceHandles.get(files[0]) || null;sourceDirectory=null;$('#save-destination').value=folderSupported?'source':'download';}
     sample=false;sheetMode='shared';sharedSettings=null;sheetSettings.clear();
     if(config.series.length){sharedSettings=makeSettings(config,metadata,1);sheetSettings.set(0,sharedSettings);}
     selected.clear();history=[];future=[];lastState=structuredClone(config);view={zoom:1,x:0,y:0};
@@ -956,6 +959,7 @@ async function loadFile(file, isSample = false, reload = false, fromClipboard = 
     loadedHeader = metadata.headerRow || headerRow;
     sheetSettings = nextSheets;
     if (!reload) {
+      projectHandle=null;projectFilename='';
       sheetSettings.clear();
       sheetMode = 'shared'; sharedSettings = null;
       sourceData = {filename, bytes:originalBytes};
@@ -1237,7 +1241,7 @@ async function prepareSaver() {
   const permission={mode:'readwrite'};
   if(await directory.queryPermission(permission)!=='granted' && await directory.requestPermission(permission)!=='granted')
     throw new Error('このフォルダへの保存が許可されていません。保存先を選び直してください。');
-  return async(blob,requestedName)=>{
+  const save=async(blob,requestedName)=>{
     const dot=requestedName.lastIndexOf('.'), stem=requestedName.slice(0,dot), extension=requestedName.slice(dot);
     let name=requestedName;
     for(let number=1;;number++) {
@@ -1249,8 +1253,10 @@ async function prepareSaver() {
     const handle=await directory.getFileHandle(name,{create:true}), writer=await handle.createWritable();
     try {await writer.write(blob);await writer.close();}
     catch(error) {try{await writer.abort();}catch{}throw error;}
+    save.handle=handle;
     return name;
   };
+  return save;
 }
 $('#save-destination').value=folderSupported?'folder':'download';
 for(const option of $('#save-destination').options)if(option.value!=='download')option.disabled=!folderSupported;
@@ -1395,9 +1401,9 @@ async function exportSheets(formats) {
   }
 }
 
-async function prepareDocumentSaver(name, description, extension) {
+async function prepareDocumentSaver(name, description, extension, startIn=saveDirectory||sourceDirectory||sourceHandle) {
   const fallback = () => prepareSaver();
-  return documentSaver({name, id:'plotlauncher-files', description, accept:{'application/json':[extension]}, startIn:saveDirectory||sourceDirectory||sourceHandle, fallback});
+  return documentSaver({name, id:'plotlauncher-files', description, accept:{'application/json':[extension]}, startIn, fallback});
 }
 
 $("#data-file").addEventListener("change", event => { const files=[...event.target.files];event.target.value="";if(files.length)loadDataFiles(files); });
@@ -1411,14 +1417,23 @@ $('#source-list').addEventListener('change',event=>{
   sources[index][header?'headerRow':'sheetIndex']=value;void loadDataFiles([],false,sources);
 });
 $("#drop-zone").addEventListener("click", () => $("#data-file").click());
+async function rememberDroppedHandles(transfer,files) {
+  await Promise.allSettled([...(transfer.items || [])].filter(item=>item.kind==='file').map(async item=>{
+    const handle=await item.getAsFileSystemHandle?.();
+    if(handle?.kind==='file'){
+      const file=files.find(file=>file.name===handle.name && !sourceHandles.has(file));
+      if(file)sourceHandles.set(file,handle);
+    }
+  }));
+}
 for (const zone of [$("#drop-zone"), $("#data-drop-area")]) {
   for (const type of ["dragenter", "dragover"]) zone.addEventListener(type, event => { event.preventDefault(); if (engineReady && !loading && !exporting) event.currentTarget.classList.add("drag-over"); });
   zone.addEventListener("dragleave", event => event.currentTarget.classList.remove("drag-over"));
-  zone.addEventListener("drop", event => { event.preventDefault();event.stopPropagation();event.currentTarget.classList.remove("drag-over"); const files=[...event.dataTransfer.files];if(engineReady && !loading && !exporting && files.length){files.length===1?openDroppedFile(files[0]):loadDataFiles(files);} });
+  zone.addEventListener("drop", async event => { event.preventDefault();event.stopPropagation();event.currentTarget.classList.remove("drag-over"); const files=[...event.dataTransfer.files];if(engineReady && !loading && !exporting && files.length){await rememberDroppedHandles(event.dataTransfer,files);files.length===1?openDroppedFile(files[0]):loadDataFiles(files);} });
 }
 // Dropping a file elsewhere must not navigate away and discard the settings.
 window.addEventListener("dragover", event => event.preventDefault());
-window.addEventListener("drop", event => {event.preventDefault();const file=event.dataTransfer.files[0];if(file && /\.(json|plotproject)$/i.test(file.name))openDroppedFile(file);});
+window.addEventListener("drop", async event => {event.preventDefault();const file=event.dataTransfer.files[0];if(file && /\.(json|plotproject)$/i.test(file.name)){await rememberDroppedHandles(event.dataTransfer,[file]);openDroppedFile(file);}});
 $("#sample-data").addEventListener("click", openSamplePicker);
 $('#close-sample-dialog').addEventListener('click',()=>{clearSampleConfirmation();$('#sample-dialog').close();});
 $('#sample-dialog').addEventListener('cancel',clearSampleConfirmation);
@@ -1455,7 +1470,11 @@ function incompleteNumberInput(input) {
 function applyControlInput(event) {
   const input = event.target;
   if (input.dataset.seriesScope !== undefined) {
-    openElementEditor(input.value==='all'?'seriesAll':'series',Number($('#element-editor-fields').dataset.seriesEditorIndex || 0));return;
+    const fields=$('#element-editor-fields');
+    const index=input.value==='all'?Number(fields.dataset.seriesEditorIndex):input.value==='one'?Number(fields.dataset.seriesEditorOrigin ?? fields.dataset.seriesEditorIndex):/^series:\d+$/.test(input.value)?Number(input.value.slice(7)):NaN;
+    if(!Number.isInteger(index) || index<0 || !config.series[index])return;
+    openElementEditor(input.value==='all'?'seriesAll':'series',index);
+    fields.querySelector('[data-series-scope]')?.focus();return;
   }
   // Native number inputs keep an internal editing buffer for "0.", "-", "1e-".
   // Do not commit incomplete values or assign back to the field being edited.
@@ -1582,24 +1601,32 @@ $("#open-project").addEventListener("click", () => $("#project-file").click());
 $("#project-file").addEventListener("change", event => {
   const file=event.target.files[0]; event.target.value=""; if(file) readProject(file);
 });
-async function saveProject() {
+async function saveProject({saveAs=false}={}) {
   if(!engineReady || loading || exporting || !sourceData || !metadata || !config.series.length)return;
   exporting=true;updateButtons();
   try {
-    const name=`${safeStem($("#save-name").value)}.plotproject`;
-    const saveFile=await prepareDocumentSaver(name,"PlotLauncherプロジェクト",".plotproject");
+    const name=projectFilename || `${safeStem($("#save-name").value)}.plotproject`;
+    let saveFile;
+    if(projectHandle && !saveAs) {
+      const permission={mode:'readwrite'};
+      if(projectHandle.queryPermission && await projectHandle.queryPermission(permission)!=='granted' && (!projectHandle.requestPermission || await projectHandle.requestPermission(permission)!=='granted'))throw new Error('このファイルへの上書きが許可されていません。「名前を付けて保存」から保存先を選んでください。');
+      saveFile=await documentSaver({name,handle:projectHandle});
+    } else saveFile=await prepareDocumentSaver(name,"PlotLauncherプロジェクト",".plotproject",projectHandle || undefined);
     const savedState=projectEditState();
     const project=makeProject(makeSettings(config,metadata,loadedHeader), {...sourceData,sheetIndex:metadata.sheetIndex,headerRow:loadedHeader,sample}, [...importedFonts.values()], {
       saveName:$("#save-name").value,pngDpi:Number($("#png-dpi").value),view:{...view},sections:$$('#controls-panel .control-section').map(section=>section.open),sheetSettings:projectSheetSettings(),sheetMode,sharedSettings:sheetMode === 'shared' ? currentSharedSettings() : sharedSettings
     });
     const blob=new Blob([JSON.stringify(project)],{type:'application/json'});
     if(blob.size>PROJECT_MAX_SIZE)throw new Error('プロジェクトは130 MB以内にしてください。');
-    const filename=`${safeStem($("#save-name").value)}.plotproject`;
-    const savedName=await saveFile(blob,filename); savedProjectState=savedState; status(`${savedName} を保存しました。データと設定をまとめて再開できます。`,'ready');
+    const savedName=await saveFile(blob,name);
+    projectHandle=saveFile.handle || null;projectFilename=savedName; savedProjectState=savedState; status(`${savedName} を保存しました。データと設定をまとめて再開できます。`,'ready');
   } catch(error){status(error.name==='AbortError'?'保存をキャンセルしました。':`プロジェクトを保存できませんでした: ${error.message}`,error.name==='AbortError'?'ready':'error');}
   finally{exporting=false;updateButtons();if(renderWanted)renderPreview();}
 }
 $("#save-project").addEventListener("click",saveProject);
+$('#save-project-as').addEventListener('click',()=>{$('#project-save-menu').open=false;void saveProject({saveAs:true});});
+window.addEventListener('pointerdown',event=>{if(!event.target.closest('#project-save-menu'))$('#project-save-menu').open=false;});
+$('#project-save-menu').addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();$('#project-save-menu').open=false;$('#project-save-menu summary')?.focus();}});
 $('#new-project').addEventListener('click', () => {
   if (loading || exporting) return;
   // A fresh page clears data, settings, undo history and the worker together.
@@ -1620,6 +1647,7 @@ async function readProject(file, saved) {
     // Older projects may contain distinct sheet styles; keep those individual.
     sheetMode=project.workspace.sheetMode || 'individual'; sharedSettings=project.workspace.sharedSettings || null;
     sourceHandle=sourceHandles.get(file) || null; sourceDirectory=null;
+    projectHandle=sourceHandle;projectFilename=file.name;
     $('#save-destination').value=folderSupported?'source':'download'; refreshSaveDestination(); loadedHeader=metadata.headerRow;
     importedFonts.clear(); retainedFonts.forEach(font=>importedFonts.set(font.name,font));
     loadedFonts.clear(); ['Liberation Sans','Noto Sans JP','DejaVu Sans',...result.families].forEach(family=>loadedFonts.add(family));
@@ -2080,7 +2108,15 @@ function openElementEditor(part,index=0) {
     fields.innerHTML=`<div data-series-index="${index}" data-series-all-root><div class="field-grid">${SERIES_APPEARANCE_FIELDS.slice(0,3).map(control).join('')}</div><details class="settings-panel"><summary>線・点の詳細</summary><div class="field-grid">${SERIES_APPEARANCE_FIELDS.slice(3).map(control).join('')}</div></details>${processingControls(config.series[index])}</div>`;
   }
   fields.dataset.seriesEditorIndex=String(index);
-  if(['series','seriesAll'].includes(part) && editableXY(config.plotType))fields.innerHTML=`<label class="series-scope">設定の適用先<select data-series-scope title="全系列では変更した項目だけをまとめて反映します。データ列・系列名・系列色は保持します。">${choiceOptions([['one',`この系列（${config.series[index].name}）`],['all',`全系列（${config.series.length}系列）`]],part==='seriesAll'?'all':'one')}</select></label>`+fields.innerHTML;
+  if(['series','seriesAll'].includes(part) && editableXY(config.plotType)) {
+    const previousOrigin=Number(fields.dataset.seriesEditorOrigin);
+    const origin=switchingSeries && Number.isInteger(previousOrigin) && config.series[previousOrigin]?previousOrigin:index;
+    fields.dataset.seriesEditorOrigin=String(origin);
+    const name=series=>String(series.name ?? '').trim() || metadata.columns[Number(series.y)]?.name || '名前なし';
+    const choices=[['one',`この系列（${name(config.series[origin])}）`],['all',`全系列（${config.series.length}系列）`],...config.series.flatMap((series,i)=>i===origin?[]:[[ `series:${i}`,`系列${i+1}（${name(series)}）`]])];
+    const scope=part==='seriesAll'?'all':index===origin?'one':`series:${index}`;
+    fields.innerHTML=`<label class="series-scope">設定の適用先<select data-series-scope title="系列を選ぶと、その系列の現在の設定を表示します。全系列では変更した項目だけをまとめて反映し、データ列・系列名・系列色は保持します。">${choiceOptions(choices,scope)}</select></label>`+fields.innerHTML;
+  }
   if(part==='legend')fields.innerHTML=`<label><input data-axis="legend" type="checkbox" ${config.axes.legend?'checked':''}>凡例を表示</label><label>フォントサイズ (pt)<input data-axis="legendFontScale" type="number" min="${axisControlValue('legendFontScale',.2)}" max="${axisControlValue('legendFontScale',3)}" step="0.1" value="${axisControlValue('legendFontScale',config.axes.legendFontScale)}"></label><button type="button" class="button quiet" data-reset-legend>標準位置に戻す</button><details class="settings-panel"><summary>線・点の大きさ</summary><label>大きさ（標準比）<input data-axis="legendScale" type="number" min=".2" max="3" step="0.1" value="${config.axes.legendScale}"></label></details>`;
   if(part==='figureBackground')fields.innerHTML+=`<details class="settings-panel"><summary>グラフの種類・サイズ</summary><label>グラフのプリセット<select data-preview-preset>${choiceOptions(presets.map(item=>[item.id,item.label]),config.plotType)}</select></label><div class="field-grid">${['width','height'].map((key,i)=>`<label>${['軸領域の幅 (cm)','軸領域の高さ (cm)'][i]}<input data-axis="${key}" type="number" min=".5" max="24" step="0.1" value="${config.axes[key]}"></label>`).join('')}</div></details>`+$('#font-settings').outerHTML;
   if(part==='plotBackground')fields.innerHTML+=`<details class="settings-panel"><summary>グリッド</summary><label><input data-axis="grid" type="checkbox" ${config.axes.grid?'checked':''}>グリッドを表示</label></details>`;
@@ -2419,7 +2455,7 @@ window.addEventListener('keydown',event=>{
   else if(control&&key==='z'){event.preventDefault();restoreHistory(event.shiftKey);}
   else if(control&&key==='y'){event.preventDefault();restoreHistory(true);}
   else if(control&&['+','=','-','0'].includes(key)){event.preventDefault();if(key==='0')$('#zoom-reset').click();else zoomPreview(key==='-'?1/1.1:1.1);}
-  else if(control&&key==='s'){event.preventDefault();$(event.shiftKey?'#save-settings':'#save-project').click();}
+  else if(control&&key==='s'){event.preventDefault();$(event.altKey?'#save-project-as':event.shiftKey?'#save-settings':'#save-project').click();}
   else if(control&&key==='o'){event.preventDefault();$(event.altKey?'#data-file':event.shiftKey?'#open-settings':'#open-project').click();}
 });
 $$('dialog').forEach(enableDialogDrag);

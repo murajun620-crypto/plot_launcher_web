@@ -15,6 +15,12 @@ svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke
 .brand-web{margin-left:5px;font-size:11px;letter-spacing:.8px;text-transform:uppercase;background:var(--blue-light);color:var(--blue);padding:4px 6px;border-radius:4px;vertical-align:middle;font-weight:600}
 .brand-version{font-size:11px;font-weight:400;letter-spacing:0;color:var(--muted);white-space:nowrap;margin-left:-4px}
 .header-actions{display:flex;align-items:center;gap:12px}
+.project-save-group{display:flex;align-items:stretch;position:relative}
+.project-save-group>#save-project{border-radius:6px 0 0 6px}
+#project-save-menu>summary{height:100%;padding:9px 8px;border-radius:0 6px 6px 0;border-left-color:#ffffff50;list-style:none}
+#project-save-menu>summary::-webkit-details-marker{display:none}
+.project-save-actions{position:absolute;z-index:20;right:0;top:calc(100% + 6px);padding:5px;background:var(--surface);border:1px solid var(--border);border-radius:6px;box-shadow:0 8px 24px #202d3e26;white-space:nowrap}
+.project-save-actions .button{width:100%}
 .privacy-note{display:flex;align-items:center;gap:7px;font-size:11px;color:#66758b;margin-right:10px}
 .privacy-dot,.auto-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0}
 .button{border:1px solid var(--border);border-radius:6px;display:inline-flex;align-items:center;justify-content:center;gap:7px;background:#fff;color:var(--ink);padding:9px 13px;font-weight:550;transition:background .15s,border-color .15s}

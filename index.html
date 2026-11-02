@@ -6,8 +6,8 @@
   <meta name="description" content="Excel・CSV・TXTの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=4d05427c347a">
-  <script type="module" src="./app.js?v=4d05427c347a"></script>
+  <link rel="stylesheet" href="./style.css?v=24a6083da203">
+  <script type="module" src="./app.js?v=24a6083da203"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -31,7 +31,7 @@
       <span class="privacy-note" title="データはブラウザ内で処理します。外部には送信しません。" aria-label="データはブラウザ内で処理"><span class="privacy-dot"></span>データはブラウザ内で処理</span>
       <button id="new-project" class="button quiet" title="現在の内容を閉じて、新しいプロジェクトを開始します。未保存の場合は確認します。"><svg><use href="#i-plus"/></svg><span>新規プロジェクト</span></button>
       <button id="open-project" class="button quiet" title="データと設定をまとめて開きます（Ctrl/Command＋O）" disabled><svg><use href="#i-upload"/></svg><span>プロジェクトを開く</span></button>
-      <button id="save-project" class="button primary" title="データと設定をまとめて保存します（Ctrl/Command＋S）" disabled><svg><use href="#i-download"/></svg><span>プロジェクトを保存</span></button>
+      <div class="project-save-group"><button id="save-project" class="button primary" title="データと設定をまとめて保存します（Ctrl/Command＋S）" disabled><svg><use href="#i-download"/></svg><span>プロジェクトを保存</span></button><details id="project-save-menu"><summary class="button primary" aria-label="プロジェクトの保存オプション" title="名前を付けて保存">▾</summary><div class="project-save-actions"><button id="save-project-as" type="button" class="button quiet" title="別のファイルとして保存します（Ctrl/Command＋Alt＋S）" disabled>名前を付けて保存</button></div></details></div>
       <input id="project-file" type="file" accept=".plotproject,.json,application/json" hidden>
       <button id="open-settings" class="button quiet" aria-label="設定を開く" title="設定のみを開きます。先にデータを選んでください（Ctrl/Command＋Shift＋O）" disabled><svg><use href="#i-upload"/></svg><span>設定を開く</span></button>
       <button id="save-settings" class="button quiet" aria-label="設定を保存" title="設定のみを保存します。データは含みません（Ctrl/Command＋Shift＋S）" disabled><svg><use href="#i-download"/></svg><span>設定を保存</span></button>

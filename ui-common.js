@@ -3,16 +3,17 @@ export function filePickerOptions(id, description, accept, startIn) {
   return {id, types:[{description, accept}], ...(startIn ? {startIn} : {})};
 }
 
-export async function documentSaver({name, id, description, accept, startIn, fallback}, host = window) {
-  if (typeof host.showSaveFilePicker !== 'function') return fallback();
+export async function documentSaver({name, id, description, accept, startIn, fallback, handle}, host = window) {
+  if (!handle && typeof host.showSaveFilePicker !== 'function') return fallback();
   // Acquire the handle in the click gesture, before generating large projects.
-  const handle = await host.showSaveFilePicker({...filePickerOptions(id, description, accept, startIn), suggestedName:name});
-  return async blob => {
+  handle ||= await host.showSaveFilePicker({...filePickerOptions(id, description, accept, startIn), suggestedName:name});
+  const save = async blob => {
     const writer = await handle.createWritable();
     try {await writer.write(blob); await writer.close();}
     catch (error) {try {await writer.abort();} catch {} throw error;}
-    return handle.name;
+    return handle.name || name;
   };
+  save.handle=handle;return save;
 }
 
 export function compactHelp(root = document) {
