@@ -256,6 +256,14 @@ button:focus-visible,summary:focus-visible,a:focus-visible{outline:2px solid #ab
 .sample-confirm p{font-size:12px;line-height:1.6;margin:0 0 10px}
 .sample-confirm>div{display:flex;justify-content:flex-end;gap:8px}
 .dialog-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.movable-dialog .dialog-heading{cursor:grab;user-select:none;touch-action:none;flex-shrink:0}
+.movable-dialog>.dialog-heading{position:sticky;top:-16px;z-index:2;background:var(--surface)}
+.movable-dialog.save-dialog>.dialog-heading{top:-20px}
+.movable-dialog .dialog-heading::before{content:'⠿';color:var(--muted);font-size:18px;line-height:1}
+.movable-dialog .dialog-heading>strong,.movable-dialog .dialog-heading>h2{flex:1;min-width:0}
+.movable-dialog .dialog-heading:focus-visible{outline:2px solid var(--blue);outline-offset:4px;border-radius:4px}
+.dialog-dragging .dialog-heading{cursor:grabbing}
+#axis-editor::backdrop,#element-editor::backdrop,#color-panel::backdrop{background:transparent}
 .plot-dialog label{display:flex;flex-direction:column;gap:6px;margin:10px 0}
 .plot-dialog label:has(input[type=checkbox]){flex-direction:row;align-items:center}
 .plot-dialog input:not([type=checkbox]){width:100%;min-width:0}

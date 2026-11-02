@@ -1,12 +1,72 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=c95adbe70b99";
-import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=c95adbe70b99";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=c95adbe70b99";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=c95adbe70b99";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=c95adbe70b99";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=c95adbe70b99";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=4d05427c347a";
+import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=4d05427c347a";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=4d05427c347a";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=4d05427c347a";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=4d05427c347a";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=4d05427c347a";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
+
+function positionDialog(dialog, left, top) {
+  const box=dialog.getBoundingClientRect(), gap=8;
+  const width=document.documentElement?.clientWidth || window.innerWidth,height=document.documentElement?.clientHeight || window.innerHeight;
+  const x=Math.max(gap,Math.min(left,Math.max(gap,width-box.width-gap)));
+  const y=Math.max(gap,Math.min(top,Math.max(gap,height-box.height-gap)));
+  Object.assign(dialog.style,{position:'fixed',inset:'auto',margin:'0',left:`${Math.round(x)}px`,top:`${Math.round(y)}px`});
+}
+function keepDialogInView(dialog) {
+  if(!dialog.open || !dialog.style.left)return;
+  const box=dialog.getBoundingClientRect();positionDialog(dialog,box.left,box.top);
+}
+function showDialog(selector) {
+  const dialog=$(selector);dialog.showModal();keepDialogInView(dialog);
+}
+function enableDialogDrag(dialog) {
+  const heading=dialog.querySelector('.dialog-heading');
+  if(!heading || dialog.dataset.movable)return;
+  dialog.dataset.movable='true';dialog.classList.add('movable-dialog');
+  heading.title='ドラッグで移動。矢印キーで微調整。ダブルクリックで中央に戻す。';
+  heading.tabIndex=0;heading.setAttribute('role','group');heading.setAttribute('aria-label','ウィンドウの位置（ドラッグまたは矢印キーで移動）');
+  const interactive=target=>target.closest('button,input,select,textarea,a,label,summary,[contenteditable]');
+  let drag=null;
+  const stop=()=>{
+    if(!drag)return;
+    const id=drag.id;drag=null;dialog.classList.remove('dialog-dragging');
+    if(heading.hasPointerCapture?.(id))heading.releasePointerCapture(id);
+  };
+  const move=event=>{
+    if(!drag || event.pointerId!==drag.id)return;
+    positionDialog(dialog,drag.left+event.clientX-drag.x,drag.top+event.clientY-drag.y);
+  };
+  heading.addEventListener('pointerdown',event=>{
+    if(event.button!==0 || event.isPrimary===false || interactive(event.target))return;
+    const box=dialog.getBoundingClientRect();
+    drag={id:event.pointerId,x:event.clientX,y:event.clientY,left:box.left,top:box.top};
+    event.preventDefault();heading.focus({preventScroll:true});heading.setPointerCapture(event.pointerId);
+    dialog.classList.add('dialog-dragging');
+  });
+  heading.addEventListener('pointermove',move);
+  heading.addEventListener('pointerup',event=>{if(event.pointerId===drag?.id){move(event);stop();}});
+  heading.addEventListener('pointercancel',event=>{if(event.pointerId===drag?.id)stop();});
+  heading.addEventListener('lostpointercapture',event=>{if(event.pointerId===drag?.id)stop();});
+  dialog.addEventListener('close',stop);
+  const center=()=>{
+    stop();
+    for(const key of ['position','inset','margin','left','top','right','bottom'])dialog.style.removeProperty(key);
+  };
+  heading.addEventListener('dblclick',event=>{if(!interactive(event.target)){event.preventDefault();center();}});
+  heading.addEventListener('keydown',event=>{
+    if(event.target!==heading || event.ctrlKey || event.metaKey || event.altKey)return;
+    const direction={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[event.key];
+    if(!direction)return;
+    event.preventDefault();event.stopPropagation();
+    const box=dialog.getBoundingClientRect(),step=event.shiftKey?20:5;
+    positionDialog(dialog,box.left+direction[0]*step,box.top+direction[1]*step);
+  });
+  new ResizeObserver(()=>keepDialogInView(dialog)).observe(dialog);
+}
+
 const escapeHTML = text => String(text).replace(/[&<>"']/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character]));
 const MICRO_HINT = 'μは \\micro と入力できます（例：\\microm、\\microA）。';
 const LABEL_PADDING_BASE = defaultAxes().xLabelPad;
@@ -270,7 +330,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=c95adbe70b99", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=4d05427c347a", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -365,7 +425,7 @@ function openColorPanel(input, title) {
   $('#recent-colors').replaceChildren(...recentColors.map(hex => colorSwatch(hex)));
   $('#custom-color').value = /^#[0-9a-f]{6}$/i.test(input.value) ? input.value : '#000000';
   $('#color-code').value = $('#custom-color').value; $('#color-error').textContent = '';
-  $('#color-panel').showModal();
+  showDialog('#color-panel');
 }
 function chooseColor(value) {
   if (!/^#[0-9a-f]{6}$/i.test(value)) {$('#color-error').textContent = '#RRGGBB形式で入力してください。'; return;}
@@ -427,7 +487,7 @@ function openAxisEditor(axis, kind) {
   html += axis === 'x' ? label('spineColor','枠線・文字色','color') : label(`${axis}Color`,'軸の色（autoで自動）','text','title="軸線・目盛線・目盛数値・ラベルに適用します。autoでは、左右別の軸を使う場合に各軸の最初の系列と同じ色にします。"');
   if(kind==='ticks')html+='</details>';
   fields.innerHTML=html;
-  syncAxisEditor(); syncUnitControls(); enhanceColorInputs(); $('#axis-editor').showModal();
+  syncAxisEditor(); syncUnitControls(); enhanceColorInputs(); showDialog('#axis-editor');
 }
 function syncAxisEditor() {
   const fields = $('#axis-editor-fields'), axis = fields.dataset.axisName;
@@ -972,7 +1032,7 @@ function drawSamplePicker() {
 async function openSamplePicker() {
   if(!engineReady || loading || exporting)return;
   clearSampleConfirmation();
-  $('#sample-dialog').showModal();
+  showDialog('#sample-dialog');
   $('#sample-picker-status').textContent=sampleCatalog?'':'サンプルを読み込んでいます…';
   try {
     if(!sampleCatalog){
@@ -1033,7 +1093,7 @@ function openPasteDialog(text = '') {
   $('#paste-text').value = text; pasteHeaderAutomatic = true;
   $('#paste-header').checked = true;
   updatePastePreview();
-  $('#paste-dialog').showModal(); $('#paste-text').focus();
+  showDialog('#paste-dialog'); $('#paste-text').focus();
 }
 $('#paste-data').addEventListener('click', () => openPasteDialog());
 $('#close-paste').addEventListener('click', () => $('#paste-dialog').close());
@@ -1248,7 +1308,7 @@ function openSaveDialog(allSheets = false) {
   if ($(allSheets ? '#open-save-all' : '#open-save').disabled) return;
   $('#save-all-sheets').checked = allSheets;
   $('#save-progress').textContent = '';
-  refreshSaveDestination(); updateButtons(); $('#save-dialog').showModal();
+  refreshSaveDestination(); updateButtons(); showDialog('#save-dialog');
 }
 $('#open-save').addEventListener('click', () => openSaveDialog());
 $('#open-save-all').addEventListener('click', () => openSaveDialog(true));
@@ -1667,7 +1727,7 @@ $('#register-user-preset').addEventListener('click',()=>{
   if ($('#register-user-preset').disabled) return;
   $('#user-preset-name').value = '';
   $('#register-preset-error').textContent = '';
-  syncPresetRegistration(true); $('#register-preset-dialog').showModal(); $('#user-preset-name').focus();
+  syncPresetRegistration(true); showDialog('#register-preset-dialog'); $('#user-preset-name').focus();
 });
 $('#user-preset-name').addEventListener('input',()=>syncPresetRegistration(true));
 $('#overwrite-user-preset').addEventListener('change',()=>syncPresetRegistration());
@@ -1695,7 +1755,7 @@ $('#user-preset-select').addEventListener('change',event=>{
   } catch(error) {presetMessage('#user-preset-message',presetFailure(error),true);}
 });
 $('#manage-user-presets').addEventListener('click',()=>{
-  refreshUserPresets(); presetMessage('#manage-presets-message',''); $('#manage-presets-dialog').showModal();
+  refreshUserPresets(); presetMessage('#manage-presets-message',''); showDialog('#manage-presets-dialog');
 });
 $('#close-manage-presets').addEventListener('click',()=>$('#manage-presets-dialog').close());
 $('#managed-preset-select').addEventListener('change',syncManagedPreset);
@@ -1802,7 +1862,7 @@ function openFontSettings() {
   $('#font-advanced-fields').open = true;
   $('#local-font-list').hidden = !localFontChoices.length;
   if (localFontChoices.length) drawLocalFonts();
-  fontMessage(''); updateButtons(); $('#font-load-dialog').showModal();
+  fontMessage(''); updateButtons(); showDialog('#font-load-dialog');
 }
 $('#load-font').addEventListener('click', () => openFontSettings());
 // Use the normal font controls for the first permission gesture; no extra picker.
@@ -2050,7 +2110,7 @@ function openElementEditor(part,index=0) {
     else if(input.tagName==='SELECT'){const option=new Option('混在','');option.disabled=true;input.add(option,0);input.value='';}
     else if(input.type!=='range'){input.value='';input.placeholder='混在';}
   });
-  $('#element-editor').showModal();enhanceColorInputs();syncAxisAutomaticControls();syncUnitControls();syncOpacityControls();syncProcessingControls();
+  showDialog('#element-editor');enhanceColorInputs();syncAxisAutomaticControls();syncUnitControls();syncOpacityControls();syncProcessingControls();
 }
 $('#element-editor-fields').addEventListener('input',applyControlInput);
 for(const root of [$('#plot-form'),$('#element-editor-fields')])root.addEventListener('focusout',event=>{if(event.target.dataset.seriesField==='detrendSlope')syncProcessingControls();});
@@ -2362,5 +2422,7 @@ window.addEventListener('keydown',event=>{
   else if(control&&key==='s'){event.preventDefault();$(event.shiftKey?'#save-settings':'#save-project').click();}
   else if(control&&key==='o'){event.preventDefault();$(event.altKey?'#data-file':event.shiftKey?'#open-settings':'#open-project').click();}
 });
+$$('dialog').forEach(enableDialogDrag);
+window.addEventListener('resize',()=>$$('dialog[open]').forEach(keepDialogInView));
 try { startWorker(); }
 catch (error) { fatal(`描画機能を開始できませんでした。ブラウザを更新してください。${error.message}`); }

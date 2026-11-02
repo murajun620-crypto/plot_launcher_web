@@ -1,5 +1,5 @@
-import { resetPresetUnitScales, unitConversion } from "./units.js?v=c95adbe70b99";
-export const APP_VERSION = "2.4.1";
+import { resetPresetUnitScales, unitConversion } from "./units.js?v=4d05427c347a";
+export const APP_VERSION = "2.4.2";
 
 // Accept one numeric value or fraction without evaluating JavaScript expressions.
 export function parseCoefficient(value) {
