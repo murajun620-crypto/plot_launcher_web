@@ -1257,6 +1257,30 @@ class PlotEngine:
         style, mode = settings.get("legendStyle", "symbols"), settings.get("legendMode", "together")
         if style not in {"symbols", "text"} or mode not in {"together", "individual"}:
             raise ValueError("凡例の表示方法を確認してください。")
+        color_mode = settings.get("legendTextColorMode", "auto")
+        color_value = settings.get("legendTextColor", "#000000")
+        def validate_color(color_mode, color_value, individual=False):
+            if color_mode not in ({"inherit", "auto", "black", "series", "custom"} if individual else {"auto", "black", "series", "custom"}) or not isinstance(color_value, str) or not re.fullmatch(r"#[\da-fA-F]{6}", color_value):
+                raise ValueError("凡例の文字色を確認してください。")
+        validate_color(color_mode, color_value)
+        def text_color(handle, effective_style, local_mode="inherit", local_color="#000000"):
+            selected_mode = color_mode if local_mode == "inherit" else local_mode
+            if selected_mode == "custom":
+                return color_value if local_mode == "inherit" else local_color
+            if selected_mode == "black" or selected_mode == "auto" and effective_style == "symbols":
+                return "#000000"
+            # Use the rendered legend handle, including scatter-only series,
+            # both Y axes, bars, fitted curves and generated histogram entries.
+            if isinstance(handle, Line2D):
+                return to_rgba(handle.get_color())[:3]
+            for getter in ("get_facecolor", "get_edgecolor"):
+                if hasattr(handle, getter):
+                    colors = np.asarray(getattr(handle, getter)())
+                    if colors.size:
+                        rgba = to_rgba(colors[0] if colors.ndim > 1 else colors)
+                        if rgba[3] > 0:
+                            return rgba[:3]
+            return "#000000"
         stored = config.get("options", {}).get("legendEntries", {})
         if not isinstance(stored, dict) or len(stored) > 200 or any(not isinstance(item, dict) for item in stored.values()):
             raise ValueError("凡例項目の設定を確認してください。")
@@ -1282,13 +1306,20 @@ class PlotEngine:
             if entry_style not in {"auto", "symbols", "text"}:
                 raise ValueError("凡例項目の表示方法を確認してください。")
             font_size = number(item.get("legendFontSize" if mapped else "fontSize", ""), "凡例項目のフォントサイズ", minimum=2, maximum=72, optional=True)
+            entry_color_mode = item.get("legendTextColorMode" if mapped else "textColorMode", "inherit")
+            entry_color = item.get("legendTextColor" if mapped else "textColor", "#000000")
+            validate_color(entry_color_mode, entry_color, True)
+            effective_style = style if mode == "together" or entry_style == "auto" else entry_style
             if visible:
                 rows.append({"id": f"legend-item-{series_index if mapped else index}", "seriesIndex": series_index, "key": key,
-                             "label": text.get_text(), "handle": handle, "text": text, "style": style if entry_style=="auto" else entry_style, "fontSize": font_size, "position": None if x is None else (x, y)})
+                             "label": text.get_text(), "handle": handle, "text": text, "style": effective_style, "fontSize": font_size, "position": None if x is None else (x, y),
+                             "textColor": text_color(handle, effective_style, entry_color_mode if mode=="individual" else "inherit", entry_color)})
         if not rows:
             legend.remove()
             return None, []
         if style == "symbols" and mode == "together" and len(rows) == len(texts):
+            for row in rows:
+                row["text"].set_color(row["textColor"])
             return legend, [{"artist": legend}]
         handle_length, handle_pad = legend.handlelength, legend.handletextpad
         kwargs = dict(frameon=False, prop=legend.prop.copy(), borderaxespad=legend.borderaxespad,
@@ -1301,7 +1332,7 @@ class PlotEngine:
         placement = dict(loc=location) if position[0] is None else dict(loc="center", bbox_to_anchor=position, bbox_transform=parent.transAxes)
         grouped = parent.legend([row["handle"] for row in rows], [row["label"] for row in rows], **kwargs, **placement)
         for text, row in zip(grouped.get_texts(), rows):
-            text.set_color(row["text"].get_color())
+            text.set_color(row["textColor"])
         if style == "text":
             for handle in grouped.legend_handles:
                 handle.set_visible(False)
@@ -1326,7 +1357,7 @@ class PlotEngine:
                                 handletextpad=handle_pad*ratio if row["style"]=="symbols" else 0)
             single = Legend(parent, [row["handle"]], [row["label"]], **entry_kwargs,
                             loc="center", bbox_to_anchor=row["anchor"], bbox_transform=parent.transAxes)
-            single.get_texts()[0].set_color(row["text"].get_color())
+            single.get_texts()[0].set_color(row["textColor"])
             if row["style"] == "text":
                 for handle in single.legend_handles:
                     handle.set_visible(False)

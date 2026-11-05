@@ -1,9 +1,9 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=9d39388e9d95";
-import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=9d39388e9d95";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9d39388e9d95";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=9d39388e9d95";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=9d39388e9d95";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=9d39388e9d95";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=352632a0bbef";
+import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=352632a0bbef";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=352632a0bbef";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=352632a0bbef";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=352632a0bbef";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=352632a0bbef";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -317,7 +317,8 @@ function updateButtons() {
   $('#restore-legend-items').disabled=busy || !metadata;
   $('#edit-all-series').disabled = !engineReady || busy || !config.series.length || renderedRevision !== revision || renderRunning;
   $('#open-series-table').disabled = !engineReady || busy || !metadata || !config.series.length;
-  $$('#series-table-body input').forEach(input=>input.disabled=busy);
+  $$('#series-table-body input,#series-table-body select').forEach(input=>input.disabled=busy);
+  syncSeriesErrorControls();
   $$('#series-table-body [data-series-table-edit]').forEach(button=>button.disabled=busy || renderRunning || renderedRevision!==revision);
   $("#figure-stage").setAttribute("aria-busy", String(loading || exporting || renderRunning || !engineReady));
   $('#save-destination').disabled = $('#choose-save-folder').disabled = busy;
@@ -347,7 +348,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=9d39388e9d95", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=352632a0bbef", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -385,7 +386,7 @@ function choiceOptions(choices, selected) {
 }
 
 function enhanceColorInputs() {
-  for (const input of $$('input[type="color"],input[data-axis$="Color"],input[data-series-field$="Color"],input[data-option$="Color"]')) {
+  for (const input of $$('input[type="color"],input[data-axis$="Color"],input[data-series-field$="Color"],input[data-option$="Color"],input[data-legend-field="textColor"]')) {
     if (input.closest('#color-panel') || input.dataset.paletteEnhanced) continue;
     input.dataset.paletteEnhanced = 'true';
     const title = input.getAttribute('aria-label') || input.closest('label')?.childNodes[0]?.textContent?.trim() || '色';
@@ -653,36 +654,37 @@ function drawSeriesTableSummary() {
 function drawSeriesTable() {
   if(!metadata)return;
   const items=seriesTableItems(),text=value=>escapeHTML(value ?? '—');
-  const column=index=>index==='' || index===undefined || index===null?'—':metadata.columns.find(column=>column.index===Number(index))?.name || '—';
   const modes={line:'線',scatter:'点','line+scatter':'線＋点'},styles={'-':'実線','--':'破線','-.':'一点鎖線',':':'点線'};
   const markers={o:'丸',s:'四角','^':'三角 ▲',v:'三角 ▼',D:'ひし形','+':'+',x:'×','*':'星',p:'五角形',h:'六角形'};
   const errors={auto:'±列から自動',none:'なし',symmetric:'±値',asymmetric:'正・負の誤差幅',minmax:'最小・最大値'};
-  const color=(value,fallback)=>{
-    const automatic=value===undefined || value==='' || value==='auto',actual=automatic?fallback:value;
-    const swatch=/^(?:#[\da-f]{3}|#[\da-f]{6}|[a-z]+)$/i.test(String(actual)) && actual!=='none' && actual!=='auto'?`<span class="series-table-swatch" aria-hidden="true" style="background:${actual}"></span>`:'';
-    return swatch+text(automatic?`自動（${actual ?? '—'}）`:actual);
-  };
   const headers=['No.','表示','系列名','X列','Y列','Y軸','描画','線・棒色','点色','線幅 (pt)','点面積 (pt²)','線種','マーカー','Xオフセット','Yオフセット','誤差','±列','正の誤差列','負の誤差列','最小値列','最大値列'];
-  $('#series-table-head').innerHTML=`<tr>${headers.map((label,index)=>`<th scope="col"${index>=11?' data-series-detail':''}>${text(label)}</th>`).join('')}</tr>`;
+  $('#series-table-head').innerHTML=`<tr>${headers.map((label,index)=>`<th scope="col"${index>=11?' data-series-detail':''}>${text(label)}</th>`).join('')}<th scope="col">設定</th></tr>`;
   $('#series-table-body').innerHTML=items.map((item,index)=>{
     const histogram=config.plotType==='Particle Histogram',xps=config.plotType==='XPS Fit',bar=config.plotType==='bar_graph_general',threeD=config.plotType==='Raman 3D',options=config.options || {};
-    const mode=histogram?'ヒストグラム':xps?'点':bar?'棒':threeD?'3D線':modes[item.mode] || item.mode;
-    const name=histogram?'粒径分布':xps?'実測点':String(item.name || column(item.y));
+    const attr=(key,label,option=false)=>`data-${option?'option':'series-field'}="${key}" aria-label="表の系列${index+1}の${text(label)}"`;
+    const input=(key,label,type='text',attributes='',option=false,value=option?options[key]:item[key])=>`<input ${attr(key,label,option)} type="${type}" value="${text(value ?? '')}" ${attributes}>`;
+    const select=(key,label,choices,option=false,value=option?options[key]:item[key])=>`<select ${attr(key,label,option)}>${choiceOptions(Object.entries(choices),value)}</select>`;
+    const column=(key,label,optional=false,option=false,value=option?options[key]:item[key])=>`<label class="series-table-column"><select ${attr(key,label,option)}>${columnOptions(value,optional)}</select></label>`;
+    const name=histogram?'粒径分布':xps?'実測点':input('name','名前','text','maxlength="200"');
     const cells=[text(index+1),`<input type="checkbox" data-series-field="visible" aria-label="表の系列${index+1}を描画" ${item.visible!==false?'checked':''}>`,
-      `<button type="button" data-series-table-edit="${index}" title="${text(name)}：系列設定を開く" aria-label="系列${index+1}「${text(name)}」の設定を開く">${text(name)}</button>`,
-      text(column(histogram?options.diameterColumn ?? item.y:item.x)),text(histogram?'頻度（算出）':column(item.y)),threeD?'強度（Z）':item.yAxis==='right'?'右':'左',text(mode),
-      xps?'—':color(histogram?options.histogramColor ?? '#70BEFF':item.color),histogram || bar || threeD?'—':color(xps?options.scatterFaceColor ?? '#ffffff':item.scatterColor,item.color),
-      text(histogram || xps || threeD?'—':bar?options.barEdgeWidth ?? .4:item.lineWidth),text(histogram || bar || threeD?'—':xps?options.scatterSize ?? 18:item.markerSize),
-      text(histogram || xps || bar || threeD?'—':styles[item.lineStyle] || item.lineStyle),text(histogram || bar || threeD?'—':xps?'丸':markers[item.marker] || item.marker),
-      text(histogram?'—':item.xOffset ?? 0),text(histogram?'—':item.yOffset ?? 0),text(editableXY(config.plotType)?errors[item.errorMode] || item.errorMode:'—'),
-      ...['error','errorPlus','errorMinus','errorMin','errorMax'].map(key=>text(editableXY(config.plotType)?column(item[key]):'—'))];
-    return `<tr data-series-index="${index}" title="ダブルクリックで系列設定を開きます。">${cells.map((html,index)=>`<td title="${html.replace(/<[^>]*>/g,'')}"${index>=11?' data-series-detail':''}>${html}</td>`).join('')}</tr>`;
+      name,column(histogram?'diameterColumn':'x','X列',false,histogram,histogram?options.diameterColumn ?? item.y:item.x),histogram?'頻度（算出）':column('y','Y列'),
+      threeD?'強度（Z）':editableXY(config.plotType)?select('yAxis','Y軸',{left:'左軸',right:'右軸'}):'左',
+      histogram?'ヒストグラム':xps?'点':bar?'棒':threeD?'3D線':select('mode','描画',modes),
+      xps?'—':histogram?input('histogramColor','線・棒色','color','',true,options.histogramColor ?? '#70BEFF'):input('color','線・棒色','color'),
+      histogram || bar || threeD?'—':xps?input('scatterFaceColor','点色','text','',true,options.scatterFaceColor ?? '#ffffff'):input('scatterColor','点色'),
+      histogram || xps || threeD?'—':bar?input('barEdgeWidth','線幅 (pt)','number','min="0" max="6" step="0.1" title="全ての棒に適用します。"',true,options.barEdgeWidth ?? .4):input('lineWidth','線幅 (pt)','number','min="0" max="6" step="0.1"'),
+      histogram || bar || threeD?'—':xps?input('scatterSize','点面積 (pt²)','number','min="1" max="200" step="0.1"',true,options.scatterSize ?? 18):input('markerSize','点面積 (pt²)','number','min="1" max="200" step="0.1"'),
+      editableXY(config.plotType)?select('lineStyle','線種',styles):'—',histogram || bar || threeD?'—':xps?'丸':select('marker','マーカー',markers),
+      histogram?'—':input('xOffset','Xオフセット','number','step="any"'),histogram?'—':input('yOffset','Yオフセット','number','step="any"'),
+      editableXY(config.plotType)?select('errorMode','誤差',errors):'—',
+      ...['error','errorPlus','errorMinus','errorMin','errorMax'].map((key,i)=>editableXY(config.plotType)?column(key,headers[16+i],true):'—')];
+    return `<tr data-series-index="${index}">${cells.map((html,index)=>`<td${index>=11?' data-series-detail':''}>${html}</td>`).join('')}<td><button type="button" data-series-table-edit="${index}" aria-label="系列${index+1}の詳細設定を開く">詳細</button></td></tr>`;
   }).join('');
-  drawSeriesTableSummary();updateButtons();
+  drawSeriesTableSummary();enhanceColorInputs();updateButtons();
 }
 function openSeriesTable() {
   if(!metadata || !engineReady || loading || exporting || !config.series.length)return;
-  drawSeriesTable();showDialog('#series-table-dialog');
+  drawSeriesTable();$('#series-table-dialog .series-table-scroll').scrollLeft=0;showDialog('#series-table-dialog');
 }
 function editTableSeries(index) {
   if(!config.series[index] || loading || exporting || renderRunning || renderedRevision!==revision)return;
@@ -692,14 +694,14 @@ $('#open-series-table').addEventListener('click',openSeriesTable);
 $('#close-series-table').addEventListener('click',()=>$('#series-table-dialog').close());
 $('#series-table-details').addEventListener('change',event=>{$('#series-table').dataset.details=String(event.target.checked);});
 $('#series-table-body').addEventListener('input',event=>{
-  if(event.target.dataset.seriesField!=='visible' || loading || exporting)return;
+  if(!event.target.dataset.seriesField && !event.target.dataset.option || loading || exporting)return;
   applyControlInput(event);drawSeriesTableSummary();
 });
 $('#series-table-body').addEventListener('click',event=>{
   const button=event.target.closest('[data-series-table-edit]');if(button)editTableSeries(Number(button.dataset.seriesTableEdit));
 });
 $('#series-table-body').addEventListener('dblclick',event=>{
-  if(event.target.closest('button,input'))return;
+  if(event.target.closest('button,input,select,label,.color-control'))return;
   const row=event.target.closest('[data-series-index]');if(row)editTableSeries(Number(row.dataset.seriesIndex));
 });
 
@@ -750,7 +752,7 @@ function drawControls() {
   });
   const generic=editableXY(config.plotType || 'General');
   const markerFields=['mode','marker','markerSize','scatterColor','markerEdgeColor','markerFaceColor','markerEdgeAlpha','markerFaceAlpha','lineStyle','lineAlpha','error','errorMode','errorMin','errorMax','yAxis'];
-  $$('[data-series-field]').forEach(input=>{if(markerFields.includes(input.dataset.seriesField))input.closest('label').hidden=!generic;});
+  $$('[data-series-field]').forEach(input=>{if(!input.closest('#series-table-body') && markerFields.includes(input.dataset.seriesField))input.closest('label').hidden=!generic;});
   syncSeriesErrorControls();
   syncYAxesControls();
   syncTrendControls();
@@ -874,7 +876,9 @@ function syncSeriesErrorControls() {
     const allowed = modes[input.dataset.seriesField];
     if (!allowed) return;
     const series = config.series[Number(input.closest('[data-series-index]').dataset.seriesIndex)];
-    input.closest('label').hidden = !generic || !series || !allowed.includes(series.errorMode || 'auto');
+    const enabled=generic && series && allowed.includes(series.errorMode || 'auto');
+    if(input.closest('#series-table-body'))input.disabled=loading || exporting || !enabled;
+    else input.closest('label').hidden = !enabled;
   });
 }
 
@@ -1307,7 +1311,13 @@ function changed() {
 }
 
 function legendModeControls() {
-  return `<div class="field-grid"><label>凡例の表示<select data-axis="legendStyle">${choiceOptions([['symbols','線／点あり'],['text','文字列のみ']],config.axes.legendStyle || 'symbols')}</select></label><label>操作・移動<select data-axis="legendMode">${choiceOptions([['together','一括'],['individual','系列ごと']],config.axes.legendMode || 'together')}</select></label></div>`;
+  return `<div class="field-grid"><label>凡例の表示<select data-axis="legendStyle">${choiceOptions([['symbols','線／点あり'],['text','文字列のみ']],config.axes.legendStyle || 'symbols')}</select></label><label>操作・移動<select data-axis="legendMode">${choiceOptions([['together','一括'],['individual','系列ごと']],config.axes.legendMode || 'together')}</select></label></div>`+legendTextColorControls(key=>`data-axis="legendText${key}"`,config.axes.legendTextColorMode || 'auto',config.axes.legendTextColor || '#000000');
+}
+function legendTextColorControls(attribute,mode,color,individual=false) {
+  return `<div class="legend-text-color-controls field-grid"><label title="表示方法に合わせる：線／点ありは黒、文字列のみは系列の色になります。">${individual?'この凡例の文字色':'文字色'}<select data-legend-color-mode ${attribute('ColorMode')}>${choiceOptions([...(individual?[['inherit','全体に従う']]:[]),['auto','表示方法に合わせる'],['black','黒'],['series','系列の色'],['custom','指定色']],mode)}</select></label><label data-legend-custom-color ${mode==='custom'?'':'hidden'}>指定色<input type="color" ${attribute('Color')} value="${escapeHTML(color)}" aria-label="${individual?'この凡例の':'凡例の'}指定色"></label></div>`;
+}
+function syncLegendColorControls() {
+  $$('[data-legend-color-mode]').forEach(input=>{const custom=input.closest('.legend-text-color-controls')?.querySelector('[data-legend-custom-color]');if(custom)custom.hidden=input.value!=='custom';});
 }
 const isLegendId=id=>id==='legend' || /^legend-item-\d+$/.test(id || '');
 function legendEntry(id) {return figureResult?.geometry.legendItems?.find(item=>item.id===id);}
@@ -1765,7 +1775,7 @@ function applyControlInput(event) {
       if(['density','normalization','yAxis'].includes(key))syncProcessingAxes();
       syncProcessingControls();
     }
-  } else if (input.dataset.legendKey!==undefined && ['visible','style','fontSize'].includes(input.dataset.legendField)) {
+  } else if (input.dataset.legendKey!==undefined && ['visible','style','fontSize','textColorMode','textColor'].includes(input.dataset.legendField)) {
     config.options ||= {};config.options.legendEntries ||= {};
     (config.options.legendEntries[input.dataset.legendKey] ||= {})[input.dataset.legendField]=input.type==='checkbox'?input.checked:input.value;
   } else if (input.dataset.annotationField) {
@@ -1773,12 +1783,13 @@ function applyControlInput(event) {
     item[input.dataset.annotationField] = input.type === "checkbox" ? input.checked : ['number','range'].includes(input.type) ? Number(input.value) : input.value;
   } else if (input.dataset.option) {
     config.options ||= {}; config.options[input.dataset.option] = input.type === "checkbox" ? input.checked : ['number','range'].includes(input.type) ? Number(input.value) : input.value;
+    $$(`[data-option="${input.dataset.option}"]`).forEach(field=>{if(field!==input){field.value=input.value;field.checked=input.checked;}});
   } else if (input.dataset.fill) {
     const fill=config.options.fills[Number(input.closest('[data-fill-index]').dataset.fillIndex)];
     fill[input.dataset.fill]=['number','range'].includes(input.type) || input.tagName === "SELECT"?Number(input.value):input.value;
   } else if(input.dataset.previewPreset !== undefined){changePlotType(input.value);return;}
   else return;
-  syncAxisAutomaticControls(); syncOpacityControls(input); changed();
+  syncAxisAutomaticControls(); syncOpacityControls(input); syncLegendColorControls(); changed();
 }
 $("#plot-form").addEventListener("input", applyControlInput);
 $('#preset-options').addEventListener('input', applyControlInput);
@@ -2329,8 +2340,8 @@ function openElementEditor(part,index=0) {
     const entry=legendEntry(index);fields.dataset.legendItemId=entry?.id || '';fields.dataset.legendSeriesIndex=entry?.seriesIndex ?? '';fields.dataset.legendKey=entry?.key || '';
     const item=entry?.seriesIndex!==null && entry?.seriesIndex!==undefined?config.series[entry.seriesIndex]:null;
     const stored=item || config.options?.legendEntries?.[entry?.key] || {};
-    const attribute=key=>item?`data-series-field="${key==='style'?'legendStyle':'legendFontSize'}"`:`data-legend-key="${escapeHTML(entry?.key)}" data-legend-field="${key}"`;
-    const appearance=entry?`<label>この凡例の表示<select ${attribute('style')}>${choiceOptions([['auto','全体に従う'],['symbols','線／点あり'],['text','文字列のみ']],stored[item?'legendStyle':'style'] || 'auto')}</select></label><label title="空欄は全体設定に従います。">この凡例のフォントサイズ (pt)<input ${attribute('fontSize')} type="number" min="2" max="72" step="0.1" value="${escapeHTML(stored[item?'legendFontSize':'fontSize'] ?? '')}" placeholder="全体設定（${axisControlValue('legendFontScale',config.axes.legendFontScale)} pt）"></label>`:'';
+    const attribute=key=>item?`data-series-field="${{style:'legendStyle',fontSize:'legendFontSize',ColorMode:'legendTextColorMode',Color:'legendTextColor'}[key]}"`:`data-legend-key="${escapeHTML(entry?.key)}" data-legend-field="${{ColorMode:'textColorMode',Color:'textColor'}[key] || key}"`;
+    const appearance=entry?`<label>この凡例の表示<select ${attribute('style')}>${choiceOptions([['auto','全体に従う'],['symbols','線／点あり'],['text','文字列のみ']],stored[item?'legendStyle':'style'] || 'auto')}</select></label><label title="空欄は全体設定に従います。">この凡例のフォントサイズ (pt)<input ${attribute('fontSize')} type="number" min="2" max="72" step="0.1" value="${escapeHTML(stored[item?'legendFontSize':'fontSize'] ?? '')}" placeholder="全体設定（${axisControlValue('legendFontScale',config.axes.legendFontScale)} pt）"></label>`+legendTextColorControls(attribute,stored[item?'legendTextColorMode':'textColorMode'] || 'inherit',stored[item?'legendTextColor':'textColor'] || '#000000',true):'';
     const local=entry?item?`<div data-series-index="${entry.seriesIndex}"><label>凡例名<input data-series-field="name" value="${escapeHTML(item.name)}" maxlength="200"></label>${appearance}<label><input data-series-field="legendVisible" type="checkbox" ${item.legendVisible!==false?'checked':''}>この凡例を表示</label></div>`:`${appearance}<label><input data-legend-key="${escapeHTML(entry.key)}" data-legend-field="visible" type="checkbox" checked>この凡例を表示</label>`:'';
     const shared=`<label><input data-axis="legend" type="checkbox" ${config.axes.legend?'checked':''}>凡例を表示</label>${legendModeControls()}<label title="全凡例に共通です。">フォントサイズ (pt)<input data-axis="legendFontScale" type="number" min="${axisControlValue('legendFontScale',.2)}" max="${axisControlValue('legendFontScale',3)}" step="0.1" value="${axisControlValue('legendFontScale',config.axes.legendFontScale)}"></label><details class="settings-panel"><summary>線・点の大きさ</summary><label>大きさ（標準比）<input data-axis="legendScale" type="number" min=".2" max="3" step="0.1" value="${config.axes.legendScale}"></label></details>`;
     fields.innerHTML=local+(entry?`<details class="settings-panel"><summary>全凡例の設定</summary>${shared}</details>`:shared)+`<button type="button" class="button quiet" data-reset-legend>${entry?'この凡例を':'凡例を'}標準位置に戻す</button><button type="button" class="button quiet" data-restore-legend-items ${hasHiddenLegendItems()?'':'hidden'}>凡例項目をすべて再表示</button>`;
@@ -2363,7 +2374,7 @@ function openElementEditor(part,index=0) {
     else if(input.tagName==='SELECT'){const option=new Option('混在','');option.disabled=true;input.add(option,0);input.value='';}
     else if(input.type!=='range'){input.value='';input.placeholder='混在';}
   });
-  showDialog('#element-editor');enhanceColorInputs();syncAxisAutomaticControls();syncUnitControls();syncOpacityControls();syncProcessingControls();
+  showDialog('#element-editor');enhanceColorInputs();syncAxisAutomaticControls();syncUnitControls();syncOpacityControls();syncProcessingControls();syncLegendColorControls();
 }
 $('#element-editor-fields').addEventListener('input',applyControlInput);
 for(const root of [$('#plot-form'),$('#element-editor-fields')])root.addEventListener('focusout',event=>{if(event.target.dataset.seriesField==='detrendSlope')syncProcessingControls();});

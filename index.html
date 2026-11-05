@@ -6,8 +6,8 @@
   <meta name="description" content="Excel・CSV・TXTの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=9d39388e9d95">
-  <script type="module" src="./app.js?v=9d39388e9d95"></script>
+  <link rel="stylesheet" href="./style.css?v=352632a0bbef">
+  <script type="module" src="./app.js?v=352632a0bbef"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -73,7 +73,7 @@
         <fieldset id="plot-fields" disabled>
           <details class="control-section" open>
             <summary class="section-heading"><h2><span class="step">02</span>系列</h2><span id="series-count" class="section-note">0 系列</span></summary>
-            <div class="series-manager-actions"><button id="open-series-table" class="button" type="button" disabled title="X・Y列、色、線幅などを一覧します。系列名または行のダブルクリックで設定を開けます。">系列の表</button><button id="edit-all-series" class="button quiet" type="button" disabled title="線・点の見た目やデータ補正を全系列へまとめて設定します。データ列・名前・系列色は保持します。">全系列の設定</button></div>
+            <div class="series-manager-actions"><button id="open-series-table" class="button" type="button" disabled title="X・Y列、名前、色、線幅などを表から直接変更できます。">系列の表</button><button id="edit-all-series" class="button quiet" type="button" disabled title="線・点の見た目やデータ補正を全系列へまとめて設定します。データ列・名前・系列色は保持します。">全系列の設定</button></div>
             <div id="series-list" class="series-list"><p class="empty-series">ファイルを読み込むと、X列・Y列を選べます。</p></div>
             <button id="add-series" class="button add-series" type="button"><svg><use href="#i-plus"/></svg>系列を追加</button>
             <details id="series-colormap" class="settings-panel"><summary>まとめて配色</summary><div class="field-grid"><label>連続配色<select id="color-map"><option value="viridis">Viridis</option><option value="plasma">Plasma</option><option value="spectrum">Spectrum</option></select></label><label>適用先<select id="colormap-target"><option value="both">線とマーカー</option><option value="line">線</option><option value="scatter">マーカー</option></select></label></div><button id="apply-colormap" type="button" class="button quiet">配色を適用</button></details>
