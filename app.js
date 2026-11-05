@@ -1,9 +1,9 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=8c25b29a37bb";
-import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=8c25b29a37bb";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=8c25b29a37bb";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=8c25b29a37bb";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=8c25b29a37bb";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=8c25b29a37bb";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=1f3dc3d89014";
+import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=1f3dc3d89014";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=1f3dc3d89014";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=1f3dc3d89014";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=1f3dc3d89014";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=1f3dc3d89014";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -339,7 +339,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=8c25b29a37bb", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=1f3dc3d89014", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -603,7 +603,7 @@ function drawPresetOptions() {
 
 function changePlotType(type) {
   if(metadata?.sources && !editableXY(type)){status('複数ファイルの重ね描きでは通常のXYグラフを選んでください。','error');$('#plot-type').value=config.plotType;return;}
-  applyPreset(config,presets.find(item=>item.id===type));
+  applyPreset(config,presets.find(item=>item.id===type),metadata);
   delete config.options.processingAxes;
   if(!editableXY(config.plotType))for(const item of config.series)for(const key of PROCESSING_FIELDS)item[key]=createSeries(item.x,item.y,item.name)[key];
   if(!editableXY(config.plotType))config.series.forEach(item=>{item.mode='line';item.errorMode='none';item.yAxis='left';});
@@ -862,7 +862,7 @@ function resetPreview() {
 function initialSheetConfig(data) {
   const inferred = data.plotType || 'General';
   const result = {axes:defaultAxes(), plotType:inferred, options:{}, series:initialSeries(data.columns, inferred)};
-  applyPreset(result, presets.find(item=>item.id===inferred));
+  applyPreset(result, presets.find(item=>item.id===inferred),data);
   if (inferred==='XPS Fit') result.series=[createSeries(0,1,data.columns[1]?.name || 'Raw')];
   if (inferred==='Roughness') result.series.forEach(item=>item.mode='line+scatter');
   if (inferred==='Particle Histogram') result.options.diameterColumn=Math.min(2,data.columns.length-1);

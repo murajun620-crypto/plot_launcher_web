@@ -332,6 +332,15 @@ def read_text_table(path, header_row):
     return frame, detected_header
 
 
+LENGTH_UNIT_FACTORS = {"pm": 1e-12, "Å": 1e-10, "nm": 1e-9, "μm": 1e-6, "mm": 1e-3, "cm": 1e-2, "m": 1, "km": 1e3}
+
+
+def column_length_unit(name):
+    label = re.sub(r"\s+\[\d+\]$", "", str(name))
+    match = re.search(r"(?:/|\(|\[)\s*(pm|Å|nm|[μµu]m|mm|cm|km|m)\s*[)\]]?\s*$", label)
+    return match.group(1).replace("µ", "μ").replace("u", "μ") if match else None
+
+
 class _MarkerExtent(Artist):
     """Include full scatter markers in tight preview/export bounds at any DPI."""
 
@@ -460,6 +469,11 @@ class PlotEngine:
             {"index": index, "name": name, "numeric": int(pd.to_numeric(frame.iloc[:2000, index], errors="coerce").notna().sum())}
             for index, name in enumerate(names)
         ]
+        for column in columns:
+            unit = column_length_unit(column["name"])
+            if unit:
+                numeric = pd.to_numeric(frame.iloc[:, column["index"]], errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
+                column.update(lengthUnit=unit, numericRange=[float(numeric.min()), float(numeric.max())] if len(numeric) else None)
         rows = [[None if pd.isna(value) else str(value)[:140] for value in row] for row in frame.head(8).itertuples(index=False, name=None)]
         self.frame, self.filename, self.sheet_name = frame, filename, sheet_name
         self.column_labels = dict(zip(names, names))
@@ -705,6 +719,15 @@ class PlotEngine:
 
         frame = self.frame
         unit_scales = {axis: number(axes.get(f"{axis}UnitScale", 1), "単位の表示倍率", minimum=1e-30, maximum=1e30) for axis in ("x", "y")}
+        afm_bases = options.get("afmSourceUnits", {}) if preset == "AFM Section" else {}
+        if not isinstance(afm_bases, dict) or any(key not in {"x", "y", "y2"} or value not in LENGTH_UNIT_FACTORS for key, value in afm_bases.items()):
+            raise ValueError("AFM断面データの元単位を確認してください。")
+        def input_scale(axis, column):
+            basis = afm_bases.get(axis)
+            if not basis:
+                return 1
+            native = column_length_unit(getattr(self, "column_labels", {}).get(frame.columns[column], frame.columns[column]))
+            return LENGTH_UNIT_FACTORS[native] / LENGTH_UNIT_FACTORS[basis] if basis and native else 1
         draw_columns = {}
         keys = {key: [] for key in ("columns", "names", "colors", "modes", "widths", "markers", "sizes", "xoffsets", "yoffsets", "errors", "errorModes", "errorMins", "errorMaxs", "scatterColors", "edgeColors", "faceColors", "lineAlphas", "edgeAlphas", "faceAlphas")}
         diagnostics, warnings = [], []
@@ -727,10 +750,10 @@ class PlotEngine:
                 raise ValueError("誤差（±）の列を指定してください。")
             xoff = number(item.get("xOffset", 0), "Xオフセット")
             yoff = number(item.get("yOffset", 0), "Yオフセット")
-            x = pd.to_numeric(frame.iloc[:, xi], errors="coerce").to_numpy(dtype=float) * number(item.get('xFactor', 1), 'Xに掛ける係数') * unit_scales["x"] + xoff
+            x = pd.to_numeric(frame.iloc[:, xi], errors="coerce").to_numpy(dtype=float) * number(item.get('xFactor', 1), 'Xに掛ける係数') * input_scale("x", xi) * unit_scales["x"] + xoff
             raw_y = pd.to_numeric(frame.iloc[:, yi], errors="coerce").to_numpy(dtype=float)
             processed, gain, bias, processing = self.process_series(x, raw_y, item)
-            display_scale = unit_scales["y"]
+            display_scale = unit_scales["y"] * input_scale("y", yi)
             processed_unit = None
             if item.get("normalization", "none") != "none":
                 processed_unit = str(axes.get("yUnit", "auto"))
@@ -1245,6 +1268,14 @@ class PlotEngine:
         def axis_config(indices, name):
             result = {**config, "axes": dict(config.get("axes", {})), "series": [original_series[i] for i in indices]}
             if name == "y2":
+                bases = config.get("options", {}).get("afmSourceUnits")
+                if bases is not None:
+                    bases = dict(bases)
+                    if "y2" in bases:
+                        bases["y"] = bases["y2"]
+                    else:
+                        bases.pop("y", None)
+                    result["options"] = {**config.get("options", {}), "afmSourceUnits": bases}
                 for suffix, default in (("Label", ""), ("Unit", "auto"), ("UnitScale", 1), ("Scale", "linear"), ("Min", ""), ("Max", ""), ("Step", ""), ("MinorStep", ""), ("LogFormat", "power"), ("LabelPad", 2), ("TickPad", 0)):
                     result["axes"][f"y{suffix}"] = config.get("axes", {}).get(f"y2{suffix}", default)
                 for suffix in ("Label", "TickLabels", "Ticks", "MinorTicks"):

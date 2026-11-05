@@ -25,6 +25,48 @@ export function unitConversion(from, to) {
   }
   return null;
 }
+const lengthUnits=['pm','Å','nm','μm','mm','cm','m','km'];
+export function columnLengthUnit(column) {
+  if(lengthUnits.includes(column?.lengthUnit))return column.lengthUnit;
+  const name=String(column?.originalName ?? column?.name ?? '').replace(/\s+\[\d+\]$/, '');
+  const unit=name.match(/(?:\/|\(|\[)\s*(pm|Å|nm|[μµu]m|mm|cm|km|m)\s*[)\]]?\s*$/)?.[1];
+  return unit?.replace(/[µu]/,'μ') || null;
+}
+
+export function configureAFMUnits(config, metadata) {
+  const bases={};
+  for(const axis of ['x','y','y2']){
+    const preferred=axis==='x'?'μm':'nm';
+    const series=(config.series || []).filter(item=>axis==='x' || (item.yAxis==='right'?'y2':'y')===axis);
+    if(!series.length)continue;
+    const entries=series.map(item=>{
+      const column=metadata?.columns.find(column=>column.index===Number(item[axis==='x'?'x':'y']));
+      return {item,column,unit:columnLengthUnit(column)};
+    });
+    const basis=entries.every(entry=>entry.unit)?entries[0].unit:preferred;
+    const previousBasis=config.options?.afmSourceUnits?.[axis] || entries[0].unit || preferred;
+    if(axis==='y2'){
+      const scale=Number(config.axes.y2UnitScale ?? 1);
+      if(scale!==1)Object.assign(config,scaleAxis(config,axis,1/scale));
+    }
+    const basisFactor=unitConversion(previousBasis,basis);
+    if(basisFactor!==1){Object.assign(config,scaleAxis(config,axis,basisFactor));config.axes[`${axis}UnitScale`]=1;}
+    let unit=preferred;
+    const visible=entries.filter(entry=>entry.item.visible!==false),active=visible.length?visible:entries;
+    if(active.every(entry=>entry.unit && Array.isArray(entry.column?.numericRange))){
+      const maximum=Math.max(...active.flatMap(entry=>entry.column.numericRange.map(value=>Math.abs(value)*unitConversion(entry.unit,'m'))));
+      const shown=maximum*unitConversion('m',preferred);
+      if(maximum>0 && (shown<.1*(1-1e-12) || shown>1000*(1+1e-12))){
+        const candidates=['pm','nm','μm','mm','m','km'].map(to=>({to,value:maximum*unitConversion('m',to)})).filter(item=>item.value>=.1 && item.value<=1000);
+        candidates.sort((a,b)=>Math.abs(Math.log10(a.value)-1.5)-Math.abs(Math.log10(b.value)-1.5));
+        unit=candidates[0]?.to || preferred;
+      }
+    }
+    Object.assign(config,scaleAxis(config,axis,unitConversion(basis,unit)));
+    config.axes[`${axis}Unit`]=unit;bases[axis]=basis;
+  }
+  config.options ||= {};config.options.afmSourceUnits=bases;
+}
 export function unitSuggestion(axis, info) {
   const maximum=Number(info?.tickMax);
   if (!info || info.categorical || info.hidden || !Number.isFinite(maximum) || maximum<=0 || (maximum>=.1*(1-1e-12) && maximum<=1000*(1+1e-12))) return null;
@@ -63,9 +105,16 @@ export function convertAxisUnit(config,axis,from,to) {
   if (factor!==1 && axis!=='x' && config.plotType==='Raman 3D' && config.options?.normalize!==false) throw new Error('強度を換算する場合は、先に正規化を解除してください。');
   const next=scaleAxis(config,axis,factor);next.axes[`${axis}Unit`]=to;return next;
 }
-export function resetPresetUnitScales(config) {
+export function resetPresetUnitScales(config, metadata) {
   for (const axis of ['x','y']) {
     const factor=Number(config.axes[`${axis}UnitScale`] ?? 1);
     if (factor!==1) Object.assign(config,scaleAxis(config,axis,1/factor));
+    const basis=config.plotType==='AFM Section' && config.options?.afmSourceUnits?.[axis];
+    const item=config.series.find(item=>axis==='x' || item.yAxis!=='right');
+    const native=columnLengthUnit(metadata?.columns.find(column=>column.index===Number(item?.[axis])));
+    if(basis && native && basis!==native){
+      Object.assign(config,scaleAxis(config,axis,unitConversion(basis,native)));config.axes[`${axis}UnitScale`]=1;
+      config.options.afmSourceUnits[axis]=native;
+    }
   }
 }

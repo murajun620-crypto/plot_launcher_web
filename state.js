@@ -1,5 +1,5 @@
-import { resetPresetUnitScales, unitConversion } from "./units.js?v=8c25b29a37bb";
-export const APP_VERSION = "2.4.5";
+import { resetPresetUnitScales, unitConversion, configureAFMUnits } from "./units.js?v=1f3dc3d89014";
+export const APP_VERSION = "2.4.6";
 
 // Accept one numeric value or fraction without evaluating JavaScript expressions.
 export function parseCoefficient(value) {
@@ -41,8 +41,8 @@ export const COLOR_PALETTE = {
 
 export const PLOT_TYPES = ["CV/LSV", "CA", "CP", "EDX", "XPS Survey", "XPS Core", "XPS Fit", "XAFS", "Raman Spectrum", "AFM Section", "Particle Histogram", "General", "Roughness", "bar_graph_general", "Raman 3D", "Polishing Rate", "Waviness"];
 
-export function applyPreset(config, preset) {
-  resetPresetUnitScales(config);
+export function applyPreset(config, preset, metadata) {
+  resetPresetUnitScales(config, metadata);
   config.plotType = preset.id;
   const [xLabel, xUnit, yLabel, yUnit] = preset.labels;
   Object.assign(config.axes, {xLabel: xLabel === "auto" ? "" : xLabel, xUnit, yLabel: yLabel === "auto" ? "" : yLabel, yUnit});
@@ -55,6 +55,8 @@ export function applyPreset(config, preset) {
     config.series.forEach((series, index) => Object.assign(series, {mode: "line+scatter", marker: "o", lineStyle: "-", color: index === 2 ? "#000000" : COLORS[index % COLORS.length]}));
   }
   config.options ||= {};
+  if(preset.id==='AFM Section')configureAFMUnits(config,metadata);
+  else delete config.options.afmSourceUnits;
 }
 
 export function zoomAt(view, factor, point) {
