@@ -1,9 +1,9 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=352632a0bbef";
-import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=352632a0bbef";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=352632a0bbef";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=352632a0bbef";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=352632a0bbef";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=352632a0bbef";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=6fa1ebe12611";
+import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=6fa1ebe12611";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=6fa1ebe12611";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=6fa1ebe12611";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=6fa1ebe12611";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=6fa1ebe12611";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -316,8 +316,8 @@ function updateButtons() {
   $$('#element-editor-fields [data-restore-legend-items]').forEach(button=>button.hidden=!hasHiddenLegendItems());
   $('#restore-legend-items').disabled=busy || !metadata;
   $('#edit-all-series').disabled = !engineReady || busy || !config.series.length || renderedRevision !== revision || renderRunning;
-  $('#open-series-table').disabled = !engineReady || busy || !metadata || !config.series.length;
-  $$('#series-table-body input,#series-table-body select').forEach(input=>input.disabled=busy);
+  $('#series-table-panel').hidden = !metadata || !config.series.length;
+  $$('#series-table-body input,#series-table-body select').forEach(input=>input.disabled=!engineReady || busy);
   syncSeriesErrorControls();
   $$('#series-table-body [data-series-table-edit]').forEach(button=>button.disabled=busy || renderRunning || renderedRevision!==revision);
   $("#figure-stage").setAttribute("aria-busy", String(loading || exporting || renderRunning || !engineReady));
@@ -348,7 +348,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=352632a0bbef", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=6fa1ebe12611", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -652,7 +652,7 @@ function drawSeriesTableSummary() {
   $('#series-table-summary').textContent=`${items.length} 系列 · 表示 ${items.filter(item=>item.visible!==false).length}`;
 }
 function drawSeriesTable() {
-  if(!metadata)return;
+  if(!metadata){$('#series-table-head').innerHTML='';$('#series-table-body').innerHTML='';drawSeriesTableSummary();return;}
   const items=seriesTableItems(),text=value=>escapeHTML(value ?? '—');
   const modes={line:'線',scatter:'点','line+scatter':'線＋点'},styles={'-':'実線','--':'破線','-.':'一点鎖線',':':'点線'};
   const markers={o:'丸',s:'四角','^':'三角 ▲',v:'三角 ▼',D:'ひし形','+':'+',x:'×','*':'星',p:'五角形',h:'六角形'};
@@ -682,16 +682,18 @@ function drawSeriesTable() {
   }).join('');
   drawSeriesTableSummary();enhanceColorInputs();updateButtons();
 }
-function openSeriesTable() {
-  if(!metadata || !engineReady || loading || exporting || !config.series.length)return;
-  drawSeriesTable();$('#series-table-dialog .series-table-scroll').scrollLeft=0;showDialog('#series-table-dialog');
+function toggleSeriesTable() {
+  const content=$('#series-table-content'),button=$('#toggle-series-table');
+  content.hidden=!content.hidden;
+  button.textContent=content.hidden?'＋':'−';
+  button.setAttribute('aria-expanded',String(!content.hidden));
+  button.setAttribute('aria-label',content.hidden?'系列表を開く':'系列表を閉じる');
 }
 function editTableSeries(index) {
   if(!config.series[index] || loading || exporting || renderRunning || renderedRevision!==revision)return;
-  $('#series-table-dialog').close();openElementEditor('series',index);
+  openElementEditor('series',index);
 }
-$('#open-series-table').addEventListener('click',openSeriesTable);
-$('#close-series-table').addEventListener('click',()=>$('#series-table-dialog').close());
+$('#toggle-series-table').addEventListener('click',toggleSeriesTable);
 $('#series-table-details').addEventListener('change',event=>{$('#series-table').dataset.details=String(event.target.checked);});
 $('#series-table-body').addEventListener('input',event=>{
   if(!event.target.dataset.seriesField && !event.target.dataset.option || loading || exporting)return;
@@ -763,7 +765,7 @@ function drawControls() {
   $('#series-batch').hidden=xpsFit || histogram;
   $$('.series-errors').forEach(panel=>panel.hidden=!generic);
   if(config.plotType==='XPS Fit')$$('.series-advanced,.series-card .annotation-buttons').forEach(element=>element.hidden=true);
-  if(config.plotType==='Raman 3D')$$('[data-series-field="lineWidth"]').forEach(input=>input.closest('label').hidden=true);
+  if(config.plotType==='Raman 3D')$$('#series-list [data-series-field="lineWidth"]').forEach(input=>input.closest('label').hidden=true);
   updateButtons();
   syncAxisAutomaticControls();
   drawAnnotations();
@@ -771,7 +773,7 @@ function drawControls() {
   $$('[data-axis="xLabel"],[data-axis="yLabel"],[data-axis="y2Label"],[data-axis="xUnit"],[data-axis="yUnit"],[data-axis="y2Unit"],.series-label').forEach(input=>input.title=MICRO_HINT);
   enhanceColorInputs();
   $$('[data-preview-preset]').forEach(input=>input.value=config.plotType);
-  if($('#series-table-dialog').open)drawSeriesTable();
+  drawSeriesTable();
 }
 
 function processingControls(item) {
@@ -877,7 +879,7 @@ function syncSeriesErrorControls() {
     if (!allowed) return;
     const series = config.series[Number(input.closest('[data-series-index]').dataset.seriesIndex)];
     const enabled=generic && series && allowed.includes(series.errorMode || 'auto');
-    if(input.closest('#series-table-body'))input.disabled=loading || exporting || !enabled;
+    if(input.closest('#series-table-body'))input.disabled=!engineReady || loading || exporting || !enabled;
     else input.closest('label').hidden = !enabled;
   });
 }
@@ -2697,7 +2699,7 @@ function highlightTicks(event,active){
 for(const name of ['pointerover','focusin'])$('#figure-interactions').addEventListener(name,event=>highlightTicks(event,true));
 for(const name of ['pointerout','focusout'])$('#figure-interactions').addEventListener(name,event=>highlightTicks(event,false));
 window.addEventListener('keydown',event=>{
-  if($('#color-panel').open || $('#axis-editor').open || $('#element-editor').open || $('#save-dialog').open || $('#paste-dialog').open || $('#data-import-dialog').open || $('#series-table-dialog').open)return;
+  if($('#color-panel').open || $('#axis-editor').open || $('#element-editor').open || $('#save-dialog').open || $('#paste-dialog').open || $('#data-import-dialog').open)return;
   if(event.target.matches('input,textarea,select') || event.target.isContentEditable)return;
   const control=event.ctrlKey||event.metaKey,key=event.key.toLowerCase();
   if(key==='delete'||key==='backspace'){if(selected.size){event.preventDefault();deleteAnnotations();}}

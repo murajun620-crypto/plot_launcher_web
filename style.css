@@ -247,16 +247,21 @@ button:focus-visible,summary:focus-visible,a:focus-visible{outline:2px solid #ab
 }
 .plot-dialog{width:min(360px,calc(100vw - 24px));max-height:85dvh;border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:0 12px 48px #202d3e40;color:var(--ink);overflow:auto}
 .plot-dialog::backdrop{background:#202d3e66}
-.series-table-dialog{width:min(1180px,calc(100vw - 32px))}
-.series-table-dialog::backdrop{background:transparent}
-.series-table-toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:12px;font-size:12px;color:var(--muted)}
+.series-table-panel{min-width:0;margin:8px 0 12px;border:1px solid var(--border);border-radius:7px;background:var(--surface)}
+.series-table-heading{display:flex;align-items:center;gap:12px;padding:10px 14px}
+.series-table-heading h2{margin:0;font-size:13px;font-weight:600}
+.series-table-heading output{font-size:11px;color:var(--muted)}
+#toggle-series-table{margin-left:auto;min-width:32px;min-height:32px;padding:0;font-size:21px;line-height:1}
+#series-table-content{padding:0 14px 14px}
+.series-table-toolbar{display:flex;align-items:center;justify-content:flex-end;gap:16px;margin-bottom:10px;font-size:12px;color:var(--muted)}
 .series-table-toolbar label{margin:0;white-space:nowrap;font-size:12px}
-.series-table-scroll{max-height:min(55vh,460px);border:1px solid var(--border);border-radius:6px;overscroll-behavior:contain}
+.series-table-scroll{max-height:min(45vh,360px);border:1px solid var(--border);border-radius:6px;overscroll-behavior:contain}
 #series-table{text-align:left;font-size:12px;color:var(--ink)}
 #series-table td,#series-table th{padding:7px 8px;max-width:220px;overflow:hidden;text-overflow:ellipsis}
 #series-table th{z-index:1}
-#series-table td:first-child,#series-table th:first-child{position:sticky;left:0;background:#f7f9fc;width:36px;color:var(--muted)}
-#series-table th:first-child{z-index:2}
+#series-table td:first-child,#series-table th:first-child{position:sticky;left:0;background:#f7f9fc;width:36px;min-width:36px;color:var(--muted);z-index:2}
+#series-table td:nth-child(2),#series-table th:nth-child(2){position:sticky;left:36px;background:#f7f9fc;width:38px;min-width:38px;z-index:2}
+#series-table th:first-child,#series-table th:nth-child(2){z-index:3}
 #series-table th:nth-child(3){min-width:170px}
 #series-table input:not([type="checkbox"]),#series-table select{width:120px;min-width:80px;padding:7px 8px;font-size:12px;height:34px}
 #series-table input[data-series-field="name"]{width:170px}
