@@ -1,5 +1,5 @@
-import { resetPresetUnitScales, unitConversion, configureAFMUnits } from "./units.js?v=238071c2c3b1";
-export const APP_VERSION = "2.4.8";
+import { resetPresetUnitScales, unitConversion, configureAFMUnits } from "./units.js?v=9d39388e9d95";
+export const APP_VERSION = "2.4.9";
 
 // Accept one numeric value or fraction without evaluating JavaScript expressions.
 export function parseCoefficient(value) {
@@ -96,7 +96,7 @@ export function defaultAxes() {
     hideMinorTicks: false, hideXMinorTicks: false, hideYMinorTicks: false, hideY2MinorTicks: false,
     spineLeft: true, spineRight: true, spineTop: true, spineBottom: true,
     yAxisRight: false, xAxisTop: false, spineColor: "#000000",
-    legend: true, legendPosition: "best", legendX: "", legendY: "", legendScale: 1, legendFontScale: 1,
+    legend: true, legendPosition: "best", legendX: "", legendY: "", legendScale: 1, legendFontScale: 1, legendStyle: "symbols", legendMode: "together",
     transparent: true, backgroundColor: "#ffffff", backgroundAlpha: 1, grid: false,
     plotBackgroundEnabled: false, plotBackgroundColor: "#ffffff", plotBackgroundAlpha: 1,
     markerEdgeWidth: 0.6, errorLineWidth: 0.8, errorCapSize: 3, errorCapThick: 0.8,
@@ -104,7 +104,7 @@ export function defaultAxes() {
 }
 
 export function createSeries(x, y, name, index = 0, plotType = "General") {
-  return { x, y, name, yAxis: "left", visible: true, color: plotType === "Polishing Rate" && index === 2 ? "#000000" : COLORS[index % COLORS.length], scatterColor: "auto", mode: ['Polishing Rate','Waviness'].includes(plotType) ? "line+scatter" : "line", lineWidth: 1, lineStyle: "-", lineAlpha: 1, marker: "o", markerSize: 18, markerEdgeColor: "auto", markerFaceColor: "auto", markerEdgeAlpha: 0.8, markerFaceAlpha: 0.8, xOffset: 0, yOffset: 0, error: "", errorMode: "auto", errorMin: "", errorMax: "", errorPlus: "", errorMinus: "", trendType: "none", trendOrigin: false, trendDegree: 2, trendEquation: true, trendColor: "auto", trendStyle: "--", trendWidth: 1, trendFontSize: 6, trendDigits: 4, trendX: "", trendY: "", xFactor:1, yFactor:1, detrend:false, detrendMin:'', detrendMax:'', detrendSlope:'', density:false, currentUnit:'A', area:1, areaUnit:'cm2', normalization:'none', referenceMode:'max', referencePoint:1, referenceMin:'', referenceMax:'', referenceValue:1 };
+  return { x, y, name, yAxis: "left", visible: true, legendVisible:true, legendX:'', legendY:'', legendStyle:'auto',legendFontSize:'', color: plotType === "Polishing Rate" && index === 2 ? "#000000" : COLORS[index % COLORS.length], scatterColor: "auto", mode: ['Polishing Rate','Waviness'].includes(plotType) ? "line+scatter" : "line", lineWidth: 1, lineStyle: "-", lineAlpha: 1, marker: "o", markerSize: 18, markerEdgeColor: "auto", markerFaceColor: "auto", markerEdgeAlpha: 0.8, markerFaceAlpha: 0.8, xOffset: 0, yOffset: 0, error: "", errorMode: "auto", errorMin: "", errorMax: "", errorPlus: "", errorMinus: "", trendType: "none", trendOrigin: false, trendDegree: 2, trendEquation: true, trendColor: "auto", trendStyle: "--", trendWidth: 1, trendFontSize: 6, trendDigits: 4, trendX: "", trendY: "", xFactor:1, yFactor:1, detrend:false, detrendMin:'', detrendMax:'', detrendSlope:'', density:false, currentUnit:'A', area:1, areaUnit:'cm2', normalization:'none', referenceMode:'max', referencePoint:1, referenceMin:'', referenceMax:'', referenceValue:1 };
 }
 
 export function initialSeries(columns, plotType = 'General') {
@@ -230,6 +230,7 @@ export function restoreSettings(document, metadata) {
       axes[key] = value;
     }
   }
+  if(!['symbols','text'].includes(axes.legendStyle) || !['together','individual'].includes(axes.legendMode))throw new Error('凡例の表示方法を確認してください。');
   // Earlier automatic ranges saved the then-default false flag. Upgrade only
   // automatic endpoints; numeric limits remain authoritative in the renderer.
   if(document.rangeDefaultsVersion===undefined)for(const axis of ['x','y','y2']){
@@ -244,7 +245,7 @@ export function restoreSettings(document, metadata) {
     for (const key of Object.keys(result)) {
       if (["x", "y", "error", "errorMin", "errorMax", "errorPlus", "errorMinus"].includes(key)) continue;
       if (Object.hasOwn(item, key)) {
-        if (['visible','trendOrigin','trendEquation','detrend','density'].includes(key)) {
+        if (['visible','legendVisible','trendOrigin','trendEquation','detrend','density'].includes(key)) {
           if (typeof item[key] !== 'boolean') throw new Error("設定JSONの系列表示を確認してください。");
           result[key] = item[key]; continue;
         }
@@ -261,11 +262,21 @@ export function restoreSettings(document, metadata) {
       if (item[`${key}Column`] !== undefined && typeof item[`${key}Column`] !== "string") throw new Error("設定JSONの誤差列を確認してください。");
       result[key] = item[`${key}Column`] ? find(item[`${key}Column`]) : "";
     }
+    if((result.legendX==='')!==(result.legendY==='') || [result.legendX,result.legendY].some(value=>value!=='' && (!Number.isFinite(Number(value)) || Math.abs(Number(value))>10)))throw new Error('系列ごとの凡例位置を確認してください。');
+    if(!['auto','symbols','text'].includes(result.legendStyle) || result.legendFontSize!=='' && (!Number.isFinite(Number(result.legendFontSize)) || Number(result.legendFontSize)<2 || Number(result.legendFontSize)>72))throw new Error('系列ごとの凡例表示を確認してください。');
     return result;
   });
   const plotType = document.plotType || "General";
   if (!PLOT_TYPES.includes(plotType)) throw new Error("設定JSONのプロット種別を確認してください。");
   const restored = { axes, series, plotType, options: structuredClone(document.options || {}) };
+  if(restored.options.legendEntries!==undefined){
+    const entries=restored.options.legendEntries;
+    if(!entries || Array.isArray(entries) || typeof entries!=='object' || Object.keys(entries).length>200)throw new Error('凡例項目の設定を確認してください。');
+    for(const [key,item] of Object.entries(entries)){
+      if(key.length>200 || !item || Array.isArray(item) || typeof item!=='object' || Object.keys(item).some(key=>!['x','y','visible','style','fontSize'].includes(key)) || item.visible!==undefined && typeof item.visible!=='boolean' || item.style!==undefined && !['auto','symbols','text'].includes(item.style) || item.fontSize!==undefined && item.fontSize!=='' && (!['string','number'].includes(typeof item.fontSize) || !Number.isFinite(Number(item.fontSize)) || Number(item.fontSize)<2 || Number(item.fontSize)>72))throw new Error('凡例項目の設定を確認してください。');
+      const coords=[item.x ?? '',item.y ?? ''];if((coords[0]==='')!==(coords[1]==='') || coords.some(value=>value!=='' && (!['string','number'].includes(typeof value) || !Number.isFinite(Number(value)) || Math.abs(Number(value))>10)))throw new Error('凡例項目の位置を確認してください。');
+    }
+  }
   if(restored.options.processingAxes!==undefined){
     const snapshots=restored.options.processingAxes;
     if(!snapshots || Array.isArray(snapshots) || typeof snapshots!=='object' || Object.keys(snapshots).some(key=>!['y','y2'].includes(key)))throw new Error('補正前の軸設定を確認してください。');

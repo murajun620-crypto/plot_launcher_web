@@ -1,9 +1,9 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=238071c2c3b1";
-import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=238071c2c3b1";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=238071c2c3b1";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=238071c2c3b1";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=238071c2c3b1";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=238071c2c3b1";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=9d39388e9d95";
+import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=9d39388e9d95";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9d39388e9d95";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=9d39388e9d95";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=9d39388e9d95";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=9d39388e9d95";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -236,6 +236,7 @@ function desktopAppearance() {
     <details class="settings-panel"><summary>データ線・マーカー・誤差棒</summary>
     ${numeric("dataLineScale", "データ線の太さ（標準比）", 0, 6)}
     <div class="field-grid">${numeric("markerEdgeWidth", "マーカーの縁 (pt)", 0, 20)}${numeric("errorLineWidth", "誤差棒の太さ (pt)", 0, 20)}${numeric("errorCapSize", "キャップの長さ (pt)", 0, 20)}${numeric("errorCapThick", "キャップの太さ (pt)", 0, 20)}</div></details>`;
+  $('#legend-modes').innerHTML=legendModeControls();
   $("#legend-appearance").innerHTML = `${numeric("legendScale", "凡例の線・点の大きさ（標準比）", .2)}${numeric("legendFontScale", "フォントサイズ (pt)", .2)}${numeric("legendX", "凡例の横位置（左0・右1）", -10, 10, .01)}${numeric("legendY", "凡例の縦位置（下0・上1）", -10, 10, .01)}`;
   for(const axis of ['x','y','y2'])$(`#${axis}-tick-appearance`).innerHTML=tickLineControls(axis);
 }
@@ -311,6 +312,9 @@ function updateButtons() {
   for (const id of ["#save-name", "#png-dpi", "#save-destination", "#choose-save-folder", "#close-save"]) $(id).disabled = busy;
   $("#copy-image").disabled = !engineReady || busy || renderedRevision !== revision || renderRunning;
   $('#edit-all-series').hidden = !editableXY(config.plotType || 'General');
+  $('#restore-legend-items').hidden=!hasHiddenLegendItems();
+  $$('#element-editor-fields [data-restore-legend-items]').forEach(button=>button.hidden=!hasHiddenLegendItems());
+  $('#restore-legend-items').disabled=busy || !metadata;
   $('#edit-all-series').disabled = !engineReady || busy || !config.series.length || renderedRevision !== revision || renderRunning;
   $('#open-series-table').disabled = !engineReady || busy || !metadata || !config.series.length;
   $$('#series-table-body input').forEach(input=>input.disabled=busy);
@@ -343,7 +347,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=238071c2c3b1", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=9d39388e9d95", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -1302,6 +1306,33 @@ function changed() {
   renderTimer = setTimeout(() => { renderWanted = true; renderPreview(); }, 400);
 }
 
+function legendModeControls() {
+  return `<div class="field-grid"><label>凡例の表示<select data-axis="legendStyle">${choiceOptions([['symbols','線／点あり'],['text','文字列のみ']],config.axes.legendStyle || 'symbols')}</select></label><label>操作・移動<select data-axis="legendMode">${choiceOptions([['together','一括'],['individual','系列ごと']],config.axes.legendMode || 'together')}</select></label></div>`;
+}
+const isLegendId=id=>id==='legend' || /^legend-item-\d+$/.test(id || '');
+function legendEntry(id) {return figureResult?.geometry.legendItems?.find(item=>item.id===id);}
+function legendEntryState(entry) {
+  if(entry.seriesIndex!==null && entry.seriesIndex!==undefined)return config.series[entry.seriesIndex];
+  config.options ||= {};config.options.legendEntries ||= {};
+  return config.options.legendEntries[entry.key] ||= {};
+}
+function hasHiddenLegendItems() {
+  return config.series.some(item=>item.legendVisible===false) || Object.values(config.options?.legendEntries || {}).some(item=>item.visible===false);
+}
+function resetLegendPositions(entry=null,position='best') {
+  if(!entry){config.axes.legendX=config.axes.legendY='';config.axes.legendPosition=position;}
+  for(const item of entry?[legendEntryState(entry)]:config.series){item.legendX=item.legendY='';}
+  if(!entry)for(const item of Object.values(config.options?.legendEntries || {})){item.x=item.y='';}
+  else if(entry.seriesIndex===null || entry.seriesIndex===undefined){const item=legendEntryState(entry);item.x=item.y='';delete item.legendX;delete item.legendY;}
+}
+function restoreLegendItems() {
+  for(const item of config.series)item.legendVisible=true;
+  for(const item of Object.values(config.options?.legendEntries || {}))item.visible=true;
+  $$('[data-series-field="legendVisible"],[data-legend-field="visible"]').forEach(input=>input.checked=true);
+  config.axes.legend=true;drawControls();changed();
+}
+$('#restore-legend-items').addEventListener('click',restoreLegendItems);
+
 async function renderPreview() {
   if (!engineReady || !metadata || loading || exporting || renderRunning || !renderWanted) return;
   await loadCurrentLocalFonts();
@@ -1635,7 +1666,7 @@ function incompleteNumberInput(input) {
   if (input.type !== 'number') return false;
   if (input.validity?.badInput) return true;
   if (input.value !== '') return !Number.isFinite(Number(input.value));
-  if (['trendX','trendY'].includes(input.dataset.seriesField)) return false;
+  if (['trendX','trendY','legendFontSize'].includes(input.dataset.seriesField) || input.dataset.legendField==='fontSize') return false;
   if (['detrendMin','detrendMax','detrendSlope','referenceMin','referenceMax'].includes(input.dataset.seriesField)) return false;
   return !['xMin','xMax','yMin','yMax','y2Min','y2Max','xStep','yStep','y2Step','xMinorStep','yMinorStep','y2MinorStep','legendX','legendY','xLabelX','xLabelY','yLabelX','yLabelY','y2LabelX','y2LabelY'].includes(input.dataset.axis);
 }
@@ -1706,7 +1737,8 @@ function applyControlInput(event) {
       }
     }
     if (/^(x|y|y2)LabelPad$/.test(key)) {const axis=key.replace(/LabelPad$/,'');config.axes[`${axis}LabelX`] = config.axes[`${axis}LabelY`] = "";}
-    if(key==='legendPosition')config.axes.legendX=config.axes.legendY='';
+    if(key==='legendPosition')resetLegendPositions(null,input.value);
+    if(key==='legendMode')selected.clear();
     if(key==='fontScale')for(const fontKey of ['tickFontScale','labelFontScale','legendFontScale'])$$(`[data-axis="${fontKey}"]`).forEach(field=>{field.value=axisControlValue(fontKey,config.axes[fontKey]);field.min=axisControlValue(fontKey,.2);field.max=axisControlValue(fontKey,3);});
     if(key==='fontScale')$$('[data-series-field="trendFontSize"]').forEach(field=>{const item=config.series[Number(field.closest('[data-series-index]').dataset.seriesIndex)];field.value=seriesControlValue('trendFontSize',item.trendFontSize);field.min=3*config.axes.fontScale;field.max=24*config.axes.fontScale;});
     $$(`[data-axis="${key}"]`).forEach(field => {if(field !== input) {field.value = axisControlValue(key, config.axes[key]); field.checked = field.dataset.invert === "true" ? !config.axes[key] : config.axes[key];}});
@@ -1733,6 +1765,9 @@ function applyControlInput(event) {
       if(['density','normalization','yAxis'].includes(key))syncProcessingAxes();
       syncProcessingControls();
     }
+  } else if (input.dataset.legendKey!==undefined && ['visible','style','fontSize'].includes(input.dataset.legendField)) {
+    config.options ||= {};config.options.legendEntries ||= {};
+    (config.options.legendEntries[input.dataset.legendKey] ||= {})[input.dataset.legendField]=input.type==='checkbox'?input.checked:input.value;
   } else if (input.dataset.annotationField) {
     const item = config.annotations[Number(input.closest("[data-annotation-index]").dataset.annotationIndex)];
     item[input.dataset.annotationField] = input.type === "checkbox" ? input.checked : ['number','range'].includes(input.type) ? Number(input.value) : input.value;
@@ -2263,7 +2298,7 @@ function openElementEditor(part,index=0) {
     selected=new Set([item.id]);drawAnnotations();syncInteractionSelection();
     title=({text:'テキスト',arrow:'矢印',segment:'線'})[item.type]+'の設定';
     sources=[$(`#annotation-list [data-annotation-index="${index}"]`)];
-  } else if(part==='legend'){title='凡例の設定';sources=[$('.legend-controls')];}
+  } else if(part==='legend'){const entry=legendEntry(index);title=entry?`「${entry.label}」の凡例の設定`:'凡例の設定';sources=[];}
   else if(part==='preset'){title='グラフの設定';sources=[$('#preset-options')];}
   else if(part==='frame'){title='枠線・軸の位置';sources=[$('#frame-settings-content')];}
   else {
@@ -2290,7 +2325,16 @@ function openElementEditor(part,index=0) {
     const scope=part==='seriesAll'?'all':index===origin?'one':`series:${index}`;
     fields.innerHTML=`<label class="series-scope">設定の適用先<select data-series-scope title="系列を選ぶと、その系列の現在の設定を表示します。全系列では変更した項目だけをまとめて反映し、データ列・系列名・系列色は保持します。">${choiceOptions(choices,scope)}</select></label>`+fields.innerHTML;
   }
-  if(part==='legend')fields.innerHTML=`<label><input data-axis="legend" type="checkbox" ${config.axes.legend?'checked':''}>凡例を表示</label><label>フォントサイズ (pt)<input data-axis="legendFontScale" type="number" min="${axisControlValue('legendFontScale',.2)}" max="${axisControlValue('legendFontScale',3)}" step="0.1" value="${axisControlValue('legendFontScale',config.axes.legendFontScale)}"></label><button type="button" class="button quiet" data-reset-legend>標準位置に戻す</button><details class="settings-panel"><summary>線・点の大きさ</summary><label>大きさ（標準比）<input data-axis="legendScale" type="number" min=".2" max="3" step="0.1" value="${config.axes.legendScale}"></label></details>`;
+  if(part==='legend'){
+    const entry=legendEntry(index);fields.dataset.legendItemId=entry?.id || '';fields.dataset.legendSeriesIndex=entry?.seriesIndex ?? '';fields.dataset.legendKey=entry?.key || '';
+    const item=entry?.seriesIndex!==null && entry?.seriesIndex!==undefined?config.series[entry.seriesIndex]:null;
+    const stored=item || config.options?.legendEntries?.[entry?.key] || {};
+    const attribute=key=>item?`data-series-field="${key==='style'?'legendStyle':'legendFontSize'}"`:`data-legend-key="${escapeHTML(entry?.key)}" data-legend-field="${key}"`;
+    const appearance=entry?`<label>この凡例の表示<select ${attribute('style')}>${choiceOptions([['auto','全体に従う'],['symbols','線／点あり'],['text','文字列のみ']],stored[item?'legendStyle':'style'] || 'auto')}</select></label><label title="空欄は全体設定に従います。">この凡例のフォントサイズ (pt)<input ${attribute('fontSize')} type="number" min="2" max="72" step="0.1" value="${escapeHTML(stored[item?'legendFontSize':'fontSize'] ?? '')}" placeholder="全体設定（${axisControlValue('legendFontScale',config.axes.legendFontScale)} pt）"></label>`:'';
+    const local=entry?item?`<div data-series-index="${entry.seriesIndex}"><label>凡例名<input data-series-field="name" value="${escapeHTML(item.name)}" maxlength="200"></label>${appearance}<label><input data-series-field="legendVisible" type="checkbox" ${item.legendVisible!==false?'checked':''}>この凡例を表示</label></div>`:`${appearance}<label><input data-legend-key="${escapeHTML(entry.key)}" data-legend-field="visible" type="checkbox" checked>この凡例を表示</label>`:'';
+    const shared=`<label><input data-axis="legend" type="checkbox" ${config.axes.legend?'checked':''}>凡例を表示</label>${legendModeControls()}<label title="全凡例に共通です。">フォントサイズ (pt)<input data-axis="legendFontScale" type="number" min="${axisControlValue('legendFontScale',.2)}" max="${axisControlValue('legendFontScale',3)}" step="0.1" value="${axisControlValue('legendFontScale',config.axes.legendFontScale)}"></label><details class="settings-panel"><summary>線・点の大きさ</summary><label>大きさ（標準比）<input data-axis="legendScale" type="number" min=".2" max="3" step="0.1" value="${config.axes.legendScale}"></label></details>`;
+    fields.innerHTML=local+(entry?`<details class="settings-panel"><summary>全凡例の設定</summary>${shared}</details>`:shared)+`<button type="button" class="button quiet" data-reset-legend>${entry?'この凡例を':'凡例を'}標準位置に戻す</button><button type="button" class="button quiet" data-restore-legend-items ${hasHiddenLegendItems()?'':'hidden'}>凡例項目をすべて再表示</button>`;
+  }
   if(part==='figureBackground')fields.innerHTML+=`<details class="settings-panel"><summary>グラフの種類・サイズ</summary><label>グラフのプリセット<select data-preview-preset>${choiceOptions(presets.map(item=>[item.id,item.label]),config.plotType)}</select></label><div class="field-grid">${['width','height'].map((key,i)=>`<label>${['軸領域の幅 (cm)','軸領域の高さ (cm)'][i]}<input data-axis="${key}" type="number" min=".5" max="24" step="0.1" value="${config.axes[key]}"></label>`).join('')}</div></details>`+$('#font-settings').outerHTML;
   if(part==='plotBackground')fields.innerHTML+=`<details class="settings-panel"><summary>グリッド</summary><label><input data-axis="grid" type="checkbox" ${config.axes.grid?'checked':''}>グリッドを表示</label></details>`;
   if(part==='grid')fields.innerHTML=`<label><input data-axis="grid" type="checkbox" ${config.axes.grid?'checked':''}>グリッドを表示</label>`+['x','y',...(config.series.some(item=>item.yAxis==='right')?['y2']:[])].map(axis=>`<details class="settings-panel"><summary>${axisName(axis)}軸の目盛線</summary>${tickLineControls(axis)}</details>`).join('');
@@ -2298,7 +2342,7 @@ function openElementEditor(part,index=0) {
   // Reuse the sidebar controls, restoring live values and color-picker handlers.
   fields.querySelectorAll('.color-control').forEach(wrapper=>{const input=wrapper.querySelector('input');if(input){input.hidden=false;delete input.dataset.paletteEnhanced;wrapper.replaceWith(input);}});
   fields.querySelectorAll('[id]').forEach(element=>element.removeAttribute('id'));
-  fields.querySelectorAll('button').forEach(element=>{if(element.dataset.resetTrend===undefined&&element.dataset.resetLegend===undefined&&element.dataset.resetSlope===undefined)element.remove();});
+  fields.querySelectorAll('button').forEach(element=>{if(element.dataset.resetTrend===undefined&&element.dataset.resetLegend===undefined&&element.dataset.resetSlope===undefined&&element.dataset.restoreLegendItems===undefined)element.remove();});
   // Position is edited by dragging; retain numeric coordinates in the sidebar only.
   fields.querySelectorAll('[data-axis="legendX"],[data-axis="legendY"],[data-series-field="trendX"],[data-series-field="trendY"],[data-annotation-field="x"],[data-annotation-field="y"],[data-annotation-field="x1"],[data-annotation-field="y1"],[data-annotation-field="x2"],[data-annotation-field="y2"],[data-annotation-field="coordinate_system"]').forEach(input=>input.closest('label')?.remove());
   fields.querySelectorAll('.annotation-card > summary').forEach(element=>element.remove());
@@ -2326,7 +2370,8 @@ for(const root of [$('#plot-form'),$('#element-editor-fields')])root.addEventLis
 $('#edit-all-series').addEventListener('click',()=>openElementEditor('seriesAll'));
 $('#element-editor-fields').addEventListener('click',event=>{
   if(resetProcessingSlope(event))return;
-  if(event.target.closest('[data-reset-legend]')){config.axes.legendX=config.axes.legendY='';config.axes.legendPosition='best';drawControls();changed();return;}
+  if(event.target.closest('[data-restore-legend-items]')){restoreLegendItems();return;}
+  if(event.target.closest('[data-reset-legend]')){const fields=$('#element-editor-fields');resetLegendPositions(fields.dataset.legendItemId?{seriesIndex:fields.dataset.legendSeriesIndex===''?null:Number(fields.dataset.legendSeriesIndex),key:fields.dataset.legendKey}:null);drawControls();changed();return;}
   const reset=event.target.closest('[data-reset-trend]');if(reset){const item=config.series[Number(reset.dataset.resetTrend)];item.trendX=item.trendY='';$$(`[data-series-index="${reset.dataset.resetTrend}"] [data-series-field="trendX"],[data-series-index="${reset.dataset.resetTrend}"] [data-series-field="trendY"]`).forEach(input=>input.value='');changed();}
 });
 $('#element-editor-fields').addEventListener('pointerdown',event=>{if(event.target.closest('[data-axis="fontFamily"],[data-axis="japaneseFontFamily"]')&&!fontQueryRunning&&['idle','prompt'].includes(fontAccess))void browseLocalFonts({automatic:true});});
@@ -2338,7 +2383,7 @@ function syncInteractionSelection(){
   $$('#figure-interactions .figure-drag-target').forEach(target=>{
     const active=selected.has(target.dataset.dragId);
     target.classList[active?'add':'remove']('selected');
-    if(target.dataset.dragId==='legend' || config.annotations?.some(item=>item.id===target.dataset.dragId))target.setAttribute('aria-pressed',String(active));
+    if(isLegendId(target.dataset.dragId) || config.annotations?.some(item=>item.id===target.dataset.dragId))target.setAttribute('aria-pressed',String(active));
   });
   $$('#figure-interactions .annotation-handle').forEach(handle=>handle.remove());
   const imageBox=$('#figure-image').getBoundingClientRect();
@@ -2394,6 +2439,7 @@ function positionInteractions() {
   if(figureResult.geometry.series) dataInteractions(overlay,imageBox);
   const targets = [...(figureResult.geometry.axisLabels || []), ...(figureResult.geometry.tickLabels || []), ...[...figureResult.geometry.annotations,...(figureResult.geometry.trendEquations || [])].sort((a,b)=>(a.seriesIndex!==undefined?30:config.annotations?.find(item=>item.id===a.id)?.zorder??20)-(b.seriesIndex!==undefined?30:config.annotations?.find(item=>item.id===b.id)?.zorder??20))];
   if (config.axes.legend && figureResult.geometry.legend) targets.unshift({id:"legend",box:figureResult.geometry.legend});
+  if(config.axes.legend)targets.unshift(...(figureResult.geometry.legendItems || []).map(entry=>({id:entry.id,box:entry.box,legendItem:entry})));
   for (const target of targets) {
     const item = config.annotations?.find(item => item.id === target.id);
     const [x,y,w,h]=target.box;
@@ -2415,10 +2461,10 @@ function positionInteractions() {
     if(target.kind !== 'ticks')button.dataset.dragId=target.id;
     if(target.axis) {button.dataset.editAxis = target.axis; button.dataset.axisKind = target.kind; if(target.kind === 'ticks')button.classList.add('axis-tick-target');}
     if(target.seriesIndex!==undefined)button.dataset.trendIndex=String(target.seriesIndex);
-    button.title=target.seriesIndex!==undefined ? `系列${target.seriesIndex+1}の近似式：ドラッグで移動・ダブルクリックで設定` : target.axis ? `${axisName(target.axis)}軸${target.kind === 'label' ? 'ラベル：ドラッグで移動・ダブルクリックで設定' : '目盛り：ダブルクリックで設定'}` : target.id==="legend"?"凡例：ドラッグで移動・ダブルクリックで設定":"注釈：ドラッグで移動・ダブルクリックで設定";
+    button.title=target.legendItem?`凡例「${target.legendItem.label}」：ドラッグで移動・ダブルクリックで設定`:target.seriesIndex!==undefined ? `系列${target.seriesIndex+1}の近似式：ドラッグで移動・ダブルクリックで設定` : target.axis ? `${axisName(target.axis)}軸${target.kind === 'label' ? 'ラベル：ドラッグで移動・ダブルクリックで設定' : '目盛り：ダブルクリックで設定'}` : target.id==="legend"?"凡例：ドラッグで移動・ダブルクリックで設定":"注釈：ドラッグで移動・ダブルクリックで設定";
     button.setAttribute('aria-label',button.title);
-    if(item || target.id==='legend')button.setAttribute('aria-pressed',String(selected.has(target.id)));
-    if(target.id==='legend')button.title+='・選択してDelete／Backspaceで削除';
+    if(item || isLegendId(target.id))button.setAttribute('aria-pressed',String(selected.has(target.id)));
+    if(isLegendId(target.id))button.title+='・選択してDelete／Backspaceで削除';
     if(item?.locked)button.title+='（位置固定）';
     if(item && selected.has(item.id) && !item.locked){
       const handleSize = 14;
@@ -2440,16 +2486,17 @@ $("#figure-interactions").addEventListener("pointerdown", event => {
   if(!target || renderedRevision !== revision || loading || exporting || renderRunning) return;
   const id=target.dataset.dragId, item=config.annotations?.find(item=>item.id===id);
   target.focus({preventScroll:true});
-  if(item || id==='legend'){
+  if(item || isLegendId(id)){
     if(event.shiftKey){if(selected.has(id))selected.delete(id);else selected.add(id);}else if(!selected.has(id))selected=new Set([id]);
     drawAnnotations();
   } else {
     selected.clear();drawAnnotations();
   }
   syncInteractionSelection();
-  if(item?.locked || ((item || id==='legend') && !selected.has(id)))return;
+  if(item?.locked || ((item || isLegendId(id)) && !selected.has(id)))return;
   const imageBox=$("#figure-image").getBoundingClientRect();
   dragging={pointerId:event.pointerId,id,item,axis:target.dataset.editAxis,trendIndex:target.dataset.trendIndex,anchor:[...(figureResult.geometry.axisLabels || []),...(figureResult.geometry.trendEquations || [])].find(label=>label.id===id)?.anchor,start:item?structuredClone(item):null,items:(config.annotations||[]).filter(item=>selected.has(item.id)&&!item.locked).map(item=>({item,start:structuredClone(item)})),handle:target.dataset.handle,x:event.clientX,y:event.clientY,box:imageBox,axes:figureResult.geometry.axes,legend:figureResult.geometry.legend};
+  dragging.legendItems=(figureResult.geometry.legendItems || []).filter(entry=>selected.has(entry.id));
   target.setPointerCapture(event.pointerId); event.preventDefault();
 });
 $("#figure-interactions").addEventListener("pointermove", event => {
@@ -2479,6 +2526,12 @@ function finishDrag(event) {
     config.axes.legendX=((x+w/2-ax)/aw+dx).toFixed(4);
     config.axes.legendY=(1-(y+h/2-ay)/ah+dy).toFixed(4);
     $$('[data-axis="legendX"],[data-axis="legendY"]').forEach(input=>input.value=config.axes[input.dataset.axis]);
+  } else if(isLegendId(d.id)) {
+    for(const entry of d.legendItems){
+      const [x,y,w,h]=entry.box,state=legendEntryState(entry),series=entry.seriesIndex!==null && entry.seriesIndex!==undefined;
+      state[series?'legendX':'x']=Math.max(-10,Math.min(10,(x+w/2-ax)/aw+dx)).toFixed(4);
+      state[series?'legendY':'y']=Math.max(-10,Math.min(10,1-(y+h/2-ay)/ah+dy)).toFixed(4);
+    }
   } else {
     if(d.handle==='resize')d.item.font_size=Math.max(2,Math.min(200,Number(d.start.font_size)+((event.clientX-d.x)-(event.clientY-d.y))/d.box.width*30));
     else if(d.handle==='rotate'){d.item.rotation=(Number(d.start.rotation)+(event.clientX-d.x)/d.box.width*360)%360;if(event.shiftKey)d.item.rotation=Math.round(d.item.rotation/15)*15;}
@@ -2503,8 +2556,9 @@ function selectAnnotation(id, multiple=false){
 }
 function deleteAnnotations(){
   if(!selected.size || loading || exporting)return;
-  const hideLegend=selected.has('legend');
-  if(hideLegend)config.axes.legend=false;
+  const hideLegend=[...selected].some(isLegendId);
+  if(selected.has('legend'))config.axes.legend=false;
+  for(const id of selected){const entry=legendEntry(id);if(entry)legendEntryState(entry)[entry.seriesIndex!==null && entry.seriesIndex!==undefined?'legendVisible':'visible']=false;}
   config.annotations=(config.annotations||[]).filter(item=>!selected.has(item.id));
   selected.clear();
   if(hideLegend)drawControls();else drawAnnotations();
@@ -2609,7 +2663,7 @@ function editPreviewElement(event) {
   if(part){event.preventDefault();openElementEditor(part.dataset.editPart);return;}
   const target=event.target.closest('[data-drag-id]');if(!target)return;
   event.preventDefault();
-  if(target.dataset.dragId==='legend')openElementEditor('legend');
+  if(isLegendId(target.dataset.dragId))openElementEditor('legend',target.dataset.dragId);
   else openElementEditor('annotation',(config.annotations||[]).findIndex(item=>item.id===target.dataset.dragId));
 }
 $('#figure-interactions').addEventListener('dblclick',editPreviewElement);

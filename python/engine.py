@@ -32,6 +32,7 @@ from matplotlib.lines import Line2D
 from matplotlib.collections import PathCollection, PolyCollection, LineCollection
 from matplotlib.patches import Rectangle
 from matplotlib.artist import Artist
+from matplotlib.legend import Legend
 from matplotlib.transforms import Bbox
 import numpy as np
 import pandas as pd
@@ -1250,6 +1251,89 @@ class PlotEngine:
                 limits = limits[::-1]
             getattr(target, f"set_{dimension}lim")(limits)
 
+    @staticmethod
+    def _web_legends(figure, legend, config, diagnostics, preset):
+        settings = config.get("axes", {})
+        style, mode = settings.get("legendStyle", "symbols"), settings.get("legendMode", "together")
+        if style not in {"symbols", "text"} or mode not in {"together", "individual"}:
+            raise ValueError("凡例の表示方法を確認してください。")
+        stored = config.get("options", {}).get("legendEntries", {})
+        if not isinstance(stored, dict) or len(stored) > 200 or any(not isinstance(item, dict) for item in stored.values()):
+            raise ValueError("凡例項目の設定を確認してください。")
+        if legend is None:
+            return None, []
+        parent = legend.axes
+        handles, texts = list(legend.legend_handles), list(legend.get_texts())
+        indices = [i for i, item in enumerate(diagnostics) if item["visible"]]
+        mapped = preset not in {"XPS Fit", "Particle Histogram"} and len(indices) == len(texts)
+        rows = []
+        for index, (handle, text) in enumerate(zip(handles, texts)):
+            key = f"{preset}:{index}"
+            series_index = indices[index] if mapped else None
+            item = config["series"][series_index] if mapped else stored.get(key, {})
+            visible = item.get("legendVisible" if mapped else "visible", True)
+            if not isinstance(visible, bool):
+                raise ValueError("凡例の表示を確認してください。")
+            x = number(item.get("legendX" if mapped else "x", ""), "凡例X位置", minimum=-10, maximum=10, optional=True)
+            y = number(item.get("legendY" if mapped else "y", ""), "凡例Y位置", minimum=-10, maximum=10, optional=True)
+            if (x is None) != (y is None):
+                raise ValueError("凡例のX・Y位置を両方指定してください。")
+            entry_style = item.get("legendStyle" if mapped else "style", "auto")
+            if entry_style not in {"auto", "symbols", "text"}:
+                raise ValueError("凡例項目の表示方法を確認してください。")
+            font_size = number(item.get("legendFontSize" if mapped else "fontSize", ""), "凡例項目のフォントサイズ", minimum=2, maximum=72, optional=True)
+            if visible:
+                rows.append({"id": f"legend-item-{series_index if mapped else index}", "seriesIndex": series_index, "key": key,
+                             "label": text.get_text(), "handle": handle, "text": text, "style": style if entry_style=="auto" else entry_style, "fontSize": font_size, "position": None if x is None else (x, y)})
+        if not rows:
+            legend.remove()
+            return None, []
+        if style == "symbols" and mode == "together" and len(rows) == len(texts):
+            return legend, [{"artist": legend}]
+        handle_length, handle_pad = legend.handlelength, legend.handletextpad
+        kwargs = dict(frameon=False, prop=legend.prop.copy(), borderaxespad=legend.borderaxespad,
+                      borderpad=legend.borderpad, labelspacing=legend.labelspacing, handleheight=legend.handleheight,
+                      handlelength=0 if style == "text" else legend.handlelength,
+                      handletextpad=0 if style == "text" else legend.handletextpad, markerscale=1)
+        legend.remove()
+        location = settings.get("legendPosition", "best")
+        position = [number(settings.get(f"legend{coordinate}", ""), "凡例位置", optional=True) for coordinate in ("X", "Y")]
+        placement = dict(loc=location) if position[0] is None else dict(loc="center", bbox_to_anchor=position, bbox_transform=parent.transAxes)
+        grouped = parent.legend([row["handle"] for row in rows], [row["label"] for row in rows], **kwargs, **placement)
+        for text, row in zip(grouped.get_texts(), rows):
+            text.set_color(row["text"].get_color())
+        if style == "text":
+            for handle in grouped.legend_handles:
+                handle.set_visible(False)
+        if mode == "together":
+            return grouped, [{"artist": grouped}]
+        # Start separate entries at the grouped layout, then retain each
+        # manually positioned center in axes coordinates on later renders.
+        figure.canvas.draw()
+        renderer = figure.canvas.get_renderer()
+        group_box = grouped.get_window_extent(renderer)
+        for row, text in zip(rows, grouped.get_texts()):
+            box = text.get_window_extent(renderer)
+            center = ((group_box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2)
+            row["anchor"] = row["position"] or tuple(parent.transAxes.inverted().transform(center))
+        grouped.remove()
+        for row in rows:
+            entry_kwargs = dict(kwargs, prop=kwargs["prop"].copy())
+            if row["fontSize"] is not None:
+                entry_kwargs["prop"].set_size(row["fontSize"])
+            ratio=kwargs["prop"].get_size_in_points()/entry_kwargs["prop"].get_size_in_points()
+            entry_kwargs.update(handlelength=handle_length*ratio if row["style"]=="symbols" else 0,
+                                handletextpad=handle_pad*ratio if row["style"]=="symbols" else 0)
+            single = Legend(parent, [row["handle"]], [row["label"]], **entry_kwargs,
+                            loc="center", bbox_to_anchor=row["anchor"], bbox_transform=parent.transAxes)
+            single.get_texts()[0].set_color(row["text"].get_color())
+            if row["style"] == "text":
+                for handle in single.legend_handles:
+                    handle.set_visible(False)
+            parent.add_artist(single)
+            row["artist"] = single
+        return None, rows
+
     @micro_text_rendering()
     def render(self, config):
         preset = config.get("plotType", "General")
@@ -1462,6 +1546,7 @@ class PlotEngine:
                             label.set_visible(False)
                         else:
                             axis.set_label_coords(*position)
+                legend, legend_records = self._web_legends(figure, legend, config, diagnostics, preset)
                 annotations = config.get("annotations", [])
                 if not isinstance(annotations, list) or len(annotations) > 200:
                     raise ValueError("注釈は200個以内にしてください。")
@@ -1489,8 +1574,8 @@ class PlotEngine:
                     renderer = figure.canvas.get_renderer()
                     region = annotation_axes.get_window_extent(renderer)
                     top = .97
-                    if legend:
-                        legend_box = legend.get_window_extent(renderer)
+                    for record in legend_records:
+                        legend_box = record["artist"].get_window_extent(renderer)
                         if legend_box.x0 < region.x0 + .55 * region.width and legend_box.y1 > region.y0 + .5 * region.height:
                             top = min(top, (legend_box.y0-region.y0)/region.height-.04)
                     for spec in sorted(equation_specs, key=lambda item: item["index"]):
@@ -1513,6 +1598,8 @@ class PlotEngine:
                 plot_utils.expand_figure_to_include_artists(figure)
                 image = BytesIO()
                 extra_artists = [positioned_labels.get("x", axes.xaxis.label), axes.yaxis.label, positioned_labels.get("y", axes.zaxis.label)] if preset == "Raman 3D" else None
+                if config.get("axes", {}).get("legendMode") == "individual":
+                    extra_artists = (extra_artists or list(figure.get_default_bbox_extra_artists())) + [record["artist"] for record in legend_records]
                 figure.savefig(image, format="svg", bbox_inches="tight", bbox_extra_artists=extra_artists, pad_inches=0.05, transparent=False)
                 # Hit areas must use SVG text metrics, exactly as the preview,
                 # rather than Agg bitmap metrics (noticeably different fonts).
@@ -1527,6 +1614,7 @@ class PlotEngine:
                     b = artist_box.transformed(figure.dpi_scale_trans.inverted())
                     return [(b.x0 - box.x0) / box.width, (box.y1 - b.y1) / box.height, b.width / box.width, b.height / box.height]
                 geometry = {"axes": svg_box(axes.get_window_extent(renderer)), "legend": svg_box(legend.get_window_extent(renderer)) if legend else None, "annotations": [], "axisLabels": [], "tickLabels": []}
+                geometry["legendItems"] = [{"id": row["id"], "seriesIndex": row["seriesIndex"], "key": row["key"], "label": row["label"], "box": svg_box(row["artist"].get_window_extent(renderer))} for row in legend_records if "id" in row]
                 geometry["series"] = self._data_geometry(series_groups, axes, box, renderer)
                 geometry["trendEquations"] = [{"id": f"trend-equation-{index}", "seriesIndex": index,
                     "box": svg_box(artist.get_window_extent(renderer)), "anchor": anchor} for index, artist, anchor in equation_artists]

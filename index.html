@@ -6,8 +6,8 @@
   <meta name="description" content="Excel・CSV・TXTの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=238071c2c3b1">
-  <script type="module" src="./app.js?v=238071c2c3b1"></script>
+  <link rel="stylesheet" href="./style.css?v=9d39388e9d95">
+  <script type="module" src="./app.js?v=9d39388e9d95"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -126,9 +126,11 @@
             <summary class="section-heading"><h2>凡例・注釈</h2><span class="section-note">図上で移動</span></summary>
             <div class="legend-controls">
               <div class="check-options"><label><input id="show-legend" data-axis="legend" type="checkbox" checked>凡例を表示</label></div>
+              <div id="legend-modes"></div>
               <details class="legend-options"><summary>凡例の位置・サイズ</summary>
                 <label>凡例の位置<select id="legend-position" data-axis="legendPosition"><option value="best">自動</option><option value="upper right">右上</option><option value="upper left">左上</option><option value="lower right">右下</option><option value="lower left">左下</option></select></label>
                 <div id="legend-appearance" class="field-grid"></div>
+                <button id="restore-legend-items" data-restore-legend-items type="button" class="button quiet" hidden>凡例項目をすべて再表示</button>
                 <p class="field-hint">凡例は図上でドラッグして移動できます。位置を自動に戻す場合はX・Yを両方空欄にします。</p>
               </details>
             </div>
