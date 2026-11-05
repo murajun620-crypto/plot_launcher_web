@@ -6,8 +6,8 @@
   <meta name="description" content="Excel・CSV・TXTの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=1f3dc3d89014">
-  <script type="module" src="./app.js?v=1f3dc3d89014"></script>
+  <link rel="stylesheet" href="./style.css?v=c489ae0c6bfb">
+  <script type="module" src="./app.js?v=c489ae0c6bfb"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -194,6 +194,16 @@
     <div class="preset-actions"><button id="export-user-presets" type="button" class="button" title="登録済みの全プリセットをJSONファイルに保存します。別のPCへの移行やバックアップに使用できます。">全件を書き出す</button><button id="import-user-presets" type="button" class="button">読み込む</button></div>
     <input id="user-presets-file" type="file" accept=".json,application/json" hidden>
     <p id="manage-presets-message" class="preset-message" role="status"></p>
+  </dialog>
+  <dialog id="data-import-dialog" class="plot-dialog" aria-labelledby="data-import-title" aria-describedby="data-import-files">
+    <div class="dialog-heading"><strong id="data-import-title">データの読み込み先</strong><button id="data-import-cancel" type="button" class="button quiet">キャンセル</button></div>
+    <p id="data-import-files" class="data-import-files"></p>
+    <div class="data-import-options">
+      <button id="data-import-new" type="button" class="button"><strong>新規プロジェクトとして開く</strong><span>現在のデータ・グラフ設定を置き換えます。</span></button>
+      <p id="data-import-unsaved" class="data-import-warning" hidden>新規で開くと、現在の未保存の変更は失われます。</p>
+      <button id="data-import-add" type="button" class="button"><strong>現在のプロジェクトに追加</strong><span>現在のグラフ設定を保ち、系列を追加します。</span></button>
+      <p id="data-import-unavailable" class="data-import-warning" hidden>追加するには、先に「一般」などのXYグラフに切り替えてください。</p>
+    </div>
   </dialog>
   <dialog id="paste-dialog" class="plot-dialog paste-dialog" aria-labelledby="paste-dialog-title">
     <div class="dialog-heading"><strong id="paste-dialog-title">データを貼り付け</strong><button type="button" id="close-paste" class="button quiet">閉じる</button></div>

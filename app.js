@@ -1,9 +1,9 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=1f3dc3d89014";
-import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=1f3dc3d89014";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=1f3dc3d89014";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=1f3dc3d89014";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=1f3dc3d89014";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=1f3dc3d89014";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=c489ae0c6bfb";
+import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=c489ae0c6bfb";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=c489ae0c6bfb";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=c489ae0c6bfb";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=c489ae0c6bfb";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=c489ae0c6bfb";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -103,6 +103,7 @@ const folderSupported = typeof window.showDirectoryPicker === 'function';
 const importedFonts = new Map();
 let savedProjectState = null;
 let projectHandle=null, projectFilename='';
+let pendingDataFiles = null;
 let sampleCatalog = null, sampleCatalogPromise = null, sampleGroup = 'all', pendingSampleId = null;
 let sheetSettings = new Map(), cancelBatch = false;
 let sheetMode = 'shared', sharedSettings = null;
@@ -339,7 +340,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=1f3dc3d89014", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=c489ae0c6bfb", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -899,6 +900,38 @@ function drawSources() {
   $('#source-list').innerHTML=(metadata?.sources || []).map((source,index)=>`<div class="source-file" data-source-index="${index}"><strong title="${escapeHTML(source.filename)}">${escapeHTML(source.filename)}</strong><div class="field-grid"><label>シート<select data-source-sheet aria-label="${escapeHTML(source.filename)}のシート">${choiceOptions(source.sheets.map((name,index)=>[String(index),name]),String(source.sheetIndex))}</select></label><label>ヘッダー行<input data-source-header type="number" min="1" max="1000" step="1" value="${source.headerRow}"></label></div></div>`).join('');
 }
 
+async function openDataFiles(files) {
+  if(!engineReady || loading || exporting || pendingDataFiles)return false;
+  files=[...files];
+  if(!files.length)return false;
+  if(files.length>16 || files.some(file=>!/\.(xlsx|xlsm|xls|csv|txt)$/i.test(file.name)) || files.reduce((sum,file)=>sum+file.size,0)>30*1024*1024){
+    status('Excel / CSV / TXTは16ファイル・合計30 MB以内で選んでください。','error');return false;
+  }
+  if(!sourceData || !metadata)return loadDataFiles(files);
+  pendingDataFiles=files;
+  $('#data-import-files').textContent=files.map(file=>file.name).join('、');
+  $('#data-import-unsaved').hidden=!hasUnsavedChanges();
+  $('#data-import-add').disabled=!editableXY(config.plotType);
+  $('#data-import-unavailable').hidden=editableXY(config.plotType);
+  showDialog('#data-import-dialog');
+  $('#data-import-cancel').focus();
+  return false;
+}
+
+function cancelDataImport() {
+  pendingDataFiles=null;$('#data-import-dialog').close();
+}
+async function acceptDataImport(append) {
+  if(!pendingDataFiles || loading || exporting || append && !editableXY(config.plotType))return false;
+  const files=pendingDataFiles;cancelDataImport();
+  return loadDataFiles(files,append);
+}
+$('#data-import-cancel').addEventListener('click',cancelDataImport);
+$('#data-import-dialog').addEventListener('cancel',cancelDataImport);
+$('#data-import-dialog').addEventListener('close',()=>{pendingDataFiles=null;});
+$('#data-import-new').addEventListener('click',()=>acceptDataImport(false));
+$('#data-import-add').addEventListener('click',()=>acceptDataImport(true));
+
 async function loadDataFiles(files, append=false, selection=null) {
   if(!engineReady || loading || exporting)return;
   files=[...files];
@@ -1345,7 +1378,7 @@ $('#choose-save-folder').addEventListener('click',async()=>{
   finally{exporting=false;updateButtons();}
 });
 for(const [selector,description,accept,open] of [
-  ['#data-file','Excel / CSV / TXT',{'application/octet-stream':['.xlsx','.xlsm','.xls','.csv','.txt']},loadDataFiles],
+  ['#data-file','Excel / CSV / TXT',{'application/octet-stream':['.xlsx','.xlsm','.xls','.csv','.txt']},openDataFiles],
   ['#add-data-files','Excel / CSV / TXT',{'application/octet-stream':['.xlsx','.xlsm','.xls','.csv','.txt']},files=>loadDataFiles(files,true)],
   ['#project-file','PlotLauncherプロジェクト',{'application/json':['.plotproject','.json']},readProject],
   ['#settings-file','設定JSON',{'application/json':['.json']},readSettings],
@@ -1482,7 +1515,7 @@ async function prepareDocumentSaver(name, description, extension, startIn=saveDi
   return documentSaver({name, id:'plotlauncher-files', description, accept:{'application/json':[extension]}, startIn, fallback});
 }
 
-$("#data-file").addEventListener("change", event => { const files=[...event.target.files];event.target.value="";if(files.length)loadDataFiles(files); });
+$("#data-file").addEventListener("change", event => { const files=[...event.target.files];event.target.value="";if(files.length)openDataFiles(files); });
 $('#add-data-files').addEventListener('change',event=>{const files=[...event.target.files];event.target.value='';if(files.length)loadDataFiles(files,true);});
 $('#add-data').addEventListener('click',()=>$('#add-data-files').click());
 $('#source-list').addEventListener('change',event=>{
@@ -1505,11 +1538,11 @@ async function rememberDroppedHandles(transfer,files) {
 for (const zone of [$("#drop-zone"), $("#data-drop-area")]) {
   for (const type of ["dragenter", "dragover"]) zone.addEventListener(type, event => { event.preventDefault(); if (engineReady && !loading && !exporting) event.currentTarget.classList.add("drag-over"); });
   zone.addEventListener("dragleave", event => event.currentTarget.classList.remove("drag-over"));
-  zone.addEventListener("drop", async event => { event.preventDefault();event.stopPropagation();event.currentTarget.classList.remove("drag-over"); const files=[...event.dataTransfer.files];if(engineReady && !loading && !exporting && files.length){await rememberDroppedHandles(event.dataTransfer,files);files.length===1?openDroppedFile(files[0]):loadDataFiles(files);} });
+  zone.addEventListener("drop", async event => { event.preventDefault();event.stopPropagation();event.currentTarget.classList.remove("drag-over"); const files=[...event.dataTransfer.files];if(engineReady && !loading && !exporting && !pendingDataFiles && files.length){await rememberDroppedHandles(event.dataTransfer,files);files.length===1?openDroppedFile(files[0]):openDataFiles(files);} });
 }
 // Dropping a file elsewhere must not navigate away and discard the settings.
 window.addEventListener("dragover", event => event.preventDefault());
-window.addEventListener("drop", async event => {event.preventDefault();const file=event.dataTransfer.files[0];if(file && /\.(json|plotproject)$/i.test(file.name)){await rememberDroppedHandles(event.dataTransfer,[file]);openDroppedFile(file);}});
+window.addEventListener("drop", async event => {event.preventDefault();const files=[...event.dataTransfer.files];if(!files.length || loading || exporting || pendingDataFiles)return;await rememberDroppedHandles(event.dataTransfer,files);if(files.length===1)await openDroppedFile(files[0]);else await openDataFiles(files);});
 $("#sample-data").addEventListener("click", openSamplePicker);
 $('#close-sample-dialog').addEventListener('click',()=>{clearSampleConfirmation();$('#sample-dialog').close();});
 $('#sample-dialog').addEventListener('cancel',clearSampleConfirmation);
@@ -1756,7 +1789,7 @@ async function openDroppedFile(file) {
     catch{status('JSONファイルを読み込めません。','error');return;}
     await readSettings(file);return;
   }
-  await loadFile(file);
+  return openDataFiles([file]);
 }
 
 $('#save-settings').addEventListener('click', async()=>{
@@ -2535,7 +2568,7 @@ function highlightTicks(event,active){
 for(const name of ['pointerover','focusin'])$('#figure-interactions').addEventListener(name,event=>highlightTicks(event,true));
 for(const name of ['pointerout','focusout'])$('#figure-interactions').addEventListener(name,event=>highlightTicks(event,false));
 window.addEventListener('keydown',event=>{
-  if($('#color-panel').open || $('#axis-editor').open || $('#element-editor').open || $('#save-dialog').open || $('#paste-dialog').open)return;
+  if($('#color-panel').open || $('#axis-editor').open || $('#element-editor').open || $('#save-dialog').open || $('#paste-dialog').open || $('#data-import-dialog').open)return;
   if(event.target.matches('input,textarea,select') || event.target.isContentEditable)return;
   const control=event.ctrlKey||event.metaKey,key=event.key.toLowerCase();
   if(key==='delete'||key==='backspace'){if(selected.size){event.preventDefault();deleteAnnotations();}}
