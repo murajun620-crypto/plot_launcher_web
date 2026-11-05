@@ -6,8 +6,8 @@
   <meta name="description" content="Excel・CSV・TXTの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=24a6083da203">
-  <script type="module" src="./app.js?v=24a6083da203"></script>
+  <link rel="stylesheet" href="./style.css?v=dbb3134f95df">
+  <script type="module" src="./app.js?v=dbb3134f95df"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -29,7 +29,7 @@
     </a>
     <div class="header-actions" role="group" aria-label="プロジェクトと設定">
       <span class="privacy-note" title="データはブラウザ内で処理します。外部には送信しません。" aria-label="データはブラウザ内で処理"><span class="privacy-dot"></span>データはブラウザ内で処理</span>
-      <button id="new-project" class="button quiet" title="現在の内容を閉じて、新しいプロジェクトを開始します。未保存の場合は確認します。"><svg><use href="#i-plus"/></svg><span>新規プロジェクト</span></button>
+      <button id="new-project" class="button" title="現在の内容を閉じて、新しいプロジェクトを開始します。未保存の場合は確認します。"><svg><use href="#i-plus"/></svg><span>新規プロジェクト</span></button>
       <button id="open-project" class="button quiet" title="データと設定をまとめて開きます（Ctrl/Command＋O）" disabled><svg><use href="#i-upload"/></svg><span>プロジェクトを開く</span></button>
       <div class="project-save-group"><button id="save-project" class="button primary" title="データと設定をまとめて保存します（Ctrl/Command＋S）" disabled><svg><use href="#i-download"/></svg><span>プロジェクトを保存</span></button><details id="project-save-menu"><summary class="button primary" aria-label="プロジェクトの保存オプション" title="名前を付けて保存">▾</summary><div class="project-save-actions"><button id="save-project-as" type="button" class="button quiet" title="別のファイルとして保存します（Ctrl/Command＋Alt＋S）" disabled>名前を付けて保存</button></div></details></div>
       <input id="project-file" type="file" accept=".plotproject,.json,application/json" hidden>
@@ -52,6 +52,8 @@
         <div id="file-summary" class="file-summary" hidden>
           <svg><use href="#i-file"/></svg><div><strong id="file-name"></strong><span id="file-stats"></span></div><span id="sample-badge" class="badge" hidden>サンプル</span>
         </div>
+        <button id="reload-data" class="button quiet" hidden disabled title="元ファイルの更新内容を、グラフの設定を保って読み込みます。直接読み込めない場合は同じファイルを選び直してください。"><svg><use href="#i-refresh"/></svg>再読み込み</button>
+        <input id="reload-data-files" type="file" accept=".xlsx,.xlsm,.xls,.csv,.txt" multiple hidden>
         <div id="data-options" class="data-options" hidden>
           <details id="source-files" class="settings-panel" hidden><summary>ファイル別のシート・読み込み設定</summary><div id="source-list"></div></details>
           <label id="sheet-select-field">シート<select id="sheet-select" disabled><option>未読み込み</option></select></label>
@@ -172,7 +174,7 @@
       </div>
       <div id="status" class="status" role="status" aria-live="polite"><span class="status-dot"></span><span id="status-text">描画機能を読み込んでいます…</span><button id="retry-engine" class="button quiet" hidden>再読み込み</button></div>
       <details id="plot-warnings" class="plot-warnings" hidden><summary>描画データの確認</summary><ul id="warning-list"></ul></details>
-      <details id="data-preview" class="data-preview" title="先頭8行を表示します。グラフには全行を使用します。Excelで編集した場合はファイルを読み込み直すか、セル範囲を貼り付け直してください。" hidden><summary><span>読み込んだデータ</span><span id="table-caption"></span></summary><div class="table-scroll"><table id="data-table"><thead></thead><tbody></tbody></table></div></details>
+      <details id="data-preview" class="data-preview" title="先頭8行を表示します。グラフには全行を使用します。Excelなどで元ファイルを編集した場合は「再読み込み」を押してください。貼り付けたデータはセル範囲を貼り付け直してください。" hidden><summary><span>読み込んだデータ</span><span id="table-caption"></span></summary><div class="table-scroll"><table id="data-table"><thead></thead><tbody></tbody></table></div></details>
       <footer class="preview-footer"><span>PlotLauncher Web · 一般グラフ</span></footer>
     </main>
   </div>

@@ -1,9 +1,9 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=24a6083da203";
-import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=24a6083da203";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=24a6083da203";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=24a6083da203";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=24a6083da203";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=24a6083da203";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=dbb3134f95df";
+import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=dbb3134f95df";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=dbb3134f95df";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=dbb3134f95df";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=dbb3134f95df";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=dbb3134f95df";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -98,6 +98,7 @@ const recentColors = [];
 let sourceData = null;
 let sourceHandle = null, sourceDirectory = null, saveDirectory = null;
 const sourceHandles = new WeakMap();
+let dataFileHandles = [];
 const folderSupported = typeof window.showDirectoryPicker === 'function';
 const importedFonts = new Map();
 let savedProjectState = null;
@@ -264,6 +265,8 @@ function updateButtons() {
   $$('#sample-list button,#sample-groups button').forEach(button=>button.disabled=busy||pendingSampleId!==null);
   $('#add-data').hidden=!sourceData;
   $('#add-data').disabled=!engineReady || busy;
+  $('#reload-data').hidden=!sourceData || sample;
+  $('#reload-data').disabled=!engineReady || busy || !sourceData;
   $("#paste-data").disabled = !engineReady || busy;
   $("#plot-fields").disabled = !engineReady || !metadata || busy;
   $('#preset-fields').disabled = !engineReady || !metadata || busy;
@@ -333,7 +336,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=24a6083da203", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=dbb3134f95df", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -898,6 +901,7 @@ async function loadDataFiles(files, append=false, selection=null) {
   files=[...files];
   if(!selection && files.length===1 && !append)return loadFile(files[0]);
   const oldMetadata=metadata,oldConfig=structuredClone(config);
+  const nextHandles=selection?dataFileHandles:[...(append?dataFileHandles:[]),...files.map(file=>sourceHandles.get(file) || null)];
   const existing=append && sourceData?(sourceData.files || [{...sourceData,sheetIndex:metadata.sheetIndex,headerRow:loadedHeader}]):[];
   if(!selection && (files.length+existing.length>16 || files.some(file=>!/\.(xlsx|xlsm|xls|csv|txt)$/i.test(file.name)) || files.reduce((sum,file)=>sum+file.size,0)+existing.reduce((sum,file)=>sum+file.bytes.byteLength,0)>30*1024*1024)){status('Excel / CSV / TXTは16ファイル・合計30 MB以内で選んでください。','error');return;}
   let originals;
@@ -911,6 +915,7 @@ async function loadDataFiles(files, append=false, selection=null) {
     const data=await request('load-many',args);
     config=combinedConfig(data,append || selection?oldMetadata:null,oldConfig);metadata=data;loadedHeader=1;
     sourceData={filename,files:originals.map((file,index)=>({...file,sheetIndex:data.sources[index].sheetIndex,headerRow:data.sources[index].headerRow}))};
+    dataFileHandles=nextHandles;
     if(!append && !selection){projectHandle=null;projectFilename='';sourceHandle=sourceHandles.get(files[0]) || null;sourceDirectory=null;$('#save-destination').value=folderSupported?'source':'download';}
     sample=false;sheetMode='shared';sharedSettings=null;sheetSettings.clear();
     if(config.series.length){sharedSettings=makeSettings(config,metadata,1);sheetSettings.set(0,sharedSettings);}
@@ -921,6 +926,59 @@ async function loadDataFiles(files, append=false, selection=null) {
   }catch(error){status(`読み込みに失敗しました: ${error.message}`,'error');drawSources();renderWanted=!!config.series.length;return false;}
   finally{loading=false;updateButtons();if(renderWanted)renderPreview();}
 }
+
+async function reloadSourceData(chosenFiles=null) {
+  if(!engineReady || loading || exporting || !sourceData || !metadata)return false;
+  const originals=sourceData.files || [{filename:sourceData.filename,sheetIndex:metadata.sheetIndex,headerRow:loadedHeader}];
+  loading=true;clearTimeout(renderTimer);updateButtons();status('データを再読み込みしています…');
+  try {
+    let files,handles,direct=false;
+    if(chosenFiles){files=[...chosenFiles];handles=files.map(file=>sourceHandles.get(file) || null);}
+    else if(dataFileHandles.length===originals.length && dataFileHandles.every(Boolean)){
+      handles=dataFileHandles;
+      direct=true;
+      try {
+        files=await Promise.all(handles.map(async handle=>{
+          if(handle.queryPermission && await handle.queryPermission({mode:'read'})!=='granted' && await handle.requestPermission({mode:'read'})!=='granted')throw new Error('アクセスが許可されていません。');
+          return handle.getFile();
+        }));
+      } catch {
+        dataFileHandles=[];
+        throw new Error('元ファイルを直接読み込めませんでした。もう一度「再読み込み」を押し、元ファイルを選び直してください。');
+      }
+    } else {
+      handles=await window.showOpenFilePicker({...filePickerOptions('plotlauncher-files','再読み込みする元ファイル',{'application/octet-stream':['.xlsx','.xlsm','.xls','.csv','.txt']},saveDirectory||sourceDirectory||sourceHandle),multiple:originals.length>1});
+      files=await Promise.all(handles.map(handle=>handle.getFile()));
+    }
+    if(files.length!==originals.length || !direct && new Set(originals.map(item=>item.filename)).size!==originals.length)throw new Error('元ファイルと同じ名前・数のファイルを選んでください。同名のファイルが複数ある場合は「データを開く」から読み直してください。');
+    const ordered=originals.map((item,index)=>direct?index:files.findIndex(file=>file.name===item.filename));
+    if(ordered.some(index=>index<0))throw new Error('元ファイルと同じ名前のファイルを選んでください。');
+    const selectedFiles=ordered.map(index=>files[index]);
+    if(selectedFiles.some(file=>!/\.(xlsx|xlsm|xls|csv|txt)$/i.test(file.name)) || selectedFiles.reduce((sum,file)=>sum+file.size,0)>30*1024*1024)throw new Error('Excel / CSV / TXTは合計30 MB以内で選んでください。');
+    const refreshed=await Promise.all(selectedFiles.map(async(file,index)=>({...originals[index],bytes:await file.arrayBuffer()})));
+    const settings=makeSettings(config,metadata,loadedHeader);
+    // The project loader validates settings and rolls back the worker if a
+    // used column/sheet disappeared. No original file or font is overwritten.
+    const result=await request('project',{filename:sourceData.filename,...(sourceData.files?{files:refreshed.map(file=>({...file,bytes:file.bytes.slice(0)}))}:{bytes:refreshed[0].bytes.slice(0)}),sheetIndex:metadata.sheetIndex,headerRow:loadedHeader,settings,fonts:[],sheetSettings:projectSheetSettings(),sharedSettings});
+    ++revision;metadata=result.metadata;config=result.config;
+    sourceData=sourceData.files?{filename:sourceData.filename,files:refreshed}:{filename:sourceData.filename,bytes:refreshed[0].bytes};
+    dataFileHandles=ordered.map(index=>handles[index]);
+    if(dataFileHandles[0] && sourceHandle!==dataFileHandles[0]){sourceHandle=dataFileHandles[0];sourceDirectory=null;refreshSaveDestination();}
+    selected.clear();history=[];future=[];lastState=structuredClone(config);
+    resetPreview();drawMetadata();drawControls();renderWanted=true;
+    return true;
+  } catch(error){status(error.name==='AbortError'?'再読み込みをキャンセルしました。':`再読み込みに失敗しました: ${error.message}`,error.name==='AbortError'?'ready':'error');return false;}
+  finally{loading=false;updateButtons();if(renderWanted)renderPreview();}
+}
+$('#reload-data').addEventListener('click',()=>{
+  if(!engineReady || loading || exporting || !sourceData)return;
+  const count=sourceData.files?.length || 1;
+  if(!(dataFileHandles.length===count && dataFileHandles.every(Boolean)) && typeof window.showOpenFilePicker!=='function'){
+    $('#reload-data-files').click();return;
+  }
+  void reloadSourceData();
+});
+$('#reload-data-files').addEventListener('change',event=>{const files=[...event.target.files];event.target.value='';if(files.length)void reloadSourceData(files);});
 
 function configurationForSheet(data, setting, template) {
   const inherited = sheetMode === 'shared' ? template : setting?.inheritSharedSettings ? sharedSettings : setting?.inheritFirstSheet ? sheetSettings.get(0) : !setting ? template : null;
@@ -963,6 +1021,7 @@ async function loadFile(file, isSample = false, reload = false, fromClipboard = 
       sheetSettings.clear();
       sheetMode = 'shared'; sharedSettings = null;
       sourceData = {filename, bytes:originalBytes};
+      dataFileHandles = [sourceHandles.get(file) || null];
       sourceHandle = sourceHandles.get(file) || null; sourceDirectory = null;
       $('#save-destination').value = folderSupported ? (isSample || fromClipboard ? 'folder' : 'source') : 'download';
       refreshSaveDestination();
@@ -1642,7 +1701,7 @@ async function readProject(file, saved) {
     const retainedData={filename:project.data.filename,...(project.data.files?{files:project.data.files.map(file=>({...file,bytes:file.bytes.slice(0)}))}:{bytes:project.data.bytes.slice(0)})};
     const retainedFonts=project.fonts.map(font=>({...font,bytes:font.bytes.slice(0)}));
     const result=await request('project',{filename:project.data.filename,bytes:project.data.bytes,...(project.data.files?{files:project.data.files}:{}),sheetIndex:project.data.sheetIndex,headerRow:project.data.headerRow,settings:project.settings,fonts:project.fonts,sheetSettings:project.workspace.sheetSettings || [],sharedSettings:project.workspace.sharedSettings});
-    metadata=result.metadata; config=result.config; sourceData=retainedData; sample=project.data.sample;
+    metadata=result.metadata; config=result.config; sourceData=retainedData; sample=project.data.sample; dataFileHandles=[];
     sheetSettings=new Map((project.workspace.sheetSettings || []).map(item=>[item.sheetIndex,item.settings]));
     // Older projects may contain distinct sheet styles; keep those individual.
     sheetMode=project.workspace.sheetMode || 'individual'; sharedSettings=project.workspace.sharedSettings || null;
@@ -2162,7 +2221,11 @@ $('#element-editor').addEventListener('close',()=>{drawControls();positionIntera
 
 function syncInteractionSelection(){
   // A stationary click must preserve its DOM target for the next dblclick.
-  $$('#figure-interactions .figure-drag-target').forEach(target=>target.classList[selected.has(target.dataset.dragId)?'add':'remove']('selected'));
+  $$('#figure-interactions .figure-drag-target').forEach(target=>{
+    const active=selected.has(target.dataset.dragId);
+    target.classList[active?'add':'remove']('selected');
+    if(target.dataset.dragId==='legend' || config.annotations?.some(item=>item.id===target.dataset.dragId))target.setAttribute('aria-pressed',String(active));
+  });
   $$('#figure-interactions .annotation-handle').forEach(handle=>handle.remove());
   const imageBox=$('#figure-image').getBoundingClientRect();
   for(const target of figureResult?.geometry.annotations || []) {
@@ -2216,7 +2279,7 @@ function positionInteractions() {
   Object.assign(overlay.style, {left:'0',top:'0',width:'100%',height:'100%'});
   if(figureResult.geometry.series) dataInteractions(overlay,imageBox);
   const targets = [...(figureResult.geometry.axisLabels || []), ...(figureResult.geometry.tickLabels || []), ...[...figureResult.geometry.annotations,...(figureResult.geometry.trendEquations || [])].sort((a,b)=>(a.seriesIndex!==undefined?30:config.annotations?.find(item=>item.id===a.id)?.zorder??20)-(b.seriesIndex!==undefined?30:config.annotations?.find(item=>item.id===b.id)?.zorder??20))];
-  if (figureResult.geometry.legend) targets.unshift({id:"legend",box:figureResult.geometry.legend});
+  if (config.axes.legend && figureResult.geometry.legend) targets.unshift({id:"legend",box:figureResult.geometry.legend});
   for (const target of targets) {
     const item = config.annotations?.find(item => item.id === target.id);
     const [x,y,w,h]=target.box;
@@ -2240,6 +2303,8 @@ function positionInteractions() {
     if(target.seriesIndex!==undefined)button.dataset.trendIndex=String(target.seriesIndex);
     button.title=target.seriesIndex!==undefined ? `系列${target.seriesIndex+1}の近似式：ドラッグで移動・ダブルクリックで設定` : target.axis ? `${axisName(target.axis)}軸${target.kind === 'label' ? 'ラベル：ドラッグで移動・ダブルクリックで設定' : '目盛り：ダブルクリックで設定'}` : target.id==="legend"?"凡例：ドラッグで移動・ダブルクリックで設定":"注釈：ドラッグで移動・ダブルクリックで設定";
     button.setAttribute('aria-label',button.title);
+    if(item || target.id==='legend')button.setAttribute('aria-pressed',String(selected.has(target.id)));
+    if(target.id==='legend')button.title+='・選択してDelete／Backspaceで削除';
     if(item?.locked)button.title+='（位置固定）';
     if(item && selected.has(item.id) && !item.locked){
       const handleSize = 14;
@@ -2261,11 +2326,14 @@ $("#figure-interactions").addEventListener("pointerdown", event => {
   if(!target || renderedRevision !== revision || loading || exporting || renderRunning) return;
   const id=target.dataset.dragId, item=config.annotations?.find(item=>item.id===id);
   target.focus({preventScroll:true});
-  if(item){
+  if(item || id==='legend'){
     if(event.shiftKey){if(selected.has(id))selected.delete(id);else selected.add(id);}else if(!selected.has(id))selected=new Set([id]);
     drawAnnotations();
+  } else {
+    selected.clear();drawAnnotations();
   }
-  if(item?.locked || (item && !selected.has(id))){syncInteractionSelection();return;}
+  syncInteractionSelection();
+  if(item?.locked || ((item || id==='legend') && !selected.has(id)))return;
   const imageBox=$("#figure-image").getBoundingClientRect();
   dragging={pointerId:event.pointerId,id,item,axis:target.dataset.editAxis,trendIndex:target.dataset.trendIndex,anchor:[...(figureResult.geometry.axisLabels || []),...(figureResult.geometry.trendEquations || [])].find(label=>label.id===id)?.anchor,start:item?structuredClone(item):null,items:(config.annotations||[]).filter(item=>selected.has(item.id)&&!item.locked).map(item=>({item,start:structuredClone(item)})),handle:target.dataset.handle,x:event.clientX,y:event.clientY,box:imageBox,axes:figureResult.geometry.axes,legend:figureResult.geometry.legend};
   target.setPointerCapture(event.pointerId); event.preventDefault();
@@ -2320,7 +2388,13 @@ function selectAnnotation(id, multiple=false){
   drawAnnotations();positionInteractions();
 }
 function deleteAnnotations(){
-  if(!selected.size || loading || exporting)return;config.annotations=(config.annotations||[]).filter(item=>!selected.has(item.id));selected.clear();drawAnnotations();changed();
+  if(!selected.size || loading || exporting)return;
+  const hideLegend=selected.has('legend');
+  if(hideLegend)config.axes.legend=false;
+  config.annotations=(config.annotations||[]).filter(item=>!selected.has(item.id));
+  selected.clear();
+  if(hideLegend)drawControls();else drawAnnotations();
+  positionInteractions();changed();
 }
 function copyAnnotations(){clipboard=(config.annotations||[]).filter(item=>selected.has(item.id)).map(item=>structuredClone(item));}
 function pasteAnnotations(){

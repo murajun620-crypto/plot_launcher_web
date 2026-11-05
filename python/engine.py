@@ -1098,7 +1098,7 @@ class PlotEngine:
                     offsets = artist.get_offset_transform().transform(artist.get_offsets())
                     seen = set()
                     for xy in offsets:
-                        if np.ma.is_masked(xy) or not np.isfinite(xy).all() or not axes.bbox.contains(*xy):
+                        if np.ma.is_masked(xy) or not np.isfinite(xy).all() or not axes.bbox.padded(1e-7).contains(*xy):
                             continue
                         key = tuple(np.round(xy, 1))
                         if key not in seen:
@@ -1131,6 +1131,22 @@ class PlotEngine:
                         entry["polygons" if isinstance(artist, PolyCollection) else "paths"].append(segment)
             result.append(entry)
         return result
+
+    @staticmethod
+    def _show_boundary_markers(groups):
+        """Keep markers whole at the limits without revealing off-range points."""
+        for group in groups:
+            for artist in group["artists"]:
+                if not isinstance(artist, PathCollection) or artist.axes.name == "3d":
+                    continue
+                offsets = np.ma.masked_invalid(artist.get_offsets(), copy=True)
+                values = offsets.filled(np.nan)
+                inside = np.isfinite(values).all(axis=1)
+                for column, limits in enumerate((artist.axes.get_xlim(), artist.axes.get_ylim())):
+                    low, high = sorted(limits)
+                    inside &= (values[:, column] >= np.nextafter(low, -np.inf)) & (values[:, column] <= np.nextafter(high, np.inf))
+                artist.set_offsets(np.ma.masked_where(np.repeat(~inside[:, None], 2, axis=1), offsets))
+                artist.set_clip_on(False)
 
     @staticmethod
     def _fit_data_limits(axes, right_axes, config, primary_name):
@@ -1300,6 +1316,7 @@ class PlotEngine:
                         # Right-side fits may extend the shared X range.
                         plot_utils.ensure_axis_limits_include_data(axes)
                 self._fit_data_limits(axes, right_axes, config, primary_name)
+                self._show_boundary_markers(series_groups)
                 if preset == "Raman 3D":
                     options = config.get("options", {})
                     axes.view_init(elev=number(options.get("elevation", 24), "仰角", minimum=-180, maximum=180), azim=number(options.get("azimuth", -66), "方位角", minimum=-360, maximum=360))
