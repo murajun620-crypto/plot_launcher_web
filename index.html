@@ -6,8 +6,8 @@
   <meta name="description" content="Excel・CSV・TXTの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=c489ae0c6bfb">
-  <script type="module" src="./app.js?v=c489ae0c6bfb"></script>
+  <link rel="stylesheet" href="./style.css?v=238071c2c3b1">
+  <script type="module" src="./app.js?v=238071c2c3b1"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -73,7 +73,7 @@
         <fieldset id="plot-fields" disabled>
           <details class="control-section" open>
             <summary class="section-heading"><h2><span class="step">02</span>系列</h2><span id="series-count" class="section-note">0 系列</span></summary>
-            <button id="edit-all-series" class="button quiet" type="button" disabled title="線・点の見た目やデータ補正を全系列へまとめて設定します。データ列・名前・系列色は保持します。">全系列の設定</button>
+            <div class="series-manager-actions"><button id="open-series-table" class="button" type="button" disabled title="X・Y列、色、線幅などを一覧します。系列名または行のダブルクリックで設定を開けます。">系列の表</button><button id="edit-all-series" class="button quiet" type="button" disabled title="線・点の見た目やデータ補正を全系列へまとめて設定します。データ列・名前・系列色は保持します。">全系列の設定</button></div>
             <div id="series-list" class="series-list"><p class="empty-series">ファイルを読み込むと、X列・Y列を選べます。</p></div>
             <button id="add-series" class="button add-series" type="button"><svg><use href="#i-plus"/></svg>系列を追加</button>
             <details id="series-colormap" class="settings-panel"><summary>まとめて配色</summary><div class="field-grid"><label>連続配色<select id="color-map"><option value="viridis">Viridis</option><option value="plasma">Plasma</option><option value="spectrum">Spectrum</option></select></label><label>適用先<select id="colormap-target"><option value="both">線とマーカー</option><option value="line">線</option><option value="scatter">マーカー</option></select></label></div><button id="apply-colormap" type="button" class="button quiet">配色を適用</button></details>
@@ -194,6 +194,11 @@
     <div class="preset-actions"><button id="export-user-presets" type="button" class="button" title="登録済みの全プリセットをJSONファイルに保存します。別のPCへの移行やバックアップに使用できます。">全件を書き出す</button><button id="import-user-presets" type="button" class="button">読み込む</button></div>
     <input id="user-presets-file" type="file" accept=".json,application/json" hidden>
     <p id="manage-presets-message" class="preset-message" role="status"></p>
+  </dialog>
+  <dialog id="series-table-dialog" class="plot-dialog series-table-dialog" aria-labelledby="series-table-title">
+    <div class="dialog-heading"><strong id="series-table-title">系列の表</strong><button id="close-series-table" type="button" class="button quiet">閉じる</button></div>
+    <div class="series-table-toolbar"><output id="series-table-summary" aria-live="polite"></output><label class="check" title="オフセット、線種、マーカー、誤差列などを表示します。横スクロールで確認できます。"><input id="series-table-details" type="checkbox">詳細列を表示</label></div>
+    <div class="table-scroll series-table-scroll" tabindex="0" role="region" aria-label="系列の表（横・縦にスクロールできます）"><table id="series-table" data-details="false" aria-label="系列の設定一覧"><thead id="series-table-head"></thead><tbody id="series-table-body"></tbody></table></div>
   </dialog>
   <dialog id="data-import-dialog" class="plot-dialog" aria-labelledby="data-import-title" aria-describedby="data-import-files">
     <div class="dialog-heading"><strong id="data-import-title">データの読み込み先</strong><button id="data-import-cancel" type="button" class="button quiet">キャンセル</button></div>

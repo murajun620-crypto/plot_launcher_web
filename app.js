@@ -1,9 +1,9 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=c489ae0c6bfb";
-import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=c489ae0c6bfb";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=c489ae0c6bfb";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=c489ae0c6bfb";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=c489ae0c6bfb";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=c489ae0c6bfb";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=238071c2c3b1";
+import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=238071c2c3b1";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=238071c2c3b1";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=238071c2c3b1";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=238071c2c3b1";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=238071c2c3b1";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -312,6 +312,9 @@ function updateButtons() {
   $("#copy-image").disabled = !engineReady || busy || renderedRevision !== revision || renderRunning;
   $('#edit-all-series').hidden = !editableXY(config.plotType || 'General');
   $('#edit-all-series').disabled = !engineReady || busy || !config.series.length || renderedRevision !== revision || renderRunning;
+  $('#open-series-table').disabled = !engineReady || busy || !metadata || !config.series.length;
+  $$('#series-table-body input').forEach(input=>input.disabled=busy);
+  $$('#series-table-body [data-series-table-edit]').forEach(button=>button.disabled=busy || renderRunning || renderedRevision!==revision);
   $("#figure-stage").setAttribute("aria-busy", String(loading || exporting || renderRunning || !engineReady));
   $('#save-destination').disabled = $('#choose-save-folder').disabled = busy;
   syncColorIcons();
@@ -340,7 +343,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=c489ae0c6bfb", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=238071c2c3b1", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -636,6 +639,66 @@ $("#apply-offsets").addEventListener('click',()=>{
   config.series.forEach((item,i)=>item.yOffset=start+i*step);drawControls();changed();
 });
 
+function seriesTableItems() {
+  return ['XPS Fit','Particle Histogram'].includes(config.plotType)?config.series.slice(0,1):config.series;
+}
+function drawSeriesTableSummary() {
+  const items=seriesTableItems();
+  $('#series-table-summary').textContent=`${items.length} 系列 · 表示 ${items.filter(item=>item.visible!==false).length}`;
+}
+function drawSeriesTable() {
+  if(!metadata)return;
+  const items=seriesTableItems(),text=value=>escapeHTML(value ?? '—');
+  const column=index=>index==='' || index===undefined || index===null?'—':metadata.columns.find(column=>column.index===Number(index))?.name || '—';
+  const modes={line:'線',scatter:'点','line+scatter':'線＋点'},styles={'-':'実線','--':'破線','-.':'一点鎖線',':':'点線'};
+  const markers={o:'丸',s:'四角','^':'三角 ▲',v:'三角 ▼',D:'ひし形','+':'+',x:'×','*':'星',p:'五角形',h:'六角形'};
+  const errors={auto:'±列から自動',none:'なし',symmetric:'±値',asymmetric:'正・負の誤差幅',minmax:'最小・最大値'};
+  const color=(value,fallback)=>{
+    const automatic=value===undefined || value==='' || value==='auto',actual=automatic?fallback:value;
+    const swatch=/^(?:#[\da-f]{3}|#[\da-f]{6}|[a-z]+)$/i.test(String(actual)) && actual!=='none' && actual!=='auto'?`<span class="series-table-swatch" aria-hidden="true" style="background:${actual}"></span>`:'';
+    return swatch+text(automatic?`自動（${actual ?? '—'}）`:actual);
+  };
+  const headers=['No.','表示','系列名','X列','Y列','Y軸','描画','線・棒色','点色','線幅 (pt)','点面積 (pt²)','線種','マーカー','Xオフセット','Yオフセット','誤差','±列','正の誤差列','負の誤差列','最小値列','最大値列'];
+  $('#series-table-head').innerHTML=`<tr>${headers.map((label,index)=>`<th scope="col"${index>=11?' data-series-detail':''}>${text(label)}</th>`).join('')}</tr>`;
+  $('#series-table-body').innerHTML=items.map((item,index)=>{
+    const histogram=config.plotType==='Particle Histogram',xps=config.plotType==='XPS Fit',bar=config.plotType==='bar_graph_general',threeD=config.plotType==='Raman 3D',options=config.options || {};
+    const mode=histogram?'ヒストグラム':xps?'点':bar?'棒':threeD?'3D線':modes[item.mode] || item.mode;
+    const name=histogram?'粒径分布':xps?'実測点':String(item.name || column(item.y));
+    const cells=[text(index+1),`<input type="checkbox" data-series-field="visible" aria-label="表の系列${index+1}を描画" ${item.visible!==false?'checked':''}>`,
+      `<button type="button" data-series-table-edit="${index}" title="${text(name)}：系列設定を開く" aria-label="系列${index+1}「${text(name)}」の設定を開く">${text(name)}</button>`,
+      text(column(histogram?options.diameterColumn ?? item.y:item.x)),text(histogram?'頻度（算出）':column(item.y)),threeD?'強度（Z）':item.yAxis==='right'?'右':'左',text(mode),
+      xps?'—':color(histogram?options.histogramColor ?? '#70BEFF':item.color),histogram || bar || threeD?'—':color(xps?options.scatterFaceColor ?? '#ffffff':item.scatterColor,item.color),
+      text(histogram || xps || threeD?'—':bar?options.barEdgeWidth ?? .4:item.lineWidth),text(histogram || bar || threeD?'—':xps?options.scatterSize ?? 18:item.markerSize),
+      text(histogram || xps || bar || threeD?'—':styles[item.lineStyle] || item.lineStyle),text(histogram || bar || threeD?'—':xps?'丸':markers[item.marker] || item.marker),
+      text(histogram?'—':item.xOffset ?? 0),text(histogram?'—':item.yOffset ?? 0),text(editableXY(config.plotType)?errors[item.errorMode] || item.errorMode:'—'),
+      ...['error','errorPlus','errorMinus','errorMin','errorMax'].map(key=>text(editableXY(config.plotType)?column(item[key]):'—'))];
+    return `<tr data-series-index="${index}" title="ダブルクリックで系列設定を開きます。">${cells.map((html,index)=>`<td title="${html.replace(/<[^>]*>/g,'')}"${index>=11?' data-series-detail':''}>${html}</td>`).join('')}</tr>`;
+  }).join('');
+  drawSeriesTableSummary();updateButtons();
+}
+function openSeriesTable() {
+  if(!metadata || !engineReady || loading || exporting || !config.series.length)return;
+  drawSeriesTable();showDialog('#series-table-dialog');
+}
+function editTableSeries(index) {
+  if(!config.series[index] || loading || exporting || renderRunning || renderedRevision!==revision)return;
+  $('#series-table-dialog').close();openElementEditor('series',index);
+}
+$('#open-series-table').addEventListener('click',openSeriesTable);
+$('#close-series-table').addEventListener('click',()=>$('#series-table-dialog').close());
+$('#series-table-details').addEventListener('change',event=>{$('#series-table').dataset.details=String(event.target.checked);});
+$('#series-table-body').addEventListener('input',event=>{
+  if(event.target.dataset.seriesField!=='visible' || loading || exporting)return;
+  applyControlInput(event);drawSeriesTableSummary();
+});
+$('#series-table-body').addEventListener('click',event=>{
+  const button=event.target.closest('[data-series-table-edit]');if(button)editTableSeries(Number(button.dataset.seriesTableEdit));
+});
+$('#series-table-body').addEventListener('dblclick',event=>{
+  if(event.target.closest('button,input'))return;
+  const row=event.target.closest('[data-series-index]');if(row)editTableSeries(Number(row.dataset.seriesIndex));
+});
+
 function drawControls() {
   $("#plot-type").value = config.plotType || "General";
   for(const option of $('#plot-type').options)option.disabled=!!metadata?.sources && !editableXY(option.value);
@@ -702,6 +765,7 @@ function drawControls() {
   $$('[data-axis="xLabel"],[data-axis="yLabel"],[data-axis="y2Label"],[data-axis="xUnit"],[data-axis="yUnit"],[data-axis="y2Unit"],.series-label').forEach(input=>input.title=MICRO_HINT);
   enhanceColorInputs();
   $$('[data-preview-preset]').forEach(input=>input.value=config.plotType);
+  if($('#series-table-dialog').open)drawSeriesTable();
 }
 
 function processingControls(item) {
@@ -2568,7 +2632,7 @@ function highlightTicks(event,active){
 for(const name of ['pointerover','focusin'])$('#figure-interactions').addEventListener(name,event=>highlightTicks(event,true));
 for(const name of ['pointerout','focusout'])$('#figure-interactions').addEventListener(name,event=>highlightTicks(event,false));
 window.addEventListener('keydown',event=>{
-  if($('#color-panel').open || $('#axis-editor').open || $('#element-editor').open || $('#save-dialog').open || $('#paste-dialog').open || $('#data-import-dialog').open)return;
+  if($('#color-panel').open || $('#axis-editor').open || $('#element-editor').open || $('#save-dialog').open || $('#paste-dialog').open || $('#data-import-dialog').open || $('#series-table-dialog').open)return;
   if(event.target.matches('input,textarea,select') || event.target.isContentEditable)return;
   const control=event.ctrlKey||event.metaKey,key=event.key.toLowerCase();
   if(key==='delete'||key==='backspace'){if(selected.size){event.preventDefault();deleteAnnotations();}}
