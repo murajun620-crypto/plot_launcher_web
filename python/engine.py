@@ -1827,6 +1827,23 @@ class PlotEngine:
                     item[f"x{suffix}"], item[f"y{suffix}"] = map(float, xy)
         return {"annotations": items}
 
+    def colormap_colors(self, name, count, start=0, end=1, preview=False):
+        count = number(count, "系列数", minimum=1, maximum=32)
+        if not count.is_integer():
+            raise ValueError("系列数は整数にしてください。")
+        start = number(start, "配色の開始", minimum=0, maximum=1)
+        end = number(end, "配色の終了", minimum=0, maximum=1)
+        if start > end:
+            raise ValueError("配色の開始は終了以下にしてください。")
+        if not isinstance(name, str) or name not in {"viridis", "virigit", "plasma", "spectrum"}:
+            raise ValueError("配色はViridis・Plasma・Spectrumから選んでください。")
+        cmap = matplotlib.colormaps.get_cmap({"virigit":"viridis", "spectrum":"nipy_spectral"}.get(name, name))
+        positions = np.linspace(start, end, int(count)) if count > 1 else [start]
+        result = {"colors": [matplotlib.colors.to_hex(cmap(float(position)), keep_alpha=False) for position in positions]}
+        if preview:
+            result["ramp"] = [matplotlib.colors.to_hex(cmap(float(position)), keep_alpha=False) for position in np.linspace(0, 1, 256)]
+        return result
+
     def dispatch(self, operation, payload):
         args = json.loads(payload)
         if operation == "load-many":
@@ -1843,7 +1860,7 @@ class PlotEngine:
         elif operation == "font":
             result = self.add_font(args["path"])
         elif operation == "colors":
-            result = {"colors": self.gradient_colors(args["name"], int(number(args["count"], "系列数", minimum=1, maximum=32)))}
+            result = self.colormap_colors(args["name"], args["count"], args.get("start", 0), args.get("end", 1), args.get("preview", False))
         elif operation == "align":
             result = self.align_annotations(args["config"], args["ids"], args["operation"])
         else:

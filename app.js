@@ -1,9 +1,9 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=6fa1ebe12611";
-import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=6fa1ebe12611";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=6fa1ebe12611";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=6fa1ebe12611";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=6fa1ebe12611";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=6fa1ebe12611";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=2e5bdb262e35";
+import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=2e5bdb262e35";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=2e5bdb262e35";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=2e5bdb262e35";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=2e5bdb262e35";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=2e5bdb262e35";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -95,6 +95,8 @@ let revision = 0, renderedRevision = -1, renderRunning = false, renderWanted = f
 let previewURL, figureResult, dragging;
 let colorTarget;
 const recentColors = [];
+let colormapControlConfig=null,colormapPreviewToken=0,colormapPreviewTimer,colormapApplying=false;
+const colormapRamps=new Map();
 let sourceData = null;
 let sourceHandle = null, sourceDirectory = null, saveDirectory = null;
 const sourceHandles = new WeakMap();
@@ -317,6 +319,7 @@ function updateButtons() {
   $('#restore-legend-items').disabled=busy || !metadata;
   $('#edit-all-series').disabled = !engineReady || busy || !config.series.length || renderedRevision !== revision || renderRunning;
   $('#series-table-panel').hidden = !metadata || !config.series.length;
+  for(const id of ['color-map','colormap-target','colormap-start','colormap-end','apply-colormap','reset-colormap-range'])$('#'+id).disabled=!engineReady || busy || !metadata || !config.series.length || colormapApplying;
   $$('#series-table-body input,#series-table-body select').forEach(input=>input.disabled=!engineReady || busy);
   syncSeriesErrorControls();
   $$('#series-table-body [data-series-table-edit]').forEach(button=>button.disabled=busy || renderRunning || renderedRevision!==revision);
@@ -348,7 +351,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=6fa1ebe12611", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=2e5bdb262e35", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -633,8 +636,67 @@ for(const [id,paired] of [['shared-x-series',false],['paired-series',true]]) $("
   config.series=pairs;drawControls();changed();
 });
 $("#series-colors").addEventListener('click',()=>{config.series.forEach((item,i)=>item.color=COLORS[i%COLORS.length]);drawControls();changed();});
+function colormapSelection() {
+  return {name:$('#color-map').value,target:$('#colormap-target').value,start:Number($('#colormap-start').value)/100,end:Number($('#colormap-end').value)/100};
+}
+function syncColormapRange(changed=null) {
+  const start=$('#colormap-start'),end=$('#colormap-end');
+  if(Number(start.value)>Number(end.value)){if(changed===start)start.value=end.value;else end.value=start.value;}
+  for(const key of ['start','end']){
+    const input=$('#colormap-'+key),value=`${Number(input.value)}%`;
+    $('#colormap-'+key+'-value').textContent=value;input.setAttribute('aria-valuetext',value);
+  }
+  $('#colormap-mask-start').style.width=`${start.value}%`;
+  $('#colormap-mask-end').style.left=`${end.value}%`;
+  start.setAttribute('aria-valuemax',end.value);end.setAttribute('aria-valuemin',start.value);
+  $('#colormap-start').style.zIndex=Number(start.value)===100?'3':'1';
+  const ramp=colormapRamps.get($('#color-map').value);
+  $('#colormap-gradient').style.backgroundImage=ramp?`linear-gradient(to right,${ramp.join(',')})`:'none';
+}
+async function previewColormap() {
+  if(!engineReady || loading || exporting || !metadata || !config.series.length || colormapApplying || $('#series-colormap').hidden || !$('#series-colormap').open)return;
+  const token=++colormapPreviewToken,selection=colormapSelection(),count=config.series.length;
+  try{
+    const result=await request('colors',{...selection,count,preview:!colormapRamps.has(selection.name)});
+    if(token!==colormapPreviewToken || JSON.stringify(selection)!==JSON.stringify(colormapSelection()) || count!==config.series.length)return;
+    if(result.ramp?.length===256 && result.ramp.every(color=>/^#[\da-f]{6}$/i.test(color)))colormapRamps.set(selection.name,result.ramp);
+    syncColormapRange();
+    $('#colormap-samples').innerHTML=(result.colors || []).filter(color=>/^#[\da-f]{6}$/i.test(color)).map((color,i)=>`<span style="background:${color}" title="系列${i+1}：${color}"></span>`).join('');
+    $('#colormap-error').hidden=true;
+  }catch(error){if(token===colormapPreviewToken){$('#colormap-error').textContent=error.message;$('#colormap-error').hidden=false;}}
+}
+function scheduleColormapPreview() {
+  ++colormapPreviewToken;clearTimeout(colormapPreviewTimer);
+  $('#colormap-samples').innerHTML='';
+  colormapPreviewTimer=setTimeout(previewColormap,80);
+}
+function drawColormapControls() {
+  if(colormapControlConfig!==config){
+    const saved=config.options?.colormapRange || {name:'viridis',target:'both',start:0,end:1};
+    $('#color-map').value=saved.name;$('#colormap-target').value=saved.target;
+    $('#colormap-start').value=String(saved.start*100);$('#colormap-end').value=String(saved.end*100);
+    colormapControlConfig=config;
+  }
+  syncColormapRange();if($('#series-colormap').open)scheduleColormapPreview();
+}
+$('#series-colormap').addEventListener('toggle',()=>{if($('#series-colormap').open)void previewColormap();else{++colormapPreviewToken;clearTimeout(colormapPreviewTimer);}});
+$('#color-map').addEventListener('input',()=>{syncColormapRange();scheduleColormapPreview();});
+$('#colormap-target').addEventListener('input',scheduleColormapPreview);
+for(const id of ['colormap-start','colormap-end'])$('#'+id).addEventListener('input',event=>{syncColormapRange(event.target);scheduleColormapPreview();});
+$('#reset-colormap-range').addEventListener('click',()=>{$('#colormap-start').value='0';$('#colormap-end').value='100';syncColormapRange();scheduleColormapPreview();});
 $("#apply-colormap").addEventListener('click',async()=>{
-  try{const result=await request('colors',{name:$('#color-map').value,count:config.series.length}),target=$('#colormap-target').value;config.series.forEach((item,i)=>{if(target!=='scatter')item.color=result.colors[i];if(target!=='line')item.scatterColor=result.colors[i];});drawControls();changed();}catch(error){status(error.message,'error');}
+  if(!engineReady || loading || exporting || !metadata || !config.series.length || colormapApplying)return;
+  const original=config,atRevision=revision,selection=colormapSelection(),count=config.series.length;
+  colormapApplying=true;updateButtons();
+  try{
+    const result=await request('colors',{...selection,count});
+    if(loading || exporting || config!==original || revision!==atRevision){status('グラフ設定が変更されました。もう一度「配色を適用」を押してください。','ready');return;}
+    if(result.colors?.length!==count || !result.colors.every(color=>/^#[\da-f]{6}$/i.test(color)))throw new Error('配色を取得できませんでした。もう一度お試しください。');
+    config.options ||= {};config.options.colormapRange=selection;
+    config.series.forEach((item,i)=>{if(selection.target!=='scatter')item.color=result.colors[i];if(selection.target!=='line')item.scatterColor=result.colors[i];});
+    drawControls();changed();$('#colormap-error').hidden=true;
+  }catch(error){status(error.message,'error');}
+  finally{colormapApplying=false;updateButtons();if($('#series-colormap').open)scheduleColormapPreview();}
 });
 $("#apply-offsets").addEventListener('click',()=>{
   if (['#offset-start','#offset-step'].some(selector => incompleteNumberInput($(selector)))) {
@@ -762,6 +824,7 @@ function drawControls() {
   const seriesSection=$('#series-list').closest('.control-section');if(seriesSection)seriesSection.hidden=false;
   $('#add-series').hidden=xpsFit || histogram;
   $('#series-colormap').hidden=xpsFit || histogram;
+  drawColormapControls();
   $('#series-batch').hidden=xpsFit || histogram;
   $$('.series-errors').forEach(panel=>panel.hidden=!generic);
   if(config.plotType==='XPS Fit')$$('.series-advanced,.series-card .annotation-buttons').forEach(element=>element.hidden=true);
@@ -1384,6 +1447,7 @@ async function renderPreview() {
   } finally {
     renderRunning = false;
     updateButtons();
+    if(!renderWanted && $('#series-colormap').open)scheduleColormapPreview();
     if (renderWanted) renderPreview();
   }
 }

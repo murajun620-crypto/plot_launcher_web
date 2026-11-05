@@ -6,8 +6,8 @@
   <meta name="description" content="Excel・CSV・TXTの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=6fa1ebe12611">
-  <script type="module" src="./app.js?v=6fa1ebe12611"></script>
+  <link rel="stylesheet" href="./style.css?v=2e5bdb262e35">
+  <script type="module" src="./app.js?v=2e5bdb262e35"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -76,7 +76,13 @@
             <div class="series-manager-actions"><button id="edit-all-series" class="button quiet" type="button" disabled title="線・点の見た目やデータ補正を全系列へまとめて設定します。データ列・名前・系列色は保持します。">全系列の設定</button></div>
             <div id="series-list" class="series-list"><p class="empty-series">ファイルを読み込むと、X列・Y列を選べます。</p></div>
             <button id="add-series" class="button add-series" type="button"><svg><use href="#i-plus"/></svg>系列を追加</button>
-            <details id="series-colormap" class="settings-panel"><summary>まとめて配色</summary><div class="field-grid"><label>連続配色<select id="color-map"><option value="viridis">Viridis</option><option value="plasma">Plasma</option><option value="spectrum">Spectrum</option></select></label><label>適用先<select id="colormap-target"><option value="both">線とマーカー</option><option value="line">線</option><option value="scatter">マーカー</option></select></label></div><button id="apply-colormap" type="button" class="button quiet">配色を適用</button></details>
+            <details id="series-colormap" class="settings-panel"><summary>まとめて配色</summary><div class="field-grid"><label>連続配色<select id="color-map"><option value="viridis">Viridis</option><option value="plasma">Plasma</option><option value="spectrum">Spectrum</option></select></label><label>適用先<select id="colormap-target"><option value="both">線とマーカー</option><option value="line">線</option><option value="scatter">マーカー</option></select></label></div><div class="colormap-range-settings"><span id="colormap-range-title">使用する色の範囲</span><div class="colormap-range" role="group" aria-labelledby="colormap-range-title" title="2つのつまみを動かして範囲を指定します。矢印キーで1％ずつ調整できます。">
+              <div id="colormap-gradient" class="colormap-gradient" aria-hidden="true"><span id="colormap-mask-start"></span><span id="colormap-mask-end"></span></div>
+              <input id="colormap-start" type="range" min="0" max="100" step="1" value="0" aria-label="配色範囲の開始" aria-valuetext="0%">
+              <input id="colormap-end" type="range" min="0" max="100" step="1" value="100" aria-label="配色範囲の終了" aria-valuetext="100%">
+            </div><div class="colormap-range-values"><span>開始 <output id="colormap-start-value">0%</output></span><span>終了 <output id="colormap-end-value">100%</output></span></div>
+            <div id="colormap-samples" class="colormap-samples" role="img" aria-label="選択範囲の系列順の配色" title="選択した範囲から系列数に合わせて等間隔に取り出した配色です。"></div></div>
+            <div class="colormap-actions"><button id="apply-colormap" type="button" class="button quiet">配色を適用</button><button id="reset-colormap-range" type="button" class="button quiet">全範囲に戻す</button></div><p id="colormap-error" class="preset-error" role="status" hidden></p></details>
             <details id="series-batch"><summary>系列の一括操作</summary><div class="annotation-buttons"><button id="shared-x-series" type="button" class="button quiet">共通X・全Y</button><button id="paired-series" type="button" class="button quiet">XYペア</button><button id="series-colors" type="button" class="button quiet">配色を戻す</button></div><div class="field-grid"><label>Yオフセット開始<input id="offset-start" type="number" value="0" step="any"></label><label>Yオフセット間隔<input id="offset-step" type="number" value="0" step="any"></label></div><button id="apply-offsets" type="button" class="button quiet">全系列へ適用</button></details>
           </details>
 

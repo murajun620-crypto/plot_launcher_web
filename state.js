@@ -1,5 +1,5 @@
-import { resetPresetUnitScales, unitConversion, configureAFMUnits } from "./units.js?v=6fa1ebe12611";
-export const APP_VERSION = "2.4.11";
+import { resetPresetUnitScales, unitConversion, configureAFMUnits } from "./units.js?v=2e5bdb262e35";
+export const APP_VERSION = "2.4.12";
 
 // Accept one numeric value or fraction without evaluating JavaScript expressions.
 export function parseCoefficient(value) {
@@ -272,6 +272,10 @@ export function restoreSettings(document, metadata) {
   const plotType = document.plotType || "General";
   if (!PLOT_TYPES.includes(plotType)) throw new Error("設定JSONのプロット種別を確認してください。");
   const restored = { axes, series, plotType, options: structuredClone(document.options || {}) };
+  if(restored.options.colormapRange!==undefined){
+    const range=restored.options.colormapRange;
+    if(!range || Array.isArray(range) || typeof range!=='object' || !['viridis','plasma','spectrum'].includes(range.name) || !['both','line','scatter'].includes(range.target) || [range.start,range.end].some(value=>typeof value!=='number' || !Number.isFinite(value) || value<0 || value>1) || range.start>range.end)throw new Error('配色の範囲を確認してください。');
+  }
   if(restored.options.legendEntries!==undefined){
     const entries=restored.options.legendEntries;
     if(!entries || Array.isArray(entries) || typeof entries!=='object' || Object.keys(entries).length>200)throw new Error('凡例項目の設定を確認してください。');
