@@ -6,8 +6,8 @@
   <meta name="description" content="Excel・CSV・TXTの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=dbb3134f95df">
-  <script type="module" src="./app.js?v=dbb3134f95df"></script>
+  <link rel="stylesheet" href="./style.css?v=8c25b29a37bb">
+  <script type="module" src="./app.js?v=8c25b29a37bb"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -52,7 +52,7 @@
         <div id="file-summary" class="file-summary" hidden>
           <svg><use href="#i-file"/></svg><div><strong id="file-name"></strong><span id="file-stats"></span></div><span id="sample-badge" class="badge" hidden>サンプル</span>
         </div>
-        <button id="reload-data" class="button quiet" hidden disabled title="元ファイルの更新内容を、グラフの設定を保って読み込みます。直接読み込めない場合は同じファイルを選び直してください。"><svg><use href="#i-refresh"/></svg>再読み込み</button>
+        <div id="data-reload-actions" class="data-reload-actions" hidden><button id="reload-data" class="button quiet" hidden disabled title="元ファイルの保存済みの内容を、グラフの設定を保って読み込みます。使用中で選択できない場合は右の▽からフォルダーを選んでください。"><svg><use href="#i-refresh"/></svg>再読み込み</button><details id="reload-data-menu"><summary class="button quiet" aria-label="データの再読み込み方法" title="使用中のExcelファイルを読み込む">▾</summary><div class="reload-data-options"><button id="reload-data-folder" type="button" class="button quiet" disabled title="元ファイルのあるフォルダーを選びます。Excelのファイル選択で「使用中」と表示される場合に使用します。保存済みのデータだけを読み込みます。">フォルダーから再読み込み</button></div></details></div>
         <input id="reload-data-files" type="file" accept=".xlsx,.xlsm,.xls,.csv,.txt" multiple hidden>
         <div id="data-options" class="data-options" hidden>
           <details id="source-files" class="settings-panel" hidden><summary>ファイル別のシート・読み込み設定</summary><div id="source-list"></div></details>

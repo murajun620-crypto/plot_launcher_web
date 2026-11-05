@@ -1,9 +1,9 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=dbb3134f95df";
-import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=dbb3134f95df";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=dbb3134f95df";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=dbb3134f95df";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=dbb3134f95df";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=dbb3134f95df";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=8c25b29a37bb";
+import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=8c25b29a37bb";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=8c25b29a37bb";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=8c25b29a37bb";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=8c25b29a37bb";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=8c25b29a37bb";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -267,6 +267,9 @@ function updateButtons() {
   $('#add-data').disabled=!engineReady || busy;
   $('#reload-data').hidden=!sourceData || sample;
   $('#reload-data').disabled=!engineReady || busy || !sourceData;
+  $('#data-reload-actions').hidden=!sourceData || sample;
+  $('#reload-data-menu').hidden=!folderSupported;
+  $('#reload-data-folder').disabled=!engineReady || busy || !sourceData;
   $("#paste-data").disabled = !engineReady || busy;
   $("#plot-fields").disabled = !engineReady || !metadata || busy;
   $('#preset-fields').disabled = !engineReady || !metadata || busy;
@@ -336,7 +339,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=dbb3134f95df", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=8c25b29a37bb", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -927,13 +930,23 @@ async function loadDataFiles(files, append=false, selection=null) {
   finally{loading=false;updateButtons();if(renderWanted)renderPreview();}
 }
 
-async function reloadSourceData(chosenFiles=null) {
+async function reloadSourceData(chosenFiles=null,{fromFolder=false}={}) {
   if(!engineReady || loading || exporting || !sourceData || !metadata)return false;
   const originals=sourceData.files || [{filename:sourceData.filename,sheetIndex:metadata.sheetIndex,headerRow:loadedHeader}];
   loading=true;clearTimeout(renderTimer);updateButtons();status('データを再読み込みしています…');
   try {
-    let files,handles,direct=false;
+    let files,handles,directory=null,direct=false;
     if(chosenFiles){files=[...chosenFiles];handles=files.map(file=>sourceHandles.get(file) || null);}
+    else if(fromFolder){
+      if(!folderSupported)throw new Error('このブラウザではフォルダーからの読み込みに対応していません。ChromeまたはEdgeを使用してください。');
+      if(new Set(originals.map(item=>item.filename)).size!==originals.length)throw new Error('別フォルダーにある同名ファイルは、この方法では判別できません。ファイルを個別に読み直してください。');
+      directory=await window.showDirectoryPicker({...directoryOptions(sourceDirectory||sourceHandle||saveDirectory),mode:'read'});
+      handles=await Promise.all(originals.map(async item=>{
+        try{return await directory.getFileHandle(item.filename,{create:false});}
+        catch(error){if(error.name==='NotFoundError')throw new Error(`選択したフォルダーに「${item.filename}」がありません。元ファイルのあるフォルダーを選んでください。`);throw error;}
+      }));
+      files=await Promise.all(handles.map(handle=>handle.getFile()));direct=true;
+    }
     else if(dataFileHandles.length===originals.length && dataFileHandles.every(Boolean)){
       handles=dataFileHandles;
       direct=true;
@@ -944,7 +957,7 @@ async function reloadSourceData(chosenFiles=null) {
         }));
       } catch {
         dataFileHandles=[];
-        throw new Error('元ファイルを直接読み込めませんでした。もう一度「再読み込み」を押し、元ファイルを選び直してください。');
+        throw new Error(folderSupported?'元ファイルを直接読み込めませんでした。再読み込みの▽から「フォルダーから再読み込み」を選んでください。':'元ファイルを直接読み込めませんでした。もう一度「再読み込み」を押し、元ファイルを選び直してください。');
       }
     } else {
       handles=await window.showOpenFilePicker({...filePickerOptions('plotlauncher-files','再読み込みする元ファイル',{'application/octet-stream':['.xlsx','.xlsm','.xls','.csv','.txt']},saveDirectory||sourceDirectory||sourceHandle),multiple:originals.length>1});
@@ -964,6 +977,7 @@ async function reloadSourceData(chosenFiles=null) {
     sourceData=sourceData.files?{filename:sourceData.filename,files:refreshed}:{filename:sourceData.filename,bytes:refreshed[0].bytes};
     dataFileHandles=ordered.map(index=>handles[index]);
     if(dataFileHandles[0] && sourceHandle!==dataFileHandles[0]){sourceHandle=dataFileHandles[0];sourceDirectory=null;refreshSaveDestination();}
+    if(directory){sourceDirectory=directory;refreshSaveDestination();}
     selected.clear();history=[];future=[];lastState=structuredClone(config);
     resetPreview();drawMetadata();drawControls();renderWanted=true;
     return true;
@@ -979,6 +993,9 @@ $('#reload-data').addEventListener('click',()=>{
   void reloadSourceData();
 });
 $('#reload-data-files').addEventListener('change',event=>{const files=[...event.target.files];event.target.value='';if(files.length)void reloadSourceData(files);});
+$('#reload-data-folder').addEventListener('click',()=>{$('#reload-data-menu').open=false;void reloadSourceData(null,{fromFolder:true});});
+window.addEventListener('pointerdown',event=>{if(!event.target.closest('#reload-data-menu'))$('#reload-data-menu').open=false;});
+$('#reload-data-menu').addEventListener('keydown',event=>{if(event.key==='Escape'){$('#reload-data-menu').open=false;event.preventDefault();}});
 
 function configurationForSheet(data, setting, template) {
   const inherited = sheetMode === 'shared' ? template : setting?.inheritSharedSettings ? sharedSettings : setting?.inheritFirstSheet ? sheetSettings.get(0) : !setting ? template : null;

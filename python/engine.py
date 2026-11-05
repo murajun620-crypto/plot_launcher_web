@@ -31,6 +31,8 @@ from matplotlib.backends.backend_svg import RendererSVG
 from matplotlib.lines import Line2D
 from matplotlib.collections import PathCollection, PolyCollection, LineCollection
 from matplotlib.patches import Rectangle
+from matplotlib.artist import Artist
+from matplotlib.transforms import Bbox
 import numpy as np
 import pandas as pd
 
@@ -328,6 +330,34 @@ def read_text_table(path, header_row):
             raise ValueError(f"Web版では{MAX_ROWS:,}行以内のファイルを使用してください。")
     frame = pd.DataFrame(rows, columns=names).apply(pd.to_numeric, errors="coerce")
     return frame, detected_header
+
+
+class _MarkerExtent(Artist):
+    """Include full scatter markers in tight preview/export bounds at any DPI."""
+
+    def __init__(self, collection):
+        super().__init__()
+        self.collection = collection
+        self.set_clip_on(False)
+
+    def get_window_extent(self, renderer=None):
+        artist = self.collection
+        colors = [*artist.get_facecolors(), *artist.get_edgecolors()]
+        if not artist.get_visible() or artist.get_alpha() == 0 or not any(color[3] > 0 for color in colors):
+            return Bbox.null()
+        offsets = np.ma.masked_invalid(artist.get_offsets())
+        valid = ~np.ma.getmaskarray(offsets).any(axis=1)
+        points = artist.get_offset_transform().transform(offsets.data[valid])
+        points = points[np.isfinite(points).all(axis=1)]
+        paths, sizes = artist.get_paths(), artist.get_sizes()
+        if not len(points) or not len(paths) or not len(sizes) or max(sizes) <= 0:
+            return Bbox.null()
+        scale = (renderer.points_to_pixels(1) if renderer is not None else self.figure.dpi / 72) * np.sqrt(max(sizes))
+        extents = np.array([path.get_extents().extents for path in paths])
+        lower = extents[:, :2].min(axis=0) * scale
+        upper = extents[:, 2:].max(axis=0) * scale
+        edge = max(artist.get_linewidths(), default=0) / 2 * (renderer.points_to_pixels(1) if renderer is not None else self.figure.dpi / 72)
+        return Bbox.from_extents(*(points.min(axis=0) + lower - edge), *(points.max(axis=0) + upper + edge))
 
 
 class PlotEngine:
@@ -1147,6 +1177,7 @@ class PlotEngine:
                     inside &= (values[:, column] >= np.nextafter(low, -np.inf)) & (values[:, column] <= np.nextafter(high, np.inf))
                 artist.set_offsets(np.ma.masked_where(np.repeat(~inside[:, None], 2, axis=1), offsets))
                 artist.set_clip_on(False)
+                artist.figure.add_artist(_MarkerExtent(artist))
 
     @staticmethod
     def _fit_data_limits(axes, right_axes, config, primary_name):
