@@ -1,9 +1,9 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=2e5bdb262e35";
-import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=2e5bdb262e35";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=2e5bdb262e35";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=2e5bdb262e35";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=2e5bdb262e35";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=2e5bdb262e35";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=1c174594a8b4";
+import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=1c174594a8b4";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=1c174594a8b4";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=1c174594a8b4";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=1c174594a8b4";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=1c174594a8b4";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -92,7 +92,7 @@ const requests = new Map();
 let metadata = null, config = { axes: defaultAxes(), series: [] };
 let loading = false, exporting = false, sample = false, loadedHeader = 1;
 let revision = 0, renderedRevision = -1, renderRunning = false, renderWanted = false, renderTimer;
-let previewURL, figureResult, dragging;
+let previewURL, figureResult, dragging, livePreview;
 let colorTarget;
 const recentColors = [];
 let colormapControlConfig=null,colormapPreviewToken=0,colormapPreviewTimer,colormapApplying=false;
@@ -351,7 +351,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=2e5bdb262e35", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=1c174594a8b4", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -980,6 +980,7 @@ function drawMetadata() {
 }
 
 function resetPreview() {
+  clearLivePreview();
   figureResult = null;
   unitAdvice = null; $('#unit-suggestion').hidden = true;
   $("#figure-interactions").replaceChildren();
@@ -1360,7 +1361,7 @@ $('#import-paste').addEventListener('click', async () => {
   finally { $('#import-paste').disabled = !pastedTable; }
 });
 
-function changed() {
+function changed(delay = 400) {
   if (!restoring && lastState && JSON.stringify(lastState)!==JSON.stringify(config)) {
     history.push(lastState); if(history.length>30)history.shift(); future=[];
   }
@@ -1372,7 +1373,7 @@ function changed() {
   $("#figure-size").textContent = `軸領域 ${config.axes.width || "—"} × ${config.axes.height || "—"} cm`;
   updateButtons();
   clearTimeout(renderTimer);
-  renderTimer = setTimeout(() => { renderWanted = true; renderPreview(); }, 400);
+  renderTimer = setTimeout(() => { renderWanted = true; renderPreview(); }, delay);
 }
 
 function legendModeControls() {
@@ -1440,6 +1441,8 @@ async function renderPreview() {
     showUnitAdvice();
   } catch (error) {
     if (targetRevision !== revision) return;
+    clearLivePreview();
+    positionInteractions();
     $("#preview-state").className = "preview-state error";
     $("#preview-state").textContent = "設定を確認";
     $("#figure-stage").classList.remove("pending");
@@ -2509,7 +2512,7 @@ function dataInteractions(overlay,imageBox){
 function positionInteractions() {
   const overlay = $("#figure-interactions"), image = $("#figure-image");
   overlay.replaceChildren();
-  if (!figureResult || image.hidden || !image.naturalWidth) return;
+  if (!figureResult?.geometry || image.hidden || !image.naturalWidth) return;
   const imageBox = image.getBoundingClientRect();
   const hitSize = 24;
   Object.assign(overlay.style, {left:'0',top:'0',width:'100%',height:'100%'});
@@ -2555,7 +2558,88 @@ function positionInteractions() {
     }
   }
 }
-$("#figure-image").addEventListener("load", layoutPreview);
+function clearLivePreview() {
+  livePreview=null;
+  $('#figure-live').hidden=true;
+  $('#figure-live').replaceChildren();
+  $('#figure-content').classList.remove('live-preview');
+}
+function prepareLivePreview(d) {
+  // Parse only on the first drag of a rendered graph. All glyphs, math and
+  // colors come from its original SVG rather than browser-rendered text.
+  if(typeof DOMParser==='undefined')return;
+  if(!livePreview){
+    const parsed=new DOMParser().parseFromString(figureResult.svg,'image/svg+xml'),svg=parsed.documentElement;
+    if(svg.localName!=='svg' || parsed.querySelector('parsererror'))return;
+    const size=(svg.getAttribute('viewBox') || '').trim().split(/\s+/).map(Number);
+    if(size.length!==4 || !size.every(Number.isFinite) || size[2]<=0 || size[3]<=0)return;
+    // Only generated SVG is accepted; never enable executable or external content.
+    svg.querySelectorAll('script,foreignObject').forEach(node=>node.remove());
+    svg.querySelectorAll('*').forEach(node=>{for(const attr of [...node.attributes])if(/^on/i.test(attr.name) || /(^|:)href$/.test(attr.name) && !/^(#|data:image\/)/.test(attr.value))node.removeAttribute(attr.name);});
+    // Matplotlib's universal stroke rule must stay inside the graph.
+    svg.querySelectorAll('style').forEach(node=>node.textContent=node.textContent.replace(/(^|})\s*\*/g,'$1 #figure-live svg *'));
+    svg.setAttribute('width','100%');svg.setAttribute('height','100%');svg.setAttribute('preserveAspectRatio','none');
+    $('#figure-live').replaceChildren(svg);
+    livePreview={svg,size};
+  }
+  const g=figureResult.geometry;
+  const entries=d.axis || d.trendIndex!==undefined ? [...(g.axisLabels || []),...(g.trendEquations || [])].filter(entry=>entry.id===d.id) :
+    d.id==='legend' ? [{id:'legend',svgIds:g.legendSvgIds}] : isLegendId(d.id) ? d.legendItems :
+    g.annotations.filter(entry=>(d.handle?[d.item]:d.items.map(row=>row.item)).some(item=>item.id===entry.id));
+  d.liveEntries=entries.map(entry=>({...entry,nodes:(entry.svgIds || []).map(id=>livePreview.svg.querySelector(`[id="${id}"]`)).filter(Boolean).map(node=>({node,original:node.getAttribute('transform') || ''}))}));
+}
+function annotationDragUpdates(d,event) {
+  const dx=(event.clientX-d.x)/d.box.width/d.axes[2],dy=-(event.clientY-d.y)/d.box.height/d.axes[3];
+  return (d.handle?[{item:d.item,start:d.start}]:d.items).map(({item,start})=>{
+    const value={};
+    if(d.handle==='resize')value.font_size=Math.max(2,Math.min(200,Number(start.font_size)+((event.clientX-d.x)-(event.clientY-d.y))/d.box.width*30));
+    else if(d.handle==='rotate'){
+      value.rotation=(Number(start.rotation)+(event.clientX-d.x)/d.box.width*360)%360;
+      if(event.shiftKey)value.rotation=Math.round(value.rotation/15)*15;
+    }else{
+      const keys=start.type==='text'?['x','y']:d.handle?[`x${d.handle}`,`y${d.handle}`]:['x1','y1','x2','y2'];
+      for(const key of keys)value[key]=shiftCoordinate(start[key],key.startsWith('x')?dx:dy,figureResult[`${key[0]}Range`],key.startsWith('y')?figureResult.yDataScale || config.axes.yScale:config.axes.xScale,start.coordinate_system);
+      if(event.shiftKey && d.handle && start.type!=='text'){
+        const other=d.handle==='1'?'2':'1',snapped=snapPoint({x:Number(start[`x${other}`]),y:Number(start[`y${other}`])},{x:Number(value[`x${d.handle}`]),y:Number(value[`y${d.handle}`])});
+        value[`x${d.handle}`]=snapped.x;value[`y${d.handle}`]=snapped.y;
+      }
+    }
+    return {item,start,value};
+  });
+}
+function liveDragTransform(d,event,entry,size) {
+  const [, ,width,height]=size,tx=(event.clientX-d.x)/d.box.width*width,ty=(event.clientY-d.y)/d.box.height*height;
+  if(!d.handle)return `translate(${tx} ${ty})`;
+  const update=annotationDragUpdates(d,event)[0];
+  if(d.handle==='resize' || d.handle==='rotate'){
+    if(!entry.anchor)return '';
+    const [x,y]=[entry.anchor[0]*width,entry.anchor[1]*height];
+    const transform=d.handle==='resize'?`scale(${update.value.font_size/Number(d.start.font_size)})`:`rotate(${Number(d.start.rotation)-update.value.rotation})`;
+    return `translate(${x} ${y}) ${transform} translate(${-x} ${-y})`;
+  }
+  if(!entry.points)return '';
+  const next={...d.start,...update.value},fraction=(key,value)=>{
+    if(next.coordinate_system==='axes_fraction')return value;
+    const range=figureResult[`${key}Range`],log=(key==='y'?figureResult.yDataScale || config.axes.yScale:config.axes.xScale)==='log',f=log?Math.log:value=>value;
+    return (f(value)-f(range[0]))/(f(range[1])-f(range[0]));
+  };
+  const points=[1,2].map(i=>[(d.axes[0]+fraction('x',Number(next[`x${i}`]))*d.axes[2])*width,(d.axes[1]+(1-fraction('y',Number(next[`y${i}`])))*d.axes[3])*height]);
+  const [a,b]=entry.points.map(([x,y])=>[x*width,y*height]),[c,e]=points;
+  const oldLength=Math.hypot(b[0]-a[0],b[1]-a[1]),newLength=Math.hypot(e[0]-c[0],e[1]-c[1]);
+  if(oldLength<1e-8)return `translate(${c[0]-a[0]} ${c[1]-a[1]})`;
+  const angle=(p,q)=>Math.atan2(q[1]-p[1],q[0]-p[0])*180/Math.PI;
+  return `translate(${c[0]} ${c[1]}) rotate(${angle(c,e)}) scale(${Math.max(1e-8,newLength)/oldLength} 1) rotate(${-angle(a,b)}) translate(${-a[0]} ${-a[1]})`;
+}
+function previewDrag(d,event) {
+  if(!livePreview || !d.liveEntries?.some(entry=>entry.nodes.length) || Math.hypot(event.clientX-d.x,event.clientY-d.y)<3)return;
+  for(const entry of d.liveEntries){
+    const transform=liveDragTransform(d,event,entry,livePreview.size);
+    for(const {node,original} of entry.nodes)node.setAttribute('transform',`${transform} ${original}`.trim());
+  }
+  $('#figure-live').hidden=false;
+  $('#figure-content').classList.add('live-preview');
+}
+$("#figure-image").addEventListener("load",()=>{if(!dragging)clearLivePreview();layoutPreview();});
 new ResizeObserver(layoutPreview).observe($("#figure-paper"));
 $("#figure-interactions").addEventListener("pointerdown", event => {
   if(event.button !== 0)return;
@@ -2569,26 +2653,33 @@ $("#figure-interactions").addEventListener("pointerdown", event => {
   } else {
     selected.clear();drawAnnotations();
   }
-  syncInteractionSelection();
+  if(!target.dataset.handle)syncInteractionSelection();
   if(item?.locked || ((item || isLegendId(id)) && !selected.has(id)))return;
   const imageBox=$("#figure-image").getBoundingClientRect();
   dragging={pointerId:event.pointerId,id,item,axis:target.dataset.editAxis,trendIndex:target.dataset.trendIndex,anchor:[...(figureResult.geometry.axisLabels || []),...(figureResult.geometry.trendEquations || [])].find(label=>label.id===id)?.anchor,start:item?structuredClone(item):null,items:(config.annotations||[]).filter(item=>selected.has(item.id)&&!item.locked).map(item=>({item,start:structuredClone(item)})),handle:target.dataset.handle,x:event.clientX,y:event.clientY,box:imageBox,axes:figureResult.geometry.axes,legend:figureResult.geometry.legend};
   dragging.legendItems=(figureResult.geometry.legendItems || []).filter(entry=>selected.has(entry.id));
+  const ids=dragging.axis || dragging.trendIndex!==undefined || id==='legend' ? [id] : isLegendId(id) ? dragging.legendItems.map(entry=>entry.id) : dragging.handle ? [id] : dragging.items.map(row=>row.item.id);
+  dragging.targets=$$('#figure-interactions [data-drag-id]').filter(node=>ids.includes(node.dataset.dragId) && (!dragging.handle || node===target));
+  prepareLivePreview(dragging);
   target.setPointerCapture(event.pointerId); event.preventDefault();
 });
 $("#figure-interactions").addEventListener("pointermove", event => {
   if(!dragging || dragging.pointerId !== event.pointerId) return;
   const dx=event.clientX-dragging.x,dy=event.clientY-dragging.y;
-  if(!dragging.handle)event.target.style.transform=`translate(${dx/view.zoom}px,${dy/view.zoom}px)`;
+  previewDrag(dragging,event);
+  for(const target of dragging.targets.length?dragging.targets:[event.target])target.style.transform=`translate(${dx/view.zoom}px,${dy/view.zoom}px)`;
 });
 function finishDrag(event) {
   if(!dragging || dragging.pointerId !== event.pointerId) return;
   const d=dragging; dragging=null;
   if(Math.hypot(event.clientX-d.x,event.clientY-d.y)<3){
     // Keep the label's DOM node between clicks so the browser emits dblclick.
-    event.target.style.transform='';syncInteractionSelection();
+    clearLivePreview();
+    for(const target of d.targets.length?d.targets:[event.target])target.style.transform='';
+    syncInteractionSelection();
     return;
   }
+  previewDrag(d,event);
   const [ax,ay,aw,ah]=d.axes, dx=(event.clientX-d.x)/d.box.width/aw,dy=-(event.clientY-d.y)/d.box.height/ah;
   if(d.trendIndex!==undefined && d.anchor) {
     const item=config.series[Number(d.trendIndex)];
@@ -2610,22 +2701,13 @@ function finishDrag(event) {
       state[series?'legendY':'y']=Math.max(-10,Math.min(10,1-(y+h/2-ay)/ah+dy)).toFixed(4);
     }
   } else {
-    if(d.handle==='resize')d.item.font_size=Math.max(2,Math.min(200,Number(d.start.font_size)+((event.clientX-d.x)-(event.clientY-d.y))/d.box.width*30));
-    else if(d.handle==='rotate'){d.item.rotation=(Number(d.start.rotation)+(event.clientX-d.x)/d.box.width*360)%360;if(event.shiftKey)d.item.rotation=Math.round(d.item.rotation/15)*15;}
-    else for(const {item,start} of d.handle?[{item:d.item,start:d.start}]:d.items){
-      const keys=start.type==='text'?['x','y']:d.handle?[`x${d.handle}`,`y${d.handle}`]:['x1','y1','x2','y2'];
-      for(const key of keys)item[key]=shiftCoordinate(start[key],key.startsWith('x')?dx:dy,figureResult[`${key[0]}Range`],key.startsWith('y')?figureResult.yDataScale || config.axes.yScale:config.axes.xScale,start.coordinate_system);
-      if(event.shiftKey && d.handle && start.type!=='text'){
-        const other=d.handle==='1'?'2':'1';
-        const snapped=snapPoint({x:Number(item[`x${other}`]),y:Number(item[`y${other}`])},{x:Number(item[`x${d.handle}`]),y:Number(item[`y${d.handle}`])});item[`x${d.handle}`]=snapped.x;item[`y${d.handle}`]=snapped.y;
-      }
-    }
+    for(const {item,value} of annotationDragUpdates(d,event))Object.assign(item,value);
     drawAnnotations();
   }
-  changed();
+  changed(0);
 }
 $("#figure-interactions").addEventListener("pointerup",finishDrag);
-$("#figure-interactions").addEventListener("pointercancel",()=>{dragging=null;positionInteractions();});
+for(const name of ['pointercancel','lostpointercapture'])$("#figure-interactions").addEventListener(name,event=>{if(dragging && event.pointerId===dragging.pointerId){dragging=null;clearLivePreview();positionInteractions();}});
 
 function selectAnnotation(id, multiple=false){
   if(multiple){if(selected.has(id))selected.delete(id);else selected.add(id);}else selected=new Set([id]);

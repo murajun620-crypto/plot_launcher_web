@@ -177,9 +177,8 @@ input[type=color]::-webkit-color-swatch{border:0;border-radius:5px}
 .save-options select{height:27px;background:transparent;width:86px;font-size:10px;padding:3px 7px}
 .figure-stage{background:#e9edf4;border:1px solid #dfe5ee;border-radius:10px;padding:32px 36px 10px;min-height:455px;display:flex;flex-direction:column}
 .paper{flex:1;display:flex;justify-content:center;align-items:center;min-height:370px;border-radius:3px;box-shadow:0 2px 13px #263d5720;background-color:#e7e7e7;background-image:linear-gradient(45deg,#d5d5d5 25%,transparent 25%),linear-gradient(-45deg,#d5d5d5 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#d5d5d5 75%),linear-gradient(-45deg,transparent 75%,#d5d5d5 75%);background-size:18px 18px;background-position:0 0,0 9px,9px -9px,-9px 0;overflow:hidden;padding:26px 28px}
-.paper img{display:block;width:100%;height:auto;max-height:500px;object-fit:contain;transition:opacity .15s}
+.paper img{display:block;width:100%;height:auto;max-height:500px;object-fit:contain}
 .paper img[hidden]{display:none}
-.figure-stage.pending img{opacity:.5}
 .initial-message{text-align:center;display:flex;flex-direction:column;align-items:center;color:#8495aa;font-size:11px;gap:15px;padding:45px 20px;line-height:1.8}
 .initial-message[hidden]{display:none}
 .initial-message strong{font-size:13px;font-weight:550;color:#637b98}
@@ -212,6 +211,9 @@ th:first-child,td:first-child{width:30px;color:#a3aebd}
 [hidden]{display:none!important}
 .paper{position:relative}
 #figure-interactions{position:absolute;pointer-events:none}
+#figure-live{position:absolute;inset:0;pointer-events:none}
+#figure-live svg{display:block;width:100%;height:100%;overflow:visible;fill:#000;stroke:none;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter}
+#figure-content.live-preview img{visibility:hidden}
 .figure-drag-target{position:absolute;pointer-events:auto;background:transparent;border:1px solid transparent;padding:0;cursor:move;touch-action:none}
 .figure-drag-target:hover,.figure-drag-target:focus-visible{border:1px dashed #205eb0;background:#205eb00a}
 .annotation-buttons{display:flex;gap:8px}

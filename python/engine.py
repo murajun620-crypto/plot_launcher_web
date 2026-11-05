@@ -1616,6 +1616,26 @@ class PlotEngine:
                             ha="left", va="top", fontsize=spec["fontsize"], color=spec["color"], zorder=30, clip_on=False)
                         equation_artists.append((spec["index"], artist, anchor))
                         top -= artist.get_window_extent(renderer).height/region.height+.03
+                # Stable SVG groups let the browser move the existing vectors
+                # immediately, while the final Matplotlib render runs in parallel.
+                for name, axis in editable_axes:
+                    positioned_labels.get(name, axis.label).set_gid(f"web-axis-label-{name}")
+                if legend:
+                    legend.set_gid("web-legend")
+                for index, row in enumerate(legend_records):
+                    if row["artist"] is not legend:
+                        row["artist"].set_gid(f"web-legend-item-{index}")
+                for index, artist, _ in equation_artists:
+                    artist.set_gid(f"web-trend-equation-{index}")
+                annotation_svg_ids = {}
+                for index, annotation in enumerate(collection.items):
+                    artists = manager.artist_by_id.get(annotation.id)
+                    artists = artists if isinstance(artists, list) else [artists] if artists is not None else []
+                    annotation_svg_ids[annotation.id] = []
+                    for part, artist in enumerate(artists):
+                        gid = f"web-annotation-{index}-{part}"
+                        artist.set_gid(gid)
+                        annotation_svg_ids[annotation.id].append(gid)
                 figure.canvas.draw()
                 # Hide off-screen log ticks before calculating the export box.
                 for axis in [item[1] for item in editable_axes]:
@@ -1645,10 +1665,11 @@ class PlotEngine:
                     b = artist_box.transformed(figure.dpi_scale_trans.inverted())
                     return [(b.x0 - box.x0) / box.width, (box.y1 - b.y1) / box.height, b.width / box.width, b.height / box.height]
                 geometry = {"axes": svg_box(axes.get_window_extent(renderer)), "legend": svg_box(legend.get_window_extent(renderer)) if legend else None, "annotations": [], "axisLabels": [], "tickLabels": []}
-                geometry["legendItems"] = [{"id": row["id"], "seriesIndex": row["seriesIndex"], "key": row["key"], "label": row["label"], "box": svg_box(row["artist"].get_window_extent(renderer))} for row in legend_records if "id" in row]
+                geometry["legendSvgIds"] = [legend.get_gid()] if legend else []
+                geometry["legendItems"] = [{"id": row["id"], "svgIds": [row["artist"].get_gid()], "seriesIndex": row["seriesIndex"], "key": row["key"], "label": row["label"], "box": svg_box(row["artist"].get_window_extent(renderer))} for row in legend_records if "id" in row]
                 geometry["series"] = self._data_geometry(series_groups, axes, box, renderer)
                 geometry["trendEquations"] = [{"id": f"trend-equation-{index}", "seriesIndex": index,
-                    "box": svg_box(artist.get_window_extent(renderer)), "anchor": anchor} for index, artist, anchor in equation_artists]
+                    "svgIds": [artist.get_gid()], "box": svg_box(artist.get_window_extent(renderer)), "anchor": anchor} for index, artist, anchor in equation_artists]
                 geometry["spines"] = [{"id": side, "paths": self._data_geometry([{"artists": [spine]}], axes, box, renderer)[0]["paths"]} for target in (axes, right_axes) if target is not None for side, spine in target.spines.items() if spine.get_visible() and preset != "Raman 3D"]
                 geometry["grid"] = self._data_geometry([{"part": "grid", "artists": [line for line in axes.get_xgridlines() + axes.get_ygridlines() if line.get_visible()]}], axes, box, renderer)
                 geometry["tickLines"] = [{"axis": name, "boxes": [svg_box(line.get_window_extent(renderer)) for tick in [*axis.get_major_ticks(), *axis.get_minor_ticks()] for line in (tick.tick1line, tick.tick2line) if line.get_visible() and line.get_markersize() > 0 and line.get_markeredgewidth() > 0]} for name, axis in editable_axes] if preset != "Raman 3D" else []
@@ -1658,7 +1679,7 @@ class PlotEngine:
                     label = positioned_labels.get(name, axis.label)
                     if label.get_visible() and label.get_text():
                         anchor = axes.transAxes.inverted().transform(label.get_transform().transform(label.get_position()))
-                        geometry["axisLabels"].append({"id": f"axis-label-{name}", "axis": name, "kind": "label", "box": svg_box(label.get_window_extent(renderer)), "anchor": list(map(float, anchor))})
+                        geometry["axisLabels"].append({"id": f"axis-label-{name}", "svgIds": [label.get_gid()], "axis": name, "kind": "label", "box": svg_box(label.get_window_extent(renderer)), "anchor": list(map(float, anchor))})
                     for index, label in enumerate(axis.get_ticklabels()):
                         if label.get_visible() and label.get_text():
                             geometry["tickLabels"].append({"id": f"axis-ticks-{name}-{index}", "axis": name, "kind": "ticks", "box": svg_box(label.get_window_extent(renderer))})
@@ -1667,7 +1688,10 @@ class PlotEngine:
                     if isinstance(artist, list):
                         artist = artist[0]
                     if artist is not None and annotation.visible:
-                        entry = {"id": annotation.id, "box": svg_box(artist.get_window_extent(renderer))}
+                        entry = {"id": annotation.id, "svgIds": annotation_svg_ids[annotation.id], "box": svg_box(artist.get_window_extent(renderer))}
+                        if annotation.type == "text":
+                            point = artist.get_transform().transform(artist.get_position()) / figure.dpi
+                            entry["anchor"] = [(point[0] - box.x0) / box.width, (box.y1 - point[1]) / box.height]
                         if annotation.type != "text":
                             points = annotation_axes.transData.transform([(annotation.x1, annotation.y1), (annotation.x2, annotation.y2)]) / figure.dpi
                             entry["points"] = [[(x - box.x0) / box.width, (box.y1 - y) / box.height] for x, y in points]
