@@ -1439,7 +1439,7 @@ class PlotEngine:
                         diagnostics_by_index.update(zip(right_indices, right_diagnostics))
                         handles_by_index.update(zip(right_indices, right_namespace["legend_handles"]))
                         warnings += right_warnings
-                        right_axes.grid(False)
+                        right_axes.grid(False, which="both")
                         # Only the outer right spine belongs to this axes.
                         for side in ("left", "top", "bottom"):
                             right_axes.spines[side].set_visible(False)
@@ -1477,10 +1477,8 @@ class PlotEngine:
                     if preset not in {"XPS Fit", "Particle Histogram"}:
                         for text, series in zip(legend.get_texts(), [item for item in diagnostics if item["visible"]]):
                             text.set_text(series["name"])
-                if config.get("axes", {}).get("grid", False):
-                    axes.grid(True, alpha=0.15, linewidth=0.5)
-                else:
-                    axes.grid(False)
+                if preset == "Raman 3D":
+                    axes.grid(bool(config.get("axes", {}).get("grid", False)))
                 if preset in {"General", "Roughness", "Polishing Rate", "Waviness"} or namespace.get("web_errorbars"):
                     plot_utils.ensure_axis_limits_include_data(axes)
                 fits, equation_specs = [], []
@@ -1537,6 +1535,25 @@ class PlotEngine:
                             axis.set_tick_params(which=which, width=base.get_markeredgewidth()*width, length=base.get_markersize()*length)
                     if config.get("axes", {}).get(f"hide{name.upper()}MinorTicks", config.get("axes", {}).get("hideMinorTicks", False)):
                         axis.set_minor_locator(NullLocator())
+                if preset != "Raman 3D":
+                    from matplotlib.ticker import AutoMinorLocator, LogLocator, MultipleLocator
+                    settings = config.get("axes", {})
+                    # Draw one horizontal grid against the primary Y axis,
+                    # including projects whose only plotted data use the right axis.
+                    for name, axis in editable_axes[:2]:
+                        direction = "x" if name == "x" else "y"
+                        minor = settings.get(f"{direction}MinorGrid", False)
+                        if minor and isinstance(axis.get_minor_locator(), NullLocator):
+                            step = number(settings.get(f"{name}MinorStep", ""), "副目盛り間隔", minimum=0, optional=True)
+                            axis.set_minor_locator(LogLocator(base=10, subs=range(2, 10)) if axis.get_scale() == "log" else MultipleLocator(step) if step else AutoMinorLocator())
+                            axis.set_minor_formatter(matplotlib.ticker.NullFormatter())
+                        if minor and settings.get(f"hide{name.upper()}MinorTicks", settings.get("hideMinorTicks", False)):
+                            axis.set_tick_params(which="minor", length=0)
+                        for which, enabled, alpha, width in (("major", settings.get(f"{direction}Grid", settings.get("grid", False)), .2, .5), ("minor", minor, .12, .4)):
+                            if enabled:
+                                axis.grid(True, which=which, color="#808080", alpha=alpha, linewidth=width)
+                            else:
+                                axis.grid(False, which=which)
                 for name, axis in editable_axes:
                     if name == "x":
                         continue
@@ -1671,7 +1688,7 @@ class PlotEngine:
                 geometry["trendEquations"] = [{"id": f"trend-equation-{index}", "seriesIndex": index,
                     "svgIds": [artist.get_gid()], "box": svg_box(artist.get_window_extent(renderer)), "anchor": anchor} for index, artist, anchor in equation_artists]
                 geometry["spines"] = [{"id": side, "paths": self._data_geometry([{"artists": [spine]}], axes, box, renderer)[0]["paths"]} for target in (axes, right_axes) if target is not None for side, spine in target.spines.items() if spine.get_visible() and preset != "Raman 3D"]
-                geometry["grid"] = self._data_geometry([{"part": "grid", "artists": [line for line in axes.get_xgridlines() + axes.get_ygridlines() if line.get_visible()]}], axes, box, renderer)
+                geometry["grid"] = self._data_geometry([{"part": "grid", "artists": [tick.gridline for axis in (axes.xaxis, axes.yaxis) for tick in [*axis.get_major_ticks(), *axis.get_minor_ticks()] if tick.gridline.get_visible()]}], axes, box, renderer)
                 geometry["tickLines"] = [{"axis": name, "boxes": [svg_box(line.get_window_extent(renderer)) for tick in [*axis.get_major_ticks(), *axis.get_minor_ticks()] for line in (tick.tick1line, tick.tick2line) if line.get_visible() and line.get_markersize() > 0 and line.get_markeredgewidth() > 0]} for name, axis in editable_axes] if preset != "Raman 3D" else []
                 if preset == "Raman 3D":
                     geometry["depth"] = [svg_box(label.get_window_extent(renderer)) for label in [axes.yaxis.label, *axes.yaxis.get_ticklabels()] if label.get_visible() and label.get_text()]

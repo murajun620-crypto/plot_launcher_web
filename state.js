@@ -1,5 +1,5 @@
-import { resetPresetUnitScales, unitConversion, configureAFMUnits } from "./units.js?v=333983dd29e0";
-export const APP_VERSION = "2.4.15";
+import { resetPresetUnitScales, unitConversion, configureAFMUnits } from "./units.js?v=1019bee5de2e";
+export const APP_VERSION = "2.4.16";
 
 // Accept one numeric value or fraction without evaluating JavaScript expressions.
 export function parseCoefficient(value) {
@@ -48,6 +48,7 @@ export function applyPreset(config, preset, metadata) {
   Object.assign(config.axes, {xLabel: xLabel === "auto" ? "" : xLabel, xUnit, yLabel: yLabel === "auto" ? "" : yLabel, yUnit});
   const spectrum = ["EDX", "XPS Survey", "XPS Core", "XPS Fit", "XAFS", "Raman Spectrum"].includes(preset.id);
   Object.assign(config.axes, {hideYTickLabels: spectrum, hideYTicks: spectrum, xScale: "linear", yScale: ['Roughness','Waviness'].includes(preset.id) ? "log" : "linear", grid: preset.id === "Raman 3D"});
+  Object.assign(config.axes, {xGrid: false, yGrid: false, xMinorGrid: false, yMinorGrid: false});
   if (['Roughness','Waviness'].includes(preset.id)) config.series.forEach(series => series.mode = "line+scatter");
   if (preset.id === 'Waviness') Object.assign(config.axes, {yMin: '', yMax: '', yStep: '', yMinorStep: '', yLogFormat: 'power', legendPosition: 'best', legendX: '', legendY: ''});
   if (preset.id === "Polishing Rate") {
@@ -98,6 +99,7 @@ export function defaultAxes() {
     yAxisRight: false, xAxisTop: false, spineColor: "#000000",
     legend: true, legendPosition: "best", legendX: "", legendY: "", legendScale: 1, legendFontScale: 1, legendStyle: "symbols", legendMode: "together", legendTextColorMode:'auto',legendTextColor:'#000000',
     transparent: true, backgroundColor: "#ffffff", backgroundAlpha: 1, grid: false,
+    xGrid: false, yGrid: false, xMinorGrid: false, yMinorGrid: false,
     plotBackgroundEnabled: false, plotBackgroundColor: "#ffffff", plotBackgroundAlpha: 1,
     markerEdgeWidth: 0.6, errorLineWidth: 0.8, errorCapSize: 3, errorCapThick: 0.8,
   };
@@ -241,6 +243,8 @@ export function restoreSettings(document, metadata) {
   for (const key of ['hideXMinorTicks','hideYMinorTicks','hideY2MinorTicks']) {
     if (!Object.hasOwn(document.axes, key)) axes[key] = axes.hideMinorTicks;
   }
+  // Older projects had one switch for both directions, at major ticks only.
+  for (const key of ['xGrid','yGrid']) if (!Object.hasOwn(document.axes, key)) axes[key] = axes.grid;
   const series = document.series.map((item, index) => {
     if (!item || typeof item !== "object" || typeof item.xColumn !== "string" || typeof item.yColumn !== "string") throw new Error("設定JSONの系列設定を確認してください。");
     const result = createSeries(find(item.xColumn), find(item.yColumn), item.yColumn, index);

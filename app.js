@@ -1,13 +1,13 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=333983dd29e0";
-import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=333983dd29e0";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=333983dd29e0";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=333983dd29e0";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=333983dd29e0";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=333983dd29e0";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=1019bee5de2e";
+import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=1019bee5de2e";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=1019bee5de2e";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=1019bee5de2e";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=1019bee5de2e";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=1019bee5de2e";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
-const APP_BUILD = "333983dd29e0";
+const APP_BUILD = "1019bee5de2e";
 
 function positionDialog(dialog, left, top) {
   const box=dialog.getBoundingClientRect(), gap=8;
@@ -73,6 +73,7 @@ const MICRO_HINT = 'μは \\micro と入力できます（例：\\microm、\\mic
 const LABEL_PADDING_BASE = defaultAxes().xLabelPad;
 const LABEL_PADDING_HINT = `0は標準の余白（${LABEL_PADDING_BASE} pt）。正の値で広く、負の値で狭くします。`;
 const isLabelPadding = key => /^(x|y|y2)LabelPad$/.test(key);
+const axisSetting = key => config.axes[key] ?? (['xGrid','yGrid'].includes(key) ? Boolean(config.axes.grid) : undefined);
 // Keep saved settings compatible; controls show padding offsets and line widths in pt.
 const fontPointBase = key => ({fontScale:8,tickFontScale:7,labelFontScale:8,legendFontScale:7})[key] * (key === 'fontScale' ? 1 : Number(config.axes.fontScale));
 const axisControlValue = (key, value) => isLabelPadding(key) ? Number((Number(value) - LABEL_PADDING_BASE).toPrecision(12)) : key === 'spineScale' ? Number((Number(value) * .8).toPrecision(12)) : /^(fontScale|tickFontScale|labelFontScale|legendFontScale)$/.test(key) ? Number((Number(value)*fontPointBase(key)).toPrecision(12)) : value;
@@ -217,8 +218,8 @@ function desktopAppearance() {
         <tr><th scope="row">副目盛線</th>${displayCell("hideXMinorTicks", "X軸の副目盛線")}${displayCell("hideYMinorTicks", "Y軸の副目盛線")}</tr>
       </tbody></table>
     </fieldset>
-    <div class="check-options"><label><input id="show-grid" data-axis="grid" type="checkbox">グリッドを表示</label></div>
     ${numeric("tickLength", "目盛りの長さ（標準比）", 0, 5)}</details>
+    <details class="settings-panel"><summary>グリッド線</summary><div id="grid-settings-content">${gridControls()}</div></details>
     <details class="settings-panel"><summary>枠線・軸の位置</summary><div id="frame-settings-content" class="frame-settings">
       <fieldset class="axis-control-group"><legend>表示する枠線</legend><div class="frame-edge-picker">
         <div class="frame-guide" aria-hidden="true">グラフ</div>
@@ -244,6 +245,15 @@ function desktopAppearance() {
   $('#legend-modes').innerHTML=legendModeControls();
   $("#legend-appearance").innerHTML = `${numeric("legendScale", "凡例の線・点の大きさ（標準比）", .2)}${numeric("legendFontScale", "フォントサイズ (pt)", .2)}${numeric("legendX", "凡例の横位置（左0・右1）", -10, 10, .01)}${numeric("legendY", "凡例の縦位置（下0・上1）", -10, 10, .01)}`;
   for(const axis of ['x','y','y2'])$(`#${axis}-tick-appearance`).innerHTML=tickLineControls(axis);
+}
+
+function gridControls() {
+  if(config.plotType==='Raman 3D')return `<label><input data-axis="grid" type="checkbox" ${config.axes.grid?'checked':''}>3Dグリッド線を表示</label>`;
+  const cell=(key,name)=>`<td><label><input data-axis="${key}" type="checkbox" ${axisSetting(key)?'checked':''}><span>${name}を表示</span></label></td>`;
+  return `<table class="axis-visibility-table" aria-label="グリッド線の表示" title="縦はX軸、横はY軸の目盛位置。左右のY軸がある場合は左軸に合わせます。"><thead><tr><th scope="col">位置</th><th scope="col">縦</th><th scope="col">横</th></tr></thead><tbody>
+    <tr><th scope="row">主目盛</th>${cell('xGrid','縦の主グリッド線')}${cell('yGrid','横の主グリッド線')}</tr>
+    <tr><th scope="row">副目盛</th>${cell('xMinorGrid','縦の補助グリッド線')}${cell('yMinorGrid','横の補助グリッド線')}</tr>
+    </tbody></table>`;
 }
 
 function tickLineControls(axis) {
@@ -362,7 +372,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=333983dd29e0", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=1019bee5de2e", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -517,7 +527,7 @@ function openAxisEditor(axis, kind) {
   const flag=axis.toUpperCase();
   html+=`<div class="check-options">${(kind==='label'?[['Label','軸ラベル']]:[['TickLabels','目盛り数値'],['Ticks','主目盛線']]).map(([key,text])=>`<label><input data-axis="hide${flag}${key}" data-invert="true" type="checkbox" ${config.axes[`hide${flag}${key}`]?'':'checked'}>${text}を表示</label>`).join('')}</div>`;
   html += axis === 'x' ? label('spineColor','枠線・文字色','color') : label(`${axis}Color`,'軸の色（autoで自動）','text','title="軸線・目盛線・目盛数値・ラベルに適用します。autoでは、左右別の軸を使う場合に各軸の最初の系列と同じ色にします。"');
-  if(kind==='ticks')html+='</details>';
+  if(kind==='ticks')html+=`</details><details class="settings-panel"><summary>グリッド線</summary>${gridControls()}</details>`;
   fields.innerHTML=html;
   syncAxisEditor(); syncUnitControls(); enhanceColorInputs(); showDialog('#axis-editor');
 }
@@ -782,6 +792,7 @@ $('#series-table-body').addEventListener('dblclick',event=>{
 
 function drawControls() {
   $("#plot-type").value = config.plotType || "General";
+  $('#grid-settings-content').innerHTML=gridControls();
   for(const option of $('#plot-type').options)option.disabled=!!metadata?.sources && !editableXY(option.value);
   drawPresetOptions();
   syncFontChoices();
@@ -820,7 +831,7 @@ function drawControls() {
       </details>${processingControls(series)}</div>`;
   }).join("") || '<p class="empty-series">「系列を追加」でX列とY列を選んでください。</p>';
   $$('[data-axis]').forEach(input => {
-    const value = config.axes[input.dataset.axis];
+    const value = axisSetting(input.dataset.axis);
     if (input.type === "checkbox") input.checked = input.dataset.invert === 'true' ? !value : Boolean(value);
     else input.value = axisControlValue(input.dataset.axis, value);
     if(['tickFontScale','labelFontScale','legendFontScale'].includes(input.dataset.axis)){input.min=axisControlValue(input.dataset.axis,.2);input.max=axisControlValue(input.dataset.axis,3);}
@@ -2562,12 +2573,11 @@ function openElementEditor(part,index=0) {
   else {
     const keys=part==='figureBackground'?['transparent','backgroundColor','backgroundAlpha']:
       part==='plotBackground'?['plotBackgroundEnabled','plotBackgroundColor','plotBackgroundAlpha']:
-      part==='grid'?['grid','tickLength','hideXTicks','hideYTicks','hideXMinorTicks','hideYMinorTicks','xMinorStep','yMinorStep']:
+      part==='grid'?[]:
       ['spineColor','spineScale','spineLeft','spineRight','spineTop','spineBottom','yAxisRight','xAxisTop'];
-    title=({figureBackground:'図全体の背景',plotBackground:'枠内の背景',grid:'目盛り線・グリッド',frame:'枠線'})[part]+'の設定';
+    title=({figureBackground:'図全体の背景',plotBackground:'枠内の背景',grid:'グリッド線',frame:'枠線'})[part]+'の設定';
     sources=keys.map(key=>$(`#plot-form [data-axis="${key}"]`)?.closest('label'));
   }
-  if(part==='grid')sources.push(...$$('#plot-form [data-axis-auto="minor"]').map(input=>input.closest('label')));
   fields.innerHTML=sources.filter(Boolean).map(source=>source.outerHTML).join('');
   if(part==='seriesAll') {
     const control=key=>$(`#series-list [data-series-index="${index}"] [data-series-field="${key}"]`)?.closest('label')?.outerHTML || '';
@@ -2594,8 +2604,8 @@ function openElementEditor(part,index=0) {
     fields.innerHTML=local+(entry?`<details class="settings-panel"><summary>全凡例の設定</summary>${shared}</details>`:shared)+`<button type="button" class="button quiet" data-reset-legend>${entry?'この凡例を':'凡例を'}標準位置に戻す</button><button type="button" class="button quiet" data-restore-legend-items ${hasHiddenLegendItems()?'':'hidden'}>凡例項目をすべて再表示</button>`;
   }
   if(part==='figureBackground')fields.innerHTML+=`<details class="settings-panel"><summary>グラフの種類・サイズ</summary><label>グラフのプリセット<select data-preview-preset>${choiceOptions(presets.map(item=>[item.id,item.label]),config.plotType)}</select></label><div class="field-grid">${['width','height'].map((key,i)=>`<label>${['軸領域の幅 (cm)','軸領域の高さ (cm)'][i]}<input data-axis="${key}" type="number" min=".5" max="24" step="0.1" value="${config.axes[key]}"></label>`).join('')}</div></details>`+$('#font-settings').outerHTML;
-  if(part==='plotBackground')fields.innerHTML+=`<details class="settings-panel"><summary>グリッド</summary><label><input data-axis="grid" type="checkbox" ${config.axes.grid?'checked':''}>グリッドを表示</label></details>`;
-  if(part==='grid')fields.innerHTML=`<label><input data-axis="grid" type="checkbox" ${config.axes.grid?'checked':''}>グリッドを表示</label>`+['x','y',...(config.series.some(item=>item.yAxis==='right')?['y2']:[])].map(axis=>`<details class="settings-panel"><summary>${axisName(axis)}軸の目盛線</summary>${tickLineControls(axis)}</details>`).join('');
+  if(part==='plotBackground')fields.innerHTML+=`<details class="settings-panel"><summary>グリッド線</summary>${gridControls()}</details>`;
+  if(part==='grid')fields.innerHTML=gridControls();
   if(part==='trend')fields.innerHTML=`<div data-series-index="${index}">${fields.innerHTML}</div>`;
   // Reuse the sidebar controls, restoring live values and color-picker handlers.
   fields.querySelectorAll('.color-control').forEach(wrapper=>{const input=wrapper.querySelector('input');if(input){input.hidden=false;delete input.dataset.paletteEnhanced;wrapper.replaceWith(input);}});
@@ -2607,7 +2617,7 @@ function openElementEditor(part,index=0) {
   fields.querySelectorAll('details').forEach(element=>element.open=element.classList.contains('annotation-card') || part==='trend' && element.classList.contains('series-trend'));
   fields.querySelectorAll('[data-axis],[data-series-field],[data-annotation-field],[data-option],[data-fill]').forEach(input=>{
     const data=input.dataset;
-    const value=data.axis?config.axes[data.axis]:data.seriesField?config.series[Number(input.closest('[data-series-index]').dataset.seriesIndex)][data.seriesField]:
+    const value=data.axis?axisSetting(data.axis):data.seriesField?config.series[Number(input.closest('[data-series-index]').dataset.seriesIndex)][data.seriesField]:
       data.annotationField?config.annotations[Number(input.closest('[data-annotation-index]').dataset.annotationIndex)][data.annotationField]:
       data.fill?config.options.fills[Number(input.closest('[data-fill-index]').dataset.fillIndex)][data.fill]:config.options?.[data.option] ?? input.value;
     if(input.type==='checkbox')input.checked=data.invert==='true'?!value:Boolean(value);else input.value=data.axis?axisControlValue(data.axis,value):data.seriesField?seriesControlValue(data.seriesField,value):value;
@@ -2667,7 +2677,7 @@ function dataInteractions(overlay,imageBox){
   const points=segment=>segment.map(([x,y],i)=>`${i?'L':'M'}${x*1000},${y*1000}`).join('');
   const add=(entry,part)=>{
     const series=entry.index===undefined?null:config.series[entry.index];
-    const title=series?`系列${entry.index+1}「${series.name}」：ダブルクリックで設定`:part==='ticks'?`${axisName(entry.axis)}軸目盛線：ダブルクリックで設定`:`${({frame:'枠線',grid:'目盛り線・グリッド',preset:'グラフ'})[part] || 'グラフ'}：ダブルクリックで設定`;
+    const title=series?`系列${entry.index+1}「${series.name}」：ダブルクリックで設定`:part==='ticks'?`${axisName(entry.axis)}軸目盛線：ダブルクリックで設定`:`${({frame:'枠線',grid:'グリッド線',preset:'グラフ'})[part] || 'グラフ'}：ダブルクリックで設定`;
     const target=(tag,filled=false)=>{
       const node=document.createElementNS(svg.namespaceURI,tag);node.classList.add('data-hit-target');node.setAttribute('tabindex','0');node.setAttribute('role','button');node.setAttribute('aria-label',title);node.setAttribute('vector-effect','non-scaling-stroke');
       node.setAttribute('stroke-width',12);node.setAttribute('stroke-linecap','round');node.setAttribute('fill',filled?'transparent':'none');node.setAttribute('stroke',filled?'none':'transparent');
