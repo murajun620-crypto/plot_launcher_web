@@ -193,6 +193,18 @@ def number(value, label, *, minimum=None, maximum=None, optional=False):
     return result
 
 
+def grid_style(settings, minor=False):
+    prefix = "minorGrid" if minor else "grid"
+    label = "補助グリッド線" if minor else "主グリッド線"
+    style = str(settings.get(prefix+"Style", "-"))
+    color = str(settings.get(prefix+"Color", "#808080"))
+    if style not in {"-", "--", "-.", ":"} or not is_color_like(color):
+        raise ValueError(f"{label}の線種・色を確認してください。")
+    return {"linestyle": style, "color": color,
+            "linewidth": number(settings.get(prefix+"Width", .4 if minor else .5), f"{label}の太さ", minimum=0, maximum=5),
+            "alpha": number(settings.get(prefix+"Alpha", .12 if minor else .2), f"{label}の不透明度", minimum=0, maximum=1)}
+
+
 def column_index(value, column_count, label):
     numeric = number(value, label)
     if not numeric.is_integer() or not 0 <= numeric < column_count:
@@ -1368,6 +1380,8 @@ class PlotEngine:
     @micro_text_rendering()
     def render(self, config):
         preset = config.get("plotType", "General")
+        settings = config.get("axes", {})
+        grid_styles = {"major": grid_style(settings), "minor": grid_style(settings, minor=True)}
         original_series = config.get("series", [])
         if not 1 <= len(original_series) <= MAX_SERIES:
             raise ValueError(f"系列を1〜{MAX_SERIES}個追加してください。")
@@ -1479,6 +1493,12 @@ class PlotEngine:
                             text.set_text(series["name"])
                 if preset == "Raman 3D":
                     axes.grid(bool(config.get("axes", {}).get("grid", False)))
+                    if any(key in settings for key in ("gridStyle", "gridWidth", "gridColor", "gridAlpha")):
+                        style = grid_styles["major"]
+                        # Axes3D.grid() only toggles visibility; its Axis.draw()
+                        # reads the line appearance from each projected plane.
+                        for axis in (axes.xaxis, axes.yaxis, axes.zaxis):
+                            axis._axinfo["grid"].update(color=to_rgba(style["color"], style["alpha"]), linewidth=style["linewidth"], linestyle=style["linestyle"])
                 if preset in {"General", "Roughness", "Polishing Rate", "Waviness"} or namespace.get("web_errorbars"):
                     plot_utils.ensure_axis_limits_include_data(axes)
                 fits, equation_specs = [], []
@@ -1549,9 +1569,9 @@ class PlotEngine:
                             axis.set_minor_formatter(matplotlib.ticker.NullFormatter())
                         if minor and settings.get(f"hide{name.upper()}MinorTicks", settings.get("hideMinorTicks", False)):
                             axis.set_tick_params(which="minor", length=0)
-                        for which, enabled, alpha, width in (("major", settings.get(f"{direction}Grid", settings.get("grid", False)), .2, .5), ("minor", minor, .12, .4)):
+                        for which, enabled in (("major", settings.get(f"{direction}Grid", settings.get("grid", False))), ("minor", minor)):
                             if enabled:
-                                axis.grid(True, which=which, color="#808080", alpha=alpha, linewidth=width)
+                                axis.grid(True, which=which, **grid_styles[which])
                             else:
                                 axis.grid(False, which=which)
                 for name, axis in editable_axes:

@@ -1,5 +1,5 @@
-import { resetPresetUnitScales, unitConversion, configureAFMUnits } from "./units.js?v=1019bee5de2e";
-export const APP_VERSION = "2.4.16";
+import { resetPresetUnitScales, unitConversion, configureAFMUnits } from "./units.js?v=9127ec4c4f31";
+export const APP_VERSION = "2.4.17";
 
 // Accept one numeric value or fraction without evaluating JavaScript expressions.
 export function parseCoefficient(value) {
@@ -100,6 +100,8 @@ export function defaultAxes() {
     legend: true, legendPosition: "best", legendX: "", legendY: "", legendScale: 1, legendFontScale: 1, legendStyle: "symbols", legendMode: "together", legendTextColorMode:'auto',legendTextColor:'#000000',
     transparent: true, backgroundColor: "#ffffff", backgroundAlpha: 1, grid: false,
     xGrid: false, yGrid: false, xMinorGrid: false, yMinorGrid: false,
+    gridStyle: "-", gridWidth: .5, gridColor: "#808080", gridAlpha: .2,
+    minorGridStyle: "-", minorGridWidth: .4, minorGridColor: "#808080", minorGridAlpha: .12,
     plotBackgroundEnabled: false, plotBackgroundColor: "#ffffff", plotBackgroundAlpha: 1,
     markerEdgeWidth: 0.6, errorLineWidth: 0.8, errorCapSize: 3, errorCapThick: 0.8,
   };
@@ -235,6 +237,13 @@ export function restoreSettings(document, metadata) {
   if(!['symbols','text'].includes(axes.legendStyle) || !['together','individual'].includes(axes.legendMode))throw new Error('凡例の表示方法を確認してください。');
   const validLegendColor=(mode,color,individual=false)=>[...(individual?['inherit']:[]),'auto','black','series','custom'].includes(mode) && typeof color==='string' && /^#[\da-f]{6}$/i.test(color);
   if(!validLegendColor(axes.legendTextColorMode,axes.legendTextColor))throw new Error('凡例の文字色を確認してください。');
+  for(const prefix of ['grid','minorGrid']){
+    if(!['-','--','-.',':'].includes(axes[prefix+'Style']) || !/^#[\da-f]{6}$/i.test(axes[prefix+'Color']))throw new Error('グリッド線の線種・色を確認してください。');
+    for(const [suffix,max] of [['Width',5],['Alpha',1]]){
+      const value=axes[prefix+suffix];
+      if(String(value).trim()==='' || !Number.isFinite(Number(value)) || Number(value)<0 || Number(value)>max)throw new Error('グリッド線の太さ・不透明度を確認してください。');
+    }
+  }
   // Earlier automatic ranges saved the then-default false flag. Upgrade only
   // automatic endpoints; numeric limits remain authoritative in the renderer.
   if(document.rangeDefaultsVersion===undefined)for(const axis of ['x','y','y2']){

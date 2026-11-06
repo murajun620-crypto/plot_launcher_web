@@ -1,13 +1,13 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=1019bee5de2e";
-import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=1019bee5de2e";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=1019bee5de2e";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=1019bee5de2e";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=1019bee5de2e";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=1019bee5de2e";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=9127ec4c4f31";
+import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=9127ec4c4f31";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9127ec4c4f31";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=9127ec4c4f31";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=9127ec4c4f31";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=9127ec4c4f31";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
-const APP_BUILD = "1019bee5de2e";
+const APP_BUILD = "9127ec4c4f31";
 
 function positionDialog(dialog, left, top) {
   const box=dialog.getBoundingClientRect(), gap=8;
@@ -73,7 +73,7 @@ const MICRO_HINT = 'μは \\micro と入力できます（例：\\microm、\\mic
 const LABEL_PADDING_BASE = defaultAxes().xLabelPad;
 const LABEL_PADDING_HINT = `0は標準の余白（${LABEL_PADDING_BASE} pt）。正の値で広く、負の値で狭くします。`;
 const isLabelPadding = key => /^(x|y|y2)LabelPad$/.test(key);
-const axisSetting = key => config.axes[key] ?? (['xGrid','yGrid'].includes(key) ? Boolean(config.axes.grid) : undefined);
+const axisSetting = key => config.axes[key] ?? (['xGrid','yGrid'].includes(key) ? Boolean(config.axes.grid) : /^(?:grid|minorGrid)(?:Style|Width|Color|Alpha)$/.test(key) ? defaultAxes()[key] : undefined);
 // Keep saved settings compatible; controls show padding offsets and line widths in pt.
 const fontPointBase = key => ({fontScale:8,tickFontScale:7,labelFontScale:8,legendFontScale:7})[key] * (key === 'fontScale' ? 1 : Number(config.axes.fontScale));
 const axisControlValue = (key, value) => isLabelPadding(key) ? Number((Number(value) - LABEL_PADDING_BASE).toPrecision(12)) : key === 'spineScale' ? Number((Number(value) * .8).toPrecision(12)) : /^(fontScale|tickFontScale|labelFontScale|legendFontScale)$/.test(key) ? Number((Number(value)*fontPointBase(key)).toPrecision(12)) : value;
@@ -248,12 +248,18 @@ function desktopAppearance() {
 }
 
 function gridControls() {
-  if(config.plotType==='Raman 3D')return `<label><input data-axis="grid" type="checkbox" ${config.axes.grid?'checked':''}>3Dグリッド線を表示</label>`;
+  const appearance=(prefix,name)=>`<fieldset class="axis-control-group"><legend>${name}</legend><div class="field-grid">
+    <label>線種<select data-axis="${prefix}Style" aria-label="${name}の線種">${choiceOptions([['-','実線'],['--','破線'],['-.','一点鎖線'],[':','点線']],axisSetting(prefix+'Style'))}</select></label>
+    <label>太さ (pt)<input data-axis="${prefix}Width" aria-label="${name}の太さ (pt)" type="number" min="0" max="5" step="0.1" value="${axisSetting(prefix+'Width')}"></label>
+    <label>色<input data-axis="${prefix}Color" aria-label="${name}の色" type="color" value="${escapeHTML(axisSetting(prefix+'Color'))}"></label>
+    ${opacityControl(`data-axis="${prefix}Alpha"`,'不透明度',axisSetting(prefix+'Alpha'))}</div></fieldset>`;
+  const styles=`<details class="settings-panel" title="${config.plotType==='Raman 3D'?'すべての面に共通の設定です。':'主線・補助線それぞれ、縦・横に共通の設定です。'}"><summary>線の見た目</summary>${appearance('grid',config.plotType==='Raman 3D'?'3Dグリッド線':'主グリッド線')}${config.plotType==='Raman 3D'?'':appearance('minorGrid','補助グリッド線')}</details>`;
+  if(config.plotType==='Raman 3D')return `<label><input data-axis="grid" type="checkbox" ${config.axes.grid?'checked':''}>3Dグリッド線を表示</label>`+styles;
   const cell=(key,name)=>`<td><label><input data-axis="${key}" type="checkbox" ${axisSetting(key)?'checked':''}><span>${name}を表示</span></label></td>`;
   return `<table class="axis-visibility-table" aria-label="グリッド線の表示" title="縦はX軸、横はY軸の目盛位置。左右のY軸がある場合は左軸に合わせます。"><thead><tr><th scope="col">位置</th><th scope="col">縦</th><th scope="col">横</th></tr></thead><tbody>
     <tr><th scope="row">主目盛</th>${cell('xGrid','縦の主グリッド線')}${cell('yGrid','横の主グリッド線')}</tr>
     <tr><th scope="row">副目盛</th>${cell('xMinorGrid','縦の補助グリッド線')}${cell('yMinorGrid','横の補助グリッド線')}</tr>
-    </tbody></table>`;
+    </tbody></table>`+styles;
 }
 
 function tickLineControls(axis) {
@@ -372,7 +378,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=1019bee5de2e", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=9127ec4c4f31", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {

@@ -1,4 +1,4 @@
-import { restoreSettings, safeStem } from "./state.js?v=1019bee5de2e";
+import { restoreSettings, safeStem } from "./state.js?v=9127ec4c4f31";
 
 // An unedited sheet inherits appearance and column choices from the preview.
 // Prefer matching headers; use the same column position when headers differ.
