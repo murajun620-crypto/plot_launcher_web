@@ -2,7 +2,7 @@
 
 *{box-sizing:border-box}
 body{min-width:1000px;margin:0;background:var(--canvas);color:var(--ink)}
-button,input,select{font:inherit}
+button,input,select,textarea{font:inherit}
 button{cursor:pointer}
 button:disabled{cursor:default;opacity:.45}
 a{color:inherit;text-decoration:none}
@@ -90,6 +90,8 @@ input[type=range]:disabled{cursor:default;opacity:.45}
 select{padding-right:23px}
 input::placeholder{color:#a6afbd;font-size:11px}
 input:focus,select:focus{outline:2px solid #abc8f3;outline-offset:1px;border-color:#5387cd}
+textarea[data-annotation-field="text"]{width:100%;min-height:68px;resize:vertical;border:1px solid #d9e0e9;border-radius:5px;padding:7px 9px;background:#fff;color:var(--ink);font-size:12px;line-height:1.5}
+textarea[data-annotation-field="text"]:focus{outline:2px solid #abc8f3;outline-offset:1px;border-color:#5387cd}
 input:user-invalid{border-color:var(--danger)}
 input[type=number]{font-variant-numeric:tabular-nums}
 input[type=checkbox]{accent-color:var(--blue);margin:0;width:13px;height:13px;flex-shrink:0}
@@ -167,7 +169,8 @@ input[type=color]::-webkit-color-swatch{border:0;border-radius:5px}
 .export-buttons{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .export-button{font-size:11px;min-width:62px;padding:9px 13px}
 .figure-options{display:flex;align-items:center;gap:12px;min-height:37px;margin-bottom:12px;font-size:10px;color:#8d99aa;flex-wrap:wrap}
-.preview-state{color:#8493a7}
+.preview-state{color:#8493a7;display:inline-flex;align-items:center;min-width:5em;min-height:1em}
+.preview-state.updating::before{content:"";width:5px;height:5px;border-radius:50%;background:#8493a7}
 .preview-state.ready{color:var(--green)}
 .preview-state.error{color:var(--danger)}
 .toolbar-divider{display:inline-block;height:11px;border-left:1px solid #d4dce7}
@@ -228,6 +231,7 @@ th:first-child,td:first-child{width:30px;color:#a3aebd}
 .annotation-card summary,#desktop-appearance summary{cursor:pointer;font-size:11px;margin:10px 0}
 .preview-tools{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:8px;font-size:10px;color:#64738a}
 .preview-tools output{min-width:42px;text-align:center}
+.preview-tools .panel-label-toggle{margin-left:auto;gap:6px;white-space:nowrap;font-size:11px}
 .paper{height:430px;min-height:300px;flex:none;padding:0;cursor:grab}
 #figure-content{position:relative;flex-shrink:0;transform-origin:center;}
 #figure-content img{width:100%;height:100%;max-height:none;object-fit:fill;user-select:none;-webkit-user-drag:none}

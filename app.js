@@ -1,9 +1,9 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=1c174594a8b4";
-import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=1c174594a8b4";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=1c174594a8b4";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=1c174594a8b4";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=1c174594a8b4";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=1c174594a8b4";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=db6921af8de9";
+import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=db6921af8de9";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=db6921af8de9";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=db6921af8de9";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=db6921af8de9";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=db6921af8de9";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -258,6 +258,11 @@ function status(text, kind = "working") {
 function updateButtons() {
   compactHelp();
   const busy = loading || exporting;
+  const panel=panelLabel();
+  for(const id of ['#panel-label','#preview-panel-label']){
+    $(id).checked=!!panel && panel.visible!==false;
+    $(id).disabled=!engineReady || !metadata || busy;
+  }
   $("#new-project").disabled = busy;
   $("#open-project").disabled = !engineReady || busy;
   $("#save-project").disabled = !engineReady || busy || !sourceData || !metadata || !config.series.length;
@@ -351,7 +356,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=1c174594a8b4", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=db6921af8de9", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -952,14 +957,18 @@ function drawAnnotations() {
     const text = (key, label) => `<label>${label}<input data-annotation-field="${key}" value="${escapeHTML(item[key] ?? '')}"></label>`;
     const num = (key, label) => `<label>${label}<input type="number" step="${/^[xy][12]?$/.test(key) ? (item.coordinate_system === 'data' ? 'any' : '.01') : key === 'rotation' ? '1' : '.1'}" data-annotation-field="${key}" value="${escapeHTML(item[key] ?? '')}"></label>`;
     return `<details class="annotation-card ${selected.has(item.id)?'selected':''}" data-annotation-index="${index}" ${selected.has(item.id)?'open':''}><summary><button type="button" class="button quiet" data-select-annotation="${escapeHTML(item.id)}" aria-pressed="${selected.has(item.id)}">${{text:"文字",arrow:"矢印",segment:"線"}[item.type]} ${index+1} ${escapeHTML(item.text || '')}</button></summary>
-      ${item.type === "text" ? text("text", "文字") : ''}
+      ${item.type === "text" ? `<label>文字<textarea data-annotation-field="text" rows="3" spellcheck="false">${escapeHTML(item.text ?? '')}</textarea></label>` : ''}
       <div class="field-grid">${item.type === "text" ? num("x", "X") + num("y", "Y") + num("font_size", "フォントサイズ (pt)") + num("rotation", "回転 (度)") : num("x1", "始点X") + num("y1", "始点Y") + num("x2", "終点X") + num("y2", "終点Y") + num("line_width", "線幅 (pt)") + text("line_style", "線種 (- / -- / -. / :)")}
       ${item.type === "arrow" ? `<label>矢印<select data-annotation-field="arrow_style">${choiceOptions([["->","片矢印"],["<->","両矢印"],["-|>","塗り矢印"]],item.arrow_style)}</select></label>` + num("arrow_size", "矢印サイズ (pt)") : ''}
       <label>色<input type="color" data-annotation-field="color" value="${escapeHTML(item.color)}"></label>${opacityControl('data-annotation-field="opacity"','不透明度',item.opacity ?? 1)}<label title="グラフ枠基準では左下が0、右上が1です。位置はプレビュー上でドラッグできます。">座標<select data-annotation-field="coordinate_system">${choiceOptions([["axes_fraction","グラフ枠を基準（0〜1）"],["data","データ座標"]],item.coordinate_system)}</select></label></div>
       ${item.type === "text" ? `<label>フォント<select data-annotation-field="font_family">${choiceOptions([...loadedFonts].map(name=>[name,escapeHTML(name)]),item.font_family)}</select></label><div class="field-grid"><label>横揃え<select data-annotation-field="horizontal_alignment">${choiceOptions([["left","左"],["center","中央"],["right","右"]],item.horizontal_alignment)}</select></label><label>縦揃え<select data-annotation-field="vertical_alignment">${choiceOptions([["baseline","基準線"],["center","中央"],["top","上"],["bottom","下"]],item.vertical_alignment)}</select></label></div><div class="check-options"><label><input type="checkbox" data-annotation-field="bold" ${item.bold?'checked':''}>太字</label><label><input type="checkbox" data-annotation-field="italic" ${item.italic?'checked':''}>斜体</label></div>` : ''}
       <div class="check-options"><label><input type="checkbox" data-annotation-field="visible" ${item.visible?'checked':''}>表示</label><label><input type="checkbox" data-annotation-field="locked" ${item.locked?'checked':''}>位置を固定</label></div><button type="button" class="button quiet" data-remove-annotation="${index}">削除</button></details>`;
   }).join('');
-  $$('[data-annotation-field="text"]').forEach(input=>input.title=MICRO_HINT);
+  $$('[data-annotation-field="text"]').forEach(input=>{
+    input.title=`Enterで改行できます。${MICRO_HINT}`;
+    // HTML strips one leading newline in a textarea; restore the exact text.
+    input.value=config.annotations[Number(input.closest('[data-annotation-index]').dataset.annotationIndex)]?.text ?? '';
+  });
   syncOpacityControls();
   enhanceColorInputs();
 }
@@ -1368,12 +1377,19 @@ function changed(delay = 400) {
   lastState=structuredClone(config); $("#undo").disabled=!history.length;$("#redo").disabled=!future.length;
   ++revision;
   $("#figure-stage").classList.add("pending");
-  $("#preview-state").className = "preview-state";
-  $("#preview-state").textContent = "設定を反映中";
+  previewUpdating();
   $("#figure-size").textContent = `軸領域 ${config.axes.width || "—"} × ${config.axes.height || "—"} cm`;
   updateButtons();
   clearTimeout(renderTimer);
   renderTimer = setTimeout(() => { renderWanted = true; renderPreview(); }, delay);
+}
+
+function previewUpdating() {
+  const existing=!!figureResult && !$('#figure-image').hidden,indicator=$('#preview-state');
+  indicator.className=existing?'preview-state updating':'preview-state';
+  indicator.textContent=existing?'':'設定を反映中';
+  indicator.title='プレビューを更新中';
+  indicator.setAttribute('aria-label','プレビューを更新中');
 }
 
 function legendModeControls() {
@@ -1416,7 +1432,11 @@ async function renderPreview() {
   renderWanted = false;
   renderRunning = true;
   const snapshot = structuredClone(config), targetRevision = revision;
-  status("グラフを描画しています…");
+  const existing=!!figureResult && !$('#figure-image').hidden;
+  previewUpdating();
+  // Routine edits stay quiet. Announce only the first graph or a slow update.
+  if(!existing)status("グラフを描画しています…");
+  const progressTimer=existing?setTimeout(()=>{if(renderRunning && targetRevision===revision && !loading && !exporting)status('プレビューを更新しています…');},2000):null;
   updateButtons();
   try {
     const result = await request("render", { config: snapshot });
@@ -1431,6 +1451,7 @@ async function renderPreview() {
     if(result.statistics){$('#preset-note').hidden=false;$('#preset-note').textContent=`粒径の統計：D50 = ${result.statistics.median.toFixed(3)}、平均 = ${result.statistics.mean.toFixed(3)}。ビン幅20 nm、頻度%。`;}
     $("#preview-state").className = "preview-state ready";
     $("#preview-state").textContent = "更新済み";
+    $('#preview-state').title='';$('#preview-state').removeAttribute('aria-label');
     $("#figure-size").textContent = `軸領域 ${snapshot.axes.width} × ${snapshot.axes.height} cm`;
     const checks=[...result.warnings,...result.series.filter(item=>item.processing && Object.keys(item.processing).length).map(item=>`${item.name}: ${Object.entries(item.processing).map(([key,value])=>`${({slope:'補正した傾き',fittedSlope:'自動計算の傾き',reference:'基準値Y₀（表示単位変換前）',areaCm2:'試料面積（cm²）',factor:'Y係数'})[key] || key} = ${Number(value.toPrecision(8))}`).join('、')}`)];
     $("#warning-list").replaceChildren(...checks.map(text => { const item = document.createElement("li"); item.textContent = text; return item; }));
@@ -1445,9 +1466,11 @@ async function renderPreview() {
     positionInteractions();
     $("#preview-state").className = "preview-state error";
     $("#preview-state").textContent = "設定を確認";
+    $('#preview-state').title='';$('#preview-state').removeAttribute('aria-label');
     $("#figure-stage").classList.remove("pending");
     status(error.message, "error");
   } finally {
+    clearTimeout(progressTimer);
     renderRunning = false;
     updateButtons();
     if(!renderWanted && $('#series-colormap').open)scheduleColormapPreview();
@@ -1850,6 +1873,12 @@ function applyControlInput(event) {
   } else if (input.dataset.annotationField) {
     const item = config.annotations[Number(input.closest("[data-annotation-index]").dataset.annotationIndex)];
     item[input.dataset.annotationField] = input.type === "checkbox" ? input.checked : ['number','range'].includes(input.type) ? Number(input.value) : input.value;
+    const index=input.closest('[data-annotation-index]').dataset.annotationIndex,key=input.dataset.annotationField;
+    $$(`[data-annotation-index="${index}"] [data-annotation-field="${key}"]`).forEach(field=>{
+      if(field===input)return;
+      if(field.type==='checkbox')field.checked=Boolean(item[key]);else field.value=item[key];
+      if(field.tagName==='TEXTAREA')field.textContent=item[key];
+    });
   } else if (input.dataset.option) {
     config.options ||= {}; config.options[input.dataset.option] = input.type === "checkbox" ? input.checked : ['number','range'].includes(input.type) ? Number(input.value) : input.value;
     $$(`[data-option="${input.dataset.option}"]`).forEach(field=>{if(field!==input){field.value=input.value;field.checked=input.checked;}});
@@ -2733,11 +2762,17 @@ function pasteAnnotations(){
 }
 $("#delete-annotation").addEventListener('click',deleteAnnotations);
 $("#copy-annotation").addEventListener('click',()=>{copyAnnotations();pasteAnnotations();});
-$("#panel-label").addEventListener('click',()=>{
-  config.annotations ||= [];let label=config.annotations.find(item=>['__panel_label__','panel-label'].includes(item.id));
+function panelLabel(){return config.annotations?.find(item=>['__panel_label__','panel-label'].includes(item.id));}
+function setPanelLabelVisible(visible){
+  if(!engineReady || !metadata || loading || exporting)return;
+  config.annotations ||= [];let label=panelLabel();
+  if(!label && !visible)return;
   if(!label){label={id:'__panel_label__',type:'text',axes_id:'primary',coordinate_system:'axes_fraction',x:0,y:1.02,text:'(a)',font_size:8,font_family:config.axes.fontFamily,rotation:0,color:'#000000',opacity:1,bold:false,italic:false,horizontal_alignment:'left',vertical_alignment:'bottom',visible:true,locked:false,zorder:30};config.annotations.push(label);}
-  selected=new Set([label.id]);drawAnnotations();changed();
-});
+  if(visible)selected=new Set([label.id]);else selected.delete(label.id);
+  label.visible=visible;
+  drawAnnotations();changed(0);
+}
+for(const id of ['#panel-label','#preview-panel-label'])$(id).addEventListener('change',event=>setPanelLabelVisible(event.target.checked));
 $$('[data-align]').forEach(button=>button.addEventListener('click',async()=>{
   if(selected.size<2 || loading || exporting)return;
   loading=true;updateButtons();
