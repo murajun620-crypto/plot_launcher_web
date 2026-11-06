@@ -1,12 +1,13 @@
-import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=db6921af8de9";
-import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=db6921af8de9";
-import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=db6921af8de9";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=db6921af8de9";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=db6921af8de9";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=db6921af8de9";
+import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=333983dd29e0";
+import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=333983dd29e0";
+import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=333983dd29e0";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=333983dd29e0";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=333983dd29e0";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=333983dd29e0";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
+const APP_BUILD = "333983dd29e0";
 
 function positionDialog(dialog, left, top) {
   const box=dialog.getBoundingClientRect(), gap=8;
@@ -105,6 +106,7 @@ const folderSupported = typeof window.showDirectoryPicker === 'function';
 const importedFonts = new Map();
 let savedProjectState = null;
 let projectHandle=null, projectFilename='';
+let updateChecking=false, updateReloading=false, availableUpdate=null, updateRecovery=null;
 let pendingDataFiles = null;
 let sampleCatalog = null, sampleCatalogPromise = null, sampleGroup = 'all', pendingSampleId = null;
 let sheetSettings = new Map(), cancelBatch = false;
@@ -170,6 +172,7 @@ function hasUnsavedChanges() {
 }
 
 window.addEventListener('beforeunload', event => {
+  if(updateReloading)return;
   if (!hasUnsavedChanges()) return;
   event.preventDefault();
   event.returnValue = '';
@@ -258,6 +261,9 @@ function status(text, kind = "working") {
 function updateButtons() {
   compactHelp();
   const busy = loading || exporting;
+  $('#check-update').disabled=busy || updateChecking;
+  $('#apply-update').disabled=busy || !availableUpdate;
+  $('#retry-update-restore').disabled=busy;
   const panel=panelLabel();
   for(const id of ['#panel-label','#preview-panel-label']){
     $(id).checked=!!panel && panel.visible!==false;
@@ -356,7 +362,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=db6921af8de9", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=333983dd29e0", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -368,7 +374,7 @@ function startWorker() {
       $("#initial-message p").textContent = "Excel / CSV / TXTを読み込むか、「サンプルを使う」を押してください。";
       $("#preview-state").textContent = "データ未選択";
       status("Excel / CSV / TXTファイルを選んでください。", "ready");
-      await openGalleryProject();
+      if(!await restoreUpdateSession())await openGalleryProject();
       // Permission waiting must never delay opening data or a gallery project.
       void browseLocalFonts({automatic:true});
     } else if (data.type === "fatal") {
@@ -1949,6 +1955,149 @@ $('#new-project').addEventListener('click', () => {
   // A fresh page clears data, settings, undo history and the worker together.
   // The existing beforeunload handler protects unsaved work on cancellation.
   window.location.assign(new URL('./', window.location.href).href);
+});
+
+function updateSessionStore(operation,key,value) {
+  return new Promise((resolve,reject)=>{
+    if(!window.indexedDB){reject(new Error('このブラウザでは作業の一時保存を利用できません。'));return;}
+    const opening=window.indexedDB.open('plotlauncher-updates',1);
+    opening.onupgradeneeded=()=>opening.result.createObjectStore('sessions');
+    opening.onerror=()=>reject(opening.error || new Error('一時保存を開けませんでした。'));
+    opening.onblocked=()=>reject(new Error('一時保存がほかのタブで使用されています。'));
+    opening.onsuccess=()=>{
+      const db=opening.result;
+      try{
+        const tx=db.transaction('sessions',operation==='get'?'readonly':'readwrite'),store=tx.objectStore('sessions');
+        const result=operation==='put'?store.put(value,key):operation==='delete'?store.delete(key):store.get(key);
+        tx.oncomplete=()=>{db.close();resolve(result.result);};
+        tx.onabort=tx.onerror=()=>{db.close();reject(tx.error || result.error || new Error('作業内容を一時保存できませんでした。'));};
+      }catch(error){db.close();reject(error);}
+    };
+  });
+}
+function captureUpdateSession(target) {
+  return {format:'plotlauncher-update',version:1,target,fromVersion:APP_VERSION,fromBuild:APP_BUILD,createdAt:Date.now(),url:window.location.href,
+    config,sourceData,metadata,fonts:[...importedFonts.values()],fontFamilies:[...loadedFonts],fontAliases:[...localFontAliases],
+    savedProjectState,loadedHeader,sample,sheetSettings:[...sheetSettings],sheetMode,sharedSettings,
+    history,future,lastState,selected:[...selected],clipboard,
+    handles:{projectHandle,projectFilename,sourceHandle,sourceDirectory,saveDirectory,dataFileHandles},
+    workspace:{saveName:$('#save-name').value,pngDpi:$('#png-dpi').value,saveDestination:$('#save-destination').value,
+      view,tableHidden:$('#series-table-content').hidden,tableDetails:$('#series-table-details').checked,
+      details:$$('#controls-panel details').map(node=>({id:node.id,open:node.open})),
+      controlScroll:$('#controls-panel').scrollTop || 0,pageScroll:window.scrollY || 0}
+  };
+}
+function updateMessage(message,error=false) {
+  $('#update-message').textContent=message;
+  $('#update-message').dataset.kind=error?'error':'ready';
+}
+async function checkAppUpdate() {
+  if(updateChecking || loading || exporting)return;
+  updateChecking=true;availableUpdate=null;
+  $('#apply-update').hidden=true;$('#retry-update-restore').hidden=!updateRecovery;
+  $('#download-update-backup').hidden=!updateRecovery?.record.sourceData || !updateRecovery.record.config.series.length;
+  updateMessage('更新を確認しています…');showDialog('#update-dialog');updateButtons();
+  try{
+    const url=new URL('./version.json',window.location.href);url.searchParams.set('check',String(Date.now()));
+    const response=await fetch(url,{cache:'no-store'});
+    if(!response.ok)throw new Error('配信情報を取得できませんでした。');
+    const latest=await response.json();
+    if(!/^\d{1,5}\.\d{1,5}\.\d{1,5}$/.test(latest.version) || !/^[a-f\d]{12}$/.test(latest.build))throw new Error('配信情報を確認できませんでした。');
+    const a=latest.version.split('.').map(Number),b=APP_VERSION.split('.').map(Number),difference=a.findIndex((value,i)=>value!==b[i]);
+    if(difference>=0 && a[difference]<b[difference])updateMessage(`現在は v${APP_VERSION} です。配信情報が古いため、少し後に再確認してください。`);
+    else if(latest.version===APP_VERSION && latest.build===APP_BUILD)updateMessage(`最新の v${APP_VERSION} を使用しています。`);
+    else{
+      availableUpdate=latest;$('#apply-update').hidden=false;
+      updateMessage(`v${latest.version} に更新できます。開いているプロジェクトと未保存の変更を維持して更新します。`);
+    }
+  }catch(error){updateMessage(`更新を確認できませんでした。接続を確認して再確認してください。${error.message}`,true);}
+  finally{updateChecking=false;updateButtons();}
+}
+async function applyAppUpdate() {
+  if(!availableUpdate || loading || exporting)return;
+  exporting=true;updateButtons();updateMessage('作業内容を一時保存しています…');
+  const token=crypto.randomUUID();
+  try{
+    // IndexedDB clones one object graph, preserving the saved-state references
+    // and file handles as well as binary data. No files leave this browser.
+    const snapshot=updateRecovery && !sourceData?{...updateRecovery.record,target:{...availableUpdate},fromVersion:APP_VERSION,fromBuild:APP_BUILD}:captureUpdateSession({...availableUpdate});
+    await updateSessionStore('put',token,snapshot);
+    const url=new URL(window.location.href);url.searchParams.set('_update',token);
+    updateReloading=true;
+    window.location.replace(url.href);
+    // Restore normal close protection if navigation was blocked by the browser.
+    setTimeout(()=>{updateReloading=false;exporting=false;updateButtons();},5000);
+  }catch(error){
+    updateReloading=false;exporting=false;updateButtons();
+    updateMessage(`更新を中止しました。現在の作業はそのままです。${error.message}`,true);
+  }
+}
+async function restoreUpdateSession() {
+  const token=new URL(window.location.href).searchParams.get('_update');
+  if(!token || !/^[a-f\d-]{36}$/.test(token))return false;
+  loading=true;updateButtons();status('更新前の作業を復元しています…');
+  try{
+    const record=await updateSessionStore('get',token);
+    if(!record || record.format!=='plotlauncher-update' || record.version!==1 || !record.config?.axes || !Array.isArray(record.config.series))throw new Error('一時保存した作業が見つかりません。');
+    updateRecovery={token,record};
+    let restoredMetadata=null;
+    if(record.sourceData){
+      const data=record.sourceData;
+      restoredMetadata=data.files?await request('load-many',{filename:data.filename,files:data.files.map(file=>({...file,bytes:file.bytes.slice(0)}))}):
+        await request('load',{filename:data.filename,bytes:data.bytes.slice(0),sheetIndex:record.metadata.sheetIndex,headerRow:record.loadedHeader});
+      if(restoredMetadata.filename!==record.metadata.filename || restoredMetadata.sheetIndex!==record.metadata.sheetIndex)throw new Error('データのシートを復元できませんでした。');
+    }
+    for(const font of record.fonts)await request('font',{filename:font.name,bytes:font.bytes.slice(0)});
+    config=record.config;sourceData=record.sourceData;metadata=restoredMetadata;
+    importedFonts.clear();record.fonts.forEach(font=>importedFonts.set(font.name,font));
+    loadedFonts.clear();[...record.fontFamilies,...record.fonts.map(font=>font.family)].forEach(family=>loadedFonts.add(family));
+    localFontAliases.clear();record.fontAliases.forEach(([family,alias])=>localFontAliases.set(family,alias));
+    savedProjectState=record.savedProjectState;loadedHeader=record.loadedHeader;sample=record.sample;
+    sheetSettings=new Map(record.sheetSettings);sheetMode=record.sheetMode;sharedSettings=record.sharedSettings;
+    history=record.history;future=record.future;lastState=record.lastState;selected=new Set(record.selected);clipboard=record.clipboard;
+    ({projectHandle,projectFilename,sourceHandle,sourceDirectory,saveDirectory,dataFileHandles}=record.handles);
+    const workspace=record.workspace;view=workspace.view;
+    $('#save-name').value=workspace.saveName;$('#png-dpi').value=workspace.pngDpi;$('#save-destination').value=workspace.saveDestination;
+    clearTimeout(renderTimer);++revision;
+    if(metadata)resetPreview();
+    else{$('#preview-state').textContent='データ未選択';$('#initial-message strong').textContent='データを選んでください';}
+    if(metadata)drawMetadata();drawControls();refreshSaveDestination();
+    const details=$$('#controls-panel details');
+    workspace.details.forEach((saved,index)=>{const node=saved.id?details.find(node=>node.id===saved.id):details[index];if(node)node.open=saved.open;});
+    if($('#series-table-content').hidden!==workspace.tableHidden)toggleSeriesTable();
+    $('#series-table-details').checked=workspace.tableDetails;$('#series-table').dataset.details=String(workspace.tableDetails);
+    $('#undo').disabled=!history.length;$('#redo').disabled=!future.length;
+    $('#controls-panel').scrollTop=workspace.controlScroll;window.scrollTo?.(0,workspace.pageScroll);
+    const original=new URL(record.url);original.searchParams.delete('_update');
+    if(original.origin===new URL(window.location.href).origin && original.pathname===new URL(window.location.href).pathname)window.history?.replaceState(null,'',original.href);
+    try{await updateSessionStore('delete',token);}catch{} // The restored work remains usable if cleanup alone fails.
+    updateRecovery=null;$('#update-dialog').close();
+    if(APP_BUILD===record.fromBuild && APP_VERSION===record.fromVersion){
+      updateMessage('作業は復元しましたが、更新ファイルをまだ取得できませんでした。少し後に再確認してください。');showDialog('#update-dialog');
+    }
+    status('作業内容を復元しました。','ready');
+    renderWanted=!!metadata && !!config.series.length;
+  }catch(error){
+    availableUpdate=null;$('#apply-update').hidden=true;$('#retry-update-restore').hidden=false;
+    $('#download-update-backup').hidden=!updateRecovery?.record.sourceData || !updateRecovery.record.config.series.length;
+    updateMessage(`作業の復元を完了できませんでした。一時保存した内容は保持しています。${error.message}`,true);
+    showDialog('#update-dialog');
+  }finally{loading=false;updateButtons();if(renderWanted)renderPreview();}
+  return true;
+}
+$('#check-update').addEventListener('click',checkAppUpdate);
+$('#recheck-update').addEventListener('click',checkAppUpdate);
+$('#apply-update').addEventListener('click',applyAppUpdate);
+$('#close-update').addEventListener('click',()=>$('#update-dialog').close());
+$('#retry-update-restore').addEventListener('click',restoreUpdateSession);
+$('#download-update-backup').addEventListener('click',()=>{
+  if(!updateRecovery)return;
+  try{
+    const record=updateRecovery.record,w=record.workspace,settings=makeSettings(record.config,record.metadata,record.loadedHeader);
+    const project=makeProject(settings,{...record.sourceData,sheetIndex:record.metadata.sheetIndex,headerRow:record.loadedHeader,sample:record.sample},record.fonts,
+      {saveName:w.saveName,pngDpi:Number(w.pngDpi),view:w.view,sections:[],sheetSettings:record.sheetSettings.map(([sheetIndex,settings])=>({sheetIndex,settings})),sheetMode:record.sheetMode,sharedSettings:record.sharedSettings});
+    download(new Blob([JSON.stringify(project)],{type:'application/json'}),record.handles.projectFilename || `${safeStem(w.saveName)}.plotproject`);
+  }catch(error){updateMessage(`プロジェクトを取り出せませんでした。${error.message}`,true);}
 });
 async function readProject(file, saved) {
   if(!engineReady || loading || exporting)return;

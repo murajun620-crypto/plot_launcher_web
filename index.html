@@ -6,8 +6,8 @@
   <meta name="description" content="Excel・CSV・TXTの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=db6921af8de9">
-  <script type="module" src="./app.js?v=db6921af8de9"></script>
+  <link rel="stylesheet" href="./style.css?v=333983dd29e0">
+  <script type="module" src="./app.js?v=333983dd29e0"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -22,11 +22,14 @@
   </svg>
 
   <header class="app-header">
+    <div class="app-identity">
     <a class="brand" href="./" aria-label="PlotLauncher Web ホーム">
       <span class="brand-mark"><svg><use href="#i-chart"/></svg></span>
       <span>PlotLauncher <span class="brand-web">Web</span></span>
       <span id="app-version" class="brand-version" aria-label="バージョン"></span>
     </a>
+    <button id="check-update" type="button" class="button quiet" title="新しいバージョンを確認します。開いているデータ・設定を維持して更新できます。">更新確認</button>
+    </div>
     <div class="header-actions" role="group" aria-label="プロジェクトと設定">
       <span class="privacy-note" title="データはブラウザ内で処理します。外部には送信しません。" aria-label="データはブラウザ内で処理"><span class="privacy-dot"></span>データはブラウザ内で処理</span>
       <button id="new-project" class="button" title="現在の内容を閉じて、新しいプロジェクトを開始します。未保存の場合は確認します。"><svg><use href="#i-plus"/></svg><span>新規プロジェクト</span></button>
@@ -290,6 +293,11 @@
       <button id="choose-font-files" type="button" class="button primary" title="TTF／OTF／TTCを選択します。通常・太字・斜体をまとめて読み込めます。対応ブラウザは前回のフォント選択先を記憶します。">フォントファイルを選ぶ</button>
     </fieldset></details>
     <p id="font-load-message" class="preset-message" role="status" aria-live="polite"></p>
+  </dialog>
+  <dialog id="update-dialog" class="plot-dialog" aria-labelledby="update-title">
+    <div class="dialog-heading"><strong id="update-title">アプリの更新</strong><button id="close-update" type="button" class="button quiet">閉じる</button></div>
+    <p id="update-message" class="preset-message" role="status" aria-live="polite"></p>
+    <div class="update-actions"><button id="apply-update" type="button" class="button primary" hidden>更新して再開</button><button id="recheck-update" type="button" class="button">再確認</button><button id="retry-update-restore" type="button" class="button" hidden>復元を再試行</button><button id="download-update-backup" type="button" class="button" hidden>プロジェクトを取り出す</button></div>
   </dialog>
   <noscript>このアプリを使用するにはJavaScriptを有効にしてください。</noscript>
 </body>
