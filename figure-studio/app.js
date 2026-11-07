@@ -1,5 +1,6 @@
 import {PT_PER_MM,mm,toMM,uid,clone,newDocument,makeObject,bounds,objectBounds,expandSelection,align,distribute,reorder,autoLayout,History,validateDocument} from './model.mjs';
-import {imageAsset,blobToDataURL,dataURLToBlob,download,sanitizeSVG} from './assets.mjs?v=0.3.0-1';
+import {imageAsset,imagePhysicalSize,blobToDataURL,dataURLToBlob,download,sanitizeSVG} from './assets.mjs?v=0.3.2-1';
+import {importedImageSize,replacedImageSize,imageInsertionPoint} from './image-placement.mjs?v=0.3.2-1';
 import {saveDraft,loadDraft} from './storage.mjs';
 import {createDemo} from './demo.mjs';
 import {createShortcutHandler} from './shortcuts.mjs';
@@ -224,7 +225,7 @@ $('#zoom').addEventListener('input',e=>setScale(Number(e.target.value)/100));
 $('#previewQuality').addEventListener('change',e=>{previewErrorShown=false;previewQuality.setQuality(Number(e.target.value));try{localStorage.setItem('figure-studio-preview-quality',e.target.value);}catch{}render();toast('プレビュー画質 '+e.target.selectedOptions[0].textContent+' · 書き出しは元の画質');});
 for(const input of $$('[data-prop]'))input.addEventListener('change',()=>{const p=input.dataset.prop;let v=input.value;if(Object.hasOwn(ARROW_PROPERTIES,p)){change(()=>editable().forEach(o=>setArrowProperty(o,p,v)));return;}if(['x','y','w','h','rotation','fontSize','strokeWidth','opacity'].includes(p)){v=Number(v);if(!Number.isFinite(v))return;if(['x','y','w','h'].includes(p))v=mm(v);if(p==='opacity')v=Math.max(0,Math.min(1,v/100));if((p==='w'||p==='h')&&v<=0&&!editable().every(o=>['line','arrow'].includes(o.type)))return;if(p==='fontSize')v=Math.max(1,Math.min(1000,v));if(p==='strokeWidth')v=Math.max(0,Math.min(100,v));}change(()=>editable().forEach(o=>{if(['fontSize','fontFamily','text','textAlign'].includes(p)&&o.type!=='text')return;if((p==='w'||p==='h')&&o.type==='image'){const ratio=v/o[p];o[p==='w'?'h':'w']*=ratio;}o[p]=v;}));});
 
-async function importImages(files,at){finishText();const documentId=doc.id,prepared=[];for(const f of files){try{const a=await imageAsset(f);prepared.push({a,f});}catch(e){toast(`${f.name||'画像'}: ${e.message}`);}}if(doc.id!==documentId){toast('Figureが切り替わったため画像追加を中止しました');return;}const before=snapshot(),ids=[];for(const {a,f}of prepared){assets.set(a.id,a);const w=Math.min(mm(70),doc.width*.42),h=w*a.height/a.width;const o=makeObject('image',{x:at?.x??mm(10)+ids.length*mm(4),y:at?.y??mm(10)+ids.length*mm(4),w,h,assetId:a.id,name:f.name||'貼り付け画像'});doc.objects.push(o);ids.push(o.id);}selection=ids;record(before);svg.focus();}
+async function importImages(files,at){finishText();const documentId=doc.id,prepared=[];for(const f of files){try{const a=await imageAsset(f);prepared.push({a,f});}catch(e){toast(`${f.name||'画像'}: ${e.message}`);}}if(doc.id!==documentId){toast('Figureが切り替わったため画像追加を中止しました');return;}const before=snapshot(),ids=[];for(const {a,f}of prepared){assets.set(a.id,a);const size=importedImageSize(a,doc),point=at??imageInsertionPoint(doc,size,ids.length*mm(4));const o=makeObject('image',{...point,...size,assetId:a.id,name:f.name||'貼り付け画像'});doc.objects.push(o);ids.push(o.id);}selection=ids;record(before);svg.focus();}
 function receiveDirectFigure(payload){
  if(updateReloading)return Promise.reject(Error('Figure Studioを更新しています。更新後にもう一度送ってください。'));
  const job=transferQueue.then(()=>importDirectFigure(payload));transferQueue=job.catch(()=>{});return job;
@@ -244,9 +245,9 @@ async function importDirectFigure({app,project,preview,sourceName,transferId}){
  if(estimated>400*1024*1024)throw Error('この追加でプロジェクトの400 MB上限を超えます。不要な図を減らしてください。');
  const before=snapshot(),source={id:uid(),name,mime:project.type||'application/octet-stream',dataUrl:projectURL};
  if(initialDemo&&revision===0){doc.objects=[];doc.name='Fig. 1';initialDemo=false;}
- const s=Math.min(mm(85)/image.width,doc.width*.65/image.width,doc.height*.65/image.height),w=image.width*s,h=image.height*s;
+ const size=importedImageSize(image,doc,app);
  const offset=(doc.objects.filter(o=>o.type==='image').length%6)*mm(4);
- const panel=makeObject('image',{x:Math.min(mm(10)+offset,doc.width-w),y:Math.min(mm(10)+offset,doc.height-h),w,h,assetId:image.id,name:name.replace(/\.(plotproject|mifito)$/i,''),source:{app,name,assetId:source.id,transferId}});
+ const panel=makeObject('image',{...imageInsertionPoint(doc,size,offset),...size,assetId:image.id,name:name.replace(/\.(plotproject|mifito)$/i,''),source:{app,name,assetId:source.id,transferId}});
  assets.set(image.id,image);assets.set(source.id,source);doc.objects.push(panel);selection=[panel.id];record(before);svg.focus({preventScroll:true});
  try{const rev=revision;await saveDraft(snapshot(),assets);if(revision===rev)$('#saveStatus').textContent='ブラウザに保存済み';toast(`${SOURCE_APPS[app].name}から追加し、元プロジェクトを関連付けました`);}
  catch{toast('図と元プロジェクトを追加しました。自動保存できないためCtrl+Sで保存してください。');}
@@ -284,8 +285,9 @@ function editSource(o){
   onStatus:({state,message,downloadProject})=>{toast(message);if(state==='unavailable'){const box=$('#sourceSummary');box.textContent='編集元アプリを更新してください。';const b=document.createElement('button');b.type='button';b.textContent='元プロジェクトを保存';b.onclick=downloadProject;box.append(b);}},
   onResult:async result=>{
    try{
-    const original=locate(),image=await imageAsset(result.preview,original.name),project={id:uid(),name:result.sourceName,mime:'application/octet-stream',dataUrl:await blobToDataURL(result.project)};
+    const original=locate(),previousSize=app==='plot'?await imagePhysicalSize(assets.get(original.assetId)):null,image=await imageAsset(result.preview,original.name),project={id:uid(),name:result.sourceName,mime:'application/octet-stream',dataUrl:await blobToDataURL(result.project)};
     locate();if(gesture)endGesture(null,true);finishText();const target=locate(),before=snapshot();
+    Object.assign(target,replacedImageSize(app,target,previousSize,image.physicalSize));
     assets.set(image.id,image);assets.set(project.id,project);target.assetId=image.id;target.source={...target.source,app:result.app,name:result.sourceName,assetId:project.id};
     expectedSourceAsset=project.id;record(before);toast('元アプリの編集結果を反映しました');
     return {editKey:sourceEditKey(editingBook,documentId,panelId,expectedSourceAsset)};
