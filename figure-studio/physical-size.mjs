@@ -28,3 +28,16 @@ export function svgPhysicalSize({width,height,viewBox}={}){
  if(h!==null&&w===null&&width==null){const ratio=viewBoxRatio(viewBox);if(ratio)w=h*ratio;}
  return validLength(w)&&validLength(h)?{width:w,height:h}:null;
 }
+
+// MiFiTo explicitly distinguishes the cropped image body from annotation
+// bands. Both are stored in document points after checking the SVG extents.
+export function validatedMiFiToBodySize(body,physical){
+ if(!body||!physical||![body.width,body.height,physical.width,physical.height].every(validLength)||body.width>physical.width||body.height>physical.height)return null;
+ return {width:body.width,height:body.height};
+}
+
+export function svgMiFiToBodySize({bodyWidthMm,bodyHeightMm}={},physical){
+ const number=/^\s*[+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?\s*$/;
+ const length=value=>typeof value==='string'&&number.test(value)?svgLengthInPoints(`${value.trim()}mm`):null;
+ return validatedMiFiToBodySize({width:length(bodyWidthMm),height:length(bodyHeightMm)},physical);
+}

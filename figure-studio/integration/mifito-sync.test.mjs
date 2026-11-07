@@ -23,6 +23,12 @@ test('render changes and original bytes change the image fingerprint',async()=>{
  const data=manifest(),a=await identifyManifest(data);data.images[0].settings.output.sizeCm=5;data.images[1].sha256='c'.repeat(64);
  const b=await identifyManifest(data);assert.notEqual(a.images[0].fingerprint,b.images[0].fingerprint);assert.notEqual(a.images[1].fingerprint,b.images[1].fingerprint);
 });
+test('unset Studio size preserves old fingerprints while an explicit body size changes them',async()=>{
+ const data=manifest(),before=await identifyManifest(data);data.images[0].settings.output.studioSize=null;
+ const unset=await identifyManifest(data);assert.equal(unset.images[0].fingerprint,before.images[0].fingerprint);
+ data.images[0].settings.output.studioSize={axis:'width',mm:40};
+ const explicit=await identifyManifest(data);assert.notEqual(explicit.images[0].fingerprint,before.images[0].fingerprint);
+});
 test('indistinguishable legacy duplicate originals are flagged, explicit IDs resolve them',async()=>{
  const data=manifest();data.images=[image('same.png'),image('same.png')];const a=await identifyManifest(data);
  assert.notEqual(a.images[0].imageId,a.images[1].imageId);assert.ok(a.images.every(i=>i.ambiguous));

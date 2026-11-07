@@ -91,17 +91,50 @@ test('popup batch fallback requires explicit batch capability after identity val
 });
 
 const nonce='12345678-1234-1234-1234-123456789012',origin='https://example.test';
-function hostEnvironment(options={}){
- const sent=[],listeners=new Set(),loads=[],accepted=[],selected=[],elements=[];
+function hostEnvironment(options={},hasHeader=true){
+ const sent=[],listeners=new Set(),loads=[],accepted=[],selected=[],elements=[],app=options.app||'mifito';
  const parent={closed:false,postMessage(data){sent.push(data);}};
- const documentRef={body:{append(el){this.child=el;}},createElement(tag){const handlers=new Map(),el={tag,style:{},children:[],disabled:false,textContent:'',append(...children){this.children.push(...children);},setAttribute(){},addEventListener(type,fn){handlers.set(type,fn);},remove(){},fire(type){return handlers.get(type)?.();}};elements.push(el);return el;}};
+ const header={append(el){this.child=el;}};
+ const documentRef={body:{append(el){this.child=el;}},querySelector:selector=>hasHeader&&selector==='.header-actions'?header:null,createElement(tag){const handlers=new Map(),el={tag,style:{},children:[],attributes:{},disabled:false,textContent:'',append(...children){this.children.push(...children);},setAttribute(k,v){this.attributes[k]=v;},addEventListener(type,fn){handlers.set(type,fn);},remove(){this.removed=true;},fire(type){return handlers.get(type)?.();}};elements.push(el);return el;}};
  const windowRef={opener:parent,document:documentRef,location:{hash:`#figureBridge=${nonce}&figureOrigin=${encodeURIComponent(origin)}`},addEventListener(t,fn){listeners.add(fn);},removeEventListener(t,fn){listeners.delete(fn);}};
  const host=setupFigureBridge({app:'mifito',windowRef,loadProject:async(file,meta)=>loads.push({text:await file.text(),meta}),captureResult:single,captureBatchResult:batch,selectImage:id=>selected.push(id),onAccepted:(result,meta)=>accepted.push({result,meta}),...options});
- const emit=(type,extra={})=>Promise.all([...listeners].map(fn=>fn({source:parent,origin,data:{protocol:BRIDGE_PROTOCOL,nonce,app:'mifito',type,...extra}})));
+ const emit=(type,extra={})=>Promise.all([...listeners].map(fn=>fn({source:parent,origin,data:{protocol:BRIDGE_PROTOCOL,nonce,app,type,...extra}})));
  const load=(extra={})=>emit('load',{panelId:'panel-a',requestId:'request-a',editKey:'old-key',imageId:'image-a',sourceName:'project.mifito',project:new Blob(['original-project']),capabilities:['batch-v1'],...extra});
  const find=text=>elements.find(e=>e.tag==='button'&&e.textContent===text);
- return {host,sent,loads,accepted,selected,parent,emit,load,button:find('Figureへ反映'),batchButton:find('変更画像をまとめて反映'),discard:find('未反映の編集を取り消す'),message:elements.find(e=>e.tag==='span')};
+ return {host,sent,loads,accepted,selected,parent,emit,load,header,documentRef,listeners,elements,panel:elements.find(e=>e.id==='figure-studio-bridge'),button:find('Figure Studioへ送る'),batchButton:find('まとめてStudioへ送る'),discard:find('未反映の編集を取り消す'),message:elements.find(e=>e.tag==='span')};
 }
+
+test('PlotLauncher header send updates the original panel, locks through ACK, and cleans up on close',async()=>{
+ const capture=deferred();let captures=0;
+ const e=hostEnvironment({app:'plot',captureResult:()=>{captures++;return capture.promise;}});
+ try{
+  assert.equal(e.header.child,e.panel);assert.equal(e.documentRef.body.child,undefined);assert.equal(e.batchButton,undefined);
+  assert.equal(e.button.id,'send-to-figure-studio');assert.equal(e.button.disabled,true);assert.equal(e.elements.filter(el=>el.id==='send-to-figure-studio').length,1);
+  assert.doesNotMatch(e.panel.style.cssText,/position\s*:\s*(fixed|absolute)/);assert.doesNotMatch(e.message.style.cssText,/position\s*:/);assert.equal(e.message.attributes['aria-live'],'polite');
+  await e.load({sourceName:'project.plotproject'});const sending=e.button.fire('click');assert.equal(captures,1);assert.equal(e.button.disabled,true);assert.equal(e.button.textContent,'Figure Studioへ送る');await e.button.fire('click');assert.equal(captures,1);
+  capture.resolve({project:new Blob(['plot-project']),preview:png()});await sending;
+  assert.equal(e.sent.at(-1).type,'result');assert.equal(e.sent.at(-1).panelId,'panel-a');assert.equal(e.sent.at(-1).requestId,'request-a');assert.equal(e.button.disabled,true);
+  await e.emit('accepted',{panelId:'panel-a',requestId:'request-a',revision:1});assert.equal(e.accepted.length,1);assert.equal(e.button.disabled,false);
+ }finally{capture.resolve({project:new Blob(['plot-project']),preview:png()});e.host.close();}
+ assert.equal(e.panel.removed,true);assert.equal(e.listeners.size,0);const count=e.sent.length;await e.button.fire('click');assert.equal(e.sent.length,count);
+});
+
+test('MiFiTo topbar has one single and one batch action; both share capture and rejection locks',async()=>{
+ const capture=deferred();let singles=0,batches=0;
+ const e=hostEnvironment({captureResult:()=>{singles++;return single();},captureBatchResult:()=>{batches++;return capture.promise;}});
+ try{
+  assert.equal(e.header.child,e.panel);assert.equal(e.documentRef.body.child,undefined);assert.equal(e.batchButton.id,'send-all-to-figure-studio');assert.equal(e.elements.filter(el=>el.tag==='button').length,3);assert.equal(e.discard.hidden,true);
+  await e.load();const sending=e.batchButton.fire('click');assert.equal(batches,1);assert.equal(singles,0);assert.equal(e.button.disabled,true);assert.equal(e.batchButton.disabled,true);
+  await e.button.fire('click');assert.equal(singles,0);capture.resolve(batch());await sending;assert.equal(e.sent.at(-1).batch.images.length,2);assert.equal(e.batchButton.textContent,'まとめてStudioへ送る');
+  await e.emit('rejected',{panelId:'panel-a',requestId:'request-a',revision:1,message:'Retry'});assert.equal(e.button.disabled,false);assert.equal(e.batchButton.disabled,false);
+  await e.button.fire('click');assert.equal(singles,1);assert.equal(e.sent.at(-1).preview.type,'image/png');assert.equal(e.sent.at(-1).batch,undefined);assert.equal(e.batchButton.disabled,true);
+ }finally{capture.resolve(batch());e.host.close();}
+ assert.equal(e.panel.removed,true);assert.equal(e.listeners.size,0);
+});
+
+test('bridge without a shared header uses an in-flow body fallback',()=>{
+ const e=hostEnvironment({},false);try{assert.equal(e.header.child,undefined);assert.equal(e.documentRef.body.child,e.panel);assert.doesNotMatch(e.panel.style.cssText,/position\s*:\s*(fixed|absolute)/);assert.equal(e.button.textContent,'Figure Studioへ送る');}finally{e.host.close();}
+});
 
 test('host batch preserves routing, disables both buttons until exact ACK and keeps private snapshot local',async()=>{
  const e=hostEnvironment();try{await e.load();assert.equal(e.loads[0].meta.imageId,'image-a');await e.batchButton.fire('click');const result=e.sent.at(-1);assert.equal(result.batch.images.length,2);assert.equal(result.bridgeState,undefined);assert.equal(result.panelId,'panel-a');assert.equal(e.button.disabled,true);assert.equal(e.batchButton.disabled,true);

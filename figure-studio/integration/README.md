@@ -10,7 +10,7 @@ PlotLauncher Web / MiFiTo Webに連携アダプターを適用して利用しま
 
 ## 作成アプリから直接送る
 
-対応するPlotLauncher Web / MiFiTo Webでは、上部の「Figure Studioへ送る」で現在の図と元プロジェクトをまとめて追加します。MiFiTo v1.9.1の「まとめてStudioへ送る」は複数画像の追加・更新に対応します。途中でプロジェクトファイルを保存する操作は不要です。
+PlotLauncher v2.4.18 / MiFiTo v1.9.2では、トップバーの「Figure Studioへ送る」で現在の図と元プロジェクトをまとめて送ります。MiFiToの「まとめてStudioへ送る」は複数画像の追加・更新に対応します。通常起動とStudioからの編集起動でボタン名・配置を統一しています。途中でプロジェクトファイルを保存する操作は不要です。
 
 - 同じブラウザで開いているFigure Studioが見つかれば、最後に操作したタブへ追加します。既存のFigureを読み直しません。
 - 見つからない場合は、クリック直後に新しいFigure Studioタブを開き、準備できてからデータを渡します。
@@ -51,9 +51,9 @@ node integration/apply-bridge.mjs mifito C:\path\to\Microscopy_figure_tools_web
 - `index.html` のapp.jsキャッシュキー、アプリのビルドID、`version.json` を揃えて更新。
 - 元の `app.js` は `app.js.before-figure-bridge` に保存。
 
-通常のURLで開いた場合は「Figure Studioへ送る」を上部へ追加します。Figureから元プロジェクトを開いた場合は「Figureへ反映」を表示します。新しいバージョンのコードでは適用前に差分の確認が必要です。
+通常起動・Figureからの編集起動ともに、トップバーへ「Figure Studioへ送る」を表示します。通常起動では図を追加し、連携編集では関連付けた元の図を更新します。接続状態・送信結果・取り消し操作もヘッダー内に表示し、画面下部に重なる操作パネルは使用しません。新しいバージョンのコードでは適用前に差分の確認が必要です。
 
-MiFiToの一括対応を移植する場合は、最新の `app.js` / `project.js` にある識別情報の保存・復元と `mifito-sync.mjs` も必要です。`captureBatchResult` を渡すと、通常画面には「まとめてStudioへ送る」、連携編集画面には「変更画像をまとめて反映」を追加します。
+MiFiToの一括対応を移植する場合は、最新の `app.js` / `project.js` にある識別情報の保存・復元と `mifito-sync.mjs` も必要です。`captureBatchResult` を渡すと、通常起動・連携編集のどちらでもトップバーに「まとめてStudioへ送る」を追加します。
 
 ## Figure Studioから呼ぶ
 
@@ -66,7 +66,8 @@ const session = openSource({
   panelId:'panel-a',
   onStatus({state,message,downloadProject}) { /* 状態表示 */ },
   async onResult({project,preview,panelId}) {
-    // 該当パネルの位置・サイズを保って、元プロジェクトと表示を差し替える。
+    // 該当パネルの位置を保って、元プロジェクトと表示を差し替える。
+    // 実寸指定がある画像は配置倍率を、それ以外は配置サイズを維持する。
   }
 });
 ```
@@ -77,11 +78,15 @@ const session = openSource({
 
 ## MiFiToの一括同期
 
-Figure Studio v0.3.4 / MiFiTo v1.9.1では、共通のプロジェクトBlobと `batch: {projectId, images: [{imageId, name, fingerprint, preview}]}` を渡します。プロジェクト・画像IDは `.mifito` へ保存し、旧形式では元画像情報から補完します。ファイル名や画像の並び順だけで既存パネルを置換しません。
+Figure Studio v0.3.5 / MiFiTo v1.9.2では、共通のプロジェクトBlobと `batch: {projectId, images: [{imageId, name, fingerprint, preview}]}` を渡します。プロジェクト・画像IDは `.mifito` へ保存し、旧形式では元画像情報から補完します。ファイル名や画像の並び順だけで既存パネルを置換しません。
 
-受信側は画像ごとの内容・描画設定の指紋を照合し、変更のないプレビューを差し替えません。変更画像は別のFigureにあっても配置・サイズを維持して更新し、未追加の画像は受信中のFigure、または連携編集を開いた元のFigureへ追加します。元プロジェクトは共有して関連付け、一括変更を1つのUndo履歴として扱います。送信元にない画像をStudioから自動削除する処理はありません。受信結果の `summary: {updated, added, unchanged}` で処理件数を返します。
+受信側は画像ごとの内容・描画設定の指紋を照合し、変更のないプレビューを差し替えません。変更画像は別のFigureにあっても位置を維持して更新し、未追加の画像は受信中のFigure、または連携編集を開いた元のFigureへ追加します。元プロジェクトは共有して関連付け、一括変更を1つのUndo履歴として扱います。送信元にない画像をStudioから自動削除する処理はありません。受信結果の `summary: {updated, added, unchanged}` で処理件数を返します。
 
 一括機能は `batch-v1` の対応確認後に使用します。変更のない画像は送信元でもプレビューを再利用し、反映確認後にだけ同期済みの状態を更新します。
+
+MiFiTo v1.9.2の「Studioに貼る画像サイズ」で「画像本体のサイズを指定」をオンにすると、幅または高さをmmで指定できます。対象画像だけに設定し、「全画像に適用」で共有します。設定は `settings.output.studioSize`（未指定は `null`、指定時は `{axis:'width'|'height', mm:number}`）として保存します。単体・一括送信ともStudio用SVGに実寸を含め、カラーバーや画像外のラベル領域を除いた画像本体の寸法と縦横比を保ちます。通常のファイル保存には適用しません。
+
+Figure Studio v0.3.5では、初めて実寸を指定した画像は指定寸法を採用し、以後の再編集ではStudioで変更した配置倍率を維持します。更新時の位置は維持します。実寸未指定の画像は従来どおり追加時に用紙へ収め、更新時は配置サイズを維持します。
 
 ## 確認
 

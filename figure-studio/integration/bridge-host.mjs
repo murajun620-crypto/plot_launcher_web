@@ -29,16 +29,18 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
   const send=(type,extra={})=>{if(!disposed)parent.postMessage({protocol:PROTOCOL,nonce:context.nonce,hostId,app,type,panelId:active.panelId,requestId:active.requestId,editKey:active.editKey,...extra},context.origin);};
   const ready=()=>send('ready',{capabilities:['reuse-v1',...(app==='mifito'&&captureBatchResult?['batch-v1']:[])],loaded,busy:busy||!!awaiting});
   const panel=documentRef.createElement('div');panel.id='figure-studio-bridge';
-  panel.style.cssText='position:fixed;right:20px;bottom:20px;z-index:2147483000;display:flex;gap:12px;align-items:center;max-width:calc(100vw - 40px);padding:12px 16px;background:#fff;color:#173c38;border:1px solid #b8cfcb;border-radius:12px;box-shadow:0 6px 28px #173c3825;font:13px/1.5 system-ui,sans-serif;';
+  panel.style.cssText='display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center;max-width:100%;min-width:0;color:#173c38;font:12px/1.5 system-ui,sans-serif;';
   const message=documentRef.createElement('span');message.textContent='Figure Studio に接続しています…';message.setAttribute('role','status');message.setAttribute('aria-live','polite');
-  const button=documentRef.createElement('button');button.type='button';button.textContent='Figureへ反映';button.disabled=true;
-  button.style.cssText='white-space:nowrap;border:0;border-radius:7px;padding:9px 14px;background:#126c60;color:#fff;font:600 13px system-ui;cursor:pointer;';
+  message.style.cssText='flex-basis:100%;max-width:420px;white-space:normal;overflow-wrap:anywhere;';
+  const button=documentRef.createElement('button');button.id='send-to-figure-studio';button.type='button';button.className='button primary';button.textContent='Figure Studioへ送る';button.title='編集した図と元プロジェクトを、元のFigure Studioの図へ反映します。';button.disabled=true;
   const batchButton=app==='mifito'&&typeof captureBatchResult==='function'?documentRef.createElement('button'):null;
-  if(batchButton){batchButton.type='button';batchButton.textContent='変更画像をまとめて反映';batchButton.disabled=true;batchButton.style.cssText=button.style.cssText;}
+  if(batchButton){batchButton.id='send-all-to-figure-studio';batchButton.type='button';batchButton.className='button primary';batchButton.textContent='まとめてStudioへ送る';batchButton.title='変更した画像を元のFigure Studioへまとめて反映し、未追加の画像を追加します。変更のない画像はそのまま残します。';batchButton.disabled=true;}
   function setDisabled(value){button.disabled=value;if(batchButton)batchButton.disabled=value;}
   const discard=documentRef.createElement('button');discard.type='button';discard.textContent='未反映の編集を取り消す';discard.hidden=true;
   discard.style.cssText='white-space:nowrap;border:1px solid #c6d3cf;border-radius:7px;padding:8px 12px;background:#fff;color:#526661;font:12px system-ui;cursor:pointer;';
-  panel.append(message,button);if(batchButton)panel.append(batchButton);panel.append(discard);documentRef.body.append(panel);
+  // Bridge actions update the original Studio panel and stay in normal layout.
+  // Editors without the shared header still get an in-flow fallback.
+  panel.append(button);if(batchButton)panel.append(batchButton);panel.append(discard,message);(documentRef.querySelector?.('.header-actions')||documentRef.body).append(panel);
   const readyTimer=setInterval(()=>{if(!initialized)ready();},700);
   const matchesActive=data=>data.panelId===active.panelId&&(data.requestId||'')===active.requestId;
   function block(data,reason,text){
@@ -92,7 +94,7 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
         if(disposed)return;
         await onProjectLoaded?.({...active,reconnect:!!data.reconnect});
         if(disposed)return;
-        baseline={project:data.project,sourceName:active.sourceName};loaded=true;message.textContent='修正後に「Figureへ反映」を押してください。';send('loaded');
+        baseline={project:data.project,sourceName:active.sourceName};loaded=true;message.textContent='修正後に「Figure Studioへ送る」を押してください。';send('loaded');
       }catch(error){
         // A failed import might already have changed the source editor.
         // Disable Apply, instead of attaching that content to the previous panel.

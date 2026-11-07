@@ -1,13 +1,13 @@
 import {PT_PER_MM,mm,toMM,uid,clone,newDocument,makeObject,bounds,objectBounds,expandSelection,align,distribute,reorder,autoLayout,History,validateDocument} from './model.mjs';
-import {imageAsset,imagePhysicalSize,blobToDataURL,dataURLToBlob,download,sanitizeSVG} from './assets.mjs?v=0.3.2-1';
-import {importedImageSize,replacedImageSize,imageInsertionPoint} from './image-placement.mjs?v=0.3.2-1';
+import {imageAsset,imagePhysicalSize,imageMiFiToBodySize,blobToDataURL,dataURLToBlob,download,sanitizeSVG} from './assets.mjs?v=0.3.5-1';
+import {importedImageSize,replacedImageSize,replacedMiFiToImageSize,imageInsertionPoint} from './image-placement.mjs?v=0.3.5-1';
 import {saveDraft,loadDraft} from './storage.mjs';
 import {createDemo} from './demo.mjs';
 import {createShortcutHandler} from './shortcuts.mjs';
 import {openSource,SOURCE_APPS} from './integration/bridge-client.mjs?v=0.3.4-1';
 import {createFigureSidebar} from './thumbnails.mjs?v=0.3.0-1';
 import {setupTransferReceiver} from './integration/direct-transfer.mjs?v=batch-v034-1';
-import {readMifitoIdentity} from './integration/mifito-sync.mjs?v=batch-v034-1';
+import {readMifitoIdentity} from './integration/mifito-sync.mjs?v=0.3.5-1';
 import {planMiFiToSync} from './mifito-batch.mjs?v=0.3.4-1';
 import {setupUpdateCheck} from './update-check.mjs';
 import {marqueeSelection} from './selection.mjs';
@@ -300,6 +300,15 @@ async function syncMiFiToFigures(result,{guard,anchorPanelId,targetFigureId=doc.
  // changes made to placement during decoding are kept.
  plan=planMiFiToSync(figures,incoming,identityByAsset,{anchorPanelId});
  for(const id of [...plan.matches.filter(m=>m.changed).map(m=>m.imageId),...plan.additions.map(m=>m.imageId)])if(!prepared.has(id))throw Error('反映中に画像の対応が変わりました。もう一度反映してください。');
+ const previousSizes=new Map();
+ for(const match of plan.matches.filter(m=>m.changed)){
+  const panel=figures.find(f=>f.id===match.figureId)?.objects.find(o=>o.id===match.panelId);
+  if(panel&&!previousSizes.has(panel.assetId)){
+   const asset=assets.get(panel.assetId),[physical,body]=await Promise.all([imagePhysicalSize(asset),imageMiFiToBodySize(asset)]);
+   previousSizes.set(panel.assetId,{physical,body});
+  }
+ }
+ check();
  const needsIdentity=plan.linked.some(link=>{const panel=figures.find(f=>f.id===link.figureId)?.objects.find(o=>o.id===link.panelId);return !panel?.source?.projectId||!panel.source.imageId||!panel.source.fingerprint;});
  const response=()=>{
   const panel=figures.find(f=>f.id===targetFigureId)?.objects.find(o=>o.id===anchorPanelId),link=plan.linked.find(m=>m.panelId===anchorPanelId);
@@ -319,7 +328,13 @@ async function syncMiFiToFigures(result,{guard,anchorPanelId,targetFigureId=doc.
  const changed=new Map(plan.matches.filter(m=>m.changed).map(m=>[m.panelId,m]));
  const next=figures.map(f=>({...f,objects:f.objects.map(o=>{
   const link=linked.get(o.id);if(!link)return o;const update=changed.get(o.id);
-  return {...o,...(update?{assetId:prepared.get(update.imageId).id}:{}),source:{...o.source,app:'mifito',name,assetId:project.id,projectId:identity.projectId,imageId:link.imageId,fingerprint:update?update.image.fingerprint:link.fingerprint}};
+  let replacement={};
+  if(update){
+   const asset=prepared.get(update.imageId),previous=previousSizes.get(o.assetId);
+   if(!previous)throw Error('反映中に画像が置き換わりました。もう一度反映してください。');
+   replacement={assetId:asset.id,...replacedMiFiToImageSize(o,previous.physical,asset.physicalSize,previous.body,asset.mifitoBodySize)};
+  }
+  return {...o,...replacement,source:{...o.source,app:'mifito',name,assetId:project.id,projectId:identity.projectId,imageId:link.imageId,fingerprint:update?update.image.fingerprint:link.fingerprint}};
  })}));
  const destination=next.find(f=>f.id===targetFigureId),added=[];
  if(initialDemo&&revision===0&&!guard){destination.objects=[];destination.name='Fig. 1';}

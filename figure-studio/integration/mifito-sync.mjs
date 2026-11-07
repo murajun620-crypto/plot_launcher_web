@@ -31,7 +31,7 @@ export async function identifyManifest(data){
   // Only committed rendering settings affect the SVG. Selection, pending crop
   // controls and export-list/PPT/PNG choices must not trigger image updates.
   const {cropOptions,...settings}=image.settings;
-  if(settings.output){const {dpi,pptEditable,pptIncludeLabel,...output}=settings.output;settings.output=output;}
+  if(settings.output){const {dpi,pptEditable,pptIncludeLabel,...output}=settings.output;if(output.studioSize==null)delete output.studioSize;settings.output=output;}
   const fingerprint=await hash(JSON.stringify(stable({source:image.sha256,width:image.width,height:image.height,settings})));
   images.push({imageId,name:image.name,fingerprint,...(!image.figureStudioImageId&&counts.get(key)>1?{ambiguous:true}:{})});
  }
