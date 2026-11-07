@@ -1,5 +1,5 @@
-import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=70dc35cf4915';
-import {setupDirectSendButton} from './direct-transfer.mjs?v=70dc35cf4915';
+import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=f4a2fd25ffa2';
+import {setupDirectSendButton} from './direct-transfer.mjs?v=f4a2fd25ffa2';
 import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=9127ec4c4f31";
 import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=9127ec4c4f31";
 import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9127ec4c4f31";
@@ -9,7 +9,7 @@ import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProj
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
-const APP_BUILD = "70dc35cf4915";
+const APP_BUILD = "f4a2fd25ffa2";
 
 function positionDialog(dialog, left, top) {
   const box=dialog.getBoundingClientRect(), gap=8;
@@ -3069,6 +3069,13 @@ catch (error) { fatal(`描画機能を開始できませんでした。ブラウ
 
 // Figure Studio bridge: included in the source application's module scope.
 var figureStudioDirectSender;
+let figureBridgeBaseline=null,figureBridgePreservedOnReconnect=false;
+const figureBridgePendingInput=()=>$$('[data-axis],[data-option],[data-series-field],[data-annotation-field],[data-legend-field],[data-fill]').some(input=>!input.disabled&&input.getClientRects().length>0&&incompleteNumberInput(input));
+function figureBridgeIsDirty(){
+  if(loading||exporting||renderRunning||renderedRevision!==revision||dragging||colormapApplying||pendingDataFiles||figureBridgePendingInput())return true;
+  const state=projectEditState(),baseline=figureBridgeBaseline;
+  return !baseline||state.source!==baseline.source||state.content!==baseline.content||state.fonts.length!==baseline.fonts.length||state.fonts.some((font,index)=>font!==baseline.fonts[index]);
+}
 const figureBridgeWait = (predicate,checkError=()=>null) => new Promise((resolve,reject) => {
   const started = Date.now();
   const timer = setInterval(() => {
@@ -3080,11 +3087,12 @@ const figureBridgeWait = (predicate,checkError=()=>null) => new Promise((resolve
 });
 async function captureFigureStudioResult() {
   if (!engineReady || loading || exporting || !metadata || !sourceData || !config.series.length) throw new Error('グラフの処理が完了してから反映してください。');
+  if(figureBridgePendingInput())throw new Error('入力中の数値設定を確定してから反映してください。');
   await figureBridgeWait(() => !renderRunning && renderedRevision === revision,
     () => !renderRunning && $('#preview-state').classList.contains('error') ? 'グラフの設定を確認してから反映してください。' : null);
   exporting = true; updateButtons();
   try {
-    const snapshot = structuredClone(config);
+    const snapshot = structuredClone(config),bridgeState=projectEditState();
     const project = makeProject(makeSettings(config,metadata,loadedHeader), {...sourceData,sheetIndex:metadata.sheetIndex,headerRow:loadedHeader,sample}, [...importedFonts.values()], {
       saveName:$('#save-name').value,pngDpi:Number($('#png-dpi').value),view:{...view},sections:$$('#controls-panel .control-section').map(section=>section.open),sheetSettings:projectSheetSettings(),sheetMode,sharedSettings:sheetMode === 'shared' ? currentSharedSettings() : sharedSettings
     });
@@ -3092,7 +3100,7 @@ async function captureFigureStudioResult() {
     if (blob.size > PROJECT_MAX_SIZE) throw new Error('プロジェクトは130 MB以内にしてください。');
     const result = await request('export',{config:snapshot,format:'svg',dpi:Number($('#png-dpi').value)});
     const bytes = Uint8Array.from(atob(result.base64),character=>character.charCodeAt(0));
-    return {project:blob,preview:new Blob([bytes],{type:'image/svg+xml'}),sourceName:projectFilename || `${safeStem($('#save-name').value)}.plotproject`};
+    return {project:blob,preview:new Blob([bytes],{type:'image/svg+xml'}),sourceName:projectFilename || `${safeStem($('#save-name').value)}.plotproject`,bridgeState};
   } finally {exporting = false;updateButtons();if(renderWanted)renderPreview();}
 }
 setupFigureBridge({
@@ -3100,11 +3108,15 @@ setupFigureBridge({
   async loadProject(file,{reconnect}={}) {
     parseProject(JSON.parse(await file.text()));
     await figureBridgeWait(() => engineReady && !loading && !exporting);
-    if (!(reconnect && metadata && sourceData) && !await readProject(file)) throw new Error('プロジェクトを復元できませんでした。編集画面のエラーを確認してください。');
+    figureBridgePreservedOnReconnect=!!(reconnect&&metadata&&sourceData);
+    if (!figureBridgePreservedOnReconnect && !await readProject(file)) throw new Error('プロジェクトを復元できませんでした。編集画面のエラーを確認してください。');
     await figureBridgeWait(() => !loading && !renderRunning && renderedRevision === revision,
       () => !renderRunning && $('#preview-state').classList.contains('error') ? 'グラフを描画できませんでした。編集画面で設定を確認してください。' : null);
   },
-  captureResult:captureFigureStudioResult
+  captureResult:captureFigureStudioResult,
+  isDirty:figureBridgeIsDirty,
+  onProjectLoaded(){figureBridgeBaseline=figureBridgePreservedOnReconnect?null:projectEditState();},
+  onAccepted(result){if(result?.bridgeState)figureBridgeBaseline=result.bridgeState;}
 });
 figureStudioDirectSender = setupDirectSendButton({app:'plot',captureResult:captureFigureStudioResult,container:'.header-actions',
   isReady:()=>engineReady&&!loading&&!exporting&&!renderRunning&&!!metadata&&!!sourceData&&!!config.series.length&&renderedRevision===revision});

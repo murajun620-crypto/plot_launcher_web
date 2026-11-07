@@ -1,6 +1,7 @@
-/** Add this small module to the source editor. It is inactive on normal visits. */
+/** Source-editor bridge. The engine and tab stay alive when a different panel opens. */
 const PROTOCOL = 'figure-studio-bridge-v1';
-const MAX_PROJECT = 320 * 1024 * 1024;
+const MAX_PROJECT = 320 * 1024 * 1024, MAX_PREVIEW = 96 * 1024 * 1024;
+const PREVIEW_TYPES = ['image/svg+xml','image/png','image/jpeg','image/webp'];
 
 export function getFigureBridgeContext(locationRef = location) {
   const params = new URLSearchParams(locationRef.hash.slice(1));
@@ -13,65 +14,124 @@ export function getFigureBridgeContext(locationRef = location) {
   } catch {return null;}
 }
 
-/** captureResult may return both blobs atomically; otherwise use the two callbacks. */
-export function setupFigureBridge({app,loadProject,buildProject,renderPreview,captureResult,onAccepted}) {
-  const context = getFigureBridgeContext();
-  const parent = window.opener;
-  if (!context || !parent || !['plot','mifito'].includes(app)) return null;
-  const hostId = crypto.randomUUID();
-  let panelId = '', sourceName = '', revision = 0, initialized = false, loaded = false, busy = false, awaiting = 0;
-  const send = (type,extra={}) => parent.postMessage({protocol:PROTOCOL,nonce:context.nonce,hostId,app,type,panelId,...extra},context.origin);
-  const panel = document.createElement('div');
-  panel.id = 'figure-studio-bridge';
-  panel.style.cssText = 'position:fixed;right:20px;bottom:20px;z-index:2147483000;display:flex;gap:12px;align-items:center;max-width:calc(100vw - 40px);padding:12px 16px;background:#fff;color:#173c38;border:1px solid #b8cfcb;border-radius:12px;box-shadow:0 6px 28px #173c3825;font:13px/1.5 system-ui,sans-serif;';
-  const message = document.createElement('span'); message.textContent = 'Figure Studio に接続しています…';
-  message.setAttribute('role','status'); message.setAttribute('aria-live','polite');
-  const button = document.createElement('button'); button.type = 'button'; button.textContent = 'Figureへ反映'; button.disabled = true;
-  button.style.cssText = 'white-space:nowrap;border:0;border-radius:7px;padding:9px 14px;background:#126c60;color:#fff;font:600 13px system-ui;cursor:pointer;';
-  panel.append(message,button); document.body.append(panel);
-  const readyTimer = setInterval(() => {if (!initialized) send('ready');},700);
-  send('ready');
-  async function receive(event) {
-    const data = event.data;
-    if (event.source !== parent || event.origin !== context.origin || data?.protocol !== PROTOCOL || data?.nonce !== context.nonce || data?.app !== app) return;
-    if (data.type === 'load' && !initialized) {
-      if (!(data.project instanceof Blob) || !data.project.size || data.project.size > MAX_PROJECT || typeof data.panelId !== 'string') {
-        send('error',{message:'プロジェクトの受け渡し形式が正しくありません。'}); return;
+/**
+ * isDirty may be async. Include uncommitted form input and compare with the
+ * last loaded / accepted snapshot, not the last local save.
+ * onAccepted receives the exact captured result, including private extra
+ * fields. Those extra fields stay in this editor and are never transmitted.
+ */
+export function setupFigureBridge({app,loadProject,buildProject,renderPreview,captureResult,isDirty=()=>false,onProjectLoaded,onAccepted,
+  windowRef=window,documentRef=windowRef.document,locationRef=windowRef.location}) {
+  const context=getFigureBridgeContext(locationRef),parent=windowRef.opener;
+  if(!context||!parent||!['plot','mifito'].includes(app))return null;
+  const hostId=crypto.randomUUID();
+  let active={panelId:'',requestId:'',editKey:'',sourceName:''},revision=0,initialized=false,loaded=false,busy=false,awaiting=0,awaitTimer=0,captured=null,baseline=null,disposed=false;
+  const send=(type,extra={})=>{if(!disposed)parent.postMessage({protocol:PROTOCOL,nonce:context.nonce,hostId,app,type,panelId:active.panelId,requestId:active.requestId,editKey:active.editKey,...extra},context.origin);};
+  const ready=()=>send('ready',{capabilities:['reuse-v1'],loaded,busy:busy||!!awaiting});
+  const panel=documentRef.createElement('div');panel.id='figure-studio-bridge';
+  panel.style.cssText='position:fixed;right:20px;bottom:20px;z-index:2147483000;display:flex;gap:12px;align-items:center;max-width:calc(100vw - 40px);padding:12px 16px;background:#fff;color:#173c38;border:1px solid #b8cfcb;border-radius:12px;box-shadow:0 6px 28px #173c3825;font:13px/1.5 system-ui,sans-serif;';
+  const message=documentRef.createElement('span');message.textContent='Figure Studio に接続しています…';message.setAttribute('role','status');message.setAttribute('aria-live','polite');
+  const button=documentRef.createElement('button');button.type='button';button.textContent='Figureへ反映';button.disabled=true;
+  button.style.cssText='white-space:nowrap;border:0;border-radius:7px;padding:9px 14px;background:#126c60;color:#fff;font:600 13px system-ui;cursor:pointer;';
+  const discard=documentRef.createElement('button');discard.type='button';discard.textContent='未反映の編集を取り消す';discard.hidden=true;
+  discard.style.cssText='white-space:nowrap;border:1px solid #c6d3cf;border-radius:7px;padding:8px 12px;background:#fff;color:#526661;font:12px system-ui;cursor:pointer;';
+  panel.append(message,button,discard);documentRef.body.append(panel);
+  const readyTimer=setInterval(()=>{if(!initialized)ready();},700);
+  const matchesActive=data=>data.panelId===active.panelId&&(data.requestId||'')===active.requestId;
+  function block(data,reason,text){
+    message.textContent=text;
+    if((reason==='dirty'||reason==='dirty-check-failed')&&loaded&&baseline){discard.hidden=false;discard.disabled=false;}
+    send('switch-blocked',{requestId:data.requestId||'',panelId:data.panelId,editKey:data.editKey||'',activePanelId:active.panelId,activeRequestId:active.requestId,reason,message:text});
+  }
+  async function receive(event){
+    const data=event.data;
+    if(disposed||event.source!==parent||event.origin!==context.origin||data?.protocol!==PROTOCOL||data?.nonce!==context.nonce||data?.app!==app||(data.hostId&&data.hostId!==hostId))return;
+    if(data.type==='ping'){ready();return;}
+    if(data.type==='load'){
+      if(!(data.project instanceof Blob)||!data.project.size||data.project.size>MAX_PROJECT||typeof data.panelId!=='string'||!data.panelId||data.panelId.length>200||
+        (data.requestId!==undefined&&(typeof data.requestId!=='string'||!data.requestId||data.requestId.length>200))||
+        (data.editKey!==undefined&&(typeof data.editKey!=='string'||data.editKey.length>2048))){
+        send('error',{requestId:typeof data.requestId==='string'?data.requestId:'',panelId:typeof data.panelId==='string'?data.panelId:'',code:'invalid-project',message:'プロジェクトの受け渡し形式が正しくありません。'});return;
       }
-      initialized = true; clearInterval(readyTimer); busy = true;
-      panelId = data.panelId; sourceName = String(data.sourceName || (app === 'plot' ? 'figure.plotproject' : 'figure.mifito'));
-      message.textContent = '元プロジェクトを読み込んでいます…';
-      try {
-        await loadProject(new File([data.project],sourceName,{type:data.project.type || 'application/octet-stream'}),{reconnect:!!data.reconnect});
-        loaded = true; button.disabled = false;
-        message.textContent = '修正後に「Figureへ反映」を押してください。'; send('loaded');
-      } catch (error) {
-        message.textContent = error.message || '元プロジェクトを開けませんでした。'; send('error',{message:message.textContent});
-      } finally {busy = false;}
-    } else if (data.type === 'accepted' && data.revision === awaiting) {
-      awaiting = 0; button.disabled = false; message.textContent = 'Figureに反映しました。続けて編集できます。';
-      onAccepted?.();
-    } else if (data.type === 'rejected' && data.revision === awaiting) {
-      awaiting = 0; button.disabled = false; message.textContent = data.message || 'Figureへの反映に失敗しました。';
+      // A retry never interrupts its own load or pending result.
+      if(initialized&&(loaded||busy||awaiting)&&matchesActive(data)&&(!data.editKey||data.editKey===active.editKey)){
+        if(loaded)send('loaded',{reused:true});return;
+      }
+      if(busy||awaiting){block(data,'busy','読み込み・反映処理中です。完了してから次のグラフを開いてください。');return;}
+      busy=true;button.disabled=true;discard.disabled=true;
+      try{
+        // Reopening this snapshot keeps all in-progress work in the warm tab.
+        if(loaded&&data.panelId===active.panelId&&data.editKey&&data.editKey===active.editKey){
+          active.requestId=data.requestId||'';send('loaded',{reused:true});return;
+        }
+        if(loaded){
+          let dirty;
+          try{dirty=await isDirty();}
+          catch{block(data,'dirty-check-failed','編集中の内容を確認できません。Figureへ反映するか、未反映の編集を取り消してから、次のグラフをもう一度開いてください。');return;}
+          if(disposed)return;
+          if(dirty){block(data,'dirty','未反映の編集があります。Figureへ反映するか、未反映の編集を取り消してから、次のグラフをもう一度開いてください。');return;}
+        }
+        active={panelId:data.panelId,requestId:data.requestId||'',editKey:data.editKey||'',sourceName:String(data.sourceName||(app==='plot'?'figure.plotproject':'figure.mifito')).replace(/[\\/]/g,'_')};
+        initialized=true;loaded=false;captured=null;baseline=null;revision=0;discard.hidden=true;clearInterval(readyTimer);
+        message.textContent='開いている編集画面へ元プロジェクトを読み込んでいます…';
+        await loadProject(new File([data.project],active.sourceName,{type:data.project.type||'application/octet-stream'}),{reconnect:!!data.reconnect});
+        if(disposed)return;
+        await onProjectLoaded?.({...active,reconnect:!!data.reconnect});
+        if(disposed)return;
+        baseline={project:data.project,sourceName:active.sourceName};loaded=true;message.textContent='修正後に「Figureへ反映」を押してください。';send('loaded');
+      }catch(error){
+        // A failed import might already have changed the source editor.
+        // Disable Apply, instead of attaching that content to the previous panel.
+        loaded=false;message.textContent=error.message||'元プロジェクトを開けませんでした。';
+        send('error',{code:'load-failed',loaded:false,message:message.textContent});
+      }finally{busy=false;if(!disposed){button.disabled=!loaded||!!awaiting;discard.disabled=!loaded||!!awaiting;}}
+      return;
+    }
+    if(!loaded||!matchesActive(data)||!awaiting||data.revision!==awaiting)return;
+    if(data.type==='accepted'){
+      clearTimeout(awaitTimer);awaitTimer=0;awaiting=0;
+      if(typeof data.editKey==='string'&&data.editKey.length<=2048)active.editKey=data.editKey;
+      if(captured){baseline={project:captured.project,sourceName:captured.sourceName||active.sourceName};active.sourceName=baseline.sourceName;}
+      discard.hidden=true;
+      busy=true;
+      try{
+        await onAccepted?.(captured,{...active,revision:data.revision});
+        if(!disposed)message.textContent='Figureに反映しました。続けて編集できます。';
+      }catch{if(!disposed)message.textContent='Figureに反映しました。編集状態を確認してから次のグラフを開いてください。';}
+      finally{captured=null;busy=false;if(!disposed)button.disabled=discard.disabled=false;}
+    }else if(data.type==='rejected'){
+      clearTimeout(awaitTimer);awaitTimer=0;awaiting=0;captured=null;button.disabled=discard.disabled=false;message.textContent=data.message||'Figureへの反映に失敗しました。';
     }
   }
-  window.addEventListener('message',receive);
-  button.addEventListener('click',async () => {
-    if (!loaded || busy || awaiting) return;
-    if (parent.closed) {message.textContent = 'Figure Studioが閉じています。編集内容をプロジェクトとして保存してください。';return;}
-    busy = true; button.disabled = true; send('applying'); message.textContent = '編集結果を作成しています…';
-    try {
-      const result = captureResult ? await captureResult() : {project:await buildProject(),preview:await renderPreview()};
-      if (!(result?.project instanceof Blob) || !(result?.preview instanceof Blob)) throw new Error('編集結果を作成できませんでした。');
-      awaiting = ++revision;
-      const sentRevision = revision;
-      send('result',{revision,project:result.project,preview:result.preview,sourceName:result.sourceName || sourceName});
-      message.textContent = 'Figureへの反映を確認しています…';
-      setTimeout(() => {if(awaiting === sentRevision){awaiting=0;button.disabled=false;message.textContent='Figureからの確認が届きません。Figure Studioの画面を確認してください。';}},15000);
-    } catch (error) {
-      message.textContent = error.message || '編集結果の作成に失敗しました。';
-      send('error',{message:message.textContent}); button.disabled = false;
-    } finally {busy = false;}
+  windowRef.addEventListener('message',receive);ready();
+  discard.addEventListener('click',async()=>{
+    if(disposed||discard.hidden||!loaded||!baseline||busy||awaiting)return;
+    busy=true;button.disabled=discard.disabled=true;message.textContent='最後にFigureと同期した状態へ戻しています…';
+    try{
+      await loadProject(new File([baseline.project],baseline.sourceName,{type:baseline.project.type||'application/octet-stream'}),{reconnect:false});
+      if(disposed)return;
+      await onProjectLoaded?.({...active,reconnect:false,discard:true});
+      if(disposed)return;
+      discard.hidden=true;message.textContent='未反映の編集を取り消しました。次のグラフを開けます。';send('loaded',{restored:true});
+    }catch(error){loaded=false;message.textContent=error.message||'元のプロジェクトへ戻せませんでした。';send('error',{code:'load-failed',loaded:false,message:message.textContent});}
+    finally{busy=false;if(!disposed){button.disabled=!loaded;discard.disabled=!loaded;}}
   });
-  return {close(){clearInterval(readyTimer);window.removeEventListener('message',receive);panel.remove();}};
+  button.addEventListener('click',async()=>{
+    if(disposed||!loaded||busy||awaiting)return;
+    if(parent.closed){message.textContent='Figure Studioが閉じています。編集内容をプロジェクトとして保存してください。';return;}
+    busy=true;button.disabled=discard.disabled=true;send('applying');message.textContent='編集結果を作成しています…';
+    try{
+      const result=captureResult?await captureResult():{project:await buildProject(),preview:await renderPreview()};
+      if(disposed)return;
+      if(!(result?.project instanceof Blob)||!result.project.size||result.project.size>MAX_PROJECT||!(result.preview instanceof Blob)||!result.preview.size||result.preview.size>MAX_PREVIEW||!PREVIEW_TYPES.includes(result.preview.type))throw Error('編集結果の形式・サイズを確認してください。');
+      captured=result;awaiting=++revision;const sentRevision=revision,sentRequest=active.requestId;
+      send('result',{revision,project:result.project,preview:result.preview,sourceName:result.sourceName||active.sourceName});
+      message.textContent='Figureへの反映を確認しています…';
+      awaitTimer=setTimeout(()=>{if(!disposed&&awaiting===sentRevision&&active.requestId===sentRequest){awaiting=0;captured=null;button.disabled=discard.disabled=false;message.textContent='Figureからの確認が届きません。Figure Studioの画面を確認してください。';}},15000);
+    }catch(error){
+      if(disposed)return;captured=null;message.textContent=error.message||'編集結果の作成に失敗しました。';send('error',{code:'capture-failed',message:message.textContent});button.disabled=false;
+    }finally{busy=false;if(!disposed)discard.disabled=!loaded||!!awaiting;}
+  });
+  return {close(){if(disposed)return;disposed=true;clearInterval(readyTimer);clearTimeout(awaitTimer);windowRef.removeEventListener('message',receive);panel.remove();}};
 }
+
