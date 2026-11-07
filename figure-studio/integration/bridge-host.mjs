@@ -4,6 +4,15 @@ import {registerEditor} from './editor-discovery.mjs?v=editor-reuse-v036-1';
 const PROTOCOL = 'figure-studio-bridge-v1';
 const MAX_PROJECT = 320 * 1024 * 1024;
 
+/** Portable binding data is validated again against the Studio book by its caller. */
+export function validateWorkspaceBinding(value){
+  if(value===null)return null;
+  const text=(s,max)=>typeof s==='string'&&s.length>0&&s.length<=max&&!/[\x00-\x1f]/.test(s);
+  const project=value?.baselineProject,blob=project&&['[object Blob]','[object File]'].includes(Object.prototype.toString.call(project))&&typeof project.arrayBuffer==='function';
+  if(value?.version!==1||!['plot','mifito'].includes(value.app)||!text(value.panelId,200)||!text(value.editKey,2048)||!text(value.sourceName,255)||!blob||!Number.isSafeInteger(project.size)||project.size<=0||project.size>MAX_PROJECT||(value.imageId!==undefined&&!isTransferImageId(value.imageId)))throw Error('編集画面とFigureの関連付けが不正です。');
+  return {version:1,app:value.app,panelId:value.panelId,editKey:value.editKey,...(value.imageId?{imageId:value.imageId}:{}),baselineProject:project,sourceName:value.sourceName};
+}
+
 export function getFigureBridgeContext(locationRef = location) {
   const params = new URLSearchParams(locationRef.hash.slice(1));
   const nonce = params.get('figureBridge'), rawOrigin = params.get('figureOrigin');
@@ -212,8 +221,30 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
   }
   button.addEventListener('click',()=>apply(false));
   batchButton?.addEventListener('click',()=>apply(true));
+  function resetWorkspaceBinding(){
+    if(disposed)throw Error('編集画面との接続は終了しています。');
+    if(busy||awaiting||loadingRequest)throw Error('読み込み・反映処理が終わってから、作業内容を復元してください。');
+    const previous=connection;removeConnectionListener?.();removeConnectionListener=null;connection=null;parent=null;context=null;previous?.close();unmount();
+    clearTimeout(awaitTimer);awaitTimer=0;active={panelId:'',requestId:'',editKey:'',sourceName:''};revision=0;initialized=false;loaded=false;captured=null;baseline=null;clientBatch=false;acceptedCheckpoint=null;
+    discard.hidden=true;setDisabled(true);setMessage('');registry?.update();
+  }
   return {
     get isConnected(){return mounted&&!!parent&&!parent.closed;},
+    async captureWorkspaceBinding(){
+      if(disposed||busy||awaiting||loadingRequest)throw Error('読み込み・反映処理が終わってから、作業内容を保存してください。');
+      if(!loaded||!baseline)return null;
+      return validateWorkspaceBinding({version:1,app,panelId:active.panelId,editKey:active.editKey,...(active.imageId?{imageId:active.imageId}:{}),baselineProject:baseline.project,sourceName:baseline.sourceName});
+    },
+    restoreWorkspaceBinding(value){
+      const binding=validateWorkspaceBinding(value);if(binding&&binding.app!==app)throw Error('編集アプリの関連付けが一致しません。');
+      resetWorkspaceBinding();if(!binding)return;
+      active={panelId:binding.panelId,requestId:'',editKey:binding.editKey,sourceName:binding.sourceName,...(binding.imageId?{imageId:binding.imageId}:{})};
+      baseline={project:new Blob([binding.baselineProject],{type:binding.baselineProject.type||'application/octet-stream'}),sourceName:binding.sourceName};
+      initialized=true;loaded=true;registry?.update();
+      // A fresh Studio request may attach to this exact identity, but neither
+      // the current editor nor its unreflected preview is loaded or applied.
+    },
+    resetWorkspaceBinding,
     async rememberAccepted(result){
       if(disposed||!(result?.project instanceof Blob)||!result.project.size||result.project.size>MAX_PROJECT)return false;
       const checkpoint={result,hash:null,ready:digest(result.project)};acceptedCheckpoint=checkpoint;

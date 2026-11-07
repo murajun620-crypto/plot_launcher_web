@@ -58,6 +58,7 @@ test('unsupported browsers download and retain a name without a writable handle'
 const app=fs.readFileSync(new URL('../app.js',import.meta.url),'utf8');
 function saveUI(files){
   const state={projectFiles:files,projectSaving:false,projectOpening:false,updateReloading:false,gesture:null,editingId:null,bookId:'book',revision:5,dirty:true,manualSavedRevision:-1,figures:[{name:'Figure 1'}],Blob,
+    transferQueue:Promise.resolve(),preservedWorkspace:null,workspacePersistence:()=>null,
     finishText(){},updateProjectFileUI(){},async saveProjectFileTarget(){},safeName:name=>name,packageProject:()=>({id:state.bookId,revision:state.revision}),toast(){},document:{activeElement:null},svg:{focus(){}}};
   vm.createContext(state);vm.runInContext(app.slice(app.indexOf('async function saveProject('),app.indexOf('async function openProject(')),state);return state;
 }
@@ -85,4 +86,21 @@ test('unavailable handle persistence does not turn a successful file write into 
   const target=handle('saved.figurestudio'),files=new ProjectFileSession({host:{async showSaveFilePicker(){return target;}}}),state=saveUI(files);
   state.saveProjectFileTarget=async()=>{throw new DOMException('cannot clone handle','DataCloneError');};
   await state.saveProject();assert.equal(state.dirty,false);assert.equal(state.manualSavedRevision,5);assert.equal(files.target('book').handle,target);
+});
+
+test('whole workspace is captured before a file is written and included without applying images',async()=>{
+ const target=handle('all.figurestudio'),state=saveUI(new ProjectFileSession({host:{async showSaveFilePicker(){return target;}}}));let captured=false,marked=false;
+ const data={format:'figure-studio-workspace',version:1,active:'studio',editors:{plot:{unreflected:'axes'},mifito:{unreflected:'label'}}};
+ state.workspacePersistence=()=>({async captureWorkspace(){assert.equal(target.calls.some(c=>c[0]==='open'),false);captured=true;return {data};},async markWorkspaceSaved(value){assert.equal(captured,true);assert.equal(value.data,data);marked=true;return true;}});
+ await state.saveProject();const written=target.calls.find(c=>c[0]==='write')[1];assert.deepEqual(JSON.parse(await written.text()).workspace,data);assert.equal(marked,true);assert.equal(state.dirty,false);
+});
+test('a failed source capture leaves the file untouched and the workspace dirty',async()=>{
+ const target=handle('all.figurestudio'),state=saveUI(new ProjectFileSession({host:{async showSaveFilePicker(){return target;}}}));
+ state.workspacePersistence=()=>({async captureWorkspace(){throw Error('busy source');}});
+ await state.saveProject();assert.equal(target.calls.some(c=>c[0]==='open'),false);assert.equal(state.dirty,true);assert.equal(state.manualSavedRevision,-1);
+});
+test('later source edits during disk writing remain unsaved',async()=>{
+ let release;const target=handle('all.figurestudio',{barrier:new Promise(resolve=>release=resolve)}),state=saveUI(new ProjectFileSession({host:{async showSaveFilePicker(){return target;}}}));
+ state.workspacePersistence=()=>({async captureWorkspace(){return {data:{version:1}};},async markWorkspaceSaved(){return false;}});
+ const saving=state.saveProject();await new Promise(resolve=>setImmediate(resolve));release();await saving;assert.equal(state.dirty,true);assert.equal(state.manualSavedRevision,-1);
 });

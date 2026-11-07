@@ -1,5 +1,13 @@
 # PlotLauncher Web
 
+## 3タブの最新の作業をまとめて保存（v2.4.21）
+
+Figure Studio v0.5.0の統合画面では、Studioの「保存」でPlotLauncher／MiFiToの最新の編集状態も一つの `.figurestudio` に保存します。まだ「Figure Studioへ送る」を押していない変更、元データ・設定・フォント・表示状態・Undo/Redo履歴も含め、ファイルを開き直して編集を続けられます。対応版はPlotLauncher v2.4.21／MiFiTo v1.9.5です。
+
+Studio上の図は最後に送った状態を保持し、「Figure Studioへ送る」で最新の編集を反映します。`.figurestudio` の保存は、個別の `.plotproject`／`.mifito` ファイルを上書きしません。以前の `.figurestudio` も開け、保存されているFigureと関連付けた元プロジェクトを利用できます。
+
+以下は過去の更新履歴です。現在のStudio連携は統合画面を利用してください。
+
 ## Studio・MiFiToと一つの画面で編集（v2.4.20）
 
 [Figure Studio統合画面](https://murajun620-crypto.github.io/plot_launcher_web/figure-studio/)のPlotLauncherタブでグラフを編集し、トップバーの「Figure Studioへ送る」で図と元プロジェクトを反映します。受信完了後はStudioタブへ自動で戻ります。Studioの図をダブルクリックすればPlotLauncherへ戻って編集でき、一度開いた画面はタブ切替で再読み込みしません。
@@ -7,8 +15,6 @@
 [PlotLauncher単独](https://murajun620-crypto.github.io/plot_launcher_web/)も引き続き使えます。単独起動時はStudio送信ボタンを表示しません。統合画面は同じHTML・JavaScript・描画エンジンを読み込み、別実装のコピーを持ちません。[Studio単独](https://murajun620-crypto.github.io/plot_launcher_web/figure-studio/studio.html)からの編集では、既存の接続可能な編集タブも再利用します。
 
 対応版はFigure Studio v0.4.0・PlotLauncher v2.4.20・MiFiTo v1.9.4です。Studioのプロジェクト保存はMiFiToと同様に、初回はフォルダー・ファイル名を選択し、以後は上書き保存します。保存メニューから「名前を付けて保存」も選べます。
-
-以下は過去の更新履歴です。現在のStudio連携は上記の統合画面を利用してください。
 
 ## 開いているタブでFigure Studioの編集を続ける（v2.4.19）
 

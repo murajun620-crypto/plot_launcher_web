@@ -29,12 +29,16 @@ export class ProjectFileSession{
   constructor({host=globalThis,fallback}={}){this.host=host;this.fallback=fallback;}
   target(bookId){return this.#targets.get(bookId)??null;}
   opened(bookId,{handle=null,name=''}){this.#targets.set(bookId,{handle,name});}
-  async save({bookId,revision,blob,name,saveAs=false}){
+  async prepare({bookId,name,saveAs=false}){
     const previous=this.target(bookId);
     const target=await prepareProjectSave({handle:previous?.handle,saveAs,name:previous?.name||name,startIn:previous?.handle,fallback:this.fallback},this.host);
+    return {bookId,target};
+  }
+  async write({bookId,target},{revision,blob}){
     await target.write(blob);
     // A failed/cancelled Save As must never replace a working original target.
     this.#targets.set(bookId,{handle:target.handle,name:target.name});
     return {bookId,revision,handle:target.handle,name:target.name};
   }
+  async save({bookId,revision,blob,name,saveAs=false}){return this.write(await this.prepare({bookId,name,saveAs}),{revision,blob});}
 }

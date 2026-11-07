@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs';
+import {setupFigureBridge,getFigureBridgeContext,validateWorkspaceBinding} from './bridge-host.mjs';
 import {createEditorDirectory,registerEditor} from './editor-discovery.mjs';
 
 const PROTOCOL='figure-studio-bridge-v1',origin='https://example.test',ownerId='12345678-1234-1234-1234-123456789012';
@@ -128,4 +128,38 @@ test('actual discovery transport reconnects a normal editor after Studio reload 
   assert.equal(messages.find(m=>m.type==='result').requestId,'request-reloaded');
  }finally{directory.close();e.host.close();}
  assert.equal(channels.size,0);
+});
+
+test('workspace bindings retain only the last reflected project and exclude live transport identities',async()=>{
+ const e=environment();try{
+  assert.equal(await e.host.captureWorkspaceBinding(),null);const c=e.connect();await c.load();
+  const binding=await e.host.captureWorkspaceBinding();assert.equal(await binding.baselineProject.text(),'saved');assert.equal(binding.app,'plot');assert.equal(binding.panelId,'panel-a');
+  for(const field of ['nonce','ownerId','hostId','requestId','revision','captured','bridgeState'])assert.equal(binding[field],undefined);
+  await e.button.fire('click');await assert.rejects(e.host.captureWorkspaceBinding(),/反映処理/);
+  assert.throws(()=>e.host.restoreWorkspaceBinding(binding),/反映処理/);
+  await c.emit('accepted',{panelId:'panel-a',requestId:'request-a',revision:1,editKey:'book/figure/panel-a/accepted'});
+  const accepted=await e.host.captureWorkspaceBinding();assert.equal(await accepted.baselineProject.text(),'edited');assert.equal(accepted.editKey,'book/figure/panel-a/accepted');
+ }finally{e.host.close();}
+});
+
+test('restoring a validated binding preserves current editor work and reattaches without loading or applying it',async()=>{
+ const original=environment(),restored=environment();try{
+  const first=original.connect();await first.load();const binding=await original.host.captureWorkspaceBinding();
+  restored.host.restoreWorkspaceBinding(binding);assert.equal(restored.host.isConnected,false);assert.equal(restored.loads.length,0);assert.equal(restored.loaded.length,0);assert.equal(restored.accepted.length,0);
+  const c=restored.connect();await c.load({requestId:'restored-request'});assert.equal(c.sent.at(-1).reused,true);assert.equal(restored.loads.length,0);assert.equal(restored.loaded.length,0);
+  await restored.button.fire('click');assert.equal(c.sent.at(-1).type,'result');assert.equal(c.sent.at(-1).panelId,'panel-a');assert.equal(c.sent.at(-1).requestId,'restored-request');
+  await c.emit('rejected',{panelId:'panel-a',requestId:'restored-request',revision:1,message:'Keep edits'});
+  await c.load({panelId:'panel-other',requestId:'other',editKey:'another'});assert.equal(restored.discard.hidden,false);
+  await restored.discard.fire('click');assert.equal(restored.loads.at(-1).text,'saved');assert.equal(restored.loaded.at(-1).discard,true);
+ }finally{original.host.close();restored.host.close();}
+});
+
+test('invalid binding cannot detach a live editor, while reset clears association without loading a project',async()=>{
+ const e=environment();try{
+  const c=e.connect();await c.load();const binding=await e.host.captureWorkspaceBinding();
+  for(const invalid of [{...binding,app:'mifito'},{...binding,baselineProject:new Blob([])},{...binding,editKey:''},{...binding,imageId:'../bad'}])assert.throws(()=>e.host.restoreWorkspaceBinding(invalid));
+  assert.equal(e.host.isConnected,true);assert.equal(e.loads.length,1);assert.equal((await e.host.captureWorkspaceBinding()).panelId,'panel-a');
+  e.host.resetWorkspaceBinding();assert.equal(e.host.isConnected,false);assert.equal(await e.host.captureWorkspaceBinding(),null);assert.equal(e.loads.length,1);assert.equal(e.registration.getState().binding,null);
+  assert.equal(validateWorkspaceBinding(null),null);
+ }finally{e.host.close();}
 });

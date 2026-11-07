@@ -1,4 +1,5 @@
-import {SOURCE_APPS} from './integration/bridge-client.mjs?v=workspace-v040-2';
+import {SOURCE_APPS} from './integration/bridge-client.mjs?v=workspace-save-v050-1';
+import {installWorkspacePersistence} from './workspace-session.mjs?v=workspace-save-v050-1';
 
 const APPS=['studio','plot','mifito'];
 
@@ -28,13 +29,14 @@ export function createWorkspace({windowRef=window,documentRef=windowRef.document
   windowRef.requestAnimationFrame(()=>{try{const child=frame.contentWindow;child.dispatchEvent(new child.Event('resize'));}catch{}});
  }
  function show(app){
-  const frame=ensureFrame(app);active=app;
+  const frame=ensureFrame(app);if(api.persistenceBusy)return frame.contentWindow;active=app;
   for(const name of APPS){const shown=name===app,panel=documentRef.getElementById(`workspace-panel-${name}`);panel.setAttribute('aria-hidden',String(!shown));panel.inert=!shown;const child=frames.get(name);if(child)child.tabIndex=shown?0:-1;}
   for(const tab of tabs){const selected=tab.dataset.app===app;tab.setAttribute('aria-selected',String(selected));tab.tabIndex=selected?0:-1;}
   resize(frame);return frame.contentWindow;
  }
  const api={ownerId:workspaceOwner,openEditor(app,options={}){if(!SOURCE_APPS[app])throw Error('編集アプリが見つかりません。');const frame=ensureFrame(app,options);show(app);return frame.contentWindow;},show,get studioWindow(){return frames.get('studio').contentWindow;},get studioReceiverId(){try{return api.studioWindow.FigureStudioWorkspaceReceiverId||null;}catch{return null;}}};
  windowRef.FigureStudioWorkspace=api;
+ installWorkspacePersistence(api,{windowRef,documentRef});
  for(const tab of tabs){
   tab.addEventListener('click',()=>show(tab.dataset.app));
   tab.addEventListener('keydown',event=>{let index=tabs.indexOf(tab);if(event.key==='ArrowRight')index=(index+1)%tabs.length;else if(event.key==='ArrowLeft')index=(index+tabs.length-1)%tabs.length;else if(event.key==='Home')index=0;else if(event.key==='End')index=tabs.length-1;else return;event.preventDefault();show(tabs[index].dataset.app);tabs[index].focus();});

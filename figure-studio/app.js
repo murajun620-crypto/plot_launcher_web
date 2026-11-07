@@ -4,9 +4,9 @@ import {importedImageSize,replacedImageSize,replacedMiFiToImageSize,imageInserti
 import {saveDraft,loadDraft,saveProjectFileTarget,loadProjectFileTarget} from './storage.mjs?v=0.3.6-1';
 import {createDemo} from './demo.mjs';
 import {createShortcutHandler} from './shortcuts.mjs';
-import {openSource,SOURCE_APPS,setupSourceDiscovery} from './integration/bridge-client.mjs?v=workspace-v040-2';
+import {openSource,SOURCE_APPS,setupSourceDiscovery,closeSourceSessions} from './integration/bridge-client.mjs?v=workspace-save-v050-1';
 import {createFigureSidebar} from './thumbnails.mjs?v=0.3.0-1';
-import {setupTransferReceiver} from './integration/direct-transfer.mjs?v=batch-v034-1';
+import {setupTransferReceiver,getFigureWorkspace} from './integration/direct-transfer.mjs?v=workspace-save-v050-1';
 import {readMifitoIdentity} from './integration/mifito-sync.mjs?v=0.3.5-1';
 import {planMiFiToSync} from './mifito-batch.mjs?v=0.3.4-1';
 import {setupUpdateCheck} from './update-check.mjs';
@@ -18,7 +18,10 @@ import {createPreviewQuality} from './preview-quality.mjs?v=0.3.0-1';
 import {reorderFigures} from './figure-order.mjs';
 import {renumberFigureNames} from './figure-names.mjs?v=0.3.3-1';
 import {deleteFigures,duplicateFigures} from './figure-commands.mjs';
-import {ProjectFileSession,projectFilePickerOptions} from './project-file.mjs';
+import {ProjectFileSession,projectFilePickerOptions} from './project-file.mjs?v=workspace-save-v050-1';
+import {installWorkspacePersistence} from './workspace-session.mjs?v=workspace-save-v050-1';
+import {decodeWorkspaceState} from './workspace-state.mjs?v=workspace-save-v050-1';
+import {validateWorkspaceBinding} from './integration/bridge-host.mjs?v=workspace-save-v050-1';
 
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 setupSourceDiscovery();
@@ -27,6 +30,7 @@ const el=(tag,attrs={},text)=>{const n=document.createElementNS(ns,tag);for(cons
 let doc=newDocument(),assets=new Map(),selection=[],tool='select',scale=1.5,history=new History(),gesture=null,textBefore=null,editingId=null,dirty=false,saveTimer,revision=0,clipboard=null,formatClipboard=null,frame=0,spaceDown=false,manualSavedRevision=-1,bridge=null;
 let figures=[doc],bookId=uid(),initialDemo=false,transferQueue=Promise.resolve(),updateReloading=false;
 let projectSaving=false,projectOpening=false;
+let preservedWorkspace=null;
 const projectFiles=new ProjectFileSession({host:window,fallback:(blob,name)=>download(blob,name)});
 if(new URLSearchParams(location.search).get('figureWorkspace')==='1')document.documentElement.dataset.workspaceEmbedded='true';
 function syncFigure(){const i=figures.findIndex(f=>f.id===doc.id);if(i>=0)figures[i]=doc;else figures.push(doc);}
@@ -218,7 +222,7 @@ function execute(action,payload={}){
   const ids=figureIds(payload);if(!ids.length)return;finishText();const before=snapshot(),result=deleteFigures(figures,ids,doc.id);if(result.figures===figures)return;figures=result.figures;doc=figures.find(f=>f.id===result.activeId);selection=[];record(before);figureSidebar.select([doc.id],doc.id);fit();focusFigure();toast(ids.length+'枚のFigureを削除しました · Ctrl+Zで戻せます');return;
  }
  if(action==='move-figure-left'||action==='move-figure-right'){finishText();const before=snapshot(),i=figures.findIndex(f=>f.id===doc.id),j=i+(action==='move-figure-left'?-1:1);if(j>=0&&j<figures.length){[figures[i],figures[j]]=[figures[j],figures[i]];record(before);}return;}
- if(action==='new'||action==='sample'){finishText();if(dirty&&!confirm('現在のFigureを閉じます。必要な場合は先にCtrl+Sで保存してください。続けますか？'))return;const before=snapshot();if(action==='sample'){const demo=createDemo();doc=demo.doc;for(const [k,v]of demo.assets)assets.set(k,v);}else{doc=newDocument();doc.name='Fig. 1';}bookId=uid();figures=[doc];selection=[];previewQuality.clear();record(before);fit();return;}
+ if(action==='new'||action==='sample'){finishText();if(dirty&&!confirm('現在のFigureを閉じます。必要な場合は先にCtrl+Sで保存してください。続けますか？'))return;const before=snapshot();if(action==='sample'){const demo=createDemo();doc=demo.doc;for(const [k,v]of demo.assets)assets.set(k,v);}else{doc=newDocument();doc.name='Fig. 1';}bookId=uid();preservedWorkspace=null;figures=[doc];selection=[];previewQuality.clear();record(before);fit();return;}
  if(action==='export-svg')return exportSVG();if(action==='export-png')return exportPNG();if(action==='export-pdf')return exportPDF();
  if(action==='attach-source'){if(selected().length!==1||selected()[0].type!=='image'){toast('画像・グラフを1つ選択してください');return;}$('#sourceInput').click();return;}
  if(action==='edit-source'){const o=selected()[0];if(o?.source)editSource(o);else toast('先に「元プロジェクトを関連付け」で .plotproject / .mifito を選択してください');return;}
@@ -272,7 +276,8 @@ document.addEventListener('cut',e=>{if(!clipboardActive(e)||!selection.length)re
 document.addEventListener('paste',async e=>{if(!clipboardActive(e))return;const files=[...e.clipboardData.files].filter(f=>f.type.startsWith('image/'));if(files.length){e.preventDefault();await importImages(files);return;}let copied;try{const raw=e.clipboardData.getData('application/x-figure-studio');if(raw)copied=JSON.parse(raw);}catch{}if(!copied&&e.clipboardData.getData('text/plain')==='Figure Studio objects')copied=clipboard;if(copied?.length){e.preventDefault();const temp={...doc,objects:copied};try{validateDocument(temp);}catch{return;}change(()=>{const groups=new Map();const added=copied.map(o=>{const n=clone(o);n.id=uid();n.x+=mm(3);n.y+=mm(3);if(n.groupId){if(!groups.has(n.groupId))groups.set(n.groupId,uid());n.groupId=groups.get(n.groupId);}return n;});doc.objects.push(...added);selection=added.map(o=>o.id);});}else{const text=e.clipboardData.getData('text/plain');if(text&&text.length<100000){e.preventDefault();change(()=>{const o=makeObject('text',{text});doc.objects.push(o);selection=[o.id];});}}});
 
 function assetIds(){syncFigure();return new Set(figures.flatMap(f=>f.objects.flatMap(o=>[o.assetId,o.source?.assetId])).filter(Boolean));}
-function packageProject(){const used={};for(const id of assetIds()){const a=assets.get(id);if(a){const {previewUrl,persisted,...rest}=a;used[id]=rest;}}return {...snapshot(),assets:used};}
+function packageProject(){const used={};for(const id of assetIds()){const a=assets.get(id);if(a){const {previewUrl,persisted,...rest}=a;used[id]=rest;}}return {...snapshot(),assets:used,...(preservedWorkspace?{workspace:preservedWorkspace}:{})};}
+function workspacePersistence(){const api=getFigureWorkspace(window);return api?installWorkspacePersistence(api,{windowRef:window.parent,documentRef:window.parent.document}):null;}
 function updateProjectFileUI(){
  const target=projectFiles.target(bookId),busy=projectSaving||projectOpening,button=$('[data-action="save"]');
  button.disabled=busy;$('[data-action="save-as"]').disabled=busy;$('[data-action="open"]').disabled=busy;
@@ -284,19 +289,31 @@ function updateProjectFileUI(){
 async function saveProject(saveAs=false){
  if(projectSaving||projectOpening||updateReloading)return;
  if(gesture)endGesture(null,false);finishText();
- const capturedBook=bookId,capturedRevision=revision;
+ const capturedBook=bookId;
  try{
-  const blob=new Blob([JSON.stringify(packageProject())],{type:'application/json'});
-  if(blob.size>400*1024*1024)throw Error('400 MBを超えています。不要なFigureや画像を減らすか、元画像を縮小してください。');
-  const name=`${safeName(figures[0].name)}${figures.length>1?`_and_${figures.length}_figures`:''}.figurestudio`;
   projectSaving=true;updateProjectFileUI();
-  const saved=await projectFiles.save({bookId:capturedBook,revision:capturedRevision,blob,name,saveAs});
+  const name=`${safeName(figures[0].name)}${figures.length>1?`_and_${figures.length}_figures`:''}.figurestudio`;
+  // The picker must be invoked while this trusted click still has activation.
+  const target=await projectFiles.prepare({bookId:capturedBook,name,saveAs});
+  await transferQueue;
+  if(bookId!==capturedBook)throw Error('保存先を選ぶ間にプロジェクトが変わりました。もう一度保存してください。');
+  if(gesture)endGesture(null,false);finishText();
+  const capturedRevision=revision,packaged=packageProject(),workspace=workspacePersistence();
+  const captured=workspace?await workspace.captureWorkspace():null;
+  if(bookId!==capturedBook||revision!==capturedRevision)throw Error('保存中にFigureの内容が変わりました。もう一度保存してください。');
+  if(captured)packaged.workspace=captured.data;
+  const blob=new Blob([JSON.stringify(packaged)],{type:'application/json'});
+  if(blob.size>400*1024*1024)throw Error('全体の保存サイズが400 MBを超えています。不要なFigureや画像を減らしてください。');
+  const saved=await projectFiles.write(target,{revision:capturedRevision,blob});
   try{await saveProjectFileTarget(saved.bookId,{handle:saved.handle,name:saved.name});}catch{}
-  if(bookId===saved.bookId&&revision===saved.revision&&!editingId&&!gesture){dirty=false;manualSavedRevision=saved.revision;toast(`${saved.name} に配置・画像・元プロジェクトを保存しました`);}
+  const editorsUnchanged=captured?await workspace.markWorkspaceSaved(captured):true;
+  if(bookId===saved.bookId)preservedWorkspace=packaged.workspace??null;
+  if(bookId===saved.bookId&&revision===saved.revision&&!editingId&&!gesture&&editorsUnchanged){dirty=false;manualSavedRevision=saved.revision;toast(`${saved.name} に${captured?'3タブの最新状態と未反映の編集':'配置・画像・元プロジェクト'}を保存しました`);}
   else{if(bookId===saved.bookId)dirty=true;toast(`${saved.name} を保存しました。保存開始後の編集は次の保存で反映されます`);}
  }catch(error){toast(error.name==='AbortError'?'保存をキャンセルしました':`保存できませんでした: ${error.message}`);}
  finally{projectSaving=false;updateProjectFileUI();if(!editingId&&!gesture&&document.activeElement?.closest('#projectSaveControls'))svg.focus();}
 }
+
 async function openProject(){
  if(projectSaving||projectOpening||updateReloading)return;
  if(typeof window.showOpenFilePicker!=='function'){return $('#projectInput').click();}
@@ -305,7 +322,67 @@ async function openProject(){
  catch(error){if(error.name!=='AbortError')toast(`開けませんでした: ${error.message}`);}
  finally{projectOpening=false;updateProjectFileUI();}
 }
-async function readProject(file,handle=null){try{if(file.size>400*1024*1024)throw Error('プロジェクトは400 MB以内で開いてください。');const raw=JSON.parse(await file.text());const next=raw.format==='figure-studio-book'?validateBook(raw):{format:'figure-studio-book',version:1,id:uid(),activeId:raw.id,figures:[validateDocument(raw)]},loaded=new Map(),imageIds=new Set(next.figures.flatMap(f=>f.objects.filter(o=>o.type==='image').map(o=>o.assetId)));for(const[id,a]of Object.entries(raw.assets||{})){if(typeof a.dataUrl!=='string'||!a.dataUrl.startsWith('data:'))throw Error('素材データが不正です。');if(imageIds.has(id)){const restored=await imageAsset(dataURLToBlob(a.dataUrl),a.name);loaded.set(id,{...restored,id});}else loaded.set(id,{...a,id});}for(const o of next.figures.flatMap(f=>f.objects))if(o.assetId&&!loaded.has(o.assetId)||o.source?.assetId&&!loaded.has(o.source.assetId))throw Error('必要な素材がありません。');delete next.assets;next.figures.forEach(f=>delete f.assets);if(gesture)endGesture(null,true);finishText();if(dirty&&!confirm('現在のFigureを閉じて、選択したプロジェクトを開きますか？'))return;restoreBook(next);renumberFigureNames(figures);assets=loaded;previewQuality.clear();history.reset();selection=[];dirty=false;revision++;manualSavedRevision=revision;projectFiles.opened(bookId,{handle,name:file.name});const openedBook=bookId;scheduleSave();render();fit();try{await saveProjectFileTarget(openedBook,{handle,name:file.name});}catch{}toast('プロジェクトを開きました');}catch(e){toast(`開けませんでした: ${e.message}`);}}
+async function savedEditorBindings(decoded,next,loaded){
+ const bindings={plot:null,mifito:null};
+ if(!decoded)return bindings;
+ const digest=async blob=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await blob.arrayBuffer())),n=>n.toString(16).padStart(2,'0')).join('');
+ for(const app of ['plot','mifito']){
+  const binding=validateWorkspaceBinding(decoded.editors[app]?.binding??null);if(!binding)continue;
+  if(binding.app!==app)throw Error('保存された編集アプリの関連付けが正しくありません。');
+  for(const figure of next.figures){
+   const panel=figure.objects.find(o=>o.id===binding.panelId&&o.source?.app===app&&sourceEditKey(next.id,figure.id,o.id,o.source.assetId)===binding.editKey);
+   if(!panel)continue;const asset=loaded.get(panel.source.assetId);if(!asset)continue;
+   const baseline=dataURLToBlob(asset.dataUrl);
+   if(baseline.size===binding.baselineProject.size&&await digest(baseline)===await digest(binding.baselineProject))bindings[app]={...binding,baselineProject:baseline,sourceName:panel.source.name};
+   break;
+  }
+ }
+ return bindings;
+}
+async function connectSavedEditors(bindings){
+ for(const app of ['plot','mifito'])if(bindings[app]){
+  const figure=figures.find(f=>f.objects.some(o=>o.id===bindings[app].panelId&&o.source?.app===app&&sourceEditKey(bookId,f.id,o.id,o.source.assetId)===bindings[app].editKey));
+  const panel=figure?.objects.find(o=>o.id===bindings[app].panelId);
+  if(panel){const session=editSource(panel,{figureId:figure.id});if(!(await session.ready).connected)throw Error('復元した編集画面へ接続できませんでした。');}
+ }
+}
+async function readProject(file,handle=null){
+ let plan=null,previous=null,previousBindings=null;
+ try{
+  if(file.size>400*1024*1024)throw Error('プロジェクトは400 MB以内で開いてください。');
+  const raw=JSON.parse(await file.text()),next=raw.format==='figure-studio-book'?validateBook(raw):{format:'figure-studio-book',version:1,id:uid(),activeId:raw.id,figures:[validateDocument(raw)]};
+  const loaded=new Map(),imageIds=new Set(next.figures.flatMap(f=>f.objects.filter(o=>o.type==='image').map(o=>o.assetId)));
+  for(const[id,a]of Object.entries(raw.assets||{})){
+   if(typeof a.dataUrl!=='string'||!a.dataUrl.startsWith('data:'))throw Error('素材データが不正です。');
+   if(imageIds.has(id)){const restored=await imageAsset(dataURLToBlob(a.dataUrl),a.name);loaded.set(id,{...restored,id});}else loaded.set(id,{...a,id});
+  }
+  for(const o of next.figures.flatMap(f=>f.objects))if(o.assetId&&!loaded.has(o.assetId)||o.source?.assetId&&!loaded.has(o.source.assetId))throw Error('必要な素材がありません。');
+  const workspace=workspacePersistence(),hasEditorChanges=workspace?await workspace.hasWorkspaceChanges():false;
+  if(gesture)endGesture(null,true);finishText();
+  if((dirty||hasEditorChanges)&&!confirm('現在の作業内容を閉じて、選択したプロジェクトを開きますか？'))return;
+  if(workspace)plan=await workspace.prepareWorkspaceRestore(raw.workspace??null);
+  else if(raw.workspace)await decodeWorkspaceState(raw.workspace);
+  const bindings=plan?await savedEditorBindings(plan.decoded,next,loaded):null;
+  previous={book:snapshot(),assets,selection:[...selection],dirty,revision,manualSavedRevision,preservedWorkspace,past:history.past,future:history.future};
+  if(plan){previousBindings=await savedEditorBindings({editors:plan.previousEditors},previous.book,previous.assets);await plan.apply();}
+  closeSourceSessions();
+  restoreBook(next);renumberFigureNames(figures);assets=loaded;preservedWorkspace=raw.workspace??null;previewQuality.clear();history.reset();selection=[];dirty=false;revision++;manualSavedRevision=revision;render();fit();
+  if(plan){
+   await plan.bind(bindings);
+   await connectSavedEditors(bindings);
+   await plan.complete();
+  }
+  projectFiles.opened(bookId,{handle,name:file.name});const openedBook=bookId;
+  scheduleSave();try{await saveProjectFileTarget(openedBook,{handle,name:file.name});}catch{}
+  toast(raw.workspace?'3タブの最新状態と未反映の編集を復元しました':'プロジェクトを開きました');
+ }catch(error){
+  if(previous)closeSourceSessions();
+  if(previous){restoreBook(previous.book);assets=previous.assets;selection=previous.selection;dirty=previous.dirty;revision=previous.revision;manualSavedRevision=previous.manualSavedRevision;preservedWorkspace=previous.preservedWorkspace;history.past=previous.past;history.future=previous.future;render();}
+  try{await plan?.cancel();if(previousBindings)await connectSavedEditors(previousBindings);}catch(rollbackError){toast(rollbackError.message);return;}
+  toast(`開けませんでした: ${error.message}`);
+ }
+}
+
 $('#projectInput').addEventListener('change',async e=>{const file=e.target.files[0];e.target.value='';if(!file||projectSaving||projectOpening||updateReloading)return;projectOpening=true;updateProjectFileUI();try{await readProject(file);}finally{projectOpening=false;updateProjectFileUI();}});
 $('#sourceInput').addEventListener('change',async e=>{const f=e.target.files[0],o=selected()[0];e.target.value='';if(!f||!o)return;const documentId=doc.id,panelId=o.id;try{if(f.size>280*1024*1024)throw Error('元プロジェクトは280 MB以内です。');const app=/\.mifito$/i.test(f.name)?'mifito':'plot',a={id:uid(),name:f.name,mime:'application/octet-stream',dataUrl:await blobToDataURL(f)};if(doc.id!==documentId)return;const target=doc.objects.find(n=>n.id===panelId);if(!target)return;assets.set(a.id,a);change(()=>target.source={app,name:f.name,assetId:a.id});toast('元プロジェクトを関連付けました');}catch(error){toast(error.message);}});
 function sourceEditKey(book,figure,panel,sourceAsset){return [book,figure,panel,sourceAsset].join('/');}
@@ -390,8 +467,8 @@ async function syncMiFiToFigures(result,{guard,anchorPanelId,targetFigureId=doc.
  catch{toast(done.message+'。自動保存できないためCtrl+Sで保存してください。');}
  return done;
 }
-function editSource(o){
- const documentId=doc.id,editingBook=bookId,panelId=o.id,app=o.source?.app;
+function editSource(o,{figureId=doc.id}={}){
+ const documentId=figureId,editingBook=bookId,panelId=o.id,app=o.source?.app;
  let expectedSourceAsset=o.source?.assetId;
  const asset=assets.get(expectedSourceAsset);if(!asset){toast('元プロジェクトを関連付けてください');return;}
  const locate=()=>{
@@ -422,6 +499,7 @@ function editSource(o){
    }catch(error){toast('反映できませんでした: '+error.message);throw error;}
   }
  });
+ return bridge;
 }
 
 function buildExport(){finishText();const out=el('svg',{xmlns:ns,width:`${toMM(doc.width)}mm`,height:`${toMM(doc.height)}mm`,viewBox:`0 0 ${doc.width} ${doc.height}`});out.append(el('rect',{width:doc.width,height:doc.height,fill:'#ffffff'}));for(const o of doc.objects){const g=el('g');drawContent(o,g,true);g.removeAttribute('data-id');g.removeAttribute('style');out.append(g);}return new XMLSerializer().serializeToString(out);}

@@ -1,15 +1,15 @@
-import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=cb1c1eee62c6';
-import {setupDirectSendButton} from './direct-transfer.mjs?v=cb1c1eee62c6';
+import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=9f84083e4601';
+import {setupDirectSendButton} from './direct-transfer.mjs?v=9f84083e4601';
 import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=9127ec4c4f31";
 import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=9127ec4c4f31";
 import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9127ec4c4f31";
 import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=9127ec4c4f31";
 import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=9127ec4c4f31";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=cb1c1eee62c6";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=9f84083e4601";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
-const APP_BUILD = "cb1c1eee62c6";
+const APP_BUILD = "9f84083e4601";
 
 function positionDialog(dialog, left, top) {
   const box=dialog.getBoundingClientRect(), gap=8;
@@ -176,6 +176,7 @@ function hasUnsavedChanges() {
 
 window.addEventListener('beforeunload', event => {
   if(updateReloading)return;
+  if(figureWorkspaceSavedSignature&&window.FigureStudioWorkspaceState?.signature()===figureWorkspaceSavedSignature)return;
   if (!hasUnsavedChanges()) return;
   event.preventDefault();
   event.returnValue = '';
@@ -510,8 +511,8 @@ function syncUnitControls(manualKey = null) {
   }
 }
 function openAxisEditor(axis, kind) {
-  if (!metadata || loading || exporting || renderRunning || renderedRevision !== revision) return;
-  const fields = $('#axis-editor-fields'); fields.dataset.axisName = axis;
+  if (!metadata || loading || exporting || !figureWorkspaceRestoring&&(renderRunning || renderedRevision !== revision)) return;
+  const fields = $('#axis-editor-fields'); fields.dataset.axisName = axis;fields.dataset.workspaceKind=kind;
   let html='';
   const label = (key, text, type='text', extra='') => `<label${isLabelPadding(key) ? ` title="${LABEL_PADDING_HINT}"` : ''}>${text}${key.endsWith('Unit') ? `<select data-unit-axis="${key.slice(0,-4)}" aria-label="${axisName(axis)}軸の単位"></select>` : ''}<input data-axis="${key}" type="${type}" value="${escapeHTML(axisControlValue(key, config.axes[key]))}" ${type==='text' && /(Label|Unit)$/.test(key)?`title="${MICRO_HINT}"`:''} ${key.endsWith('Unit') ? `aria-label="${axisName(axis)}軸単位を入力" placeholder="任意の単位"` : ''} ${extra}></label>`;
   $('#axis-editor-title').textContent = `${axisName(axis)}軸${kind === 'label' ? 'ラベル' : '目盛り'}の設定`;
@@ -2557,8 +2558,8 @@ $("#annotation-list").addEventListener("click", event => {
 
 function openElementEditor(part,index=0) {
   const switchingSeries=$('#element-editor').open && ['series','seriesAll'].includes(part);
-  if(!metadata || loading || exporting || (renderRunning || renderedRevision!==revision) && !switchingSeries)return;
-  const fields=$('#element-editor-fields');let sources=[],title='';
+  if(!metadata || loading || exporting || (renderRunning || renderedRevision!==revision) && !switchingSeries&&!figureWorkspaceRestoring)return;
+  const fields=$('#element-editor-fields');fields.dataset.workspacePart=part;fields.dataset.workspaceIndex=String(index);let sources=[],title='';
   if(part==='seriesAll') {
     if(!editableXY(config.plotType) || !config.series[index])return;
     title='全系列の設定';
@@ -3125,4 +3126,147 @@ figureStudioDirectSender = setupDirectSendButton({app:'plot',captureResult:captu
   async onAccepted(result){await figureStudioBridge?.rememberAccepted(result);if(result?.bridgeState)figureBridgeBaseline=result.bridgeState;},
   isReady:()=>engineReady&&!loading&&!exporting&&!renderRunning&&!!metadata&&!!sourceData&&!!config.series.length&&renderedRevision===revision});
 figureStudioDirectSender?.setBridgeConnected(figureStudioBridge?.isConnected===true);
+
+// Figure Studio workspace snapshots retain editor work separately from reflected figures.
+var figureWorkspaceSavedSignature=null;
+let figureWorkspaceRestoring=false,figureWorkspaceCapturing=false;
+const figureWorkspaceTokens=new WeakMap();
+const figureWorkspaceAttributes=['data-axis','data-option','data-series-field','data-annotation-field','data-legend-field','data-legend-key','data-fill','data-unit-axis','data-axis-auto','data-axis-name','data-series-scope','data-preview-preset'];
+const figureWorkspaceDialogIds=new Set($$('dialog[id]').map(node=>node.id));
+const figureWorkspaceToken=value=>{if(!value)return null;if(!figureWorkspaceTokens.has(value))figureWorkspaceTokens.set(value,crypto.randomUUID());return figureWorkspaceTokens.get(value);};
+
+// Pure guards: reject live browser objects, oversized graphs and malformed state before worker or UI changes.
+function validateFigureWorkspaceGraph(root){
+ const seen=new Set(),stack=[{value:root,depth:0}];let nodes=0,text=0,bytes=0;
+ while(stack.length){const {value,depth}=stack.pop();if(depth>80||++nodes>250000)throw Error('PlotLauncherの保存状態が複雑すぎます。');
+  if(value==null||typeof value==='boolean')continue;
+  if(typeof value==='string'){text+=value.length*2;if(text>64*1024*1024)throw Error('PlotLauncherの文字情報が大きすぎます。');continue;}
+  if(typeof value==='number'){if(!Number.isFinite(value))throw Error('PlotLauncherの数値情報が不正です。');continue;}
+  if(typeof value!=='object')throw Error('PlotLauncherの保存状態に対応しない値があります。');if(seen.has(value))continue;seen.add(value);
+  if(value instanceof ArrayBuffer){bytes+=value.byteLength;if(bytes>260*1024*1024)throw Error('PlotLauncherの保存データが大きすぎます。');continue;}
+  if(ArrayBuffer.isView(value)){stack.push({value:value.buffer,depth:depth+1});continue;}
+  if(typeof Blob!=='undefined'&&value instanceof Blob){bytes+=value.size;if(bytes>260*1024*1024)throw Error('PlotLauncherの保存データが大きすぎます。');continue;}
+  if(value instanceof Date){if(!Number.isFinite(value.getTime()))throw Error('保存日時が不正です。');continue;}
+  if(value instanceof Map){for(const [key,item]of value)stack.push({value:key,depth:depth+1},{value:item,depth:depth+1});continue;}
+  if(value instanceof Set){for(const item of value)stack.push({value:item,depth:depth+1});continue;}
+  if(!Array.isArray(value)&&Object.getPrototypeOf(value)!==Object.prototype&&Object.getPrototypeOf(value)!==null)throw Error('ファイルへのアクセス情報などは保存できません。');
+  for(const [key,descriptor]of Object.entries(Object.getOwnPropertyDescriptors(value))){if(['__proto__','prototype','constructor'].includes(key)||descriptor.get||descriptor.set)throw Error('PlotLauncherの保存状態が不正です。');if(key!=='length')stack.push({value:descriptor.value,depth:depth+1});}
+ }
+ return true;
+}
+function validateFigureWorkspaceState(snapshot){
+ if(snapshot==null)return true;validateFigureWorkspaceGraph(snapshot);
+ if(snapshot.version!==1||snapshot.app!=='plot'||!Object.hasOwn(snapshot,'state'))throw Error('PlotLauncherの作業状態ではありません。');
+ const state=snapshot.state;if(state===null)return true;
+ const fail=()=>{throw Error('PlotLauncherの作業状態を確認してください。');};
+ const string=(value,max=1000)=>typeof value==='string'&&value.length<=max;
+ const list=(value,max)=>Array.isArray(value)&&value.length<=max;
+ const configValid=value=>{if(!value||typeof value!=='object'||!value.axes||typeof value.axes!=='object'||Array.isArray(value.axes)||!list(value.series,32)||value.annotations!==undefined&&!list(value.annotations,200))return false;try{return JSON.stringify(value,(_key,item)=>{if(item&&typeof item==='object'&&!Array.isArray(item)&&Object.getPrototypeOf(item)!==Object.prototype&&Object.getPrototypeOf(item)!==null)throw Error();return item;}).length<=8*1024*1024;}catch{return false;}};
+ if(!state||state.format!=='plotlauncher-workspace'||state.version!==1||!configValid(state.config)||!list(state.fonts,32)||!list(state.fontFamilies,200)||!list(state.fontAliases,200)||!list(state.history,30)||!list(state.future,30)||!list(state.selected,300)||!list(state.clipboard,200)||!list(state.sheetSettings,1001)||!['shared','individual'].includes(state.sheetMode)||!Number.isInteger(state.loadedHeader)||state.loadedHeader<1||state.loadedHeader>1000||typeof state.sample!=='boolean'||!string(state.projectFilename,255))fail();
+ if(state.history.some(value=>!configValid(value))||state.future.some(value=>!configValid(value))||state.lastState!==undefined&&!configValid(state.lastState)||state.selected.some(value=>!string(value,200))||state.fontFamilies.some(value=>!string(value,200))||state.fontAliases.some(value=>!list(value,2)||value.length!==2||value.some(item=>!string(item,200))))fail();
+ let fontBytes=0;for(const font of state.fonts){if(!string(font?.name,255)||!string(font?.family,200)||!(font.bytes instanceof ArrayBuffer)||!font.bytes.byteLength||font.bytes.byteLength>20*1024*1024)fail();fontBytes+=font.bytes.byteLength;}if(fontBytes>60*1024*1024)fail();
+ if(state.sourceData){const data=state.sourceData,meta=state.metadata;if(!string(data.filename,255)||!/\.(xlsx|xlsm|xls|csv|txt)$/i.test(data.filename)||!meta||meta.filename!==data.filename||!list(meta.columns,20000)||!list(meta.sheets,1001)||!Number.isInteger(meta.sheetIndex)||meta.sheetIndex<0||meta.sheetIndex>=meta.sheets.length)fail();
+  const files=data.files??[data];if(!list(files,16)||!files.length)fail();let total=0;for(const file of files){if(!string(file?.filename,255)||!/\.(xlsx|xlsm|xls|csv|txt)$/i.test(file.filename)||!(file.bytes instanceof ArrayBuffer)||!file.bytes.byteLength)fail();total+=file.bytes.byteLength;if(data.files&&(!Number.isInteger(file.sheetIndex)||file.sheetIndex<0||file.sheetIndex>1000||!Number.isInteger(file.headerRow)||file.headerRow<1||file.headerRow>1000))fail();}if(total>30*1024*1024)fail();
+  if(state.config.series.length)restoreSettings(makeSettings(state.config,meta,state.loadedHeader),meta);
+ }else if(state.metadata!==null)fail();
+ for(const entry of state.sheetSettings)if(!list(entry,2)||entry.length!==2||!Number.isInteger(entry[0])||entry[0]<0||entry[0]>1000||entry[1]?.format!=='plotlauncher-web'||entry[1].version!==1)fail();
+ const w=state.workspace,u=state.ui;if(!w||!string(w.saveName,120)||![150,300,600,1200].includes(Number(w.pngDpi))||!w.view||!Number.isFinite(w.view.zoom)||w.view.zoom<.25||w.view.zoom>4||!Number.isFinite(w.view.x)||!Number.isFinite(w.view.y)||!list(w.details,1000)||typeof w.tableHidden!=='boolean'||typeof w.tableDetails!=='boolean'||!Number.isFinite(w.controlScroll)||!Number.isFinite(w.pageScroll)||!u||!list(u.fields,12000)||!list(u.dialogs,50)||!list(u.details,2000))fail();
+ const locator=value=>value&&string(value.scope,200)&&string(value.id,200)&&['INPUT','SELECT','TEXTAREA'].includes(value.tag)&&string(value.type,30)&&list(value.attributes,figureWorkspaceAttributes.length)&&value.attributes.every(pair=>list(pair,2)&&pair.length===2&&figureWorkspaceAttributes.includes(pair[0])&&string(pair[1],1000))&&Number.isInteger(value.ordinal)&&value.ordinal>=0&&value.ordinal<12000;
+ for(const field of u.fields)if(!locator(field.locator)||!string(field.value,30*1024*1024)||typeof field.checked!=='boolean'||typeof field.indeterminate!=='boolean'||field.badInput===true)fail();
+ for(const dialog of u.dialogs)if(!string(dialog.id,200)||!string(dialog.left,50)||!string(dialog.top,50)||dialog.left&&!/^-?[\d.]+px$/.test(dialog.left)||dialog.top&&!/^-?[\d.]+px$/.test(dialog.top))fail();
+ for(const detail of u.details)if(!string(detail.scope,200)||!Number.isInteger(detail.index)||detail.index<0||detail.index>2000||typeof detail.open!=='boolean')fail();
+ if(u.colorTarget&&!locator(u.colorTarget)||u.focus&&!locator(u.focus))fail();
+ if(u.axis&&(!['x','y','y2'].includes(u.axis.axis)||!['label','ticks'].includes(u.axis.kind)))fail();
+ if(u.element&&(!['series','seriesAll','trend','annotation','legend','preset','frame','figureBackground','plotBackground','grid'].includes(u.element.part)||!string(u.element.index,200)||u.element.origin!==undefined&&!string(u.element.origin,200)||u.element.part!=='legend'&&(!/^\d+$/.test(u.element.index)||Number(u.element.index)>200)))fail();
+ if(!string(state.sourceToken,200)&&state.sourceToken!==null||state.sourceData&&!string(state.sourceToken,200)||!list(state.fontTokens,32)||state.fontTokens.length!==state.fonts.length||state.fontTokens.some(value=>!string(value,200)))fail();
+ if(state.pendingDataFiles!==null&&(!list(state.pendingDataFiles,16)||state.pendingDataFiles.some(file=>!(file instanceof File))))fail();
+ return true;
+}
+// End pure workspace validation helpers.
+
+function figureWorkspaceFields(root=document){return [...root.querySelectorAll('input,select,textarea')].filter(input=>!['file','password','hidden'].includes(input.type)&&input.id!=='save-destination'&&(!input.closest('dialog')||input.closest('dialog').open));}
+function figureWorkspaceBaseLocator(input){return {scope:input.closest('dialog')?.id||'',id:input.id||'',tag:input.tagName,type:input.type||'',attributes:figureWorkspaceAttributes.filter(name=>input.hasAttribute(name)).map(name=>[name,input.getAttribute(name)]),ordinal:0};}
+const figureWorkspaceLocatorKey=locator=>JSON.stringify([locator.scope,locator.id,locator.tag,locator.type,locator.attributes]);
+function figureWorkspaceLocator(input){
+ const locator=figureWorkspaceBaseLocator(input),root=locator.scope?document.getElementById(locator.scope):document;
+ locator.ordinal=figureWorkspaceFields(root).filter(node=>figureWorkspaceMatches(node,locator)).indexOf(input);return locator;
+}
+function figureWorkspaceMatches(input,locator){return (input.closest('dialog')?.id||'')===locator.scope&&input.id===locator.id&&input.tagName===locator.tag&&(input.type||'')===locator.type&&locator.attributes.every(([name,value])=>input.getAttribute(name)===value);}
+function figureWorkspaceField(locator){const root=locator.scope?document.getElementById(locator.scope):document;return root?figureWorkspaceFields(root).filter(input=>figureWorkspaceMatches(input,locator))[locator.ordinal]:null;}
+function figureWorkspaceUI({rejectInvalid=false}={}){
+ const locators=new Map(),ordinals=new Map();
+ const fields=figureWorkspaceFields().map(input=>{if(rejectInvalid&&input.validity?.badInput)throw Error(`「${input.getAttribute('aria-label')||input.closest('label')?.textContent?.trim().slice(0,60)||input.dataset.axis||input.id||'数値欄'}」の入力を確定してから保存してください。`);const locator=figureWorkspaceBaseLocator(input),key=figureWorkspaceLocatorKey(locator);locator.ordinal=ordinals.get(key)||0;ordinals.set(key,locator.ordinal+1);locators.set(input,locator);return {locator,value:input.value,checked:!!input.checked,indeterminate:!!input.indeterminate,badInput:!!input.validity?.badInput};});
+ const dialogs=$$('dialog[open]').map(dialog=>({id:dialog.id,left:dialog.style.left||'',top:dialog.style.top||''}));
+ return {fields,dialogs,details:$$('details').filter(node=>!node.closest('dialog')||node.closest('dialog').open).map(node=>{const scope=node.closest('dialog')?.id||'',root=scope?document.getElementById(scope):document;return {scope,index:[...root.querySelectorAll('details')].filter(item=>(item.closest('dialog')?.id||'')===scope).indexOf(node),open:node.open};}),
+  axis:$('#axis-editor').open?{axis:$('#axis-editor-fields').dataset.axisName,kind:$('#axis-editor-fields').dataset.workspaceKind||($('#axis-editor-fields').querySelector('[data-axis$="Label"]')?'label':'ticks')}:null,
+  element:$('#element-editor').open?{part:$('#element-editor-fields').dataset.workspacePart,index:$('#element-editor-fields').dataset.workspaceIndex||'0',origin:$('#element-editor-fields').dataset.seriesEditorOrigin||''}:null,
+  colorTarget:$('#color-panel').open&&colorTarget?.isConnected?locators.get(colorTarget)||null:null,
+  focus:locators.get(document.activeElement)||null};
+}
+function figureWorkspaceHasWork(){return !!sourceData||[...importedFonts.values()].some(font=>!font.automatic)||!!pendingDataFiles||!!$('#paste-text').value||JSON.stringify(config)!==JSON.stringify({axes:defaultAxes(),series:[]});}
+function figureWorkspaceBusy(){return figureWorkspaceCapturing||figureWorkspaceRestoring||loading||exporting||!!dragging||!!panning||colormapApplying||updateReloading||updateChecking||!!figureStudioDirectSender?.busy;}
+function figureWorkspaceSignature(){
+ if(!figureWorkspaceHasWork())return 'plot-empty';
+ const ui=figureWorkspaceUI();ui.focus=null;
+ const value=JSON.stringify({source:figureWorkspaceToken(sourceData),fonts:[...importedFonts.values()].map(figureWorkspaceToken),config,loadedHeader,sample,sheets:[...sheetSettings],sheetMode,sharedSettings,history,future,lastState,selected:[...selected],clipboard,view,ui,pending:pendingDataFiles?.map(file=>[file.name,file.size,file.lastModified]),pasteHeaderAutomatic});
+ let a=2166136261,b=2246822507;for(let i=0;i<value.length;i++){const code=value.charCodeAt(i);a=Math.imul(a^code,16777619);b=Math.imul(b^code,3266489909);}return `plot-${value.length}-${(a>>>0).toString(16)}-${(b>>>0).toString(16)}`;
+}
+function figureWorkspaceEmpty(){return {format:'plotlauncher-workspace',version:1,config:{axes:defaultAxes(),series:[]},sourceData:null,metadata:null,fonts:[],fontFamilies:['Liberation Sans','Noto Sans JP','DejaVu Sans'],fontAliases:[],savedProjectState:null,loadedHeader:1,sample:false,sheetSettings:[],sheetMode:'shared',sharedSettings:null,history:[],future:[],lastState:undefined,selected:[],clipboard:[],projectFilename:'',sourceToken:null,fontTokens:[],bridgeBaseline:null,pendingDataFiles:null,pastedTable:null,pasteHeaderAutomatic:true,recentColors:[],workspace:{saveName:$('#save-name').defaultValue||'graph',pngDpi:'1200',saveDestination:'download',view:{zoom:1,x:0,y:0},tableHidden:false,tableDetails:false,details:[],controlScroll:0,pageScroll:0},ui:{fields:[],dialogs:[],details:[],axis:null,element:null,colorTarget:null,focus:null}};}
+async function captureFigureWorkspace(){
+ if(figureWorkspaceBusy())throw Error('PlotLauncherの処理が終わってから保存してください。');
+ if(!figureWorkspaceHasWork())return {version:1,app:'plot',state:null,binding:null};
+ figureWorkspaceUI({rejectInvalid:true});
+ await figureBridgeWait(()=>engineReady&&!renderRunning&&!renderWanted&&(renderedRevision===revision||!metadata||!config.series.length||$('#preview-state').classList.contains('error')));
+ if(figureWorkspaceBusy())throw Error('PlotLauncherの処理が終わってから保存してください。');
+ figureWorkspaceCapturing=true;exporting=true;
+ try{
+  const {handles,...record}=captureUpdateSession(null);
+  const state={...record,format:'plotlauncher-workspace',projectFilename:handles.projectFilename,sourceToken:figureWorkspaceToken(sourceData),fontTokens:[...importedFonts.values()].map(figureWorkspaceToken),bridgeBaseline:figureBridgeBaseline,pendingDataFiles,pastedTable,pasteHeaderAutomatic,recentColors:[...recentColors],ui:figureWorkspaceUI({rejectInvalid:true})};
+  const snapshot=structuredClone({version:1,app:'plot',state,binding:null});snapshot.binding=await figureStudioBridge?.captureWorkspaceBinding?.()??null;validateFigureWorkspaceState(snapshot);return snapshot;
+ }finally{figureWorkspaceCapturing=false;exporting=false;if(renderWanted)renderPreview();}
+}
+async function restoreFigureWorkspace(snapshot){
+ if(figureWorkspaceBusy())throw Error('PlotLauncherの処理が終わってから開いてください。');
+ snapshot=snapshot==null?null:structuredClone(snapshot);
+ validateFigureWorkspaceState(snapshot);
+ const record=structuredClone(snapshot?.state||figureWorkspaceEmpty());
+ await figureBridgeWait(()=>(engineReady||!record.sourceData&&!record.fonts.length)&&!loading&&!exporting&&!renderRunning);
+ if(figureWorkspaceBusy())throw Error('PlotLauncherの処理が終わってから開いてください。');
+ figureWorkspaceRestoring=true;loading=true;updateButtons();
+ try{
+  let restoredMetadata=null;
+  if(record.sourceData){const data=record.sourceData;restoredMetadata=data.files?await request('load-many',{filename:data.filename,files:data.files.map(file=>({...file,bytes:file.bytes.slice(0)}))}):await request('load',{filename:data.filename,bytes:data.bytes.slice(0),sheetIndex:record.metadata.sheetIndex,headerRow:record.loadedHeader});if(restoredMetadata.filename!==record.metadata.filename||restoredMetadata.sheetIndex!==record.metadata.sheetIndex)throw Error('元データのシートを復元できませんでした。');}
+  for(const font of record.fonts)await request('font',{filename:font.name,bytes:font.bytes.slice(0)});
+  $$('dialog[open]').forEach(dialog=>dialog.close());
+  config=record.config;sourceData=record.sourceData;metadata=restoredMetadata;importedFonts.clear();record.fonts.forEach(font=>importedFonts.set(font.name,font));
+  loadedFonts.clear();record.fontFamilies.forEach(family=>loadedFonts.add(family));localFontAliases.clear();record.fontAliases.forEach(([family,alias])=>localFontAliases.set(family,alias));failedLocalFonts.clear();
+  if(sourceData)figureWorkspaceTokens.set(sourceData,record.sourceToken);record.fonts.forEach((font,index)=>figureWorkspaceTokens.set(font,record.fontTokens[index]));
+  savedProjectState=record.savedProjectState;figureBridgeBaseline=record.bridgeBaseline;figureBridgePreservedOnReconnect=false;loadedHeader=record.loadedHeader;sample=record.sample;
+  sheetSettings=new Map(record.sheetSettings);sheetMode=record.sheetMode;sharedSettings=record.sharedSettings;history=record.history;future=record.future;lastState=record.lastState;selected=new Set(record.selected);clipboard=record.clipboard;
+  sourceHandle=sourceDirectory=saveDirectory=projectHandle=null;dataFileHandles=[];projectFilename=record.projectFilename;
+  pendingDataFiles=record.pendingDataFiles;pastedTable=record.pastedTable;pasteHeaderAutomatic=record.pasteHeaderAutomatic;recentColors.splice(0,recentColors.length,...(record.recentColors||[]));
+  const workspace=record.workspace;view=workspace.view;$('#save-name').value=workspace.saveName;$('#png-dpi').value=workspace.pngDpi;$('#save-destination').value='download';
+  clearTimeout(renderTimer);++revision;resetPreview();if(metadata)drawMetadata();else{$('#data-preview').hidden=true;$('#initial-message strong').textContent='データを選んでください';$('#preview-state').textContent='データ未選択';}
+  drawControls();refreshSaveDestination();if($('#series-table-content').hidden!==workspace.tableHidden)toggleSeriesTable();$('#series-table-details').checked=workspace.tableDetails;$('#series-table').dataset.details=String(workspace.tableDetails);
+  $('#undo').disabled=!history.length;$('#redo').disabled=!future.length;renderWanted=!!metadata&&!!config.series.length;
+ }catch(error){figureWorkspaceRestoring=false;throw error;}finally{loading=false;updateButtons();}
+ try{
+  if(renderWanted)await renderPreview();
+  await figureBridgeWait(()=>!renderRunning&&!renderWanted);
+  if(record.ui.axis&&metadata)openAxisEditor(record.ui.axis.axis,record.ui.axis.kind);
+  if(record.ui.element&&metadata){const {part,index,origin}=record.ui.element;if(['series','seriesAll'].includes(part)&&/^\d+$/.test(origin||'')&&config.series[Number(origin)]&&origin!==index)openElementEditor('series',Number(origin));openElementEditor(part,part==='legend'?index:Number(index));$('#element-editor-fields').dataset.seriesEditorOrigin=origin||'';}
+  for(const saved of record.ui.dialogs){if(!figureWorkspaceDialogIds.has(saved.id))continue;const dialog=document.getElementById(saved.id);if(saved.id==='color-panel'&&record.ui.colorTarget){const target=figureWorkspaceField(record.ui.colorTarget);if(target)openColorPanel(target,'色');}else if(!dialog.open)dialog.showModal();if(saved.left&&saved.top)positionDialog(dialog,parseFloat(saved.left),parseFloat(saved.top));}
+  const fieldIndex=new Map();for(const input of figureWorkspaceFields()){const key=figureWorkspaceLocatorKey(figureWorkspaceBaseLocator(input));if(!fieldIndex.has(key))fieldIndex.set(key,[]);fieldIndex.get(key).push(input);}
+  for(const field of record.ui.fields){const input=fieldIndex.get(figureWorkspaceLocatorKey(field.locator))?.[field.locator.ordinal];if(!input)continue;input.value=field.value;if(input.type==='checkbox'||input.type==='radio'){input.checked=field.checked;input.indeterminate=field.indeterminate;}}
+  for(const detail of record.ui.details){const root=detail.scope?document.getElementById(detail.scope):document;if(!root)continue;const node=[...root.querySelectorAll('details')].filter(item=>(item.closest('dialog')?.id||'')===detail.scope)[detail.index];if(node)node.open=detail.open;}
+  selected=new Set(record.selected);syncInteractionSelection();$('#controls-panel').scrollTop=record.workspace.controlScroll;window.scrollTo?.(0,record.workspace.pageScroll);
+  if($('#paste-dialog').open){const automatic=pasteHeaderAutomatic;pasteHeaderAutomatic=false;updatePastePreview();pasteHeaderAutomatic=automatic;}
+  if(record.ui.focus)figureWorkspaceField(record.ui.focus)?.focus({preventScroll:true});
+  figureWorkspaceSavedSignature=null;status('PlotLauncherの作業状態を復元しました。','ready');
+ }finally{figureWorkspaceRestoring=false;}
+}
+window.FigureStudioWorkspaceState={version:1,app:'plot',capture:captureFigureWorkspace,async validate(snapshot){return validateFigureWorkspaceState(snapshot==null?null:structuredClone(snapshot));},restore:restoreFigureWorkspace,signature:figureWorkspaceSignature,hasWork:figureWorkspaceHasWork,getBusy:figureWorkspaceBusy,
+ async restoreBinding(binding){if(binding==null)return figureStudioBridge?.resetWorkspaceBinding?.();return figureStudioBridge?.restoreWorkspaceBinding?.(structuredClone(binding));},
+ markSaved(signature){if(typeof signature==='string'&&signature===figureWorkspaceSignature()){figureWorkspaceSavedSignature=signature;return true;}return false;}
+};
 
