@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Figure Studio · 描画性能の診断</title>
+  <style>
+    :root{font-family:Arial,"Yu Gothic UI",sans-serif;color:#16363d;background:#eef2f3;font-synthesis:none}
+    *{box-sizing:border-box}body{margin:0;padding:24px}main{max-width:1080px;margin:auto}
+    header{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;margin-bottom:18px}
+    h1{font-size:22px;margin:0 0 8px;font-weight:600}h2{font-size:15px;margin:0 0 8px}
+    p{font-size:13px;line-height:1.65;margin:0;color:#47646b}a{color:#087d82}
+    button{font:inherit;font-size:13px;padding:10px 16px;border:1px solid #c3d0d3;border-radius:6px;background:#fff;color:#16363d;cursor:pointer;white-space:nowrap}
+    button.primary{background:#087d82;border-color:#087d82;color:white}button:disabled{opacity:.5;cursor:default}
+    .actions{display:flex;align-items:center;gap:8px}.facts{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;margin:16px 0}
+    .facts strong{font-weight:600}.metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:16px 0}
+    .metric{background:#fff;border:1px solid #d8e1e3;padding:14px;border-radius:7px}.metric dt{font-size:12px;color:#557078;margin-bottom:8px}.metric dd{font-size:23px;font-variant-numeric:tabular-nums;margin:0}.metric dd small{font-size:12px;color:#557078}
+    #benchmarkStatus{font-size:13px;min-height:20px;margin:10px 0;color:#087d82}
+    .stage{background:#e2e8ea;border:1px solid #ccd7da;padding:20px;overflow:auto;border-radius:8px}
+    #benchmarkCanvas{display:block;width:100%;height:auto;min-width:600px;background:white;border:1px solid #d4dfe1;box-shadow:0 4px 15px #16363d12}
+    .note{padding:16px 0}.note p+p{margin-top:7px}details{margin-top:12px}summary{cursor:pointer;font-size:13px}pre{white-space:pre-wrap;font-size:12px;background:white;padding:14px;border:1px solid #d8e1e3;max-height:300px;overflow:auto}
+    progress{width:100%;height:6px;accent-color:#087d82;margin:0 0 14px}
+    @media(max-width:760px){body{padding:14px}header{flex-direction:column;gap:14px}.metrics{grid-template-columns:repeat(2,1fr)}.stage{padding:8px}}
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>描画性能の診断</h1>
+      <p>Figure Studio v0 · 模擬素材を使った独立ベンチマーク</p>
+    </div>
+    <div class="actions">
+      <a href="../index.html">エディターへ戻る</a>
+      <button type="button" class="primary" id="runBenchmark">120フレームを測定</button>
+      <button type="button" id="stopBenchmark" disabled>中止</button>
+    </div>
+  </header>
+  <div class="facts" aria-label="測定条件">
+    <span><strong>20</strong> 枚の模擬画像</span>
+    <span><strong>80</strong> テキスト</span>
+    <span><strong>20</strong> 矢印</span>
+    <span><strong>120</strong> 要素を毎フレーム移動</span>
+  </div>
+  <div id="benchmarkStatus" role="status" aria-live="polite">未測定 · ボタンを押すと開始します。</div>
+  <progress id="benchmarkProgress" max="120" value="0" aria-label="測定フレーム数"></progress>
+  <dl class="metrics">
+    <div class="metric"><dt>平均フレーム間隔</dt><dd><span id="metricFrameAverage">—</span> <small>ms</small></dd></div>
+    <div class="metric"><dt>最大フレーム間隔</dt><dd><span id="metricFrameMaximum">—</span> <small>ms</small></dd></div>
+    <div class="metric"><dt>95%点 フレーム間隔</dt><dd><span id="metricFrameP95">—</span> <small>ms</small></dd></div>
+    <div class="metric"><dt>平均JS更新時間</dt><dd><span id="metricUpdateAverage">—</span> <small>ms</small></dd></div>
+    <div class="metric"><dt>最大JS更新時間</dt><dd><span id="metricUpdateMaximum">—</span> <small>ms</small></dd></div>
+  </dl>
+  <div class="stage">
+    <svg id="benchmarkCanvas" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 710" role="img" aria-label="20枚の模擬グラフと100個の注釈を並べた測定用画面">
+      <g id="benchmarkObjects"></g>
+      <g id="benchmarkOverlay" fill="none" stroke="#087d82" pointer-events="none"></g>
+    </svg>
+  </div>
+  <section class="note">
+    <h2>この数値が示す範囲</h2>
+    <p>小さなデータURIの模擬画像を事前に読み込み、モデルの座標・SVGのtransform・選択枠を更新します。12フレームの準備後、requestAnimationFrameの呼出間隔を120回測定します。タブを前面にしたまま実行してください。</p>
+    <p>画面のリフレッシュレート、ブラウザ、ほかの処理によって数値は変わります。フレーム間隔は入力遅延やGPUの描画完了時間ではありません。巨大な実画像、ファイル保存、書き出し、文字入力、元アプリとの連携は測定対象外で、実際のエディターの操作確認は別途必要です。</p>
+    <details>
+      <summary>測定値と条件のJSON</summary>
+      <pre id="benchmarkResults">未測定</pre>
+    </details>
+  </section>
+</main>
+<script type="module" src="./performance.mjs"></script>
+</body>
+</html>
