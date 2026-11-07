@@ -4,13 +4,14 @@ import {readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {validateWorkspaceBinding} from '../integration/bridge-host.mjs';
 import {readMifitoIdentity} from '../integration/mifito-sync.mjs';
+import {readPlotIdentity} from '../integration/plot-sync.mjs';
 import {dataURLToBlob} from '../assets.mjs';
 
 // Run the actual app helpers without initializing Studio's canvas or browser storage.
 const source=await readFile(new URL('../app.js',import.meta.url),'utf8');
 function section(start,end){const at=source.indexOf(start);assert.ok(at>=0,start);const until=source.indexOf(end,at);assert.ok(until>at,end);return source.slice(at,until);}
 const keySource=section('function sourceEditKey(','const mifitoIdentities=');
-const savedEditorBindings=Function('validateWorkspaceBinding','dataURLToBlob','readMifitoIdentity',keySource+section('async function savedEditorBindings(','async function connectSavedEditors(')+'return savedEditorBindings;')(validateWorkspaceBinding,dataURLToBlob,readMifitoIdentity);
+const savedEditorBindings=Function('validateWorkspaceBinding','dataURLToBlob','readMifitoIdentity','readPlotIdentity',keySource+section('async function savedEditorBindings(','async function connectSavedEditors(')+'return savedEditorBindings;')(validateWorkspaceBinding,dataURLToBlob,readMifitoIdentity,readPlotIdentity);
 function connectHelper(book,editSource){return Function('figures','bookId','editSource',keySource+section('async function connectSavedEditors(','async function readProject(')+'return connectSavedEditors;')(book.figures,book.id,editSource);}
 const dataURL=bytes=>`data:application/octet-stream;base64,${Buffer.from(bytes).toString('base64')}`;
 function mifitoBytes(projectId='project-mifito-a1'){
@@ -28,6 +29,12 @@ function fixture(){
  }
  return {book,loaded,decoded:{editors}};
 }
+
+test('saved multi-sheet PlotLauncher binding verifies the live project identity while preserving unsent edits',async()=>{
+ const p={format:'plotlauncher-project',version:1,data:{filename:'two.xlsx',base64:'AA==',sheetIndex:0},fonts:[],settings:{format:'plotlauncher-web',version:1,data:{sheet:'A'},axes:{},series:[{}]},workspace:{figureStudioProjectId:'plot-project-000001'}};const f=fixture(),bytes=JSON.stringify(p),editor=f.decoded.editors.plot;
+ f.book.figures[0].objects[0].source.projectId=p.workspace.figureStudioProjectId;f.loaded.get('project-plot').dataUrl=dataURL(bytes);editor.binding.baselineProject=new Blob([bytes]);editor.state={sourceData:{figureStudioProjectId:p.workspace.figureStudioProjectId},config:{unsent:'retained'}};
+ assert.ok((await savedEditorBindings(f.decoded,f.book,f.loaded)).plot);editor.state.sourceData.figureStudioProjectId='plot-project-000002';assert.equal((await savedEditorBindings(f.decoded,f.book,f.loaded)).plot,null);assert.equal(editor.state.config.unsent,'retained');
+});
 
 test('saved bindings require exact reflected bytes and use the actual attached project and current name',async()=>{
  const {book,loaded,decoded}=fixture(),bindings=await savedEditorBindings(decoded,book,loaded);

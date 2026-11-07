@@ -1,4 +1,4 @@
-import {PT_PER_MM,mm,toMM,uid,clone,newDocument,makeObject,bounds,objectBounds,expandSelection,align,distribute,reorder,autoLayout,History,validateDocument} from './model.mjs?v=right-sidebar-v069-1';
+import {PT_PER_MM,mm,toMM,uid,clone,newDocument,makeObject,bounds,objectBounds,expandSelection,align,distribute,reorder,autoLayout,History,validateDocument} from './model.mjs?v=source-batch-v070-1';
 import {isPathObject,pathData,objectFromPoints} from './paths.mjs?v=ribbon-v060-1';
 import {createPathDrawing} from './path-drawing.mjs?v=ribbon-v060-1';
 import {imageAsset,imagePhysicalSize,imageMiFiToBodySize,blobToDataURL,dataURLToBlob,download,sanitizeSVG} from './assets.mjs?v=0.3.5-1';
@@ -7,16 +7,17 @@ import {rasterResolution} from './image-resolution.mjs?v=image-quality-v066-1';
 import {saveDraft,loadDraft,saveProjectFileTarget,loadProjectFileTarget} from './storage.mjs?v=0.3.6-1';
 import {createDemo} from './demo.mjs';
 import {createShortcutHandler} from './shortcuts.mjs?v=ribbon-v060-1';
-import {createRibbon} from './ribbon.mjs?v=right-sidebar-v069-1';
+import {createRibbon} from './ribbon.mjs?v=source-batch-v070-1';
 import {createColorPickers} from './colors.mjs?v=ribbon-v060-1';
 import {renderTextPaint} from './text-paint.mjs?v=tex-v061-1';
 import {createTexRenderer} from './tex.mjs?v=live-v062-1';
 import {createLiveTexPreview} from './live-tex-preview.mjs?v=live-v062-1';
-import {openSource,SOURCE_APPS,setupSourceDiscovery,closeSourceSessions} from './integration/bridge-client.mjs?v=linked-target-v063-1';
+import {openSource,SOURCE_APPS,setupSourceDiscovery,closeSourceSessions} from './integration/bridge-client.mjs?v=source-batch-v070-1';
 import {createFigureSidebar} from './thumbnails.mjs?v=live-v062-1';
-import {setupTransferReceiver,getFigureWorkspace} from './integration/direct-transfer.mjs?v=project-switch-v051-1';
+import {setupTransferReceiver,getFigureWorkspace} from './integration/direct-transfer.mjs?v=source-batch-v070-1';
 import {readMifitoIdentity} from './integration/mifito-sync.mjs?v=0.3.5-1';
-import {planMiFiToSync} from './mifito-batch.mjs?v=0.3.4-1';
+import {readPlotIdentity} from './integration/plot-sync.mjs?v=source-batch-v070-1';
+import {planMiFiToSync} from './mifito-batch.mjs?v=source-batch-v070-1';
 import {setupUpdateCheck} from './update-check.mjs';
 import {marqueeSelection} from './selection.mjs';
 import {ARROW_PROPERTIES,arrowEndpoint,arrowPropertyValue,setArrowProperty,arrowGeometry} from './arrowheads.mjs?v=0.3.0-1';
@@ -26,14 +27,14 @@ import {lineStrokeAttributes,lineStyleValue,setLineStyle,supportsLineStyle} from
 import {createLineStylePicker} from './line-style-picker.mjs?v=lines-v064-1';
 import {createPreviewQuality} from './preview-quality.mjs?v=image-quality-v066-1';
 import {createSelectionWheelZoom,resetSelectionZoom} from './selection-zoom.mjs?v=selection-zoom-v067-1';
-import {selectionPNG,writeSelectionImage,studioPasteObjects,matchesSelectionPNG} from './image-clipboard.mjs?v=right-sidebar-v069-1';
+import {selectionPNG,writeSelectionImage,studioPasteObjects,matchesSelectionPNG} from './image-clipboard.mjs?v=source-batch-v070-1';
 import {reorderFigures} from './figure-order.mjs';
 import {renumberFigureNames} from './figure-names.mjs?v=0.3.3-1';
 import {deleteFigures,duplicateFigures} from './figure-commands.mjs';
 import {ProjectFileSession,projectFilePickerOptions} from './project-file.mjs?v=project-switch-v051-1';
 import {installWorkspacePersistence} from './workspace-session.mjs?v=project-switch-v051-1';
 import {decodeWorkspaceState} from './workspace-state.mjs?v=project-switch-v051-1';
-import {validateWorkspaceBinding} from './integration/bridge-host.mjs?v=project-switch-v051-1';
+import {validateWorkspaceBinding} from './integration/bridge-host.mjs?v=source-batch-v070-1';
 
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 setupSourceDiscovery();
@@ -421,7 +422,7 @@ function receiveDirectFigure(payload){
 }
 async function importDirectFigure(payload){
  const {app,project,preview,sourceName,transferId,image:sourceImage}=payload;
- if(app==='mifito'&&payload.batch)return syncMiFiToFigures(payload,{transferId});
+ if(payload.batch||app==='plot'&&sourceImage)return syncMiFiToFigures(payload,{app,transferId});
  if(!['plot','mifito'].includes(app)||typeof transferId!=='string'||!transferId)throw Error('図の送信情報が不正です。');
  // Keep the transfer ID in the saved object, so an acknowledgement lost during
  // a reload cannot create a second copy when the sender retries.
@@ -545,6 +546,10 @@ async function savedEditorBindings(decoded,next,loaded){
      const currentProjectId=decoded.editors.mifito.state?.ui?.figureStudioProjectId;
      if(!currentProjectId||currentProjectId!==(await readMifitoIdentity(baseline)).projectId)break;
     }
+    if(app==='plot'&&panel.source.projectId){
+     const currentProjectId=decoded.editors.plot.state?.sourceData?.figureStudioProjectId;
+     if(!currentProjectId||currentProjectId!==(await readPlotIdentity(baseline)).projectId)break;
+    }
     bindings[app]={...binding,baselineProject:baseline,sourceName:panel.source.name};
    }
    break;
@@ -599,32 +604,38 @@ async function readProject(file,handle=null){
 $('#projectInput').addEventListener('change',async e=>{const file=e.target.files[0];e.target.value='';if(!file||projectSaving||projectOpening||updateReloading)return;projectOpening=true;updateProjectFileUI();try{await readProject(file);}finally{projectOpening=false;updateProjectFileUI();}});
 $('#sourceInput').addEventListener('change',async e=>{const f=e.target.files[0],o=selected()[0];e.target.value='';if(!f||!o)return;const documentId=doc.id,panelId=o.id;try{if(f.size>280*1024*1024)throw Error('元プロジェクトは280 MB以内です。');const app=/\.mifito$/i.test(f.name)?'mifito':'plot',a={id:uid(),name:f.name,mime:'application/octet-stream',dataUrl:await blobToDataURL(f)};if(doc.id!==documentId)return;const target=doc.objects.find(n=>n.id===panelId);if(!target)return;assets.set(a.id,a);change(()=>target.source={app,name:f.name,assetId:a.id});toast('元プロジェクトを関連付けました');}catch(error){toast(error.message);}});
 function sourceEditKey(book,figure,panel,sourceAsset){return [book,figure,panel,sourceAsset].join('/');}
-const mifitoIdentities=new Map();
+const mifitoIdentities=new Map(),plotIdentities=new Map();
+function sourceIdentity(asset,app){
+ if(app==='mifito')return mifitoIdentity(asset);
+ if(!asset)return Promise.reject(Error('元のPlotLauncherプロジェクトがありません。'));
+ if(!plotIdentities.has(asset.id))plotIdentities.set(asset.id,readPlotIdentity(dataURLToBlob(asset.dataUrl)));
+ return plotIdentities.get(asset.id);
+}
 function mifitoIdentity(asset){
  if(!asset) return Promise.reject(Error('元のMiFiToプロジェクトがありません。'));
  if(!mifitoIdentities.has(asset.id))mifitoIdentities.set(asset.id,readMifitoIdentity(dataURLToBlob(asset.dataUrl)));
  return mifitoIdentities.get(asset.id);
 }
 function syncSummary(summary){return summary.updated||summary.added?`${summary.updated}枚を更新、${summary.added}枚を追加、${summary.unchanged}枚は変更なし`:`変更はありません（${summary.unchanged}枚をスキップ）`;}
-async function syncMiFiToFigures(result,{guard,anchorPanelId,targetFigureId=doc.id,transferId}={}){
+async function syncMiFiToFigures(result,{app='mifito',guard,anchorPanelId,targetFigureId=doc.id,transferId}={}){
  if(updateReloading)throw Error('Figure Studioの更新後にもう一度反映してください。');
  const expectedBook=bookId,check=()=>{if(bookId!==expectedBook||!figures.some(f=>f.id===targetFigureId))throw Error('受け取り先のFigureが変わりました。対象の図を開き直してください。');guard?.();};
- check();const anchor=guard?.(),identity=await readMifitoIdentity(result.project);
+ check();const anchor=guard?.(),identity=await (app==='plot'?readPlotIdentity(result.project):readMifitoIdentity(result.project));
  const incoming=result.batch||{projectId:result.image?.projectId,images:[{...result.image,preview:result.preview}]};
- if(incoming.projectId!==identity.projectId)throw Error('画像とMiFiToプロジェクトの対応情報が一致しません。');
+ if(incoming.projectId!==identity.projectId)throw Error('画像と元プロジェクトの対応情報が一致しません。');
  const definitions=new Map(identity.images.map(image=>[image.imageId,image]));
- for(const image of incoming.images){const defined=definitions.get(image.imageId);if(!defined||defined.fingerprint!==image.fingerprint)throw Error('画像とMiFiToの編集設定が一致しません。もう一度反映してください。');}
- if(anchor){const origin=await mifitoIdentity(assets.get(anchor.source.assetId));if(origin.projectId!==identity.projectId)throw Error('別のMiFiToプロジェクトが開いています。元のプロジェクトを開き直してください。');}
+ for(const image of incoming.images){const defined=definitions.get(image.imageId);if(!defined||defined.fingerprint!==image.fingerprint)throw Error('画像と元アプリの編集設定が一致しません。もう一度反映してください。');}
+ if(anchor){const origin=await sourceIdentity(assets.get(anchor.source.assetId),app);if(origin.projectId!==identity.projectId)throw Error('別の元プロジェクトが開いています。元のプロジェクトを開き直してください。');}
  check();syncFigure();const identityByAsset=new Map();
- const legacyIds=new Set(figures.flatMap(f=>f.objects.filter(o=>o.source?.app==='mifito'&&(!o.source.projectId||!o.source.imageId)).map(o=>o.source.assetId)));
- for(const id of legacyIds){try{identityByAsset.set(id,await mifitoIdentity(assets.get(id)));}catch{/* Unrelated old attachments remain untouched. */}}
- check();let plan=planMiFiToSync(figures,incoming,identityByAsset,{anchorPanelId});
+ const legacyIds=new Set(figures.flatMap(f=>f.objects.filter(o=>o.source?.app===app&&(!o.source.projectId||!o.source.imageId)).map(o=>o.source.assetId)));
+ for(const id of legacyIds){try{identityByAsset.set(id,await sourceIdentity(assets.get(id),app));}catch{/* Unrelated old attachments remain untouched. */}}
+ check();let plan=planMiFiToSync(figures,incoming,identityByAsset,{anchorPanelId,app});
  const prepared=new Map(),needed=new Set([...plan.matches.filter(m=>m.changed).map(m=>m.imageId),...plan.additions.map(m=>m.imageId)]);
  for(const image of incoming.images)if(needed.has(image.imageId))prepared.set(image.imageId,await imageAsset(image.preview,image.name));
  check();if(gesture)endGesture(null,true);finishText();syncFigure();
  // Re-plan after decoding so deleted/relinked images are never overwritten and
  // changes made to placement during decoding are kept.
- plan=planMiFiToSync(figures,incoming,identityByAsset,{anchorPanelId});
+ plan=planMiFiToSync(figures,incoming,identityByAsset,{anchorPanelId,app});
  for(const id of [...plan.matches.filter(m=>m.changed).map(m=>m.imageId),...plan.additions.map(m=>m.imageId)])if(!prepared.has(id))throw Error('反映中に画像の対応が変わりました。もう一度反映してください。');
  const previousSizes=new Map();
  for(const match of plan.matches.filter(m=>m.changed)){
@@ -642,12 +653,12 @@ async function syncMiFiToFigures(result,{guard,anchorPanelId,targetFigureId=doc.
   return {summary:plan.summary,message:syncSummary(plan.summary),anchorSourceAssetId:panel?.source?.assetId,anchorImageId,detached:!!anchorImageId&&!definitions.has(anchorImageId)};
  };
  if(!plan.summary.updated&&!plan.summary.added&&!needsIdentity){const done=response();toast(done.message);return done;}
- const name=String(result.sourceName||'figure.mifito').replace(/[\\/]/g,'_').slice(0,240);
+ const name=String(result.sourceName||(app==='plot'?'figure.plotproject':'figure.mifito')).replace(/[\\/]/g,'_').slice(0,240);
  const project={id:uid(),name,mime:result.project.type||'application/octet-stream',dataUrl:await blobToDataURL(result.project)};
  check();syncFigure();
  // Source associations must still be the ones used to prepare this atomic edit.
  for(const link of plan.linked){const panel=figures.find(f=>f.id===link.figureId)?.objects.find(o=>o.id===link.panelId);if(panel?.source?.assetId!==link.sourceAssetId)throw Error('反映中に元プロジェクトの関連付けが変わりました。もう一度反映してください。');}
- plan=planMiFiToSync(figures,incoming,identityByAsset,{anchorPanelId});
+ plan=planMiFiToSync(figures,incoming,identityByAsset,{anchorPanelId,app});
  for(const id of [...plan.matches.filter(m=>m.changed).map(m=>m.imageId),...plan.additions.map(m=>m.imageId)])if(!prepared.has(id))throw Error('反映中に画像の対応が変わりました。もう一度反映してください。');
  const incomingById=new Map(incoming.images.map(image=>[image.imageId,image]));
  const linked=new Map(plan.linked.filter(link=>{const image=incomingById.get(link.imageId);return definitions.has(link.imageId)&&!(image?.unchanged===true&&image.fingerprint!==link.fingerprint);}).map(link=>[link.panelId,link]));
@@ -658,14 +669,14 @@ async function syncMiFiToFigures(result,{guard,anchorPanelId,targetFigureId=doc.
   if(update){
    const asset=prepared.get(update.imageId),previous=previousSizes.get(o.assetId);
    if(!previous)throw Error('反映中に画像が置き換わりました。もう一度反映してください。');
-   replacement={assetId:asset.id,...replacedMiFiToImageSize(o,previous.physical,asset.physicalSize,previous.body,asset.mifitoBodySize)};
+   replacement={assetId:asset.id,...(app==='plot'?replacedImageSize('plot',o,previous.physical,asset.physicalSize):replacedMiFiToImageSize(o,previous.physical,asset.physicalSize,previous.body,asset.mifitoBodySize))};
   }
-  return {...o,...replacement,source:{...o.source,app:'mifito',name,assetId:project.id,projectId:identity.projectId,imageId:link.imageId,fingerprint:update?update.image.fingerprint:link.fingerprint}};
+  return {...o,...replacement,source:{...o.source,app,name,assetId:project.id,projectId:identity.projectId,imageId:link.imageId,fingerprint:update?update.image.fingerprint:link.fingerprint}};
  })}));
  const destination=next.find(f=>f.id===targetFigureId),added=[];
  if(initialDemo&&revision===0&&!guard){destination.objects=[];destination.name='Fig. 1';}
- for(const image of plan.additions){const asset=prepared.get(image.imageId),size=importedImageSize(asset,destination,'mifito'),offset=(destination.objects.filter(o=>o.type==='image').length%6)*mm(4);
-  const panel=makeObject('image',{...imageInsertionPoint(destination,size,offset),...size,assetId:asset.id,name:image.name,source:{app:'mifito',name,assetId:project.id,projectId:identity.projectId,imageId:image.imageId,fingerprint:image.fingerprint,...(transferId?{transferId}: {})}});
+ for(const image of plan.additions){const asset=prepared.get(image.imageId),size=importedImageSize(asset,destination,app),offset=(destination.objects.filter(o=>o.type==='image').length%6)*mm(4);
+  const panel=makeObject('image',{...imageInsertionPoint(destination,size,offset),...size,assetId:asset.id,name:image.name,source:{app,name,assetId:project.id,projectId:identity.projectId,imageId:image.imageId,fingerprint:image.fingerprint,...(transferId?{transferId}: {})}});
   destination.objects.push(panel);added.push(panel.id);
  }
  const newAssets=new Map([...prepared.values()].map(a=>[a.id,a]));newAssets.set(project.id,project);
@@ -674,7 +685,7 @@ async function syncMiFiToFigures(result,{guard,anchorPanelId,targetFigureId=doc.
  if(estimated>400*1024*1024)throw Error('この反映でプロジェクトの400 MB上限を超えます。不要な図を減らしてください。');
  check();const before=snapshot(),activeId=doc.id;for(const[id,asset]of newAssets)assets.set(id,asset);
  figures=next;doc=figures.find(f=>f.id===activeId);if(initialDemo&&revision===0&&!guard)initialDemo=false;
- if(doc.id===targetFigureId&&added.length)selection=added;record(before);mifitoIdentities.set(project.id,Promise.resolve(identity));
+ if(doc.id===targetFigureId&&added.length)selection=added;record(before);(app==='plot'?plotIdentities:mifitoIdentities).set(project.id,Promise.resolve(identity));
  const done=response();
  try{const rev=revision;await saveDraft(snapshot(),assets);if(revision===rev)$('#saveStatus').textContent='ブラウザに保存済み';toast(done.message);}
  catch{toast(done.message+'。自動保存できないためCtrl+Sで保存してください。');}
@@ -698,8 +709,8 @@ function editSource(o,{figureId=doc.id}={}){
   onStatus:({state,message,downloadProject,openInNewTab})=>{toast(message);if(['unavailable','blocked','error'].includes(state)){const box=$('#sourceSummary');box.textContent=message;if(downloadProject){const b=document.createElement('button');b.type='button';b.textContent='元プロジェクトを保存';b.onclick=downloadProject;box.append(b);}if(openInNewTab){const b=document.createElement('button');b.type='button';b.textContent='新しい編集タブで開く';b.onclick=()=>{bridge=openInNewTab();};box.append(b);}}},
   onResult:async result=>{
    try{
-    if(app==='mifito'&&(result.batch||result.image)){
-     const done=await syncMiFiToFigures(result,{guard:locate,anchorPanelId:panelId,targetFigureId:documentId});
+    if((result.batch||result.image)){
+     const done=await syncMiFiToFigures(result,{app,guard:locate,anchorPanelId:panelId,targetFigureId:documentId});
      expectedSourceAsset=done.anchorSourceAssetId||expectedSourceAsset;
      return {editKey:sourceEditKey(editingBook,documentId,panelId,expectedSourceAsset)+(done.detached?'/detached':''),imageId:done.anchorImageId,message:done.message,summary:done.summary};
     }

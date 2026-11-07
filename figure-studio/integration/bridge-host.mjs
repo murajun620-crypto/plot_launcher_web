@@ -1,5 +1,5 @@
 /** Source-editor bridge. The engine and tab stay alive when a different panel opens. */
-import {transferResult,transferReceipt,isTransferImageId,figureWorkspaceAPI,showFigureWorkspaceStudio} from './direct-transfer.mjs?v=project-switch-v051-1';
+import {transferResult,transferReceipt,isTransferImageId,figureWorkspaceAPI,showFigureWorkspaceStudio} from './direct-transfer.mjs?v=source-batch-v070-1';
 import {registerEditor} from './editor-discovery.mjs?v=editor-reuse-v036-1';
 const PROTOCOL = 'figure-studio-bridge-v1';
 const MAX_PROJECT = 320 * 1024 * 1024;
@@ -32,7 +32,7 @@ export function getFigureBridgeContext(locationRef = location) {
  * onAccepted receives the exact captured result, including private extra
  * fields. Those extra fields stay in this editor and are never transmitted.
  */
-export function setupFigureBridge({app,loadProject,buildProject,renderPreview,captureResult,captureBatchResult,selectImage,isDirty=()=>false,hasContent,canAdoptAccepted=()=>false,onProjectLoaded,onAccepted,onConnectionChange=()=>{},startDetached=false,
+export function setupFigureBridge({app,loadProject,buildProject,renderPreview,captureResult,captureBatchResult,selectImage,isDirty=()=>false,hasContent,canReuseProject,canAdoptAccepted=()=>false,onProjectLoaded,onAccepted,onConnectionChange=()=>{},startDetached=false,
   windowRef=window,documentRef=windowRef.document,locationRef=windowRef.location,registerEditorRef=registerEditor,channelFactory}) {
   if(!['plot','mifito'].includes(app))return null;
   // An updater may restore local work that no longer belongs to the URL's old
@@ -45,14 +45,14 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
   const hostId=crypto.randomUUID();
   let active={panelId:'',requestId:'',editKey:'',sourceName:''},revision=0,initialized=false,loaded=false,busy=false,awaiting=0,awaitTimer=0,captured=null,baseline=null,disposed=false,clientBatch=false,acceptedCheckpoint=null,loadingRequest=null;
   const send=(type,extra={})=>{if(!disposed&&context&&parent&&!parent.closed)parent.postMessage({protocol:PROTOCOL,nonce:context.nonce,hostId,app,type,panelId:active.panelId,requestId:active.requestId,editKey:active.editKey,...extra},context.origin);};
-  const ready=()=>send('ready',{capabilities:['reuse-v1',...(app==='mifito'&&captureBatchResult?['batch-v1']:[])],loaded,busy:busy||!!awaiting});
+  const ready=()=>send('ready',{capabilities:['reuse-v1',...(captureBatchResult?['batch-v1']:[])],loaded,busy:busy||!!awaiting});
   const panel=documentRef.createElement('div');panel.id='figure-studio-bridge';
   panel.style.cssText='display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center;max-width:100%;min-width:0;color:#173c38;font:12px/1.5 system-ui,sans-serif;';
   const message=documentRef.createElement('span');message.hidden=true;message.setAttribute('role','status');message.setAttribute('aria-live','polite');
   message.style.cssText='flex-basis:100%;max-width:420px;white-space:normal;overflow-wrap:anywhere;';
   function setMessage(text){message.textContent=text;message.hidden=!text;}
   const button=documentRef.createElement('button');button.id='send-to-figure-studio';button.type='button';button.className='button primary';button.textContent='Figure Studioへ送る';button.title='編集した図と元プロジェクトを、元のFigure Studioの図へ反映します。';button.disabled=true;
-  const batchButton=app==='mifito'&&typeof captureBatchResult==='function'?documentRef.createElement('button'):null;
+  const batchButton=typeof captureBatchResult==='function'?documentRef.createElement('button'):null;
   if(batchButton){batchButton.id='send-all-to-figure-studio';batchButton.type='button';batchButton.className='button primary';batchButton.textContent='まとめてStudioへ送る';batchButton.title='変更した画像を元のFigure Studioへまとめて反映し、未追加の画像を追加します。変更のない画像はそのまま残します。';batchButton.disabled=true;}
   function setDisabled(value){button.disabled=value;if(batchButton)batchButton.disabled=value;}
   const discard=documentRef.createElement('button');discard.type='button';discard.textContent='未反映の編集を取り消す';discard.hidden=true;
@@ -126,19 +126,21 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
       loadingRequest={panelId:data.panelId,requestId:data.requestId||'',editKey:data.editKey};
       busy=true;setDisabled(true);discard.disabled=true;
       try{
+        let adoptedCheckpoint=null,reuseProject=false;
+        if(typeof canReuseProject==='function')try{reuseProject=await canReuseProject(data)===true;}catch{}
+        if(disposed)return;
         // Reopening this snapshot keeps all in-progress work in the warm tab.
-        if(loaded&&data.panelId===active.panelId&&data.editKey&&data.editKey===active.editKey){
+        if(loaded&&data.panelId===active.panelId&&data.editKey&&data.editKey===active.editKey&&(!canReuseProject||reuseProject)){
           await reuseLoaded(data);return;
         }
-        let adoptedCheckpoint=null;
         if(normalVisit&&!initialized){
           let occupied;
           try{occupied=hasContent?await hasContent():await isDirty();adoptedCheckpoint=occupied?await adoptionProof(data.project):null;}
           catch{block(data,'dirty-check-failed','開いている編集内容を確認できません。元アプリの編集内容を保存してから、もう一度お試しください。');return;}
           if(disposed)return;
-          if(occupied&&!adoptedCheckpoint){block(data,'dirty','この編集画面には別の内容が開いています。現在の内容を保存してから、対象のプロジェクトを開き直してください。');return;}
+          if(occupied&&!adoptedCheckpoint&&!reuseProject){block(data,'dirty','この編集画面には別の内容が開いています。現在の内容を保存してから、対象のプロジェクトを開き直してください。');return;}
         }
-        if(loaded){
+        if(loaded&&!reuseProject){
           let dirty;
           try{dirty=await isDirty();}
           catch{block(data,'dirty-check-failed','編集中の内容を確認できません。Figureへ反映するか、未反映の編集を取り消してから、次のグラフをもう一度開いてください。');return;}
@@ -150,7 +152,7 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
         // Transport reconnection does not prove that this editor contains the
         // requested project. Exact bound snapshots were handled above; only a
         // byte-checked adoption may preserve content in a newly bound route.
-        const reconnect=!!adoptedCheckpoint;
+        const reconnect=!!adoptedCheckpoint||reuseProject;
         // An adopted normal workspace is not bound until its asynchronous
         // preparation has revalidated the exact same source identity.
         initialized=!adoptedCheckpoint;loaded=false;captured=null;baseline=null;revision=0;discard.hidden=true;

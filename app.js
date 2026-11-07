@@ -1,15 +1,21 @@
-import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=8035a7177f74';
-import {setupDirectSendButton} from './direct-transfer.mjs?v=8035a7177f74';
+import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=dd5569f5b97e';
+import {setupDirectSendButton} from './direct-transfer.mjs?v=dd5569f5b97e';
+import {identifyPlotProject,plotSheetIndex,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=dd5569f5b97e';
 import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=9127ec4c4f31";
 import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=9127ec4c4f31";
 import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9127ec4c4f31";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=9127ec4c4f31";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=9127ec4c4f31";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=8035a7177f74";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=dd5569f5b97e";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=dd5569f5b97e";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=dd5569f5b97e";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
-const APP_BUILD = "8035a7177f74";
+const APP_BUILD = 'dd5569f5b97e';
+function makeProject(settings,data,fonts,workspace={}){
+  const live=sourceData&&data.filename===sourceData.filename&&(data.bytes===sourceData.bytes||data.files&&data.files===sourceData.files);
+  const projectId=workspace.figureStudioProjectId||data.figureStudioProjectId||(live?(sourceData.figureStudioProjectId||=crypto.randomUUID()):crypto.randomUUID());
+  return encodePlotProject(settings,data,fonts,{...workspace,figureStudioProjectId:projectId});
+}
 
 function positionDialog(dialog, left, top) {
   const box=dialog.getBoundingClientRect(), gap=8;
@@ -383,7 +389,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=9127ec4c4f31", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=dd5569f5b97e", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -1127,7 +1133,7 @@ async function loadDataFiles(files, append=false, selection=null) {
     const data=await request('load-many',args);
     if(!append&&!selection)prepareFigureStudioProjectReplacement();
     config=combinedConfig(data,append || selection?oldMetadata:null,oldConfig);metadata=data;loadedHeader=1;
-    sourceData={filename,files:originals.map((file,index)=>({...file,sheetIndex:data.sources[index].sheetIndex,headerRow:data.sources[index].headerRow}))};
+    sourceData={filename,files:originals.map((file,index)=>({...file,sheetIndex:data.sources[index].sheetIndex,headerRow:data.sources[index].headerRow})),...((append||selection)&&sourceData?.figureStudioProjectId?{figureStudioProjectId:sourceData.figureStudioProjectId}:{})};
     dataFileHandles=nextHandles;
     if(!append && !selection){projectHandle=null;projectFilename='';sourceHandle=sourceHandles.get(files[0]) || null;sourceDirectory=null;$('#save-destination').value=folderSupported?'source':'download';}
     sample=false;sheetMode='shared';sharedSettings=null;sheetSettings.clear();
@@ -1184,7 +1190,7 @@ async function reloadSourceData(chosenFiles=null,{fromFolder=false}={}) {
     // used column/sheet disappeared. No original file or font is overwritten.
     const result=await request('project',{filename:sourceData.filename,...(sourceData.files?{files:refreshed.map(file=>({...file,bytes:file.bytes.slice(0)}))}:{bytes:refreshed[0].bytes.slice(0)}),sheetIndex:metadata.sheetIndex,headerRow:loadedHeader,settings,fonts:[],sheetSettings:projectSheetSettings(),sharedSettings});
     ++revision;metadata=result.metadata;config=result.config;
-    sourceData=sourceData.files?{filename:sourceData.filename,files:refreshed}:{filename:sourceData.filename,bytes:refreshed[0].bytes};
+    sourceData=sourceData.files?{filename:sourceData.filename,files:refreshed,figureStudioProjectId:sourceData.figureStudioProjectId}:{filename:sourceData.filename,bytes:refreshed[0].bytes,figureStudioProjectId:sourceData.figureStudioProjectId};
     dataFileHandles=ordered.map(index=>handles[index]);
     if(dataFileHandles[0] && sourceHandle!==dataFileHandles[0]){sourceHandle=dataFileHandles[0];sourceDirectory=null;refreshSaveDestination();}
     if(directory){sourceDirectory=directory;refreshSaveDestination();}
@@ -2146,8 +2152,8 @@ async function readProject(file, saved, options={}) {
   loading=true; updateButtons(); status('プロジェクトを開いています…');
   try {
     if(file.size>PROJECT_MAX_SIZE)throw new Error('プロジェクトは130 MB以内のファイルを選んでください。');
-    const project=parseProject(saved || JSON.parse(await file.text()));
-    const retainedData={filename:project.data.filename,...(project.data.files?{files:project.data.files.map(file=>({...file,bytes:file.bytes.slice(0)}))}:{bytes:project.data.bytes.slice(0)})};
+    const raw=saved || JSON.parse(await file.text()),project=parseProject(raw),identity=await identifyPlotProject(raw);
+    const retainedData={filename:project.data.filename,figureStudioProjectId:identity.projectId,...(project.data.files?{files:project.data.files.map(file=>({...file,bytes:file.bytes.slice(0)}))}:{bytes:project.data.bytes.slice(0)})};
     const retainedFonts=project.fonts.map(font=>({...font,bytes:font.bytes.slice(0)}));
     await checkFigureStudioProjectReplacement(options);
     const result=await request('project',{filename:project.data.filename,bytes:project.data.bytes,...(project.data.files?{files:project.data.files}:{}),sheetIndex:project.data.sheetIndex,headerRow:project.data.headerRow,settings:project.settings,fonts:project.fonts,sheetSettings:project.workspace.sheetSettings || [],sharedSettings:project.workspace.sharedSettings});
@@ -3094,10 +3100,9 @@ catch (error) { fatal(`描画機能を開始できませんでした。ブラウ
 // Figure Studio bridge: included in the source application's module scope.
 let figureBridgeBaseline=null,figureBridgePreservedOnReconnect=false;
 const figureBridgePendingInput=()=>$$('[data-axis],[data-option],[data-series-field],[data-annotation-field],[data-legend-field],[data-fill]').some(input=>!input.disabled&&input.getClientRects().length>0&&incompleteNumberInput(input));
-function figureBridgeIsDirty(){
+async function figureBridgeIsDirty(){
   if(loading||exporting||renderRunning||renderedRevision!==revision||dragging||colormapApplying||pendingDataFiles||figureBridgePendingInput())return true;
-  const state=projectEditState(),baseline=figureBridgeBaseline;
-  return !baseline||state.source!==baseline.source||state.content!==baseline.content||state.fonts.length!==baseline.fonts.length||state.fonts.some((font,index)=>font!==baseline.fonts[index]);
+  try{return !samePlotCheckpoint(figureBridgeBaseline,(await collectPlotGraphs()).checkpoint);}catch{return true;}
 }
 const figureBridgeWait = (predicate,checkError=()=>null) => new Promise((resolve,reject) => {
   const started = Date.now();
@@ -3108,55 +3113,102 @@ const figureBridgeWait = (predicate,checkError=()=>null) => new Promise((resolve
     else if (Date.now()-started > 180000) {clearInterval(timer);reject(new Error('描画機能の準備が完了しませんでした。'))}
   },80);
 });
-async function captureFigureStudioResult() {
-  if (!engineReady || loading || exporting || !metadata || !sourceData || !config.series.length) throw new Error('グラフの処理が完了してから反映してください。');
-  if(figureBridgePendingInput())throw new Error('入力中の数値設定を確定してから反映してください。');
-  await figureBridgeWait(() => !renderRunning && renderedRevision === revision,
-    () => !renderRunning && $('#preview-state').classList.contains('error') ? 'グラフの設定を確認してから反映してください。' : null);
-  exporting = true; updateButtons();
-  try {
-    const snapshot = structuredClone(config),bridgeState=projectEditState();
-    const project = makeProject(makeSettings(config,metadata,loadedHeader), {...sourceData,sheetIndex:metadata.sheetIndex,headerRow:loadedHeader,sample}, [...importedFonts.values()], {
-      saveName:$('#save-name').value,pngDpi:Number($('#png-dpi').value),view:{...view},sections:$$('#controls-panel .control-section').map(section=>section.open),sheetSettings:projectSheetSettings(),sheetMode,sharedSettings:sheetMode === 'shared' ? currentSharedSettings() : sharedSettings
-    });
-    const blob = new Blob([JSON.stringify(project)],{type:'application/json'});
-    if (blob.size > PROJECT_MAX_SIZE) throw new Error('プロジェクトは130 MB以内にしてください。');
-    const result = await request('export',{config:snapshot,format:'svg',dpi:Number($('#png-dpi').value)});
-    const bytes = Uint8Array.from(atob(result.base64),character=>character.charCodeAt(0));
-    return {project:blob,preview:new Blob([bytes],{type:'image/svg+xml'}),sourceName:projectFilename || `${safeStem($('#save-name').value)}.plotproject`,bridgeState};
-  } finally {exporting = false;updateButtons();if(renderWanted)renderPreview();}
+const plotPreviewCache=new Map(),plotAcknowledgements=createPlotAcknowledgements();
+let plotCollectionCache=null,plotMetadataSource=null,plotSheetMetadata=new Map();
+async function collectPlotGraphs(){
+  if(!metadata||!sourceData||!config.series.length)throw Error('先にグラフを作成してください。');
+  const before=projectEditState(),selectedIndex=metadata.sheetIndex;
+  const cache=plotCollectionCache;
+  if(cache&&cache.source===before.source&&cache.content===before.content&&cache.fonts.length===before.fonts.length&&cache.fonts.every((font,i)=>font===before.fonts[i]))return cache.value;
+  if(plotMetadataSource!==sourceData){plotMetadataSource=sourceData;plotSheetMetadata=new Map();plotPreviewCache.clear();}
+  const names=[...metadata.sheets],filename=metadata.filename,snapshots=new Map(projectSheetSettings().map(item=>[item.sheetIndex,item.settings]));
+  if(names.length>100)throw Error('Studioへの一括送信は100シート以内にしてください。');
+  const template=sheetMode==='shared'?currentSharedSettings():sharedSettings||snapshots.get(0)||makeSettings(config,metadata,loadedHeader),graphs=[];
+  for(let index=0;index<names.length;index++){
+    const setting=snapshots.get(index),headerRow=setting?.data.headerRow??loadedHeader,key=index+':'+headerRow;
+    let data=index===selectedIndex?metadata:plotSheetMetadata.get(key);
+    if(!data){data=await request('sheet-info',{filename,sheetIndex:index,headerRow});plotSheetMetadata.set(key,data);}
+    if(!data.rowCount||data.columns.length<2)throw Error(`シート「${names[index]}」にグラフ用のデータがありません。`);
+    const graphConfig=index===selectedIndex?structuredClone(config):configurationForSheet(data,setting,template);
+    if(!graphConfig.series.length)throw Error(`シート「${names[index]}」のX列とY列を設定してください。`);
+    graphs.push({index,headerRow,config:graphConfig,settings:makeSettings(graphConfig,data,headerRow)});
+  }
+  const current=graphs.find(graph=>graph.index===selectedIndex),project=makeProject(current.settings,{...sourceData,sheetIndex:selectedIndex,headerRow:loadedHeader,sample},[...importedFonts.values()],{
+    saveName:$('#save-name').value,pngDpi:Number($('#png-dpi').value),view:{...view},sections:$$('#controls-panel .control-section').map(section=>section.open),sheetSettings:graphs.map(graph=>({sheetIndex:graph.index,settings:graph.settings})),sheetMode,sharedSettings:sheetMode==='shared'?currentSharedSettings():sharedSettings
+  });
+  const identity=await identifyPlotProject(project),after=projectEditState();
+  if(after.source!==before.source||after.content!==before.content||after.fonts.length!==before.fonts.length||after.fonts.some((font,i)=>font!==before.fonts[i]))throw Error('準備中にグラフが変更されました。もう一度お試しください。');
+  const checkpoint={...after,identity},value={project,identity,graphs,checkpoint};plotCollectionCache={...after,value};return value;
 }
+async function captureFigureStudioImages(batch=false){
+  if(!engineReady||loading||exporting||!metadata||!sourceData||!config.series.length)throw Error('グラフの処理が完了してから反映してください。');
+  if(figureBridgePendingInput())throw Error('入力中の数値設定を確定してから反映してください。');
+  await figureBridgeWait(()=>!renderRunning&&renderedRevision===revision,()=>!renderRunning&&$('#preview-state').classList.contains('error')?'グラフの設定を確認してください。':null);
+  exporting=true;updateButtons();
+  try{
+    const captured=await collectPlotGraphs(),project=new Blob([JSON.stringify(captured.project)],{type:'application/json'});
+    if(project.size>PROJECT_MAX_SIZE)throw Error('プロジェクトは130 MB以内にしてください。');
+    const images=[],wanted=batch?captured.identity.images:captured.identity.images.filter(image=>image.imageId===captured.identity.activeImageId);
+    for(const descriptor of wanted){
+      const cached=plotPreviewCache.get(descriptor.imageId),graph=captured.graphs.find(graph=>graph.index===descriptor.sheetIndex);let preview=cached?.fingerprint===descriptor.fingerprint?cached.preview:null;
+      if(!preview){const rendered=await request('sheet-export',{filename:metadata.filename,sheetIndex:graph.index,headerRow:graph.headerRow,config:graph.config,format:'svg',dpi:Number($('#png-dpi').value)});const bytes=Uint8Array.from(atob(rendered.base64),c=>c.charCodeAt(0));preview=new Blob([bytes],{type:'image/svg+xml'});plotPreviewCache.set(descriptor.imageId,{fingerprint:descriptor.fingerprint,preview});}
+      images.push({...descriptor,preview,...(batch&&plotAcknowledgements.isUnchanged(captured.identity.projectId,descriptor)?{unchanged:true}:{})});
+    }
+    const result={project,sourceName:projectFilename||`${safeStem($('#save-name').value)}.plotproject`,bridgeState:captured.checkpoint};
+    if(batch)return {...result,batch:{projectId:captured.identity.projectId,images}};
+    const {preview,...image}=images[0];return {...result,preview,image:{projectId:captured.identity.projectId,...image}};
+  }finally{exporting=false;updateButtons();if(renderWanted)renderPreview();}
+}
+const captureFigureStudioResult=()=>captureFigureStudioImages(false);
+const captureFigureStudioBatch=()=>captureFigureStudioImages(true);
+async function chooseFigureStudioSheet(imageId){
+  const index=plotSheetIndex(imageId);if(index===null||!metadata?.sheets[index])throw Error('対象のシートが見つかりません。');
+  if(index===metadata.sheetIndex)return;
+  $('#sheet-select').value=String(index);await loadFile(null,false,true);
+  if(metadata?.sheetIndex!==index)throw Error('対象のシートへ切り替えられませんでした。');
+  await figureBridgeWait(()=>!loading&&!renderRunning&&renderedRevision===revision);
+}
+
 function figureStudioResultMatchesCurrentProject(result){return !!sourceData&&result?.bridgeState?.source===sourceData;}
 function acceptFigureStudioResult(result){
   if(!figureStudioResultMatchesCurrentProject(result))return false;
-  figureBridgeBaseline=result.bridgeState;return true;
+  plotAcknowledgements.accept(result);figureBridgeBaseline=result.bridgeState?.identity?mergePlotCheckpoint(figureBridgeBaseline,result.bridgeState,!!result.batch):result.bridgeState;return true;
 }
 async function acceptDirectFigureStudioResult(result){
   if(!figureStudioResultMatchesCurrentProject(result))return;
   await figureStudioBridge?.rememberAccepted(result);
   acceptFigureStudioResult(result);
 }
-function figureStudioProjectLoaded(){if(!figureBridgePreservedOnReconnect)figureBridgeBaseline=projectEditState();}
-function figureStudioHasUnreflectedContent(){return !!metadata&&!!sourceData&&figureBridgeIsDirty();}
+async function figureStudioProjectLoaded(){if(!figureBridgePreservedOnReconnect)figureBridgeBaseline=(await collectPlotGraphs()).checkpoint;}
+function figureStudioHasUnreflectedContent(){return !!metadata&&!!sourceData&&(figureBridgeBaseline?figureBridgeIsDirty():hasUnsavedChanges());}
 figureStudioBridge=setupFigureBridge({
   app:'plot',
   hasContent:figureStudioHasUnreflectedContent,
+  async canReuseProject({project,imageId}){
+    if(!sourceData||!metadata||loading||exporting||figureBridgePendingInput())return false;
+    const identity=await identifyPlotProject(JSON.parse(await project.text())),index=plotSheetIndex(imageId);
+    return identity.projectId===sourceData.figureStudioProjectId&&(!imageId||index!==null&&!!metadata.sheets[index]&&identity.images.some(image=>image.imageId===imageId));
+  },
   canAdoptAccepted:result=>!!sourceData&&sourceData===result?.bridgeState?.source,
   onConnectionChange(connected){figureStudioDirectSender?.setBridgeConnected(connected);},
-  async loadProject(file,{reconnect}={}) {
+  async loadProject(file,{reconnect,imageId}={}) {
     parseProject(JSON.parse(await file.text()));
     await figureBridgeWait(() => engineReady && !loading && !exporting);
-    figureBridgePreservedOnReconnect=!!(reconnect&&metadata&&sourceData);
+    const incomingIdentity=await identifyPlotProject(JSON.parse(await file.text()));
+    figureBridgePreservedOnReconnect=!!(reconnect&&metadata&&sourceData&&incomingIdentity.projectId===sourceData.figureStudioProjectId);
     if (!figureBridgePreservedOnReconnect && !await readProject(file,undefined,{fromBridge:true})) throw new Error('プロジェクトを復元できませんでした。編集画面のエラーを確認してください。');
+    if(imageId)await chooseFigureStudioSheet(imageId);
     await figureBridgeWait(() => !loading && !renderRunning && renderedRevision === revision,
       () => !renderRunning && $('#preview-state').classList.contains('error') ? 'グラフを描画できませんでした。編集画面で設定を確認してください。' : null);
   },
+  selectImage:chooseFigureStudioSheet,
   captureResult:captureFigureStudioResult,
+  captureBatchResult:captureFigureStudioBatch,
   isDirty:figureBridgeIsDirty,
   onProjectLoaded:figureStudioProjectLoaded,
   onAccepted:acceptFigureStudioResult
 });
-figureStudioDirectSender = setupDirectSendButton({app:'plot',captureResult:captureFigureStudioResult,container:'.header-actions',
+figureStudioDirectSender = setupDirectSendButton({app:'plot',captureResult:captureFigureStudioResult,captureBatchResult:captureFigureStudioBatch,container:'.header-actions',
   onAccepted:acceptDirectFigureStudioResult,
   isReady:()=>engineReady&&!loading&&!exporting&&!renderRunning&&!!metadata&&!!sourceData&&!!config.series.length&&renderedRevision===revision});
 figureStudioDirectSender?.setBridgeConnected(figureStudioBridge?.isConnected===true);
@@ -3200,6 +3252,7 @@ function validateFigureWorkspaceState(snapshot){
  if(state.history.some(value=>!configValid(value))||state.future.some(value=>!configValid(value))||state.lastState!==undefined&&!configValid(state.lastState)||state.selected.some(value=>!string(value,200))||state.fontFamilies.some(value=>!string(value,200))||state.fontAliases.some(value=>!list(value,2)||value.length!==2||value.some(item=>!string(item,200))))fail();
  let fontBytes=0;for(const font of state.fonts){if(!string(font?.name,255)||!string(font?.family,200)||!(font.bytes instanceof ArrayBuffer)||!font.bytes.byteLength||font.bytes.byteLength>20*1024*1024)fail();fontBytes+=font.bytes.byteLength;}if(fontBytes>60*1024*1024)fail();
  if(state.sourceData){const data=state.sourceData,meta=state.metadata;if(!string(data.filename,255)||!/\.(xlsx|xlsm|xls|csv|txt)$/i.test(data.filename)||!meta||meta.filename!==data.filename||!list(meta.columns,20000)||!list(meta.sheets,1001)||!Number.isInteger(meta.sheetIndex)||meta.sheetIndex<0||meta.sheetIndex>=meta.sheets.length)fail();
+  if(data.figureStudioProjectId!==undefined&&(typeof data.figureStudioProjectId!=='string'||!/^[a-zA-Z0-9-]{16,100}$/.test(data.figureStudioProjectId)))fail();
   const files=data.files??[data];if(!list(files,16)||!files.length)fail();let total=0;for(const file of files){if(!string(file?.filename,255)||!/\.(xlsx|xlsm|xls|csv|txt)$/i.test(file.filename)||!(file.bytes instanceof ArrayBuffer)||!file.bytes.byteLength)fail();total+=file.bytes.byteLength;if(data.files&&(!Number.isInteger(file.sheetIndex)||file.sheetIndex<0||file.sheetIndex>1000||!Number.isInteger(file.headerRow)||file.headerRow<1||file.headerRow>1000))fail();}if(total>30*1024*1024)fail();
   if(state.config.series.length)restoreSettings(makeSettings(state.config,meta,state.loadedHeader),meta);
  }else if(state.metadata!==null)fail();

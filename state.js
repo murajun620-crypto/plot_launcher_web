@@ -1,5 +1,5 @@
 import { resetPresetUnitScales, unitConversion, configureAFMUnits } from "./units.js?v=9127ec4c4f31";
-export const APP_VERSION = "2.4.24";
+export const APP_VERSION = '2.4.25';
 
 // Accept one numeric value or fraction without evaluating JavaScript expressions.
 export function parseCoefficient(value) {
@@ -172,6 +172,7 @@ export function makeProject(settings, data, fonts = [], workspace = {}) {
 export function parseProject(saved) {
   if (saved?.format !== 'plotlauncher-project' || saved.version !== 1) throw new Error('PlotLauncher Webのプロジェクトファイルを選んでください。');
   const data = saved.data, settings = saved.settings, workspace = saved.workspace || {};
+  if(workspace.figureStudioProjectId!==undefined&&!/^[a-zA-Z0-9-]{16,100}$/.test(workspace.figureStudioProjectId))throw Error('プロジェクトの識別情報を確認してください。');
   if (!data || typeof data.filename !== 'string' || data.filename.length > 255 || !/\.(xlsx|xlsm|xls|csv|txt)$/i.test(data.filename) || !Number.isInteger(data.sheetIndex) || data.sheetIndex < 0 || data.sheetIndex > 1000 || !Number.isInteger(data.headerRow) || data.headerRow < 1 || data.headerRow > 1000 || typeof data.sample !== 'boolean') throw new Error('プロジェクトのデータ・シート・ヘッダー行を確認してください。');
   if (settings?.format !== 'plotlauncher-web' || settings.version !== 1 || settings.data?.filename !== data.filename || settings.data?.headerRow !== data.headerRow || !Array.isArray(settings.series) || !settings.series.length || !settings.axes) throw new Error('プロジェクトのグラフ設定を確認してください。');
   if (!Array.isArray(saved.fonts) || saved.fonts.length > 32) throw new Error('プロジェクトのフォントを確認してください。');

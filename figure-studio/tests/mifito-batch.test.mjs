@@ -9,6 +9,13 @@ const figure=(id,...objects)=>({id,name:`Figure title ${id}`,objects});
 const identity=(activeImageId,...images)=>({projectId:'project-a',activeImageId,images,legacy:true});
 const freeze=value=>{if(value&&typeof value==='object'){Object.freeze(value);Object.values(value).forEach(freeze);}return value;};
 
+test('PlotLauncher sheet sync shares changed-only placement logic without touching MiFiTo panels',()=>{
+ const plot=(id,imageId)=>{const value=panel(id,imageId);value.source.app='plot';return value;};
+ const a=plot('a','plot-sheet-000000'),b=plot('b','plot-sheet-000001'),m=panel('m','plot-sheet-000000');
+ const result=planMiFiToSync([figure('two',b),figure('one',a,m)],{projectId:'project-a',images:[image('plot-sheet-000000','b'),image('plot-sheet-000001')]},new Map(),{app:'plot'});
+ assert.deepEqual(result.summary,{updated:1,added:0,unchanged:1});assert.deepEqual(result.matches.map(m=>m.panelId),['b','a']);assert.equal(a.x,10);assert.equal(a.w,100);
+});
+
 test('updates correct images across reordered Figures and leaves unrelated projects untouched',()=>{
  const a=panel('panel-a','image-a'),b=panel('panel-b','image-b'),foreign=panel('foreign','image-a','a','another-project');
  const figures=freeze([figure('second',b),figure('first',foreign,a)]),before=JSON.stringify(figures);

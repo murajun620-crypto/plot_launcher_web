@@ -5,7 +5,7 @@ const validFingerprint=value=>typeof value==='string'&&/^[a-f0-9]{64}$/.test(val
  * `fingerprint` in linked/matched entries describes the existing Studio preview.
  * No document, panel, source reference, or descriptor is changed here.
  */
-export function planMiFiToSync(figures,batch,identityByAsset=new Map(),{anchorPanelId}={}){
+export function planMiFiToSync(figures,batch,identityByAsset=new Map(),{anchorPanelId,app='mifito'}={}){
  if(!nonempty(batch?.projectId)||!Array.isArray(batch.images))throw Error('MiFiToの同期情報が正しくありません。');
  const incoming=new Map();
  for(const image of batch.images){
@@ -15,7 +15,7 @@ export function planMiFiToSync(figures,batch,identityByAsset=new Map(),{anchorPa
  const matches=[],linked=[],matchedIds=new Set(),changedIds=new Set();
  for(const figure of figures)for(const panel of figure.objects){
   const source=panel.source;
-  if(panel.type!=='image'||source?.app!=='mifito'||!nonempty(source.assetId))continue;
+  if(panel.type!=='image'||source?.app!==app||!nonempty(source.assetId))continue;
   const identity=identityByAsset.get(source.assetId);
   const explicit=source.projectId!==undefined||source.imageId!==undefined;
   // A partially present identity must not fall back into a different project.

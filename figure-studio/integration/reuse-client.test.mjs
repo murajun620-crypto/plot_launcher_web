@@ -17,10 +17,10 @@ function environment(){
 }
 const result=(r,extra={})=>({requestId:r.requestId,panelId:r.panelId,revision:1,project:new Blob(['edited']),preview:new Blob(['<svg/>'],{type:'image/svg+xml'}),...extra});
 
-test('same panel reuses one live tab and skips project loading',async()=>{
+test('same panel reuses one live tab and waits for fresh target acknowledgement',async()=>{
  const env=environment();const first=env.open();
  try{await env.ready();await env.loaded();const before=env.sent.length,second=env.open();
-  assert.equal(env.opened.length,1);assert.equal(second.window,first.window);assert.equal(first.window.focusCount,1);assert.equal(env.sent.length,before);assert.deepEqual(await second.ready,{connected:true});
+  assert.equal(env.opened.length,1);assert.equal(second.window,first.window);assert.equal(first.window.focusCount,1);assert.equal(env.sent.length,before+1);let resolved=false;second.ready.then(()=>resolved=true);await Promise.resolve();assert.equal(resolved,false);await env.loaded();assert.deepEqual(await second.ready,{connected:true});
  }finally{first.close();}assert.equal(env.listeners.size,0);
 });
 
@@ -37,14 +37,14 @@ test('blocked target preserves original callback and allows retry after applying
  try{await env.ready();await env.loaded();const old=env.load(),second=env.open('b',{onResult:r=>b.push(r),onStatus:s=>states.push(s.state)}),next=env.load();
   await env.emit('switch-blocked',{requestId:next.requestId,panelId:'b',message:'Apply first'});assert.deepEqual(await second.ready,{connected:false,reason:'switch-blocked'});assert.ok(states.includes('blocked'));
   await env.emit('result',result(old));assert.equal(a.length,1);assert.equal(b.length,0);assert.equal(env.sent.at(-1).data.editKey,'book/a/v2');
-  const count=env.sent.length;env.open('a',{editKey:'book/a/v2'});assert.equal(env.sent.length,count);
+  const count=env.sent.length;env.open('a',{editKey:'book/a/v2'});assert.equal(env.sent.length,count+1);await env.loaded();
   const retry=env.open('b');await env.loaded();assert.deepEqual(await retry.ready,{connected:true});assert.equal(env.opened.length,1);
  }finally{first.close();}
 });
 
-test('reopening the same panel refreshes callbacks without loading or losing editor edits',async()=>{
+test('reopening the same panel retires old results and refreshes callbacks after target confirmation',async()=>{
  const env=environment(),old=[],fresh=[];const first=env.open('a',{onResult:r=>old.push(r)});
- try{await env.ready();await env.loaded();const active=env.load();env.open('a',{onResult:r=>fresh.push(r)});await env.emit('result',result(active));assert.equal(old.length,0);assert.equal(fresh.length,1);assert.equal(env.sent.filter(x=>x.data.type==='load').length,1);
+ try{await env.ready();await env.loaded();const active=env.load();env.open('a',{onResult:r=>fresh.push(r)});await env.loaded();await env.emit('result',result(active));assert.equal(fresh.length,0);await env.emit('result',result(env.load()));assert.equal(old.length,0);assert.equal(fresh.length,1);assert.equal(env.sent.filter(x=>x.data.type==='load').length,2);
  }finally{first.close();}
 });
 
@@ -80,7 +80,7 @@ test('failed current baseline restore retries loading, while a stale failure can
   await env.loaded();assert.deepEqual(await retry.ready,{connected:true});
   const current=env.load(),count=env.sent.length;
   await env.emit('error',{requestId:original.requestId,panelId:'a',code:'load-failed',loaded:false,message:'Late failure'});
-  const reopened=env.open('a');assert.equal(env.sent.length,count);assert.equal(env.load().requestId,current.requestId);assert.deepEqual(await reopened.ready,{connected:true});
+  const reopened=env.open('a');assert.equal(env.sent.length,count+1);assert.notEqual(env.load().requestId,current.requestId);await env.loaded();assert.deepEqual(await reopened.ready,{connected:true});
  }finally{first.close();}
 });
 
@@ -100,8 +100,8 @@ test('exact native detach evicts its pooled bridge without closing the source an
   await env.ready();await env.loaded();const original=env.load(),identity={requestId:original.requestId,panelId:'a',editKey:'book/a/v1'};
   for(const patch of [{nonce:'foreign'},{hostId:'foreign'},{app:'mifito'},{requestId:'old-request'},{panelId:'other'},{editKey:'book/a/old'}])await env.emit('detached',{...identity,...patch});
   assert.equal(env.listeners.size,1);assert.equal(states.includes('detached'),false);
-  const before=env.sent.length;env.open('a');assert.equal(env.sent.length,before);assert.equal(env.opened.length,1);
-  await env.emit('detached',identity);assert.equal(env.listeners.size,0);assert.equal(first.window.closed,false);
+  const before=env.sent.length;env.open('a');assert.equal(env.sent.length,before+1);assert.equal(env.opened.length,1);await env.loaded();const next=env.load();
+  await env.emit('detached',{requestId:next.requestId,panelId:'a',editKey:'book/a/v1'});assert.equal(env.listeners.size,0);assert.equal(first.window.closed,false);
   fresh=env.open('a');assert.equal(env.listeners.size,1);assert.equal(env.opened.length,2);
   await env.ready();assert.notEqual(env.load().requestId,original.requestId);await env.loaded();assert.deepEqual(await fresh.ready,{connected:true});
   await env.emit('detached',identity,0);assert.equal(env.listeners.size,1);assert.equal(fresh.window.closed,false);

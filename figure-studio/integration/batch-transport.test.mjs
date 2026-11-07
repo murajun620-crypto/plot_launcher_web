@@ -20,8 +20,8 @@ test('wire payload preserves batch metadata and strips private state at every ne
  const s=single();s.image.private='secret';assert.deepEqual(transferResult('mifito',s).image,{projectId:'project-a',...info()});
 });
 
-test('batch validation rejects duplicate IDs, unsafe metadata, non-MiFiTo and total preview overflow',()=>{
- assert.throws(()=>transferResult('plot',batch()));
+test('batch validation rejects duplicate IDs, unsafe metadata, unknown apps and total preview overflow',()=>{
+ assert.equal(transferResult('plot',batch()).batch.images.length,2);assert.throws(()=>transferResult('unknown',batch()));
  for(const change of [v=>v.batch.images.push(v.batch.images[0]),v=>v.batch.projectId='../bad',v=>v.batch.images[0].fingerprint='bad',v=>v.batch.images[0].name='bad\u0000name',v=>v.batch.images[0].preview=new Blob(['x'],{type:'text/html'}),v=>v.batch.images=Array(101).fill(v.batch.images[0]),v=>v.image=single().image,v=>v.batch.images[0].unchanged='true']){
   const v=batch();change(v);assert.throws(()=>transferResult('mifito',v));
  }
@@ -106,7 +106,7 @@ function hostEnvironment(options={},hasHeader=true){
 
 test('PlotLauncher header send updates the original panel, locks through ACK, and cleans up on close',async()=>{
  const capture=deferred();let captures=0;
- const e=hostEnvironment({app:'plot',captureResult:()=>{captures++;return capture.promise;}});
+ const e=hostEnvironment({app:'plot',captureBatchResult:undefined,captureResult:()=>{captures++;return capture.promise;}});
  try{
   assert.equal(e.header.child,e.panel);assert.equal(e.documentRef.body.child,undefined);assert.equal(e.batchButton,undefined);
   assert.equal(e.button.id,'send-to-figure-studio');assert.equal(e.button.disabled,true);assert.equal(e.elements.filter(el=>el.id==='send-to-figure-studio').length,1);
@@ -154,6 +154,16 @@ test('same workspace image selection keeps dirty edits, does not reload, and rep
  finally{e.host.close();}
 });
 
+test('a new target in the same live project preserves dirty edits and acknowledges only after selection',async()=>{
+ const gate=deferred();const e=hostEnvironment({isDirty:()=>true,canReuseProject:async()=>true,loadProject:async(file,meta)=>{e.loads.push(meta);if(meta.imageId==='image-b')await gate.promise;}});
+ try{await e.load();const switching=e.load({panelId:'panel-b',requestId:'request-b',imageId:'image-b',editKey:'new-key'});await pause();assert.equal(e.sent.some(m=>m.type==='loaded'&&m.requestId==='request-b'),false);gate.resolve();await switching;assert.equal(e.loads.at(-1).reconnect,true);assert.equal(e.sent.at(-1).type,'loaded');assert.equal(e.sent.at(-1).panelId,'panel-b');}finally{gate.resolve();e.host.close();}
+});
+
+test('a stale loaded-panel cache cannot bypass source identity verification',async()=>{
+ let matches=true;const e=hostEnvironment({isDirty:()=>false,canReuseProject:async()=>matches});
+ try{await e.load();matches=false;await e.load({requestId:'fresh-request'});assert.equal(e.loads.length,2);assert.equal(e.loads[1].meta.reconnect,false);assert.equal(e.sent.at(-1).requestId,'fresh-request');}finally{e.host.close();}
+});
+
 test('failed or rejected batch leaves the loaded project available and explicit discard uses accepted project',async()=>{
  let fail=true;const e=hostEnvironment({isDirty:()=>true,captureBatchResult:()=>{if(fail){fail=false;throw Error('Bad image');}return batch();}});try{await e.load();await e.batchButton.fire('click');assert.equal(e.sent.at(-1).code,'capture-failed');assert.equal(e.batchButton.disabled,false);await e.batchButton.fire('click');await e.emit('rejected',{panelId:'panel-a',requestId:'request-a',revision:1,message:'Import failed'});assert.equal(e.accepted.length,0);assert.equal(e.batchButton.disabled,false);await e.batchButton.fire('click');await e.emit('accepted',{panelId:'panel-a',requestId:'request-a',revision:2,imageId:'image-a'});await e.load({panelId:'panel-b',requestId:'request-b',editKey:'other'});assert.equal(e.discard.hidden,false);await e.discard.fire('click');assert.equal(e.loads.at(-1).text,'mifito-project');assert.equal(e.loads.at(-1).meta.imageId,'image-a');}
  finally{e.host.close();}
@@ -170,7 +180,7 @@ function clientEnvironment(onResult){
 
 test('client forwards validated batch, relays receipt, and focuses exact image on warm reopen',async()=>{
  let received;const e=clientEnvironment(value=>{received=value;return {editKey:'new-key',imageId:'image-a',summary:{updated:1,added:0,unchanged:1},message:'1枚更新',private:true};});
- try{await e.emit('ready',{capabilities:['reuse-v1','batch-v1']});const load=e.sent.at(-1);assert.equal(load.imageId,'image-a');assert.ok(load.capabilities.includes('batch-v1'));await e.emit('loaded',{requestId:load.requestId,panelId:'panel-a'});await e.emit('result',{...batch(),requestId:load.requestId,panelId:'panel-a',revision:1});assert.equal(received.batch.images.length,2);assert.equal(received.bridgeState,undefined);const ack=e.sent.at(-1);assert.equal(ack.type,'accepted');assert.equal(ack.private,undefined);assert.deepEqual(ack.summary,{updated:1,added:0,unchanged:1});openSource({...e.args,editKey:'new-key'});assert.equal(e.sent.at(-1).type,'select-image');assert.equal(e.sent.at(-1).imageId,'image-a');assert.equal(e.sent.filter(m=>m.type==='load').length,1);}
+ try{await e.emit('ready',{capabilities:['reuse-v1','batch-v1']});const load=e.sent.at(-1);assert.equal(load.imageId,'image-a');assert.ok(load.capabilities.includes('batch-v1'));await e.emit('loaded',{requestId:load.requestId,panelId:'panel-a'});await e.emit('result',{...batch(),requestId:load.requestId,panelId:'panel-a',revision:1});assert.equal(received.batch.images.length,2);assert.equal(received.bridgeState,undefined);const ack=e.sent.at(-1);assert.equal(ack.type,'accepted');assert.equal(ack.private,undefined);assert.deepEqual(ack.summary,{updated:1,added:0,unchanged:1});const reopened=openSource({...e.args,editKey:'new-key'});const refreshed=e.sent.at(-1);assert.equal(refreshed.type,'load');assert.equal(refreshed.imageId,'image-a');assert.equal(e.sent.filter(m=>m.type==='load').length,2);await e.emit('loaded',{requestId:refreshed.requestId,panelId:'panel-a'});assert.deepEqual(await reopened.ready,{connected:true});}
  finally{e.session.close();}
 });
 

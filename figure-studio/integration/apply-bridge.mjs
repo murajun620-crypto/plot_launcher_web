@@ -27,7 +27,7 @@ for (const token of required) {
   if (!source.includes(token)) throw new Error(`Source changed; review the adapter before applying. Missing: ${token}`);
 }
 const hook = await fs.readFile(path.join(here,`${kind}-hook.js.txt`),'utf8');
-source = `import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=0.1.0';\nimport {setupDirectSendButton} from './direct-transfer.mjs?v=0.1.0';\n${source.replace(restore,replacement)}\n${hook}\n`;
+source = `import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=source-batch-v070-1';\nimport {setupDirectSendButton} from './direct-transfer.mjs?v=source-batch-v070-1';\n${source.replace(restore,replacement)}\n${hook}\n`;
 const syncAnchor=kind==='plot'?'function updateButtons() {':"busy = value; document.body.classList.toggle('busy', value);";
 if(!source.includes('figureStudioDirectSender?.sync();'))source=source.replace(syncAnchor,`${syncAnchor}\n  figureStudioDirectSender?.sync();`);
 if (kind === 'plot') {
@@ -41,8 +41,8 @@ if (kind === 'plot') {
 const host = await fs.readFile(path.join(here,'bridge-host.mjs'),'utf8');
 const direct = await fs.readFile(path.join(here,'direct-transfer.mjs'),'utf8');
 const build = createHash('sha256').update(source).update(host).update(direct).digest('hex').slice(0,12);
-source = source.replace('./bridge-host.mjs?v=0.1.0',`./bridge-host.mjs?v=${build}`);
-source = source.replace('./direct-transfer.mjs?v=0.1.0',`./direct-transfer.mjs?v=${build}`);
+source = source.replace('./bridge-host.mjs?v=source-batch-v070-1',`./bridge-host.mjs?v=${build}`);
+source = source.replace('./direct-transfer.mjs?v=source-batch-v070-1',`./direct-transfer.mjs?v=${build}`);
 let index = await fs.readFile(path.join(root,'index.html'),'utf8');
 if (!/app\.js\?v=[a-f0-9]+/.test(index)) throw new Error('Source changed; app.js cache version not found.');
 index = index.replace(/app\.js\?v=[a-f0-9]+/,`app.js?v=${build}`);

@@ -1,5 +1,5 @@
 /** Browser-only editing bridge. No project data is sent to a server. */
-import {transferResult,transferReceipt,isTransferImageId,getFigureWorkspace} from './direct-transfer.mjs?v=project-switch-v051-1';
+import {transferResult,transferReceipt,isTransferImageId,getFigureWorkspace} from './direct-transfer.mjs?v=source-batch-v070-1';
 import {createEditorDirectory,studioOwnerId} from './editor-discovery.mjs?v=editor-reuse-v036-1';
 export const BRIDGE_PROTOCOL = 'figure-studio-bridge-v1';
 export const SOURCE_APPS = Object.freeze({
@@ -136,14 +136,13 @@ function openSourceSession({app, project, sourceName, panelId, editKey, imageId,
   function open(options){
     focus();
     const same=(pending?[pending]:[current]).find(r=>r&&r.panelId===options.panelId&&r.editKey===options.editKey);
-    if(same){
-      same.onResult=options.onResult;same.onStatus=options.onStatus;
-      if(options.imageId)same.imageId=options.imageId;
-      if(same.loaded&&!pending&&!same.applyingRevision&&same.imageId)send('select-image',same,{imageId:same.imageId});
-      if(same.loaded)status(same,'ready','開いている編集画面に戻りました。続けて編集できます。');
-      else {if(initialized){same.deadline=Date.now()+loadTimeoutMs;same.timedOut=false;sendLoad(same);}else send('ping',same);status(same,'loading','編集画面で元プロジェクトを読み込んでいます…');}
-      return facade(same);
+    if(same&&pending===same&&!same.loaded&&!same.timedOut){
+      same.onResult=options.onResult;same.onStatus=options.onStatus;return facade(same);
     }
+    if(same&&pending===same&&same.timedOut)pending=null;
+    // A warm tab may have opened another project since its last acknowledgement.
+    // Use a fresh request and await the editor's target-selection acknowledgement.
+    // The host reuses the live project when the bound snapshot still matches.
     const r=request(options);
     if(pending){status(r,'busy','編集画面の読み込みが終わってから、もう一度対象の図を開いてください。');r.settle({connected:false,reason:'busy'});return facade(r);}
     if(initialized&&!reuse){status(r,'unavailable','編集画面を最新版へ更新してから、もう一度対象の図を開いてください。現在の編集内容はそのまま残っています。');r.settle({connected:false,reason:'adapter-outdated'});return facade(r);}

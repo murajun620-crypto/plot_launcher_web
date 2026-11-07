@@ -21,7 +21,7 @@ export function transferResult(app,value,sourceName=value?.sourceName){
     return {imageId:image.imageId,name:image.name,fingerprint:image.fingerprint};
   };
   if(value.batch!==undefined){
-    if(app!=='mifito'||value.image!==undefined||!isTransferImageId(value.batch?.projectId)||!Array.isArray(value.batch.images)||!value.batch.images.length||value.batch.images.length>100)throw Error('一括反映の画像情報が正しくありません（最大100枚）。');
+    if(value.image!==undefined||!isTransferImageId(value.batch?.projectId)||!Array.isArray(value.batch.images)||!value.batch.images.length||value.batch.images.length>100)throw Error('一括反映の画像情報が正しくありません（最大100枚）。');
     let bytes=0;const ids=new Set();
     const images=value.batch.images.map(image=>{
       const info=imageInfo(image,value.batch.projectId);
@@ -34,7 +34,7 @@ export function transferResult(app,value,sourceName=value?.sourceName){
     if(!previewValid(value.preview))throw Error('表示用画像の形式・サイズが対応範囲外です（96 MB以内）。');
     result.preview=value.preview;
     if(value.image!==undefined){
-      if(app!=='mifito')throw Error('画像の識別情報が正しくありません。');
+
       result.image={projectId:value.image.projectId,...imageInfo(value.image,value.image.projectId)};
     }
   }
@@ -201,7 +201,7 @@ export function createDirectSender({app,captureResult,captureBatchResult,onAccep
   function send({batch=false}={}) {
     if(disposed)return Promise.reject(new Error('送信機能は終了しています。'));
     if(busy)return pending?.promise || Promise.resolve({ok:false});
-    if(!pending&&batch&&(app!=='mifito'||typeof captureBatchResult!=='function'))return Promise.reject(new Error('一括送信には対応していません。'));
+    if(!pending&&batch&&(typeof captureBatchResult!=='function'))return Promise.reject(new Error('一括送信には対応していません。'));
     const record=pending || {transferId:crypto.randomUUID(),nonce:crypto.randomUUID(),payload:null,batch:!!batch,workspace:!!getFigureWorkspace(windowRef)};
     const previousPopup=record.popup&&!record.popup.closed?record.popup:null,previousReady=record.receiverReady,previousBatch=record.receiverBatch;
     clearTimeout(record.timer);record.timer=null;record.delivered=false;record.receiverReady=false;record.receiverBatch=false;record.peer=target.origin===windowRef.location.origin?findPeer(record.workspace):null;record.popup=null;
@@ -267,7 +267,7 @@ export function setupDirectSendButton({app,captureResult,captureBatchResult,onAc
   if(!host)return null;
   const group=documentRef.createElement('div');group.style.cssText='display:inline-flex;align-items:center;gap:6px;position:relative';
   const button=documentRef.createElement('button');button.id='send-to-figure-studio';button.type='button';button.className='button primary';button.textContent='Figure Studioへ送る';button.title='表示中の図と元プロジェクトを、開いているFigure Studioへ追加します。';
-  const batchButton=app==='mifito'&&typeof captureBatchResult==='function'?documentRef.createElement('button'):null;
+  const batchButton=typeof captureBatchResult==='function'?documentRef.createElement('button'):null;
   if(batchButton){batchButton.id='send-all-to-figure-studio';batchButton.type='button';batchButton.className='button primary';batchButton.textContent='まとめてStudioへ送る';batchButton.title='変更した画像をまとめて反映し、未追加の画像を追加します。変更のない画像はそのまま残します。';}
   const message=documentRef.createElement('span');message.setAttribute('role','status');message.style.cssText='display:none;position:absolute;right:0;top:calc(100% + 8px);width:280px;z-index:10000;padding:10px 12px;background:#fff;color:#173c38;border:1px solid #b8cfcb;border-radius:8px;box-shadow:0 5px 18px #173c3825;font:12px/1.5 system-ui;';
   group.append(button);if(batchButton)group.append(batchButton);group.append(message);host.append(group);
