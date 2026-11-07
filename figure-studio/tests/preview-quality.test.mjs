@@ -73,3 +73,18 @@ test('cache evicts least-recently used previews and keys source replacement corr
  assert.equal(manager.getURL(a),a.dataUrl);await manager.whenIdle();assert.equal(calls,3);
  a.dataUrl='data:image/png;base64,replaced';assert.equal(manager.getURL(a),a.dataUrl);await manager.whenIdle();assert.equal(calls,4);
 });
+
+test('automatic mode uses original pixels on zoom-in even when an earlier small preview finishes late',async()=>{
+ const asset=source(),before=structuredClone(asset),pending=gate(),renders=[];
+ const manager=createPreviewQuality({quality:'auto',schedule:()=>Promise.resolve(),renderPreview:async(a,q)=>{renders.push(q);await pending.promise;return 'data:image/png;base64,quarter';}});
+ assert.equal(normalizePreviewQuality('auto'),'auto');assert.equal(manager.getURL(asset,{width:300,height:150}),asset.dataUrl);await tick();
+ assert.equal(manager.getURL(asset,{width:2200,height:1100}),asset.dataUrl);pending.resolve();await manager.whenIdle();
+ assert.deepEqual(renders,[.25]);assert.equal(manager.getURL(asset,{width:2200,height:1100}),asset.dataUrl);assert.equal(manager.getURL(asset,{width:300,height:150}),'data:image/png;base64,quarter');assert.deepEqual(asset,before);
+});
+test('automatic mode caches different display sizes of the same asset while manual fractions remain explicit',async()=>{
+ const asset=source(),renders=[];const manager=createPreviewQuality({quality:'auto',schedule:()=>Promise.resolve(),renderPreview:async(a,q)=>{renders.push(q);return 'data:image/png;base64,'+q;}});
+ manager.getURL(asset,{width:300,height:150});manager.getURL(asset,{width:900,height:450});await manager.whenIdle();assert.deepEqual(renders,[.25,.5]);
+ assert.equal(manager.getURL(asset,{width:300,height:150}),'data:image/png;base64,0.25');assert.equal(manager.getURL(asset,{width:900,height:450}),'data:image/png;base64,0.5');
+ manager.setQuality(.25);assert.equal(manager.getURL(asset,{width:9000,height:4500,pixelRatio:2}),'data:image/png;base64,0.25');
+ manager.setQuality('auto');assert.equal(manager.getURL({...asset,mime:'image/svg+xml'},{width:10,height:10}),asset.dataUrl);
+});

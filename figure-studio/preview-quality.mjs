@@ -1,9 +1,10 @@
 import {blobToDataURL,dataURLToBlob} from './assets.mjs';
+import {automaticPreviewQuality} from './image-resolution.mjs?v=image-quality-v066-1';
 
 export const PREVIEW_QUALITIES=Object.freeze([1,.5,.25]);
-export function normalizePreviewQuality(value){const n=Number(value);return PREVIEW_QUALITIES.includes(n)?n:1;}
+export function normalizePreviewQuality(value){if(value==='auto')return 'auto';const n=Number(value);return PREVIEW_QUALITIES.includes(n)?n:1;}
 export function previewDimensions(asset,quality){
- const q=normalizePreviewQuality(quality),width=Number(asset.width),height=Number(asset.height);
+ const normalized=normalizePreviewQuality(quality),q=normalized==='auto'?1:normalized,width=Number(asset.width),height=Number(asset.height);
  if(!Number.isFinite(width)||!Number.isFinite(height)||width<1||height<1)throw Error('画像の寸法を取得できません。');
  return {width:Math.max(1,Math.round(width*q)),height:Math.max(1,Math.round(height*q))};
 }
@@ -15,7 +16,7 @@ const idle=()=>new Promise(resolve=>{
 
 /** Fractions refer to each source-image dimension. Full SVG stays vector. */
 export async function renderReducedPreview(asset,quality){
- const q=normalizePreviewQuality(quality);
+ const normalized=normalizePreviewQuality(quality),q=normalized==='auto'?1:normalized;
  if(q===1)return asset.dataUrl;
  const {width,height}=previewDimensions(asset,q);
  let bitmap,image,canvas;
@@ -53,6 +54,7 @@ export function createPreviewQuality({quality=1,onReady=()=>{},onError=()=>{},re
   return item.id;
  };
  function key(asset,q){return `${identity(asset)}:${q}`;}
+ const wanted=entry=>current==='auto'||entry.quality===current;
  function touch(k,entry){entries.delete(k);entries.set(k,entry);}
  function trim(keep){
   let ready=[...entries.values()].filter(e=>e.state==='ready').length;
@@ -71,20 +73,20 @@ export function createPreviewQuality({quality=1,onReady=()=>{},onError=()=>{},re
    while(queue.length&&!disposed){
     const entry=queue.shift(),token=epoch;
     if(entries.get(entry.key)!==entry)continue;
-    if(entry.quality!==current){entries.delete(entry.key);continue;}
+    if(!wanted(entry)){entries.delete(entry.key);continue;}
     await schedule();
     if(disposed||token!==epoch||entries.get(entry.key)!==entry)continue;
-    if(entry.quality!==current){entries.delete(entry.key);continue;}
+    if(!wanted(entry)){entries.delete(entry.key);continue;}
     try{
      const url=await renderPreview(entry.asset,entry.quality);
      if(disposed||token!==epoch||entries.get(entry.key)!==entry)continue;
      if(typeof url!=='string'||!url.startsWith('data:image/'))throw Error('プレビューデータが不正です。');
      entry.url=url;entry.state='ready';entry.bytes=url.length*2;bytes+=entry.bytes;touch(entry.key,entry);trim(entry.key);
-     if(current===entry.quality)onReady(entry.asset,url,entry.quality);
+     if(wanted(entry))onReady(entry.asset,url,current);
     }catch(error){
      if(disposed||token!==epoch||entries.get(entry.key)!==entry)continue;
      entry.state='error';
-     if(current===entry.quality)onError(error,entry.asset,entry.quality);
+     if(wanted(entry))onError(error,entry.asset,current);
     }
    }
   }finally{running=false;settle();if(queue.length&&!disposed)void pump();}
@@ -95,15 +97,17 @@ export function createPreviewQuality({quality=1,onReady=()=>{},onError=()=>{},re
    current=normalizePreviewQuality(value);
    // An explicit user choice may retry a temporary decode/canvas failure.
    // Ordinary rerenders still retain the error to avoid a busy retry loop.
-   for(const[k,e]of entries)if(e.state==='error'&&e.quality===current)entries.delete(k);
+   for(const[k,e]of entries)if(e.state==='error'&&wanted(e))entries.delete(k);
    return current;
   },
-  getURL(asset){
+  getURL(asset,view){
    if(!asset)return '';
    if(disposed||current===1)return asset.dataUrl;
-   const k=key(asset,current),existing=entries.get(k);
+   const quality=current==='auto'?automaticPreviewQuality(asset,view):current;
+   if(quality===1)return asset.dataUrl;
+   const k=key(asset,quality),existing=entries.get(k);
    if(existing){if(existing.state==='ready'){touch(k,existing);return existing.url;}return asset.dataUrl;}
-   const entry={key:k,asset,quality:current,state:'queued',bytes:0};entries.set(k,entry);queue.push(entry);void pump();
+   const entry={key:k,asset,quality,state:'queued',bytes:0};entries.set(k,entry);queue.push(entry);void pump();
    return asset.dataUrl;
   },
   // Optional hook after replacing a project; outstanding results are ignored.

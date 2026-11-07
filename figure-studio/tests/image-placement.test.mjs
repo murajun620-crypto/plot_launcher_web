@@ -18,13 +18,14 @@ test('physical figures larger than the page keep size and are placed at the top-
  assert.deepEqual(size,{w:mm(240),h:mm(180)});
  assert.deepEqual(imageInsertionPoint(page,size,mm(4)),{x:0,y:0});
 });
-test('MiFiTo and images without physical metadata keep their previous fit behavior',()=>{
+test('MiFiTo retains fit behavior while small ordinary rasters start at 300 dpi',()=>{
  for(const physicalSize of [undefined,{width:NaN,height:10},{width:-1,height:10},{width:Infinity,height:1}]){
   const size=importedImageSize({...image,physicalSize},page,'plot');
   near(size.w,mm(85));near(size.h,size.w*147/186);
  }
  near(importedImageSize(image,page,'mifito').w,mm(85));
- near(importedImageSize({...image,physicalSize:undefined},page).w,mm(70));
+ near(importedImageSize({...image,physicalSize:undefined},page).w,186*72/300);
+ near(importedImageSize({...image,mime:'image/svg+xml',physicalSize:undefined},page).w,mm(70));
 });
 test('source edits change margins without rescaling axes and keep deliberate manual scale',()=>{
  const next={width:170.12345,height:130.98765};

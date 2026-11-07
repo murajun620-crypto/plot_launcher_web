@@ -1,5 +1,6 @@
 import {mm} from './model.mjs';
 import {validatedMiFiToBodySize} from './physical-size.mjs?v=0.3.5-1';
+import {IMPORT_DPI} from './image-resolution.mjs?v=image-quality-v066-1';
 
 const validSize=size=>size&&[size.width,size.height].every(n=>Number.isFinite(n)&&n>0&&n<=mm(2000));
 
@@ -7,7 +8,8 @@ const validSize=size=>size&&[size.width,size.height].every(n=>Number.isFinite(n)
 // shrink a physical-size figure merely because it exceeds the current page.
 export function importedImageSize(image,page,mode='image'){
  if((mode==='image'||mode==='plot'||(mode==='mifito'&&validatedMiFiToBodySize(image.mifitoBodySize,image.physicalSize)))&&validSize(image.physicalSize))return {w:image.physicalSize.width,h:image.physicalSize.height};
- const s=mode==='image'?Math.min(mm(70),page.width*.42)/image.width:Math.min(mm(85)/image.width,page.width*.65/image.width,page.height*.65/image.height);
+ // Small clipboard bitmaps must not be enlarged to the usual 70 mm panel.
+ const s=mode==='image'?Math.min(mm(70)/image.width,page.width*.42/image.width,image.mime==='image/svg+xml'?Infinity:72/IMPORT_DPI):Math.min(mm(85)/image.width,page.width*.65/image.width,page.height*.65/image.height);
  return {w:image.width*s,h:image.height*s};
 }
 
