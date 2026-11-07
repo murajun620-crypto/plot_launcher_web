@@ -1,4 +1,11 @@
-# Figure Studio Web v0.3.2 検証記録
+# Figure Studio Web v0.3.3 検証記録
+
+## v0.3.3の確認
+
+- 自動テスト143件成功。Figure番号の振り直し、複数移動、補足タイトル・独自名・ID・素材参照の保持、Undo/Redoを含む。
+- ローカル実ブラウザ：Fig. 2を先頭へドラッグすると名前がFig. 1に変わり、上部の名前・ブラウザタイトル・キャンバスのFigure 1と一致。元の「Figure 1 — Demo」は「Figure 2 — Demo」へ更新し、独自名の「AFM — axes 4 × 3 cm」は保持。
+- ローカル実ブラウザ：Undo/Redoで順序と番号が一緒に復元。途中へのEnter追加とDelete削除でも後続のFigure番号が連番になることを確認。
+
 
 ## v0.3.2の確認
 
