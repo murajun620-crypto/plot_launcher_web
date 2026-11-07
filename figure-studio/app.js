@@ -25,6 +25,7 @@ import {createArrowPicker} from './arrow-picker.mjs?v=0.3.0-1';
 import {lineStrokeAttributes,lineStyleValue,setLineStyle,supportsLineStyle} from './line-styles.mjs?v=lines-v064-1';
 import {createLineStylePicker} from './line-style-picker.mjs?v=lines-v064-1';
 import {createPreviewQuality} from './preview-quality.mjs?v=image-quality-v066-1';
+import {createSelectionWheelZoom,resetSelectionZoom} from './selection-zoom.mjs?v=selection-zoom-v067-1';
 import {reorderFigures} from './figure-order.mjs';
 import {renumberFigureNames} from './figure-names.mjs?v=0.3.3-1';
 import {deleteFigures,duplicateFigures} from './figure-commands.mjs';
@@ -87,7 +88,7 @@ function change(fn){finishText();const before=snapshot();fn();record(before);}
 function scheduleSave(){clearTimeout(saveTimer);$('#saveStatus').textContent='保存待ち';saveTimer=setTimeout(async()=>{const rev=revision;try{await saveDraft(snapshot(),assets);$('#saveStatus').textContent=rev===revision?'ブラウザに保存済み':'保存待ち';}catch(e){$('#saveStatus').textContent='自動保存できません';toast('自動保存できません。Ctrl+Sでプロジェクトを保存してください。');}},650);}
 function refreshImagePreviews(){for(const o of doc.objects)if(o.type==='image'){const a=assets.get(o.assetId);if(a)nodes.get(o.id)?.querySelector('image')?.setAttribute('href',previewQuality.getURL(a,{width:Math.abs(o.w*scale),height:Math.abs(o.h*scale),pixelRatio:globalThis.devicePixelRatio||1}));}}
 function setScale(s){scale=Math.max(.25,Math.min(5,s));$('#zoom').value=Math.round(scale*100);$('#zoomLabel').textContent=`${Math.round(scale*100)}%`;paper.style.width=`${doc.width*scale}px`;paper.style.height=`${doc.height*scale}px`;svg.style.width=`${doc.width*scale}px`;svg.style.height=`${doc.height*scale}px`;refreshImagePreviews();renderOverlay();positionEditor();}
-function fit(){const w=viewport.clientWidth-100,h=viewport.clientHeight-85;setScale(Math.min(w/doc.width,h/doc.height));}
+function fit(){resetSelectionZoom(viewport);viewport.scrollLeft=viewport.scrollTop=0;const w=viewport.clientWidth-100,h=viewport.clientHeight-85;setScale(Math.min(w/doc.width,h/doc.height));}
 function svgPoint(e){const r=svg.getBoundingClientRect();return{x:(e.clientX-r.left)/scale,y:(e.clientY-r.top)/scale};}
 function transform(o){return `translate(${o.x} ${o.y}) rotate(${o.rotation||0} ${o.w/2} ${o.h/2})`;}
 function font(o){return `${o.italic?'italic ':''}${o.bold?'bold ':''}${o.fontSize}px ${o.fontFamily||'Arial'}`;}
@@ -300,7 +301,7 @@ function endGesture(e,cancel=false){const g=gesture;if(!g||(e&&e.pointerId!==g.p
 viewport.addEventListener('pointerup',e=>{if(pathDrawing.pointerUp(e,svgPoint(e)))return;endGesture(e);});viewport.addEventListener('pointercancel',e=>{if(pathDrawing.drawing)pathDrawing.cancel();endGesture(e,true);});
 viewport.addEventListener('lostpointercapture',e=>{if(gesture?.pointerId===e.pointerId)endGesture(null,true);});
 svg.addEventListener('dblclick',e=>{if(pathDrawing.doubleClick(e,svgPoint(e)))return;const id=e.target.closest('[data-id]')?.dataset.id||document.elementsFromPoint(e.clientX,e.clientY).map(n=>n.closest?.('[data-id]')?.dataset.id).find(Boolean),o=doc.objects.find(v=>v.id===id);if(o?.type==='text')beginText(o);else if(['curve','freeform'].includes(o?.type)){pathEditId=o.id;renderOverlay();renderInspector();}else if(o?.source)editSource(o);});
-viewport.addEventListener('wheel',e=>{if(e.ctrlKey||e.metaKey){e.preventDefault();setScale(scale*Math.exp(-e.deltaY*.0015));}},{passive:false});
+viewport.addEventListener('wheel',createSelectionWheelZoom({viewport,paper,getSelection:selected,getScale:()=>scale,setScale,afterCenter:positionEditor}),{passive:false});
 window.addEventListener('keydown',e=>{if(!e.defaultPrevented&&e.code==='Space'&&!editingId&&(e.target===svg||e.target===viewport||e.target===document.body)){spaceDown=true;e.preventDefault();}});window.addEventListener('keyup',e=>{if(e.code==='Space')spaceDown=false;});window.addEventListener('blur',()=>{spaceDown=false;shortcut.reset();if(gesture)endGesture(null,true);});
 
 function duplicate(){const old=selected();if(!old.length)return;change(()=>{const groups=new Map();const added=old.map(o=>{const n=clone(o);n.id=uid();n.x+=mm(3);n.y+=mm(3);n.locked=false;if(n.groupId){if(!groups.has(n.groupId))groups.set(n.groupId,uid());n.groupId=groups.get(n.groupId);}return n;});doc.objects.push(...added);selection=added.map(o=>o.id);});}
