@@ -51,3 +51,13 @@ test('workspace exposes the current Studio receiver after readiness and opens an
  workspace.openEditor('mifito',{url:'http://localhost:8080/Microscopy_figure_tools_web/',ownerId:'owner'});
  const url=new URL(env.frames[0].src);assert.equal(url.searchParams.get('figureWorkspace'),'1');assert.equal(url.hash,'');
 });
+
+test('duplicated workspaces get independent editor ownership even when session storage is copied',()=>{
+ const first=environment(),second=environment(),storage={getItem:()=> 'copied-owner',setItem(){}};
+ first.windowRef.sessionStorage=second.windowRef.sessionStorage=storage;
+ const a=createWorkspace(first),b=createWorkspace(second);
+ assert.notEqual(a.ownerId,b.ownerId);
+ a.show('mifito');b.show('mifito');
+ assert.equal(new URL(first.frames[0].src).searchParams.get('figureWorkspaceOwner'),a.ownerId);
+ assert.equal(new URL(second.frames[0].src).searchParams.get('figureWorkspaceOwner'),b.ownerId);
+});

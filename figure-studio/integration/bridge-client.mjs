@@ -39,8 +39,8 @@ export function openSource(options){
  const facade={get window(){return real?.window||null;},ready,downloadProject:()=>downloadBlob(record.options.project,record.options.sourceName||`source${spec.extension}`,windowRef.document),close(){cancelled=true;real?.close();settle({connected:false,reason:'closed'});if(openings.get(key)===record)openings.delete(key);}};
  record.facade=facade;openings.set(key,record);
  options.onStatus?.({state:'opening',message:`開いている${spec.name}を探しています…`});
- const ownerId=studioOwnerId(windowRef);
  const workspace=getFigureWorkspace(windowRef);
+ const ownerId=workspace?.ownerId||studioOwnerId(windowRef);
  if(workspace?.openEditor)workspace.openEditor(options.app,{url:target.href,ownerId});
  Promise.resolve().then(async()=>{
   let projectHash;
@@ -100,11 +100,11 @@ function openSourceSession({app, project, sourceName, panelId, editKey, imageId,
   if(existing&&!existing.window.closed&&!forceNew)return existing.open(args);
   existing?.close();
   const nonce = crypto.randomUUID();
-  const ownerId=studioOwnerId(windowRef);
+  const workspace=getFigureWorkspace(windowRef);
+  const ownerId=workspace?.ownerId||studioOwnerId(windowRef);
   target.hash = new URLSearchParams({figureBridge:nonce, figureOrigin:origin,figureOwner:ownerId}).toString();
   let connection=null;
   if(directoryPeer)connection=directory.connect(directoryPeer,{ownerId,nonce,onMessage:event=>receive(event),onLost:()=>{status(pending||current,'error','編集画面への接続が切れました。対象の図をもう一度開いて再接続してください。');close();}});
-  const workspace=getFigureWorkspace(windowRef);
   const popup = connection?.window||(workspace?.openEditor?workspace.openEditor(app,{url:target.href,nonce,origin,ownerId}):windowRef.open(target.href, `figure-editor-${nonce}`));
   const safeName=value=>String(value||`source${spec.extension}`).replace(/[\\/]/g,'_');
   if (!popup) {

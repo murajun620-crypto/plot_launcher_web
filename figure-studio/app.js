@@ -4,7 +4,7 @@ import {importedImageSize,replacedImageSize,replacedMiFiToImageSize,imageInserti
 import {saveDraft,loadDraft,saveProjectFileTarget,loadProjectFileTarget} from './storage.mjs?v=0.3.6-1';
 import {createDemo} from './demo.mjs';
 import {createShortcutHandler} from './shortcuts.mjs';
-import {openSource,SOURCE_APPS,setupSourceDiscovery} from './integration/bridge-client.mjs?v=0.3.6-1';
+import {openSource,SOURCE_APPS,setupSourceDiscovery} from './integration/bridge-client.mjs?v=workspace-v040-2';
 import {createFigureSidebar} from './thumbnails.mjs?v=0.3.0-1';
 import {setupTransferReceiver} from './integration/direct-transfer.mjs?v=batch-v034-1';
 import {readMifitoIdentity} from './integration/mifito-sync.mjs?v=0.3.5-1';

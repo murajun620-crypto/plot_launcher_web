@@ -1,11 +1,10 @@
-import {SOURCE_APPS} from './integration/bridge-client.mjs?v=workspace-v040-1';
-import {studioOwnerId} from './integration/editor-discovery.mjs?v=workspace-v040-1';
+import {SOURCE_APPS} from './integration/bridge-client.mjs?v=workspace-v040-2';
 
 const APPS=['studio','plot','mifito'];
 
 /** One live document per editor: changing the visible workspace never navigates it. */
 export function createWorkspace({windowRef=window,documentRef=windowRef.document}={}){
- const workspaceOwner=studioOwnerId(windowRef);
+ const workspaceOwner=windowRef.crypto?.randomUUID?.()||crypto.randomUUID();
  const frames=new Map([['studio',documentRef.getElementById('studio-frame')]]);
  const tabs=[...documentRef.querySelectorAll('[role="tab"][data-app]')];
  let active='studio',noticeTimer=null,updateObserver=null;
@@ -34,7 +33,7 @@ export function createWorkspace({windowRef=window,documentRef=windowRef.document
   for(const tab of tabs){const selected=tab.dataset.app===app;tab.setAttribute('aria-selected',String(selected));tab.tabIndex=selected?0:-1;}
   resize(frame);return frame.contentWindow;
  }
- const api={openEditor(app,options={}){if(!SOURCE_APPS[app])throw Error('編集アプリが見つかりません。');const frame=ensureFrame(app,options);show(app);return frame.contentWindow;},show,get studioWindow(){return frames.get('studio').contentWindow;},get studioReceiverId(){try{return api.studioWindow.FigureStudioWorkspaceReceiverId||null;}catch{return null;}}};
+ const api={ownerId:workspaceOwner,openEditor(app,options={}){if(!SOURCE_APPS[app])throw Error('編集アプリが見つかりません。');const frame=ensureFrame(app,options);show(app);return frame.contentWindow;},show,get studioWindow(){return frames.get('studio').contentWindow;},get studioReceiverId(){try{return api.studioWindow.FigureStudioWorkspaceReceiverId||null;}catch{return null;}}};
  windowRef.FigureStudioWorkspace=api;
  for(const tab of tabs){
   tab.addEventListener('click',()=>show(tab.dataset.app));
