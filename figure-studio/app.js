@@ -4,6 +4,7 @@ import {saveDraft,loadDraft} from './storage.mjs';
 import {createDemo} from './demo.mjs';
 import {createShortcutHandler} from './shortcuts.mjs';
 import {openSource,SOURCE_APPS} from './integration/bridge-client.mjs';
+import {createFigureSidebar} from './thumbnails.mjs';
 
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const ns='http://www.w3.org/2000/svg';
@@ -14,7 +15,11 @@ function syncFigure(){const i=figures.findIndex(f=>f.id===doc.id);if(i>=0)figure
 function snapshot(){syncFigure();return clone({format:'figure-studio-book',version:1,id:bookId,activeId:doc.id,figures});}
 function restoreBook(state){figures=clone(state.figures);bookId=state.id;doc=figures.find(f=>f.id===state.activeId)||figures[0];selection=[];}
 function switchFigure(id){if(id===doc.id)return;finishText();if(gesture)endGesture(null,true);bridge?.close();syncFigure();const next=figures.find(f=>f.id===id);if(!next)return;doc=next;selection=[];tool='select';render();fit();scheduleSave();svg.focus();}
-function renderFigureTabs(){const tabs=$('#figureTabs');if(!tabs)return;tabs.replaceChildren();figures.forEach((f,i)=>{const b=document.createElement('button');b.type='button';b.className='figure-tab'+(f.id===doc.id?' active':'');b.dataset.figureId=f.id;b.setAttribute('aria-current',f.id===doc.id?'page':'false');b.textContent=`${i+1} · ${f.name}`;b.onclick=()=>switchFigure(f.id);tabs.append(b);});}
+const figureSidebar=createFigureSidebar({root:$('#figureTabs'),onSelect:switchFigure,onCommand:execute,renderSVG:(f,width,height)=>{
+ const out=el('svg',{xmlns:ns,width,height,viewBox:`0 0 ${f.width} ${f.height}`});out.append(el('rect',{width:f.width,height:f.height,fill:'#fff'}));
+ for(const o of f.objects){const g=el('g');drawContent(o,g);g.removeAttribute('style');g.removeAttribute('data-id');out.append(g);}return new XMLSerializer().serializeToString(out);
+}});
+function renderFigureTabs(){figureSidebar.update(figures,doc.id);}
 const nodes=new Map(),svg=$('#canvas'),objects=$('#objects'),overlays=$('#overlays'),viewport=$('#viewport'),paper=$('#paperWrap'),editor=$('#textEditor');
 svg.setAttribute('tabindex','0');svg.setAttribute('role','application');svg.setAttribute('aria-label','Figure編集キャンバス');
 const measure=document.createElement('canvas').getContext('2d');
@@ -149,7 +154,7 @@ function execute(action,payload={}){
  if(action==='attach-source'){if(selected().length!==1||selected()[0].type!=='image'){toast('画像・グラフを1つ選択してください');return;}$('#sourceInput').click();return;}
  if(action==='edit-source'){const o=selected()[0];if(o?.source)editSource(o);else toast('先に「元プロジェクトを関連付け」で .plotproject / .mifito を選択してください');return;}
 }
-const shortcut=createShortcutHandler({execute,isEditing:e=>e.target===editor?'canvas-text':e.target.isContentEditable||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName),isCanvasActive:()=>!document.querySelector('dialog[open]')&&(document.activeElement===svg||document.activeElement===document.body||document.activeElement===editor),onHint:text=>{$('#keyHint').textContent=text;$('#keyHint').hidden=!text;}});
+const shortcut=createShortcutHandler({execute,isEditing:e=>e.target===editor?'canvas-text':e.target.isContentEditable||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName),isCanvasActive:()=>!document.querySelector('dialog[open]')&&(document.activeElement===svg||document.activeElement===document.body||document.activeElement===editor||!!document.activeElement?.closest('#figureTabs')),onHint:text=>{$('#keyHint').textContent=text;$('#keyHint').hidden=!text;}});
 window.addEventListener('keydown',shortcut);document.addEventListener('pointerdown',()=>shortcut.reset());
 document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b||b.disabled)return;const action=b.dataset.action;execute(action);for(const d of $$('details[open]'))d.open=false;if(!['help','open','import','save','attach-source','edit-source','export-pdf'].includes(action)&&!editingId)svg.focus({preventScroll:true});});
 for(const b of $$('[data-action="bold"],[data-action="italic"],[data-action="underline"]'))b.addEventListener('pointerdown',e=>{if(editingId)e.preventDefault();});

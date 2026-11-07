@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#147d73">
   <meta name="description" content="グラフと画像をまとめる、軽快な論文Figureエディター。">
   <title>Figure Studio — v0</title>
-  <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./styles.css?v=0.1.0-5">
 </head>
 <body>
   <svg class="icon-defs" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>
@@ -121,17 +121,19 @@
         <button class="tool-button" data-action="sample" title="サンプルFigureを開く" aria-label="サンプルFigureを開く"><svg class="icon"><use href="#i-grid"/></svg><span>作例</span></button>
       </nav>
 
+      <aside class="figure-rail" aria-label="Figureの一覧と管理">
+        <div class="figure-rail-header"><h2>Figures</h2><button class="figure-add" data-action="new-figure" title="Figureを追加" aria-label="Figureを追加"><svg class="icon small"><use href="#i-plus"/></svg></button></div>
+        <nav id="figureTabs" aria-label="Figure一覧"></nav>
+        <div class="figure-rail-footer figure-actions" aria-label="Figureの管理">
+          <button class="icon-button" data-action="duplicate-figure" title="このFigureを複製" aria-label="このFigureを複製"><svg class="icon small"><use href="#i-copy"/></svg></button>
+          <button class="icon-button danger" data-action="delete-figure" title="このFigureを削除" aria-label="このFigureを削除"><svg class="icon small"><use href="#i-trash"/></svg></button>
+          <span class="toolbar-spacer"></span>
+          <details class="menu-dropdown figure-order-menu"><summary class="icon-button" title="Figureの順序" aria-label="Figureの順序"><svg class="icon small"><use href="#i-chevron"/></svg></summary><div class="dropdown-panel"><div class="menu-title">Figureの順序</div><button data-action="move-figure-left">ひとつ上へ移動</button><button data-action="move-figure-right">ひとつ下へ移動</button></div></details>
+        </div>
+      </aside>
+
       <section class="canvas-workspace" aria-label="Figure編集画面">
         <div class="canvas-topbar"><span class="canvas-label"><span class="canvas-dot"></span>FIGURE CANVAS</span><div class="page-dimensions"><label for="pageWidth">幅</label><input id="pageWidth" type="number" value="180" min="10" max="2000" step="1" aria-label="ページの幅 mm"><span>×</span><label for="pageHeight">高さ</label><input id="pageHeight" type="number" value="140" min="10" max="2000" step="1" aria-label="ページの高さ mm"><span>mm</span></div></div>
-        <div class="figure-strip">
-          <nav id="figureTabs" aria-label="Figure一覧"></nav>
-          <div class="figure-actions" aria-label="Figureの管理">
-            <button class="figure-add" data-action="new-figure" title="Figureを追加" aria-label="Figureを追加"><svg class="icon small"><use href="#i-plus"/></svg><span>追加</span></button>
-            <button class="icon-button" data-action="duplicate-figure" title="このFigureを複製" aria-label="このFigureを複製"><svg class="icon small"><use href="#i-copy"/></svg></button>
-            <button class="icon-button danger" data-action="delete-figure" title="このFigureを削除" aria-label="このFigureを削除"><svg class="icon small"><use href="#i-trash"/></svg></button>
-            <details class="menu-dropdown figure-order-menu"><summary class="icon-button" title="Figureの順序" aria-label="Figureの順序"><svg class="icon small"><use href="#i-chevron"/></svg></summary><div class="dropdown-panel"><div class="menu-title">Figureの順序</div><button data-action="move-figure-left">ひとつ左へ移動</button><button data-action="move-figure-right">ひとつ右へ移動</button></div></details>
-          </div>
-        </div>
         <div id="viewport" tabindex="0" aria-label="Figureキャンバス。クリックして選択、ドラッグして移動。">
           <div id="paperWrap"><svg id="canvas" xmlns="http://www.w3.org/2000/svg" width="680" height="529" viewBox="0 0 510.236 396.85" role="img" aria-label="編集可能なFigure"><g id="objects"></g><g id="overlays"></g></svg><textarea id="textEditor" aria-label="テキストを編集" hidden spellcheck="false"></textarea></div>
         </div>
@@ -184,6 +186,6 @@
     <tr><td>選択／文字／線／矢印／四角／楕円</td><td><kbd>V</kbd> / <kbd>T</kbd> / <kbd>L</kbd> / <kbd>A</kbd> / <kbd>R</kbd> / <kbd>E</kbd></td></tr>
     <tr><td>キャンセル／ショートカット一覧</td><td><kbd>Esc</kbd> / <kbd>F1</kbd></td></tr>
   </tbody></table></div><p class="dialog-note">Alt + 数字は、ご指定のPowerPoint設定に合わせた割り当てです。ブラウザやOSが優先する操作は、画面のボタンからも実行できます。</p></dialog>
-  <script type="module" src="./app.js?v=0.1.0-4"></script>
+  <script type="module" src="./app.js?v=0.1.0-5"></script>
 </body>
 </html>
