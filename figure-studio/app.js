@@ -4,13 +4,17 @@ import {saveDraft,loadDraft} from './storage.mjs';
 import {createDemo} from './demo.mjs';
 import {createShortcutHandler} from './shortcuts.mjs';
 import {openSource,SOURCE_APPS} from './integration/bridge-client.mjs';
-import {createFigureSidebar} from './thumbnails.mjs';
+import {createFigureSidebar} from './thumbnails.mjs?v=0.2.0-1';
+import {setupTransferReceiver} from './integration/direct-transfer.mjs';
+import {setupUpdateCheck} from './update-check.mjs';
+import {marqueeSelection} from './selection.mjs';
+import {ARROW_PROPERTIES,arrowEndpoint,arrowPropertyValue,setArrowProperty,arrowGeometry} from './arrowheads.mjs';
 
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const ns='http://www.w3.org/2000/svg';
 const el=(tag,attrs={},text)=>{const n=document.createElementNS(ns,tag);for(const[k,v]of Object.entries(attrs))if(v!==undefined)n.setAttribute(k,v);if(text!==undefined)n.textContent=text;return n;};
 let doc=newDocument(),assets=new Map(),selection=[],tool='select',scale=1.5,history=new History(),gesture=null,textBefore=null,editingId=null,dirty=false,saveTimer,revision=0,clipboard=null,formatClipboard=null,frame=0,spaceDown=false,manualSavedRevision=-1,bridge=null;
-let figures=[doc],bookId=uid();
+let figures=[doc],bookId=uid(),initialDemo=false,transferQueue=Promise.resolve(),updateReloading=false;
 function syncFigure(){const i=figures.findIndex(f=>f.id===doc.id);if(i>=0)figures[i]=doc;else figures.push(doc);}
 function snapshot(){syncFigure();return clone({format:'figure-studio-book',version:1,id:bookId,activeId:doc.id,figures});}
 function restoreBook(state){figures=clone(state.figures);bookId=state.id;doc=figures.find(f=>f.id===state.activeId)||figures[0];selection=[];}
@@ -46,12 +50,12 @@ function drawContent(o,g,full=false){
  if(!full)g.prepend(el('rect',{width:Math.max(o.w,5),height:Math.max(o.h,o.fontSize*1.2),fill:'transparent','data-hit':'true'}));
  }else if(o.type==='line'||o.type==='arrow'){
  if(!full)g.append(el('line',{x1:0,y1:0,x2:o.w,y2:o.h,stroke:'transparent','stroke-width':Math.max(12/scale,o.strokeWidth),'pointer-events':'stroke'}));
- const l=el('line',{x1:0,y1:0,x2:o.w,y2:o.h,stroke:o.stroke,'stroke-width':o.strokeWidth,'stroke-dasharray':o.dashed?`${o.strokeWidth*4} ${o.strokeWidth*3}`:undefined,'stroke-linecap':'round'});g.append(l);
- if(o.type==='arrow'){const len=Math.hypot(o.w,o.h)||1,ux=o.w/len,uy=o.h/len,n=Math.max(6,o.strokeWidth*4),b=n*.42;const arrow=(x,y,dir)=>el('polygon',{points:`${x},${y} ${x-dir*ux*n+uy*b},${y-dir*uy*n-ux*b} ${x-dir*ux*n-uy*b},${y-dir*uy*n+ux*b}`,fill:o.stroke});if(o.arrowEnd!==false)g.append(arrow(o.w,o.h,1));if(o.arrowStart)g.append(arrow(0,0,-1));}
+ const geometry=arrowGeometry(o);g.append(el('line',{...geometry.shaft,stroke:o.stroke,'stroke-width':o.strokeWidth,'stroke-dasharray':o.dashed?`${o.strokeWidth*4} ${o.strokeWidth*3}`:undefined,'stroke-linecap':'round'}));
+ for(const head of geometry.heads)g.append(el(head.tag,head.attrs));
  }else {g.append(el(o.type==='ellipse'?'ellipse':'rect',o.type==='ellipse'?{cx:o.w/2,cy:o.h/2,rx:o.w/2,ry:o.h/2,fill:o.fill,stroke:o.stroke,'stroke-width':o.strokeWidth}:{width:o.w,height:o.h,fill:o.fill,stroke:o.stroke,'stroke-width':o.strokeWidth,rx:0}));}
 }
 function render(){
- syncFigure();renderFigureTabs();svg.setAttribute('viewBox',`0 0 ${doc.width} ${doc.height}`);$('#docName').value=doc.name;$('#pageWidth').value=toMM(doc.width).toFixed(1);$('#pageHeight').value=toMM(doc.height).toFixed(1);
+ syncFigure();renderFigureTabs();svg.setAttribute('viewBox',`0 0 ${doc.width} ${doc.height}`);$('#docName').value=doc.name;$('#pageWidth').value=toMM(doc.width).toFixed(1);$('#pageHeight').value=toMM(doc.height).toFixed(1);const figureLabel=$('#canvasFigureLabel');if(figureLabel){figureLabel.textContent=`Figure ${figures.findIndex(f=>f.id===doc.id)+1}`;figureLabel.title=doc.name;}
  const ids=new Set(doc.objects.map(o=>o.id));for(const[id,n]of nodes)if(!ids.has(id)){n.remove();nodes.delete(id);}for(const o of doc.objects){let g=nodes.get(o.id);if(!g){g=el('g');nodes.set(o.id,g);}drawContent(o,g);objects.append(g);}selection=selection.filter(id=>ids.has(id));
  setScale(scale);renderInspector();renderLayers();updateToolbar();document.title=`${doc.name} · Figure Studio`;
 }
@@ -65,7 +69,9 @@ function renderOverlay(){overlays.replaceChildren();const all=selected(),b=bound
  else for(const [name,x,y]of [['nw',b.x,b.y],['ne',b.x+b.w,b.y],['se',b.x+b.w,b.y+b.h],['sw',b.x,b.y+b.h]])overlays.append(el('rect',{x:x-3.5*u,y:y-3.5*u,width:7*u,height:7*u,fill:'white',stroke:ink,'stroke-width':u,'data-handle':name,cursor:`${name}-resize`}));
  if(all.length===1){overlays.append(el('line',{x1:b.x+b.w/2,y1:b.y,x2:b.x+b.w/2,y2:b.y-18*u,stroke:ink,'stroke-width':u}));overlays.append(el('circle',{cx:b.x+b.w/2,cy:b.y-22*u,r:4*u,fill:'white',stroke:ink,'stroke-width':u,'data-handle':'rotate',cursor:'crosshair'}));}
 }
-function renderInspector(){const arr=selected(),o=arr[0];$('#selectionInfo').textContent=arr.length?`${arr.length} 個を選択${o.locked?' · 固定':''}`:'オブジェクトを選択';for(const input of $$('[data-prop]')){const p=input.dataset.prop;input.disabled=!o||(o.locked&&p!=='locked')||(['fontSize','fontFamily','text','textAlign'].includes(p)&&o.type!=='text');if(!o)continue;let value=o[p];if(['x','y','w','h'].includes(p))value=toMM(value).toFixed(2);if(p==='opacity')value=Math.round((o.opacity??1)*100);if(p==='fill'&&(!value||value==='none'))value='#ffffff';if(p==='stroke'&&(!value||value==='none'))value='#263b44';if(document.activeElement!==input)input.value=value??(p==='fontSize'?12:'');}
+function renderInspector(){const arr=selected(),o=arr[0];$('#selectionInfo').textContent=arr.length?`${arr.length} 個を選択${o.locked?' · 固定':''}`:'オブジェクトを選択';for(const input of $$('[data-prop]')){const p=input.dataset.prop;if(Object.hasOwn(ARROW_PROPERTIES,p))continue;input.disabled=!o||(o.locked&&p!=='locked')||(['fontSize','fontFamily','text','textAlign'].includes(p)&&o.type!=='text');if(!o)continue;let value=o[p];if(['x','y','w','h'].includes(p))value=toMM(value).toFixed(2);if(p==='opacity')value=Math.round((o.opacity??1)*100);if(p==='fill'&&(!value||value==='none'))value='#ffffff';if(p==='stroke'&&(!value||value==='none'))value='#263b44';if(document.activeElement!==input)input.value=value??(p==='fontSize'?12:'');}
+ const showArrows=arr.length>0&&arr.every(o=>['line','arrow'].includes(o.type)),arrowEditable=showArrows?editable():[];$('#arrowProperties').hidden=!showArrows;
+ for(const input of $$('#arrowProperties [data-prop]')){const p=input.dataset.prop,end=p.startsWith('arrowStart')?'start':'end';input.disabled=!arrowEditable.length||(!p.endsWith('Style')&&arrowEditable.every(o=>arrowEndpoint(o,end).style==='none'));const values=arr.map(o=>arrowPropertyValue(o,p));if(document.activeElement!==input)input.value=values.length&&values.every(v=>v===values[0])?values[0]:'';}
  for(const a of ['bold','italic','underline']){const b=$(`[data-action="${a}"]`);if(b)b.classList.toggle('active',!!o?.[a]);}
  $('#sourceSummary').textContent=o?.source?`${o.source.app==='plot'?'PlotLauncher':'MiFiTo'} · ${o.source.name}`:'元プロジェクトを関連付けできます';if(o?.source)$('#sourceApp').value=o.source.app;
 }
@@ -77,19 +83,42 @@ function finishText(cancel=false){if(!editingId)return;const o=doc.objects.find(
 editor.addEventListener('input',()=>{const o=doc.objects.find(o=>o.id===editingId);if(o){o.text=editor.value;renderInspector();}});
 editor.addEventListener('blur',()=>{if(editingId)setTimeout(()=>{if(editingId&&document.activeElement!==editor)finishText();},0);});
 
+function captureGesture(e,target){gesture.pointerId=e.pointerId;gesture.captureTarget=target;target.setPointerCapture(e.pointerId);e.preventDefault();}
+function beginMarquee(e){
+ const initialSelection=[...selection];
+ gesture={kind:'marquee',start:svgPoint(e),startClient:{x:e.clientX,y:e.clientY},initialSelection,additive:e.shiftKey,moved:false};
+ if(!e.shiftKey)setSelection([],{focus:false});
+}
+function drawMarquee(){
+ const g=gesture;if(g?.kind!=='marquee'||!g.end)return;
+ if(g.moved)selection=marqueeSelection(doc,g.start,g.end,{initialIds:g.initialSelection,additive:g.additive});
+ renderOverlay();
+ if(g.moved)overlays.append(el('rect',{x:Math.min(g.start.x,g.end.x),y:Math.min(g.start.y,g.end.y),width:Math.abs(g.end.x-g.start.x),height:Math.abs(g.end.y-g.start.y),fill:'#0c888d14',stroke:'#0c888d','stroke-width':1/scale,'data-marquee':'true','pointer-events':'none'}));
+}
+function updateMarquee(g,e){g.end=svgPoint(e);g.moved ||= Math.hypot(e.clientX-g.startClient.x,e.clientY-g.startClient.y)>=3;}
 svg.addEventListener('pointerdown',e=>{
- if(e.button!==0)return;$('#contextMenu').hidden=true;finishText();shortcut.reset();svg.focus({preventScroll:true});const p=svgPoint(e),handle=e.target.closest('[data-handle]')?.dataset.handle,id=e.target.closest('[data-id]')?.dataset.id;
- if(spaceDown){gesture={kind:'pan',clientX:e.clientX,clientY:e.clientY,left:viewport.scrollLeft,top:viewport.scrollTop};svg.setPointerCapture(e.pointerId);return;}
+ if(e.button!==0||e.isPrimary===false||gesture)return;$('#contextMenu').hidden=true;finishText();shortcut.reset();svg.focus({preventScroll:true});const p=svgPoint(e),handle=e.target.closest('[data-handle]')?.dataset.handle,id=e.target.closest('[data-id]')?.dataset.id;
+ if(spaceDown){gesture={kind:'pan',clientX:e.clientX,clientY:e.clientY,left:viewport.scrollLeft,top:viewport.scrollTop};captureGesture(e,svg);return;}
  if(handle){gesture={kind:handle==='rotate'?'rotate':['start','end'].includes(handle)?'endpoint':'resize',handle,start:p,before:snapshot(),initial:clone(editable()),box:bounds(editable())};}
  else if(tool!=='select'){
  const o=makeObject(tool,{x:p.x,y:p.y,w:0,h:0,...(tool==='text'?{w:mm(35),h:mm(12),text:'Text'}:{})});const before=snapshot();doc.objects.push(o);selection=[o.id];render();gesture={kind:'create',start:p,before,id:o.id};
  }else if(id){const o=doc.objects.find(o=>o.id===id);if(e.shiftKey){setSelection(selection.includes(id)?selection.filter(v=>!expandSelection(doc,[id]).includes(v)):[...selection,id]);}else if(!selection.includes(id))setSelection([id]);
- if(!o.locked&&selection.includes(id))gesture={kind:'move',start:p,before:snapshot(),initial:clone(editable()),box:bounds(editable())};
- }else{if(!e.shiftKey)setSelection([]);gesture={kind:'marquee',start:p,initialSelection:e.shiftKey?[...selection]:[]};}
- if(gesture){svg.setPointerCapture(e.pointerId);e.preventDefault();}
+ if(!o.locked&&selection.includes(id)&&editable().length)gesture={kind:'move',start:p,before:snapshot(),initial:clone(editable()),box:bounds(editable())};
+ }else beginMarquee(e);
+ if(gesture)captureGesture(e,svg);
 });
-svg.addEventListener('pointermove',e=>{
- if(!gesture)return;const p=svgPoint(e),g=gesture,dx=p.x-g.start?.x,dy=p.y-g.start?.y;
+viewport.addEventListener('pointerdown',e=>{
+ // Native controls, the paper's children and scrollbar gutters retain their behavior.
+ if(e.button!==0||e.isPrimary===false||gesture||(e.target!==viewport&&e.target!==paper)||(!spaceDown&&tool!=='select'))return;
+ const r=viewport.getBoundingClientRect(),x=e.clientX-r.left-viewport.clientLeft,y=e.clientY-r.top-viewport.clientTop;
+ if(x<0||y<0||x>=viewport.clientWidth||y>=viewport.clientHeight)return;
+ $('#contextMenu').hidden=true;finishText();shortcut.reset();svg.focus({preventScroll:true});
+ if(spaceDown)gesture={kind:'pan',clientX:e.clientX,clientY:e.clientY,left:viewport.scrollLeft,top:viewport.scrollTop};
+ else beginMarquee(e);
+ captureGesture(e,viewport);
+});
+viewport.addEventListener('pointermove',e=>{
+ if(!gesture||e.pointerId!==gesture.pointerId)return;const p=svgPoint(e),g=gesture,dx=p.x-g.start?.x,dy=p.y-g.start?.y;
  if(g.kind==='pan'){viewport.scrollLeft=g.left-(e.clientX-g.clientX);viewport.scrollTop=g.top-(e.clientY-g.clientY);return;}
  if(g.kind==='move'){
  let x=dx,y=dy;if(e.shiftKey){if(Math.abs(x)>Math.abs(y))y=0;else x=0;}
@@ -102,14 +131,18 @@ svg.addEventListener('pointermove',e=>{
  }else if(g.kind==='rotate'){const o=editable()[0],b=g.box,cx=b.x+b.w/2,cy=b.y+b.h/2;let a=Math.atan2(p.y-cy,p.x-cx)*180/Math.PI+90;if(e.shiftKey)a=Math.round(a/15)*15;o.rotation=a;queueFast();}
  else if(g.kind==='endpoint'){const o=editable()[0],old=g.initial[0],r=(old.rotation||0)*Math.PI/180,cx=old.x+old.w/2,cy=old.y+old.h/2;const turn=(x,y)=>({x:cx+(x-cx)*Math.cos(r)-(y-cy)*Math.sin(r),y:cy+(x-cx)*Math.sin(r)+(y-cy)*Math.cos(r)}),a=turn(old.x,old.y),b=turn(old.x+old.w,old.y+old.h);o.rotation=0;if(g.handle==='start'){o.x=p.x;o.y=p.y;o.w=b.x-p.x;o.h=b.y-p.y;}else{o.x=a.x;o.y=a.y;o.w=p.x-a.x;o.h=p.y-a.y;}queueFast();}
  else if(g.kind==='create'){const o=doc.objects.find(v=>v.id===g.id);if(['line','arrow'].includes(o.type)){let x=dx,y=dy;if(e.shiftKey){const len=Math.hypot(x,y),a=Math.round(Math.atan2(y,x)/(Math.PI/4))*Math.PI/4;x=len*Math.cos(a);y=len*Math.sin(a);}o.w=x;o.h=y;}else{let w=Math.abs(dx),h=Math.abs(dy);if(e.shiftKey)w=h=Math.max(w,h);o.x=Math.min(p.x,g.start.x);o.y=Math.min(p.y,g.start.y);o.w=Math.max(w,2);o.h=Math.max(h,2);}drawContent(o,nodes.get(o.id));renderOverlay();}
- else if(g.kind==='marquee'){renderOverlay();overlays.append(el('rect',{x:Math.min(g.start.x,p.x),y:Math.min(g.start.y,p.y),width:Math.abs(dx),height:Math.abs(dy),fill:'#0c888d14',stroke:'#0c888d','stroke-width':1/scale,'data-marquee':'true'}));g.end=p;}
+ else if(g.kind==='marquee'){updateMarquee(g,e);if(!frame)frame=requestAnimationFrame(()=>{frame=0;drawMarquee();});}
 });
-function endGesture(e,cancel=false){const g=gesture;if(!g)return;gesture=null;if(frame){cancelAnimationFrame(frame);frame=0;}if(g.kind==='marquee'){if(g.end){const x=Math.min(g.start.x,g.end.x),y=Math.min(g.start.y,g.end.y),w=Math.abs(g.start.x-g.end.x),h=Math.abs(g.start.y-g.end.y);setSelection([...g.initialSelection,...doc.objects.filter(o=>{const b=objectBounds(o);return b.x>=x&&b.y>=y&&b.x+b.w<=x+w&&b.y+b.h<=y+h}).map(o=>o.id)]);}renderOverlay();}
- else if(g.before){if(cancel){restoreBook(g.before);render();}else{if(g.kind==='create'){const o=doc.objects.find(v=>v.id===g.id);if(o.type==='text'&&o.w<15){o.w=mm(35);o.h=mm(12);}if(o.type!=='text'&&Math.hypot(o.w,o.h)<3){o.w=mm(30);o.h=o.type==='line'||o.type==='arrow'?0:mm(20);}}record(g.before);if(g.kind==='create'){const o=doc.objects.find(v=>v.id===g.id);setTool('select');if(o.type==='text')beginText(o);}}}if(e&&svg.hasPointerCapture(e.pointerId))svg.releasePointerCapture(e.pointerId);}
-svg.addEventListener('pointerup',e=>endGesture(e));svg.addEventListener('pointercancel',e=>endGesture(e,true));
+function endGesture(e,cancel=false){const g=gesture;if(!g||(e&&e.pointerId!==g.pointerId))return;if(g.kind==='marquee'&&e&&!cancel)updateMarquee(g,e);gesture=null;if(frame){cancelAnimationFrame(frame);frame=0;}if(g.kind==='marquee'){
+ const next=cancel?g.initialSelection:g.moved?marqueeSelection(doc,g.start,g.end,{initialIds:g.initialSelection,additive:g.additive}):g.additive?g.initialSelection:[];
+ setSelection(next,{focus:!cancel});$('#statusText').textContent=cancel?'囲み選択をキャンセルしました':`${selection.length} 個を選択`;
+ }
+ else if(g.before){if(cancel){restoreBook(g.before);render();}else{if(g.kind==='create'){const o=doc.objects.find(v=>v.id===g.id);if(o.type==='text'&&o.w<15){o.w=mm(35);o.h=mm(12);}if(o.type!=='text'&&Math.hypot(o.w,o.h)<3){o.w=mm(30);o.h=o.type==='line'||o.type==='arrow'?0:mm(20);}}record(g.before);if(g.kind==='create'){const o=doc.objects.find(v=>v.id===g.id);setTool('select');if(o.type==='text')beginText(o);}}}if(g.captureTarget?.hasPointerCapture(g.pointerId))g.captureTarget.releasePointerCapture(g.pointerId);}
+viewport.addEventListener('pointerup',e=>endGesture(e));viewport.addEventListener('pointercancel',e=>endGesture(e,true));
+viewport.addEventListener('lostpointercapture',e=>{if(gesture?.pointerId===e.pointerId)endGesture(null,true);});
 svg.addEventListener('dblclick',e=>{const id=e.target.closest('[data-id]')?.dataset.id||document.elementsFromPoint(e.clientX,e.clientY).map(n=>n.closest?.('[data-id]')?.dataset.id).find(Boolean),o=doc.objects.find(v=>v.id===id);if(o?.type==='text')beginText(o);else if(o?.source)editSource(o);});
 viewport.addEventListener('wheel',e=>{if(e.ctrlKey||e.metaKey){e.preventDefault();setScale(scale*Math.exp(-e.deltaY*.0015));}},{passive:false});
-window.addEventListener('keydown',e=>{if(e.code==='Space'&&!editingId&&!/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)){spaceDown=true;e.preventDefault();}});window.addEventListener('keyup',e=>{if(e.code==='Space')spaceDown=false;});window.addEventListener('blur',()=>{spaceDown=false;shortcut.reset();});
+window.addEventListener('keydown',e=>{if(e.code==='Space'&&!editingId&&!/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)){spaceDown=true;e.preventDefault();}});window.addEventListener('keyup',e=>{if(e.code==='Space')spaceDown=false;});window.addEventListener('blur',()=>{spaceDown=false;shortcut.reset();if(gesture)endGesture(null,true);});
 
 function duplicate(){const old=selected();if(!old.length)return;change(()=>{const groups=new Map();const added=old.map(o=>{const n=clone(o);n.id=uid();n.x+=mm(3);n.y+=mm(3);n.locked=false;if(n.groupId){if(!groups.has(n.groupId))groups.set(n.groupId,uid());n.groupId=groups.get(n.groupId);}return n;});doc.objects.push(...added);selection=added.map(o=>o.id);});}
 function applyTextStyle(property,value){if(editingId){const o=doc.objects.find(o=>o.id===editingId);o[property]=typeof value==='function'?value(o[property],o):value;positionEditor();renderInspector();return;}change(()=>editable().filter(o=>o.type==='text').forEach(o=>o[property]=typeof value==='function'?value(o[property],o):value));}
@@ -141,12 +174,12 @@ function execute(action,payload={}){
  if(action==='auto-grid'||action==='auto-hero')return change(()=>{let ids=selection;if(!ids.length)ids=doc.objects.filter(o=>o.type==='image'&&!o.locked).map(o=>o.id);autoLayout(doc,ids,action==='auto-grid'?'grid':'hero');});
  if(action==='no-fill')return change(()=>editable().filter(o=>['rect','ellipse'].includes(o.type)).forEach(o=>o.fill='none'));
  if(action==='toggle-dash')return change(()=>editable().filter(o=>['line','arrow'].includes(o.type)).forEach(o=>o.dashed=!o.dashed));
- if(action==='toggle-arrow-start'||action==='toggle-arrow-end')return change(()=>editable().filter(o=>o.type==='arrow').forEach(o=>{const p=action==='toggle-arrow-start'?'arrowStart':'arrowEnd';o[p]=p==='arrowEnd'?o[p]===false:!o[p];}));
+ if(action==='toggle-arrow-start'||action==='toggle-arrow-end')return change(()=>editable().filter(o=>['line','arrow'].includes(o.type)).forEach(o=>{const end=action==='toggle-arrow-start'?'start':'end';setArrowProperty(o,end==='start'?'arrowStartStyle':'arrowEndStyle',arrowEndpoint(o,end).style==='none'?'triangle':'none');}));
  if(action==='labels')return addLabels();
  if(action==='fit')return fit();if(action==='help')return $('#helpDialog').showModal();
  if(action==='import')return $('#imageInput').click();if(action==='open')return $('#projectInput').click();if(action==='save')return saveProject();
  if(action==='next-figure'||action==='previous-figure'){syncFigure();const index=figures.findIndex(f=>f.id===doc.id);switchFigure(figures[(index+(action==='next-figure'?1:-1)+figures.length)%figures.length].id);return;}
- if(action==='new-figure'||action==='duplicate-figure'){if(figures.length>=100){toast('1プロジェクトのFigureは100枚までです');return;}finishText();const before=snapshot();bridge?.close();syncFigure();const next=action==='duplicate-figure'?clone(doc):newDocument();next.id=uid();next.name=`Fig. ${figures.length+1}`;if(action==='duplicate-figure'){const groups=new Map();next.objects.forEach(o=>{o.id=uid();if(o.groupId){if(!groups.has(o.groupId))groups.set(o.groupId,uid());o.groupId=groups.get(o.groupId);}});}figures.push(next);doc=next;selection=[];record(before);fit();svg.focus();return;}
+ if(action==='new-figure'||action==='duplicate-figure'){if(figures.length>=100){toast('1プロジェクトのFigureは100枚までです');return;}finishText();const before=snapshot();bridge?.close();syncFigure();const insertionIndex=figures.findIndex(f=>f.id===doc.id)+1,next=action==='duplicate-figure'?clone(doc):newDocument();next.id=uid();next.name=`Fig. ${figures.length+1}`;if(action==='duplicate-figure'){const groups=new Map();next.objects.forEach(o=>{o.id=uid();if(o.groupId){if(!groups.has(o.groupId))groups.set(o.groupId,uid());o.groupId=groups.get(o.groupId);}});}figures.splice(insertionIndex,0,next);doc=next;selection=[];record(before);fit();svg.focus();return;}
  if(action==='delete-figure'){if(figures.length===1){toast('最後のFigureは削除できません');return;}finishText();if(!confirm(`${doc.name} を削除しますか？ Ctrl+Zで戻せます。`))return;const before=snapshot(),index=figures.findIndex(f=>f.id===doc.id);bridge?.close();figures.splice(index,1);doc=figures[Math.min(index,figures.length-1)];selection=[];record(before);fit();return;}
  if(action==='move-figure-left'||action==='move-figure-right'){finishText();const before=snapshot(),i=figures.findIndex(f=>f.id===doc.id),j=i+(action==='move-figure-left'?-1:1);if(j>=0&&j<figures.length){[figures[i],figures[j]]=[figures[j],figures[i]];record(before);}return;}
  if(action==='new'||action==='sample'){finishText();if(dirty&&!confirm('現在のFigureを閉じます。必要な場合は先にCtrl+Sで保存してください。続けますか？'))return;const before=snapshot();if(action==='sample'){const demo=createDemo();doc=demo.doc;for(const [k,v]of demo.assets)assets.set(k,v);}else{doc=newDocument();doc.name='Fig. 1';}bridge?.close();bookId=uid();figures=[doc];selection=[];record(before);fit();return;}
@@ -161,9 +194,35 @@ for(const b of $$('[data-action="bold"],[data-action="italic"],[data-action="und
 $('#docName').addEventListener('input',e=>{const name=e.target.value||'Untitled Figure';change(()=>doc.name=name);});
 for(const [id,key]of [['pageWidth','width'],['pageHeight','height']])$('#'+id).addEventListener('change',e=>{const v=Number(e.target.value);if(v>=10&&v<=2000){change(()=>doc[key]=mm(v));fit();}else{toast('用紙サイズは10〜2000 mmです');renderInspector();}});
 $('#zoom').addEventListener('input',e=>setScale(Number(e.target.value)/100));
-for(const input of $$('[data-prop]'))input.addEventListener('change',()=>{const p=input.dataset.prop;let v=input.value;if(['x','y','w','h','rotation','fontSize','strokeWidth','opacity'].includes(p)){v=Number(v);if(!Number.isFinite(v))return;if(['x','y','w','h'].includes(p))v=mm(v);if(p==='opacity')v=Math.max(0,Math.min(1,v/100));if((p==='w'||p==='h')&&v<=0&&!editable().every(o=>['line','arrow'].includes(o.type)))return;if(p==='fontSize')v=Math.max(1,Math.min(1000,v));if(p==='strokeWidth')v=Math.max(0,Math.min(100,v));}change(()=>editable().forEach(o=>{if(['fontSize','fontFamily','text','textAlign'].includes(p)&&o.type!=='text')return;if((p==='w'||p==='h')&&o.type==='image'){const ratio=v/o[p];o[p==='w'?'h':'w']*=ratio;}o[p]=v;}));});
+for(const input of $$('[data-prop]'))input.addEventListener('change',()=>{const p=input.dataset.prop;let v=input.value;if(Object.hasOwn(ARROW_PROPERTIES,p)){change(()=>editable().forEach(o=>setArrowProperty(o,p,v)));return;}if(['x','y','w','h','rotation','fontSize','strokeWidth','opacity'].includes(p)){v=Number(v);if(!Number.isFinite(v))return;if(['x','y','w','h'].includes(p))v=mm(v);if(p==='opacity')v=Math.max(0,Math.min(1,v/100));if((p==='w'||p==='h')&&v<=0&&!editable().every(o=>['line','arrow'].includes(o.type)))return;if(p==='fontSize')v=Math.max(1,Math.min(1000,v));if(p==='strokeWidth')v=Math.max(0,Math.min(100,v));}change(()=>editable().forEach(o=>{if(['fontSize','fontFamily','text','textAlign'].includes(p)&&o.type!=='text')return;if((p==='w'||p==='h')&&o.type==='image'){const ratio=v/o[p];o[p==='w'?'h':'w']*=ratio;}o[p]=v;}));});
 
 async function importImages(files,at){finishText();const documentId=doc.id,prepared=[];for(const f of files){try{const a=await imageAsset(f);prepared.push({a,f});}catch(e){toast(`${f.name||'画像'}: ${e.message}`);}}if(doc.id!==documentId){toast('Figureが切り替わったため画像追加を中止しました');return;}const before=snapshot(),ids=[];for(const {a,f}of prepared){assets.set(a.id,a);const w=Math.min(mm(70),doc.width*.42),h=w*a.height/a.width;const o=makeObject('image',{x:at?.x??mm(10)+ids.length*mm(4),y:at?.y??mm(10)+ids.length*mm(4),w,h,assetId:a.id,name:f.name||'貼り付け画像'});doc.objects.push(o);ids.push(o.id);}selection=ids;record(before);svg.focus();}
+function receiveDirectFigure(payload){
+ if(updateReloading)return Promise.reject(Error('Figure Studioを更新しています。更新後にもう一度送ってください。'));
+ const job=transferQueue.then(()=>importDirectFigure(payload));transferQueue=job.catch(()=>{});return job;
+}
+async function importDirectFigure({app,project,preview,sourceName,transferId}){
+ if(!['plot','mifito'].includes(app)||typeof transferId!=='string'||!transferId)throw Error('図の送信情報が不正です。');
+ // Keep the transfer ID in the saved object, so an acknowledgement lost during
+ // a reload cannot create a second copy when the sender retries.
+ for(const f of figures){const existing=f.objects.find(o=>o.source?.transferId===transferId);if(existing){switchFigure(f.id);setSelection([existing.id]);return;}}
+ if(project.size>280*1024*1024)throw Error('元プロジェクトは280 MB以内にしてください。');
+ finishText();if(gesture)endGesture(null,true);const documentId=doc.id;
+ const name=String(sourceName||`Figure${app==='mifito'?'.mifito':'.plotproject'}`).replace(/[\\/]/g,'_').slice(0,240);
+ const [image,projectURL]=await Promise.all([imageAsset(preview,name.replace(/\.(plotproject|mifito)$/i,'')+(preview.type==='image/svg+xml'?'.svg':'.png')),blobToDataURL(project)]);
+ if(doc.id!==documentId)throw Error('受け取り先のFigureが切り替わりました。もう一度送ってください。');
+ const used=assetIds();let estimated=image.dataUrl.length+projectURL.length+JSON.stringify(snapshot()).length*3+4096;
+ for(const id of used)estimated+=(assets.get(id)?.dataUrl?.length||0)+1024;
+ if(estimated>400*1024*1024)throw Error('この追加でプロジェクトの400 MB上限を超えます。不要な図を減らしてください。');
+ const before=snapshot(),source={id:uid(),name,mime:project.type||'application/octet-stream',dataUrl:projectURL};
+ if(initialDemo&&revision===0){doc.objects=[];doc.name='Fig. 1';initialDemo=false;}
+ const s=Math.min(mm(85)/image.width,doc.width*.65/image.width,doc.height*.65/image.height),w=image.width*s,h=image.height*s;
+ const offset=(doc.objects.filter(o=>o.type==='image').length%6)*mm(4);
+ const panel=makeObject('image',{x:Math.min(mm(10)+offset,doc.width-w),y:Math.min(mm(10)+offset,doc.height-h),w,h,assetId:image.id,name:name.replace(/\.(plotproject|mifito)$/i,''),source:{app,name,assetId:source.id,transferId}});
+ assets.set(image.id,image);assets.set(source.id,source);doc.objects.push(panel);selection=[panel.id];record(before);svg.focus({preventScroll:true});
+ try{const rev=revision;await saveDraft(snapshot(),assets);if(revision===rev)$('#saveStatus').textContent='ブラウザに保存済み';toast(`${SOURCE_APPS[app].name}から追加し、元プロジェクトを関連付けました`);}
+ catch{toast('図と元プロジェクトを追加しました。自動保存できないためCtrl+Sで保存してください。');}
+}
 $('#imageInput').addEventListener('change',async e=>{await importImages([...e.target.files]);e.target.value='';});
 viewport.addEventListener('dragover',e=>{e.preventDefault();viewport.classList.add('drag-over');});viewport.addEventListener('dragleave',()=>viewport.classList.remove('drag-over'));
 viewport.addEventListener('drop',async e=>{e.preventDefault();viewport.classList.remove('drag-over');const files=[...e.dataTransfer.files];if(files.length===1&&/\.(figurestudio|json)$/i.test(files[0].name))await readProject(files[0]);else await importImages(files,svgPoint(e));});
@@ -192,5 +251,11 @@ svg.addEventListener('contextmenu',e=>{e.preventDefault();finishText();const id=
 document.addEventListener('pointerdown',e=>{if(!e.target.closest('#contextMenu'))$('#contextMenu').hidden=true;for(const d of $$('details[open]'))if(!d.contains(e.target))d.open=false;});
 window.addEventListener('beforeunload',e=>{if(dirty||(editingId&&textBefore&&JSON.stringify(snapshot())!==JSON.stringify(textBefore))){e.preventDefault();e.returnValue='';}});
 window.addEventListener('resize',()=>{if(!gesture)renderOverlay();});
-try{const restored=await loadDraft();if(restored){if(restored.doc.format==='figure-studio-book')restoreBook(validateBook(restored.doc));else{doc=validateDocument(restored.doc);figures=[doc];}assets=restored.assets;$('#saveStatus').textContent='ブラウザから復元';}else{const demo=createDemo();doc=demo.doc;figures=[doc];assets=demo.assets;$('#saveStatus').textContent='デモ · 模擬データ';}}catch{const demo=createDemo();doc=demo.doc;figures=[doc];assets=demo.assets;$('#saveStatus').textContent='自動保存を利用できません';}
+try{const restored=await loadDraft();if(restored){if(restored.doc.format==='figure-studio-book')restoreBook(validateBook(restored.doc));else{doc=validateDocument(restored.doc);figures=[doc];}assets=restored.assets;$('#saveStatus').textContent='ブラウザから復元';}else{const demo=createDemo();doc=demo.doc;figures=[doc];assets=demo.assets;initialDemo=true;$('#saveStatus').textContent='デモ · 模擬データ';}}catch{const demo=createDemo();doc=demo.doc;figures=[doc];assets=demo.assets;initialDemo=true;$('#saveStatus').textContent='自動保存を利用できません';}
 render();fit();setTool('select');
+setupTransferReceiver({onImport:receiveDirectFigure,onStatus:({state,message})=>{if(state==='error')toast(message);}});
+setupUpdateCheck({onStatus:toast,beforeReload:async()=>{
+ updateReloading=true;
+ try{await transferQueue;if(gesture)endGesture(null,true);finishText();const rev=revision;clearTimeout(saveTimer);await saveDraft(snapshot(),assets);if(rev!==revision)throw Error('保存中に変更がありました。もう一度「更新する」を押してください。');dirty=false;return true;}
+ catch(error){updateReloading=false;throw error;}
+}});

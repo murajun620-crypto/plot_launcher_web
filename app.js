@@ -1,4 +1,5 @@
-import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=23fbd283a1c6';
+import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=70dc35cf4915';
+import {setupDirectSendButton} from './direct-transfer.mjs?v=70dc35cf4915';
 import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=9127ec4c4f31";
 import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=9127ec4c4f31";
 import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9127ec4c4f31";
@@ -8,7 +9,7 @@ import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject, parseProj
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
-const APP_BUILD = "23fbd283a1c6";
+const APP_BUILD = "70dc35cf4915";
 
 function positionDialog(dialog, left, top) {
   const box=dialog.getBoundingClientRect(), gap=8;
@@ -276,6 +277,7 @@ function status(text, kind = "working") {
 }
 
 function updateButtons() {
+  figureStudioDirectSender?.sync();
   compactHelp();
   const busy = loading || exporting;
   $('#check-update').disabled=busy || updateChecking;
@@ -3066,6 +3068,7 @@ try { startWorker(); }
 catch (error) { fatal(`描画機能を開始できませんでした。ブラウザを更新してください。${error.message}`); }
 
 // Figure Studio bridge: included in the source application's module scope.
+var figureStudioDirectSender;
 const figureBridgeWait = (predicate,checkError=()=>null) => new Promise((resolve,reject) => {
   const started = Date.now();
   const timer = setInterval(() => {
@@ -3075,33 +3078,34 @@ const figureBridgeWait = (predicate,checkError=()=>null) => new Promise((resolve
     else if (Date.now()-started > 180000) {clearInterval(timer);reject(new Error('描画機能の準備が完了しませんでした。'))}
   },80);
 });
+async function captureFigureStudioResult() {
+  if (!engineReady || loading || exporting || !metadata || !sourceData || !config.series.length) throw new Error('グラフの処理が完了してから反映してください。');
+  await figureBridgeWait(() => !renderRunning && renderedRevision === revision,
+    () => !renderRunning && $('#preview-state').classList.contains('error') ? 'グラフの設定を確認してから反映してください。' : null);
+  exporting = true; updateButtons();
+  try {
+    const snapshot = structuredClone(config);
+    const project = makeProject(makeSettings(config,metadata,loadedHeader), {...sourceData,sheetIndex:metadata.sheetIndex,headerRow:loadedHeader,sample}, [...importedFonts.values()], {
+      saveName:$('#save-name').value,pngDpi:Number($('#png-dpi').value),view:{...view},sections:$$('#controls-panel .control-section').map(section=>section.open),sheetSettings:projectSheetSettings(),sheetMode,sharedSettings:sheetMode === 'shared' ? currentSharedSettings() : sharedSettings
+    });
+    const blob = new Blob([JSON.stringify(project)],{type:'application/json'});
+    if (blob.size > PROJECT_MAX_SIZE) throw new Error('プロジェクトは130 MB以内にしてください。');
+    const result = await request('export',{config:snapshot,format:'svg',dpi:Number($('#png-dpi').value)});
+    const bytes = Uint8Array.from(atob(result.base64),character=>character.charCodeAt(0));
+    return {project:blob,preview:new Blob([bytes],{type:'image/svg+xml'}),sourceName:projectFilename || `${safeStem($('#save-name').value)}.plotproject`};
+  } finally {exporting = false;updateButtons();if(renderWanted)renderPreview();}
+}
 setupFigureBridge({
   app:'plot',
   async loadProject(file,{reconnect}={}) {
-    // Parse first because the existing readProject reports, rather than throws, errors.
     parseProject(JSON.parse(await file.text()));
     await figureBridgeWait(() => engineReady && !loading && !exporting);
-    // An in-app update restores its unsaved snapshot before this handshake.
     if (!(reconnect && metadata && sourceData) && !await readProject(file)) throw new Error('プロジェクトを復元できませんでした。編集画面のエラーを確認してください。');
     await figureBridgeWait(() => !loading && !renderRunning && renderedRevision === revision,
       () => !renderRunning && $('#preview-state').classList.contains('error') ? 'グラフを描画できませんでした。編集画面で設定を確認してください。' : null);
   },
-  async captureResult() {
-    if (!engineReady || loading || exporting || !metadata || !sourceData || !config.series.length) throw new Error('グラフの処理が完了してから反映してください。');
-    await figureBridgeWait(() => !renderRunning && renderedRevision === revision,
-      () => !renderRunning && $('#preview-state').classList.contains('error') ? 'グラフの設定を確認してから反映してください。' : null);
-    exporting = true; updateButtons();
-    try {
-      const snapshot = structuredClone(config);
-      const project = makeProject(makeSettings(config,metadata,loadedHeader), {...sourceData,sheetIndex:metadata.sheetIndex,headerRow:loadedHeader,sample}, [...importedFonts.values()], {
-        saveName:$('#save-name').value,pngDpi:Number($('#png-dpi').value),view:{...view},sections:$$('#controls-panel .control-section').map(section=>section.open),sheetSettings:projectSheetSettings(),sheetMode,sharedSettings:sheetMode === 'shared' ? currentSharedSettings() : sharedSettings
-      });
-      const blob = new Blob([JSON.stringify(project)],{type:'application/json'});
-      if (blob.size > PROJECT_MAX_SIZE) throw new Error('プロジェクトは130 MB以内にしてください。');
-      const result = await request('export',{config:snapshot,format:'svg',dpi:Number($('#png-dpi').value)});
-      const bytes = Uint8Array.from(atob(result.base64),character=>character.charCodeAt(0));
-      return {project:blob,preview:new Blob([bytes],{type:'image/svg+xml'}),sourceName:projectFilename || `${safeStem($('#save-name').value)}.plotproject`};
-    } finally {exporting = false;updateButtons();if(renderWanted)renderPreview();}
-  }
+  captureResult:captureFigureStudioResult
 });
+figureStudioDirectSender = setupDirectSendButton({app:'plot',captureResult:captureFigureStudioResult,container:'.header-actions',
+  isReady:()=>engineReady&&!loading&&!exporting&&!renderRunning&&!!metadata&&!!sourceData&&!!config.series.length&&renderedRevision===revision});
 

@@ -1,3 +1,4 @@
+import {ARROW_PROPERTIES} from './arrowheads.mjs';
 export const PT_PER_MM=72/25.4;
 export const mm=v=>v*PT_PER_MM;
 export const toMM=v=>v/PT_PER_MM;
@@ -60,6 +61,7 @@ export function validateDocument(input){
   for(const p of ['fill','stroke'])if(o[p]&&!/^(#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})|none|transparent)$/i.test(o[p]))throw Error('色が不正です。');
   if(o.groupId!=null&&(typeof o.groupId!=='string'||!o.groupId||o.groupId.length>200))throw Error('グループが不正です。');
   for(const p of ['locked','bold','italic','underline','arrowEnd','arrowStart'])if(o[p]!==undefined&&typeof o[p]!=='boolean')throw Error('書式が不正です。');
+  for(const [p,values]of Object.entries(ARROW_PROPERTIES))if(o[p]!==undefined&&!values.includes(o[p]))throw Error('矢印の書式が不正です。');
  }
  return clone(input);
 }

@@ -47,9 +47,14 @@ export function createFigureSidebar({root,onSelect,onCommand,renderSVG}) {
     const name=document.createElement('span');name.className='figure-name';
     const count=document.createElement('small');count.className='figure-count';
     caption.append(number,name,count);button.append(preview,caption);
-    button.onclick=()=>onSelect(f.id);
+    button.onclick=()=>{onSelect(f.id);cards.get(f.id)?.button.focus({preventScroll:true});};
     button.onkeydown=e=>{
       if(e.key==='Tab'){e.stopPropagation();return;}
+      if(e.key==='Enter'&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!e.shiftKey){
+        e.preventDefault();e.stopPropagation();if(e.repeat)return;
+        onSelect(f.id);onCommand('new-figure');
+        cards.get(activeId)?.button.focus({preventScroll:true});return;
+      }
       if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='d'||e.key==='Delete'){
         e.preventDefault();e.stopPropagation();onCommand(e.key==='Delete'?'delete-figure':'duplicate-figure');return;
       }

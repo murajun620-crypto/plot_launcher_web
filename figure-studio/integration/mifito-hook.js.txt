@@ -1,4 +1,17 @@
 // Figure Studio bridge: included in the source application's module scope.
+var figureStudioDirectSender;
+async function captureFigureStudioResult() {
+  if (busy || !current || !source) throw new Error('画像の処理が完了してから反映してください。');
+  if (pendingInputEdit()) throw new Error('入力中の設定を確定してから反映してください。');
+  setBusy(true);
+  try {
+    await document.fonts.ready;
+    const ui = projectUI(), settings = copy(current.settings), image = source;
+    const project = await createProject(items,items.indexOf(current),ui);
+    const preview = await exportImage(image,settings,'svg');
+    return {project,preview,sourceName:projectName || 'figure.mifito'};
+  } finally {setBusy(false);}
+}
 setupFigureBridge({
   app:'mifito',
   async loadProject(file,{reconnect}={}) {
@@ -8,16 +21,6 @@ setupFigureBridge({
     try {await openProject(file);}
     finally {setBusy(false);}
   },
-  async captureResult() {
-    if (busy || !current || !source) throw new Error('画像の処理が完了してから反映してください。');
-    if (pendingInputEdit()) throw new Error('入力中の設定を確定してから反映してください。');
-    setBusy(true);
-    try {
-      await document.fonts.ready;
-      const ui = projectUI(), settings = copy(current.settings), image = source;
-      const project = await createProject(items,items.indexOf(current),ui);
-      const preview = await exportImage(image,settings,'svg');
-      return {project,preview,sourceName:projectName || 'figure.mifito'};
-    } finally {setBusy(false);}
-  }
+  captureResult:captureFigureStudioResult
 });
+figureStudioDirectSender = setupDirectSendButton({app:'mifito',captureResult:captureFigureStudioResult,container:'.header-actions',isReady:()=>!busy&&!!current&&!!source});
