@@ -50,7 +50,10 @@ export function arrowGeometry(object){
  let startTrim=0,endTrim=0;
  for(const end of ['start','end']){
   const config=arrowEndpoint(object,end);if(config.style==='none')continue;
-  const length=baseLength*lengthScale[config.length],width=baseLength*.84*widthScale[config.width],half=width/2;
+  const width=baseLength*.84*widthScale[config.width],half=width/2;
+  // Keep the historic "oval" project value, but display a true circle. Width
+  // selects its diameter; a retained length preference cannot distort it.
+  const length=config.style==='oval'?width:baseLength*lengthScale[config.length];
   const angle=Math.atan2(end==='start'?-dy:dy,end==='start'?-dx:dx)*180/Math.PI;
   const x=end==='start'?0:dx,y=end==='start'?0:dy;
   const attrs={transform:`translate(${x} ${y}) rotate(${angle})`,fill:object.stroke??'#263b44','pointer-events':'visiblePainted'};
@@ -58,7 +61,7 @@ export function arrowGeometry(object){
   if(config.style==='triangle')attrs.points=`0,0 ${-length},${half} ${-length},${-half}`;
   else if(config.style==='stealth')attrs.points=`0,0 ${-length},${half} ${-length*.65},0 ${-length},${-half}`;
   else if(config.style==='diamond')attrs.points=`0,0 ${-length/2},${half} ${-length},0 ${-length/2},${-half}`;
-  else if(config.style==='oval'){tag='ellipse';Object.assign(attrs,{cx:-length/2,cy:0,rx:length/2,ry:half});}
+  else if(config.style==='oval'){tag='circle';Object.assign(attrs,{cx:-half,cy:0,r:half});}
   else if(config.style==='open'){tag='polyline';Object.assign(attrs,{points:`${-length},${half} 0,0 ${-length},${-half}`,fill:'none',stroke:object.stroke??'#263b44','stroke-width':strokeWidth,'stroke-linecap':'round','stroke-linejoin':'round'});}
   heads.push({end,style:config.style,length,width,angle,x,y,tag,attrs});
   if(end==='start')startTrim=length*trimRatio[config.style];else endTrim=length*trimRatio[config.style];

@@ -49,7 +49,7 @@ test('each visible style has the appropriate filled or open SVG geometry',()=>{
   if(style==='none'){assert.equal(result.heads.length,0);continue;}
   assert.equal(result.heads.length,1);const h=result.heads[0];assert.equal(h.style,style);
   if(style==='open'){assert.equal(h.tag,'polyline');assert.equal(h.attrs.fill,'none');assert.equal(h.attrs.stroke,'#123456');assert.equal(h.attrs['stroke-width'],2);assert.equal(h.attrs['stroke-dasharray'],undefined);}
-  else if(style==='oval'){assert.equal(h.tag,'ellipse');near(h.attrs.cx+h.attrs.rx,0);near(h.attrs.ry*2,h.width);}
+  else if(style==='oval'){assert.equal(h.tag,'circle');near(h.attrs.cx+h.attrs.r,0);near(h.attrs.r*2,h.width);near(h.length,h.width);}
   else{assert.equal(h.tag,'polygon');const points=h.attrs.points.split(' ');assert.equal(points[0],'0,0');assert.equal(points.length,style==='triangle'?3:4);assert.equal(h.attrs.fill,'#123456');}
  }
 });
@@ -60,6 +60,22 @@ test('width and length are independent and increase monotonically at each level'
  previous=0;for(const length of ['short','medium','long']){const h=arrowGeometry(arrow({arrowEndLength:length})).heads[0];assert.ok(h.length>previous);near(h.width,baseline.width);previous=h.length;}
  const both=arrowGeometry(arrow({arrowStart:true,arrowStartWidth:'wide',arrowStartLength:'short',arrowEndWidth:'narrow',arrowEndLength:'long'})).heads;
  assert.ok(both[0].width>both[1].width);assert.ok(both[0].length<both[1].length);
+});
+
+test('legacy oval styles are true circles for every size and retained length setting',()=>{
+ for(const end of ['Start','End'])for(const width of ['narrow','medium','wide']){
+  let baseline;
+  for(const length of ['short','medium','long']){
+   const o=line({[`arrow${end}Style`]:'oval',[`arrow${end}Width`]:width,[`arrow${end}Length`]:length});
+   const geometry=arrowGeometry(o),head=geometry.heads[0];
+   assert.equal(head.tag,'circle');near(head.attrs.r*2,head.width);near(head.length,head.width);
+   near(head.attrs.cx+head.attrs.r,0);assert.equal(head.attrs.rx,undefined);assert.equal(head.attrs.ry,undefined);
+   if(baseline)assert.deepEqual(geometry,baseline);else baseline=geometry;
+   assert.equal(o[`arrow${end}Length`],length,'a circle must not discard the preference for the next arrow style');
+  }
+ }
+ const diameters=['narrow','medium','wide'].map(width=>arrowGeometry(arrow({arrowEndStyle:'oval',arrowEndWidth:width})).heads[0].width);
+ assert.ok(diameters[0]<diameters[1]&&diameters[1]<diameters[2]);
 });
 
 test('head tips stay at their endpoints and face outward in every line direction',()=>{

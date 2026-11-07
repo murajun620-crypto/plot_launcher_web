@@ -13,8 +13,8 @@ export async function imageAsset(blob,name=blob.name||'Image'){
  const isSVG=blob.type==='image/svg+xml'||/\.svg$/i.test(name);if(isSVG)blob=new Blob([sanitizeSVG(await blob.text())],{type:'image/svg+xml'});
  const dataUrl=await blobToDataURL(blob);const img=new Image();img.src=dataUrl;await img.decode();
  if(!img.naturalWidth||!img.naturalHeight||img.naturalWidth*img.naturalHeight>160000000)throw Error('画像サイズが大きすぎます（最大1.6億画素）。');
- let previewUrl=dataUrl;const max=1800;
- if(img.naturalWidth>max||img.naturalHeight>max||isSVG){const ratio=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight));const c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.naturalWidth*ratio));c.height=Math.max(1,Math.round(img.naturalHeight*ratio));c.getContext('2d').drawImage(img,0,0,c.width,c.height);previewUrl=c.toDataURL('image/png');c.width=c.height=1;}
- return {id:uid(),name,mime:blob.type,width:img.naturalWidth,height:img.naturalHeight,dataUrl,previewUrl};
+ // Keep the original for full-quality canvas rendering and export. Reduced
+ // previews are prepared lazily by preview-quality.mjs, outside project data.
+ return {id:uid(),name,mime:blob.type,width:img.naturalWidth,height:img.naturalHeight,dataUrl};
 }
 export function download(blob,name){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);}
