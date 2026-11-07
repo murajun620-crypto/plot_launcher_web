@@ -196,3 +196,62 @@ test('F1 and question mark both open shortcut help only in canvas scope', () => 
   assert.equal(s.press('F1').defaultPrevented,false);
   assert.equal(s.calls.length,2);
 });
+
+test('ribbon scope accepts Ctrl and Cmd file, edit, Figure and formatting commands', () => {
+  const commands=[
+    ['s',{},'save'],['o',{},'open'],['m',{},'new-figure'],
+    ['PageDown',{},'next-figure'],['PageUp',{},'previous-figure'],
+    ['z',{},'undo'],['y',{},'redo'],['z',{shiftKey:true},'redo'],
+    ['d',{},'duplicate'],['a',{},'select-all'],['g',{},'group'],['g',{shiftKey:true},'ungroup'],
+    ['b',{},'bold'],['i',{},'italic'],['u',{},'underline'],
+    ['l',{},'text-left'],['e',{},'text-center'],['r',{},'text-right'],['j',{},'text-justify'],
+    ['>',{shiftKey:true},'font-grow'],['<',{shiftKey:true},'font-shrink'],[']',{},'font-up'],['[',{},'font-down'],
+    ['c',{shiftKey:true},'copy-format'],['v',{shiftKey:true},'paste-format'],
+  ];
+  for(const modifier of ['ctrlKey','metaKey']){
+    const s=setup({active:'ribbon'});
+    for(const [key,options,action]of commands){
+      const event=s.press(key,{[modifier]:true,...options});
+      assert.equal(event.defaultPrevented,true,`${modifier} ${key}`);assert.equal(event.stopped,true);assert.equal(s.calls.at(-1)[0],action);
+    }
+    assert.equal(s.calls.length,commands.length);
+  }
+});
+
+test('ribbon buttons retain native navigation, activation, deletion and ordinary tool letters',()=>{
+  const s=setup({active:'ribbon'});
+  for(const key of ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Tab','Delete','Backspace','Enter',' ','Home','End','F2','v','t','l','a','r','e','?']){
+    for(const options of [{},{shiftKey:true},{ctrlKey:key.startsWith('Arrow')||key==='Enter'}]){
+      const event=s.press(key,options);assert.equal(event.defaultPrevented,false,`${key} ${JSON.stringify(options)}`);assert.equal(event.stopped,false);
+    }
+  }
+  for(const key of ['c','x','v'])assert.equal(s.press(key,{ctrlKey:true}).defaultPrevented,false);
+  assert.equal(s.calls.length,0);
+});
+
+test('ribbon Key Tips keep Alt ordering and Escape returns focus without clearing selection',()=>{
+  const s=setup({active:'ribbon'});
+  s.press('3',{altKey:true});s.press('4',{altKey:true});
+  for(const key of ['l','c','r','t','m','b','h','v']){s.press('Alt');s.press('5');s.press(key);}
+  assert.deepEqual(s.calls.map(c=>c[0]),['front','back','align-left','align-center','align-right','align-top','align-middle','align-bottom','distribute-h','distribute-v']);
+  s.press('Alt');s.press('5');s.press('Escape');assert.equal(s.calls.length,10);
+  s.press('Escape');assert.equal(s.calls.at(-1)[0],'focus-canvas');
+  s.press('F1');assert.equal(s.calls.at(-1)[0],'help');
+  const count=s.calls.length;assert.equal(s.press('Escape',{defaultPrevented:true}).result,false);assert.equal(s.calls.length,count);
+});
+
+test('ordinary inputs and selects in the ribbon retain all native keys except save',()=>{
+  const s=setup({active:'ribbon',editing:true});
+  for(const [key,options]of [['a',{ctrlKey:true}],['z',{ctrlKey:true}],['b',{ctrlKey:true}],['o',{ctrlKey:true}],['l',{ctrlKey:true}],['>',{ctrlKey:true,shiftKey:true}],['ArrowDown',{}],['Enter',{}],['Escape',{}],['Delete',{}],['Tab',{}],['Alt',{}],['F1',{}]])assert.equal(s.press(key,options).defaultPrevented,false,key);
+  assert.equal(s.calls.length,0);
+  assert.equal(s.press('s',{ctrlKey:true}).defaultPrevented,true);assert.equal(s.press('s',{metaKey:true}).defaultPrevented,true);
+  assert.deepEqual(s.calls.map(c=>c[0]),['save','save']);
+});
+
+test('ribbon IME and AltGraph never trigger commands and reset pending Key Tips',()=>{
+  const s=setup({active:'ribbon'});s.press('Alt');s.press('5');
+  assert.equal(s.press('l',{isComposing:true}).defaultPrevented,false);assert.equal(s.hints.at(-1),'');
+  assert.equal(s.press('s',{ctrlKey:true,keyCode:229}).defaultPrevented,false);
+  assert.equal(s.press('l',{altKey:true,ctrlKey:true,getModifierState:key=>key==='AltGraph'}).defaultPrevented,false);
+  assert.equal(s.press('l').defaultPrevented,false);assert.equal(s.calls.length,0);
+});

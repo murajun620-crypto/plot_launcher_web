@@ -72,7 +72,8 @@ function normalizedKey(event) {
  * @returns {Function & {reset: Function}}
  *
  * isEditing(event): false, true (ordinary form field), or 'canvas-text'.
- * isCanvasActive(event): false when a dialog/menu should retain keyboard focus.
+ * isCanvasActive(event): true for canvas commands, 'ribbon' for global commands
+ * with native control navigation, or false for modal/inactive surfaces.
  * onHint(text): show a Key Tip strip, or hide it when text is empty.
  */
 export function createShortcutHandler({
@@ -105,7 +106,8 @@ export function createShortcutHandler({
     const key = normalizedKey(event);
     const editing = isEditing(event);
     const canvasText = editing === 'canvas-text';
-    const active = Boolean(isCanvasActive(event));
+    const surface = isCanvasActive(event);
+    const active = Boolean(surface), ribbon = surface === 'ribbon';
     const primary = Boolean(event.ctrlKey || event.metaKey);
 
     // Modal dialogs and native form fields own their focus and navigation.
@@ -121,7 +123,7 @@ export function createShortcutHandler({
 
     if (key === 'escape') {
       if (sequence) return consume(event);
-      return consume(event, 'escape');
+      return consume(event, ribbon ? 'focus-canvas' : 'escape');
     }
 
     // Key Tips never interfere with text composition/caret navigation.
@@ -179,6 +181,12 @@ export function createShortcutHandler({
       if (['c', 'x', 'v'].includes(key)) return false;
     }
 
+    // Ribbon tabs/buttons own navigation and activation; only global commands
+    // above, Key Tips and F1 cross from their focus into the canvas.
+    if (ribbon) {
+      if (!primary && !event.altKey && key === 'f1') return consume(event, 'help');
+      return false;
+    }
     if (editing || event.altKey || event.metaKey) return false;
     const arrows = {
       arrowleft: [-1, 0], arrowright: [1, 0], arrowup: [0, -1], arrowdown: [0, 1],
