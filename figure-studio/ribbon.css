@@ -45,6 +45,8 @@
 #studioRibbon .ribbon-text-menu{margin-left:auto}
 #studioRibbon .ribbon-text-menu>summary{width:31px;justify-content:center;padding:4px}
 #studioRibbon .ribbon-text-menu>summary>span,#studioRibbon .ribbon-text-menu>summary>.icon:last-child{display:none}
+#studioRibbon [data-action=show-text-pane]{width:31px;flex:none;justify-content:center;padding:4px;margin-left:auto}
+#studioRibbon [data-action=show-text-pane]>span{display:none}
 .ribbon-paragraph-group{width:100px}
 .ribbon-paragraph-buttons{display:flex;align-items:center;justify-content:space-between;gap:1px}
 #studioRibbon .ribbon-paragraph-buttons .icon-button{width:26px}
@@ -171,7 +173,7 @@
 .text-outline-position>span{white-space:nowrap;flex:none}
 #studioRibbon .text-outline-position select{min-width:0;width:100%;height:29px;padding:3px 5px;border:1px solid #d4dade;border-radius:3px;background:#fff;font-size:11px}
 
-/* The optional selection pane contains source links and object order only. */
+/* A persistent, optional right sidebar shares the ribbon's editing model. */
 .workspace{display:grid;grid-template-columns:var(--figures) minmax(0,1fr)}
 .workspace:has(#ribbonSelectionPane:not([hidden])){grid-template-columns:var(--figures) minmax(0,1fr) var(--inspector)}
 #ribbonSelectionPane[hidden]{display:none!important}
@@ -180,6 +182,30 @@
 #ribbonSelectionPane .pane-close{font-size:22px;font-weight:300;color:#65727a}
 #ribbonSelectionPane .inspector-section{padding:15px 13px}
 #ribbonSelectionPane .source-summary{line-height:1.6}
+.ribbon-tab-row{gap:12px}
+.ribbon-tab-row .ribbon-selection-info{margin-left:auto;flex:0 1 auto}
+#studioRibbon .sidebar-toggle{display:inline-flex;align-items:center;gap:5px;align-self:center;flex:none;min-height:25px;padding:3px 8px;border:1px solid #cbd9d7;border-radius:4px;background:#fff;color:#4c655e;font-size:11px;white-space:nowrap}
+#studioRibbon .sidebar-toggle[aria-expanded=true]{background:var(--accent-soft);border-color:#b9d4cd;color:var(--accent)}
+#studioRibbon .sidebar-toggle .icon{width:15px;height:15px}
+#ribbonSelectionPane .sidebar-text-panel>summary{cursor:pointer;list-style:none;margin:0}
+#ribbonSelectionPane .sidebar-text-panel>summary::-webkit-details-marker{display:none}
+#ribbonSelectionPane .sidebar-text-panel>summary::after{content:'−';color:#7d9188;font-size:15px}
+#ribbonSelectionPane .sidebar-text-panel:not([open])>summary::after{content:'＋'}
+#ribbonSelectionPane .sidebar-text-fields{padding-top:12px}
+#ribbonSelectionPane #propText{display:block;width:100%;min-height:90px;height:96px;max-height:300px;padding:8px;border:1px solid #d4ddda;border-radius:4px;background:#fff;font-size:12px;line-height:1.5;resize:vertical}
+#ribbonSelectionPane #propTextMode{min-width:0;flex:1;height:28px;width:100%;padding:3px;font-size:10px}
+.sidebar-font-row{display:grid;grid-template-columns:minmax(0,1fr) 68px;gap:7px;margin-top:10px}
+.sidebar-font-row label{display:flex;flex-direction:column;gap:5px;min-width:0;color:#718178;font-size:10px}
+.sidebar-font-row input,.sidebar-font-row select{width:100%;min-width:0;height:28px;padding:4px 6px;border:1px solid #d4ddda;border-radius:4px;background:#fff;font-size:11px}
+#sidebarPreviewSlot .tex-live-panel{position:static;right:auto;bottom:auto;width:100%;max-width:none;margin-top:12px;border-radius:4px;box-shadow:none}
+#sidebarPreviewSlot .tex-live-panel>header{flex-wrap:wrap;gap:5px;padding:5px;font-size:10px}
+#sidebarPreviewSlot .tex-preview-body{display:block;min-height:80px;max-height:180px}
+#sidebarPreviewSlot .tex-preview-result{min-height:80px;padding:7px}
+#sidebarPreviewSlot #texPreviewSvg{max-height:150px}
+#sidebarPreviewSlot #finishTextEdit{padding:3px 5px;font-size:10px}
+#ribbonSelectionPane #layers{max-height:230px;overflow:auto;overscroll-behavior:contain}
+#ribbonSelectionPane .layer-row{min-height:34px;padding:7px 6px;gap:5px}
+#ribbonSelectionPane .layer-order-actions{display:flex;justify-content:space-between;gap:4px;padding-top:8px;border-top:1px solid #e2e9e5;margin-top:8px}
 .figure-rail{background:#f7f8fa}
 .canvas-workspace{background:#e8ecef}
 .canvas-topbar{background:#f3f5f6;border-bottom:1px solid #e0e5e8}

@@ -41,7 +41,7 @@ test('ribbon starts on Home with linked ARIA panels and a disabled contextual Fo
    const active=key==='home';assert.equal(e.tabs[key].getAttribute('aria-selected'),String(active));assert.equal(e.tabs[key].tabIndex,active?0:-1);
    assert.equal(e.panels[key].hidden,!active);assert.equal(e.panels[key].inert,!active);assert.equal(e.tabs[key].getAttribute('aria-controls'),e.panels[key].id);assert.equal(e.panels[key].getAttribute('aria-labelledby'),e.tabs[key].id);
   }
-  assert.equal(e.api.show('format'),false);assert.equal(e.api.show('unknown'),false);assert.equal(e.api.selectionPaneOpen,false);assert.equal(e.pane.hidden,true);
+  assert.equal(e.api.show('format'),false);assert.equal(e.api.show('unknown'),false);assert.equal(e.api.selectionPaneOpen,true);assert.equal(e.pane.hidden,false);
  }finally{e.api.destroy();}
 });
 
@@ -67,11 +67,16 @@ test('selection enables Format without switching tabs and safely returns focus w
 
 test('selection pane preference and accessible toggle state persist without a duplicate action listener',()=>{
  const e=environment();try{
-  e.root.fire('click',{target:e.paneButton});assert.equal(e.api.selectionPaneOpen,false);
-  e.api.toggleSelectionPane();assert.equal(e.pane.hidden,false);assert.equal(e.pane.inert,false);assert.equal(e.documentRef.documentElement.dataset.selectionPane,'open');assert.equal(e.paneButton.getAttribute('aria-expanded'),'true');assert.equal(e.values.get('figure-studio-selection-pane'),'open');
+  e.root.fire('click',{target:e.paneButton});assert.equal(e.api.selectionPaneOpen,true);
+  e.api.toggleSelectionPane(false);e.api.toggleSelectionPane(true);assert.equal(e.pane.hidden,false);assert.equal(e.pane.inert,false);assert.equal(e.documentRef.documentElement.dataset.selectionPane,'open');assert.equal(e.paneButton.getAttribute('aria-expanded'),'true');assert.equal(e.values.get('figure-studio-right-sidebar'),'open');
   const reopened=environment({stored:Object.fromEntries(e.values)});try{assert.equal(reopened.api.selectionPaneOpen,true);assert.equal(reopened.pane.hidden,false);}finally{reopened.api.destroy();}
-  e.paneInput.focus();e.api.toggleSelectionPane(false);assert.equal(e.pane.hidden,true);assert.equal(e.pane.inert,true);assert.equal(e.canvasFocus,1);assert.equal(e.documentRef.activeElement,e.outside);assert.equal(e.paneButton.getAttribute('aria-expanded'),'false');assert.equal(e.values.get('figure-studio-selection-pane'),'closed');
+  e.paneInput.focus();e.api.toggleSelectionPane(false);assert.equal(e.pane.hidden,true);assert.equal(e.pane.inert,true);assert.equal(e.canvasFocus,2);assert.equal(e.documentRef.activeElement,e.outside);assert.equal(e.paneButton.getAttribute('aria-expanded'),'false');assert.equal(e.values.get('figure-studio-right-sidebar'),'closed');
  }finally{e.api.destroy();}
+});
+
+test('a saved closed right sidebar stays closed, while the old implicit closed preference is migrated to visible',()=>{
+ const hidden=environment({stored:{'figure-studio-right-sidebar':'closed'}}),old=environment({stored:{'figure-studio-selection-pane':'closed'}});
+ try{assert.equal(hidden.api.selectionPaneOpen,false);assert.equal(hidden.pane.inert,true);assert.equal(old.api.selectionPaneOpen,true);}finally{hidden.api.destroy();old.api.destroy();}
 });
 
 test('storage denial is harmless and closing the pane never restores focus into a hidden panel',()=>{

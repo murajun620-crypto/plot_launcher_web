@@ -19,6 +19,11 @@ test('physical units round-trip and new documents are independent',()=>{
   assert.equal(b.objects.length,0);
 });
 
+test('new text starts at 9 pt while explicit and saved font sizes are preserved',()=>{
+ assert.equal(makeObject('text').fontSize,9);assert.equal(makeObject('text',{fontSize:16}).fontSize,16);
+ const doc=docWith(makeObject('text',{fontSize:21}));assert.equal(validateDocument(doc).objects[0].fontSize,21);
+});
+
 test('bounds account for rotated rectangles and reversed line endpoints',()=>{
   const b=objectBounds(rect('r',10,20,40,20,{rotation:90}));
   near(b.x,20);near(b.y,10);near(b.w,20);near(b.h,40);

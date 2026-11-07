@@ -1,4 +1,4 @@
-const PANE_PREFERENCE='figure-studio-selection-pane';
+const PANE_PREFERENCE='figure-studio-right-sidebar';
 
 /** Small, native-control ribbon. Editing commands remain owned by the app. */
 export function createRibbon({root,documentRef=globalThis.document,storage,onResize=()=>{},onFocusCanvas}={}){
@@ -9,7 +9,7 @@ export function createRibbon({root,documentRef=globalThis.document,storage,onRes
  const tabs=[...root.querySelectorAll('[data-ribbon-tab]')],panels=new Map([...root.querySelectorAll('[data-ribbon-panel]')].map(panel=>[panel.dataset.ribbonPanel,panel]));
  const pane=documentRef.getElementById('ribbonSelectionPane')||documentRef.getElementById('selectionPane');
  const paneButtons=[...documentRef.querySelectorAll('[data-action="toggle-selection-pane"]')];
- let activeTab=null,paneOpen=false,previousFocus=null,frame=null,disposed=false;
+ let activeTab=null,paneOpen=!!pane,previousFocus=null,frame=null,disposed=false;
  const details=()=>[...root.querySelectorAll('details[open]')];
  const tabFor=key=>tabs.find(tab=>tab.dataset.ribbonTab===key);
  const requestFrame=typeof view.requestAnimationFrame==='function'?callback=>view.requestAnimationFrame(callback):callback=>{callback();return null;};
@@ -101,7 +101,7 @@ export function createRibbon({root,documentRef=globalThis.document,storage,onRes
   if(!tab.id)tab.id=`ribbon-tab-${key}`;
   if(panel){if(!panel.id)panel.id=`ribbon-panel-${key}`;tab.setAttribute('aria-controls',panel.id);panel.setAttribute('role','tabpanel');panel.setAttribute('aria-labelledby',tab.id);}
  }
- try{paneOpen=!!pane&&storage?.getItem(PANE_PREFERENCE)==='open';}catch{}
+ try{paneOpen=!!pane&&storage?.getItem(PANE_PREFERENCE)!=='closed';}catch{}
  syncPane();updateSelection([]);show('home');
  root.addEventListener('click',click);root.addEventListener('keydown',keydown);root.addEventListener('toggle',toggled,true);root.addEventListener('scroll',scheduleLayout,true);view.addEventListener?.('resize',scheduleLayout);
  return {show,updateSelection,toggleSelectionPane,get activeTab(){return activeTab;},get selectionPaneOpen(){return paneOpen;},
