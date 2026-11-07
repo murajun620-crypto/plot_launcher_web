@@ -1,3 +1,4 @@
+import {lineStrokeAttributes} from '../line-styles.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
@@ -29,7 +30,7 @@ const flatten=nodes=>nodes.flatMap(node=>[node,...flatten(node.children)]);
 function harness(objects,texRenderer,{onFinishText=()=>{}}={}){
  const initialDoc={...newDocument(),name:'TeX Figure',objects},downloads=[],messages=[];let exported;
  class Serializer{serializeToString(node){exported=node;return serialize(node);}}
- const api=Function('initialDoc','texRenderer','el','toMM','XMLSerializer','renderTextPaint','download','toast','onFinishText',
+ const api=Function('initialDoc','texRenderer','el','toMM','XMLSerializer','renderTextPaint','download','toast','onFinishText','lineStrokeAttributes',
   `let doc=initialDoc,finished=0,editingId=null,scale=1;const ns='http://www.w3.org/2000/svg',measure={measureText:text=>({width:text.length*10})};
    const uid=()=> 'export-tex',safeName=name=>name;
    function finishText(){finished++;onFinishText(doc);}`+
@@ -37,7 +38,7 @@ function harness(objects,texRenderer,{onFinishText=()=>{}}={}){
   section('function buildExport(){','function validateBook(')+
   section('async function prepareFigureExport(){','function withPNGResolution(')+
   'return {prepareFigureExport,exportSVG,buildExport,setDocument(value){doc=value;},get doc(){return doc;},get finished(){return finished;}};'
- )(initialDoc,texRenderer,el,toMM,Serializer,renderTextPaint,(blob,name)=>downloads.push({blob,name}),message=>messages.push(message),onFinishText);
+ )(initialDoc,texRenderer,el,toMM,Serializer,renderTextPaint,(blob,name)=>downloads.push({blob,name}),message=>messages.push(message),onFinishText,lineStrokeAttributes);
  return {api,downloads,messages,get exported(){return exported;}};
 }
 

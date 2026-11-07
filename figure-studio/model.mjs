@@ -1,5 +1,6 @@
 import {ARROW_PROPERTIES} from './arrowheads.mjs';
 import {isPathObject,validatePathObject} from './paths.mjs';
+import {isLineStyle} from './line-styles.mjs';
 export const STROKE_ALIGNMENTS=Object.freeze(['outside','inside','center']);
 export const TEXT_MODES=Object.freeze(['auto','tex','plain']);
 export const PT_PER_MM=72/25.4;
@@ -63,6 +64,7 @@ export function validateDocument(input){
   if(o.type==='text'&&(typeof o.text!=='string'||o.text.length>100000||!finite(o.fontSize,1,1000)||(o.fontFamily!==undefined&&(typeof o.fontFamily!=='string'||o.fontFamily.length>500))||(o.textAlign!==undefined&&!['left','center','right','justify'].includes(o.textAlign))))throw Error('テキストが不正です。');
   if(o.textMode!==undefined&&!TEXT_MODES.includes(o.textMode))throw Error('文字の入力形式が不正です。');
   if(!finite(o.opacity??1,0,1)||!finite(o.strokeWidth??1,0,1000))throw Error('書式が不正です。');
+  if(o.dashStyle!==undefined&&!isLineStyle(o.dashStyle)||o.dashed!==undefined&&typeof o.dashed!=='boolean')throw Error('線種が不正です。');
   if(o.strokeAlignment!==undefined&&!STROKE_ALIGNMENTS.includes(o.strokeAlignment))throw Error('線の位置は外側・内側・中央から選んでください。');
   for(const p of ['fillTransparency','strokeTransparency'])if(o[p]!==undefined&&!finite(o[p],0,100))throw Error('塗りつぶしと線の透明度は0〜100%で指定してください。');
   for(const p of ['fill','stroke'])if(o[p]&&!/^(#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})|none|transparent)$/i.test(o[p]))throw Error('色が不正です。');

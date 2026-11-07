@@ -1,3 +1,4 @@
+import {lineStrokeAttributes} from '../line-styles.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
@@ -23,10 +24,10 @@ function harness(objects=[]){
  let exported;
  class Serializer{serializeToString(node){exported=node;return serialize(node);}}
  const image={dataUrl:'data:image/png;base64,AQID',previewUrl:'data:image/png;base64,BAUG'},assets=new Map([['raster',image]]),doc={...newDocument(),objects};
- const api=Function('el','isPathObject','pathData','arrowGeometry','assets','doc','toMM','XMLSerializer','renderTextPaint','uid','texRenderer',
+ const api=Function('el','isPathObject','pathData','arrowGeometry','assets','doc','toMM','XMLSerializer','renderTextPaint','uid','texRenderer','lineStrokeAttributes',
   `let editingId=null,scale=2;const ns='http://www.w3.org/2000/svg',measure={measureText:text=>({width:text.length*6})},previewQuality={getURL:asset=>asset.previewUrl};function finishText(){}`+
   section('function transform(','function drawContent(')+section('function drawContent(','function render(){')+section('function buildExport(){','function validateBook(')+'return {drawContent,buildExport};'
- )(el,isPathObject,pathData,arrowGeometry,assets,doc,toMM,Serializer,renderTextPaint,()=> 'text-paint-test',{hasMath:()=>false,getLayout:()=>null});
+ )(el,isPathObject,pathData,arrowGeometry,assets,doc,toMM,Serializer,renderTextPaint,()=> 'text-paint-test',{hasMath:()=>false,getLayout:()=>null},lineStrokeAttributes);
  return {...api,image,get exported(){return exported;},draw(object,full=false){const group=el('g');api.drawContent(object,group,full);return group;}};
 }
 const inherit=(node,name,fallback)=>{for(let current=node;current;current=current.parent){const value=current.getAttribute(name);if(value!==null)return value;}return fallback;};
@@ -116,4 +117,16 @@ test('SVG export and canvas/thumbnail share paint attributes for every type whil
  });
  assert.equal(groups[0].children[0].getAttribute('href'),app.image.dataUrl);assert.equal(app.draw(objects[0]).children[0].getAttribute('href'),app.image.previewUrl);
  assert.equal(groups[0].getAttribute('opacity'),'0.55');assert.equal(groups[3].children.at(-1).getAttribute('fill-opacity'),'0.7');
+});
+
+test('dash patterns reach shape borders, paths and arrow shafts in export while arrowheads stay solid',()=>{
+ const types=['line','arrow','rect','ellipse','curve','freeform','arc'];
+ const objects=types.map(type=>makeObject(type,{dashStyle:'long-dash-dot-dot',strokeWidth:2,arrowStartStyle:'triangle',arrowEndStyle:'triangle'}));
+ const app=harness(objects),markup=app.buildExport(),groups=app.exported.children.filter(n=>n.tag==='g');
+ assert.equal((markup.match(/stroke-dasharray="16 4 2 4 2 4"/g)||[]).length,types.length);
+ groups.forEach((group,i)=>{
+  const stroke=group.children[0];assert.equal(stroke.getAttribute('stroke-dasharray'),'16 4 2 4 2 4');assert.equal(stroke.getAttribute('stroke-linecap'),'butt');
+  for(const head of group.children.slice(1))assert.equal(head.getAttribute('stroke-dasharray'),null);
+  const thumbnail=app.draw(objects[i],'thumbnail');assert.equal(thumbnail.children[0].getAttribute('stroke-dasharray'),stroke.getAttribute('stroke-dasharray'));
+ });
 });

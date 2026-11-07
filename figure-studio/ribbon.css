@@ -105,6 +105,14 @@
 #studioRibbon .color-field{gap:4px;padding:0;color:#53626b;font-size:10px}
 #studioRibbon .color-field input{width:27px;height:26px;padding:2px;border-radius:3px}
 .ribbon-style-actions{display:grid;grid-template-columns:74px 48px minmax(0,1fr);align-items:center;gap:4px}
+.line-style-picker{min-width:0}
+#studioRibbon .line-style-picker>summary{gap:1px;padding-inline:2px}
+#studioRibbon .line-style-picker>summary[aria-disabled=true]{opacity:.4;cursor:default}
+#studioRibbon .line-style-panel{width:260px;padding:6px;display:flex;flex-direction:column;gap:2px}
+#studioRibbon .line-style-option{display:flex;align-items:center;gap:12px;width:100%;min-height:32px;padding:4px 8px;border:1px solid transparent;border-radius:3px;background:transparent;color:#35434c;text-align:left;font-size:12px;white-space:nowrap}
+#studioRibbon .line-style-option svg{flex:none;width:120px;height:18px}
+#studioRibbon .line-style-option:hover:not(:disabled),#studioRibbon .line-style-option:focus-visible{background:#edf4f3;border-color:#d4e5e1}
+#studioRibbon .line-style-option[aria-checked=true]{background:#e7f1ee;border-color:#92beb4;color:#126c60}
 /* Reset the old inspector rule: span 2 created an extra row and clipped icons. */
 #studioRibbon .ribbon-style-group .stroke-field{grid-column:auto;margin:0;min-width:0}
 #studioRibbon .ribbon-style-group .stroke-field input{padding-left:0;text-align:right}

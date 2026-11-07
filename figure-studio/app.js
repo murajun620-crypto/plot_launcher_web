@@ -1,4 +1,4 @@
-import {PT_PER_MM,mm,toMM,uid,clone,newDocument,makeObject,bounds,objectBounds,expandSelection,align,distribute,reorder,autoLayout,History,validateDocument} from './model.mjs?v=tex-v061-1';
+import {PT_PER_MM,mm,toMM,uid,clone,newDocument,makeObject,bounds,objectBounds,expandSelection,align,distribute,reorder,autoLayout,History,validateDocument} from './model.mjs?v=lines-v064-1';
 import {isPathObject,pathData,objectFromPoints} from './paths.mjs?v=ribbon-v060-1';
 import {createPathDrawing} from './path-drawing.mjs?v=ribbon-v060-1';
 import {imageAsset,imagePhysicalSize,imageMiFiToBodySize,blobToDataURL,dataURLToBlob,download,sanitizeSVG} from './assets.mjs?v=0.3.5-1';
@@ -21,6 +21,8 @@ import {marqueeSelection} from './selection.mjs';
 import {ARROW_PROPERTIES,arrowEndpoint,arrowPropertyValue,setArrowProperty,arrowGeometry} from './arrowheads.mjs?v=0.3.0-1';
 
 import {createArrowPicker} from './arrow-picker.mjs?v=0.3.0-1';
+import {lineStrokeAttributes,lineStyleValue,setLineStyle,supportsLineStyle} from './line-styles.mjs?v=lines-v064-1';
+import {createLineStylePicker} from './line-style-picker.mjs?v=lines-v064-1';
 import {createPreviewQuality} from './preview-quality.mjs?v=0.3.0-1';
 import {reorderFigures} from './figure-order.mjs';
 import {renumberFigureNames} from './figure-names.mjs?v=0.3.3-1';
@@ -61,6 +63,7 @@ let texFrame=0,editingTexSession=false,editorComposing=false;
 const texRenderer=createTexRenderer({measure:(text,object)=>{measure.font=font(object);return measure.measureText(text).width;},onReady:key=>{figureSidebar.invalidate(figures.filter(f=>f.objects.some(o=>o.type==='text'&&texRenderer.key(o)===key)).map(f=>f.id));if(!texFrame)texFrame=requestAnimationFrame(()=>{texFrame=0;render();});},onError:(error,key)=>{if(!editingId&&!livePreview.ownsKey(key)&&doc.objects.some(o=>o.type==='text'&&texRenderer.key(o)===key))toast(error.message);}});
 const livePreview=createLiveTexPreview({renderer:texRenderer,root:$('#texPreviewPanel'),svg:$('#texPreviewSvg'),status:$('#texPreviewStatus'),sourceSlot:$('#texSourceSlot'),paint:renderTextPaint,el,onPosition:placeTexSource});
 const arrowPicker=createArrowPicker({root:$('#arrowProperties'),onChange:(property,value)=>change(()=>editable().forEach(o=>setArrowProperty(o,property,value)))});
+const lineStylePicker=createLineStylePicker({root:$('#lineStylePicker'),onChange:value=>change(()=>editable().forEach(o=>setLineStyle(o,value)))});
 let previewErrorShown=false;
 const previewQuality=createPreviewQuality({onReady:(asset,url,quality)=>{
  if(quality!==previewQuality.quality||assets.get(asset.id)!==asset)return;
@@ -96,13 +99,13 @@ function drawContent(o,g,full=false){
  if(!full)g.prepend(el('rect',{width:Math.max(o.w,5),height:Math.max(o.h,o.fontSize*1.2,layout?.height??0),fill:'transparent','data-hit':'true'}));
  }else if(o.type==='line'||o.type==='arrow'){
  if(!full)g.append(el('line',{x1:0,y1:0,x2:o.w,y2:o.h,stroke:'transparent','stroke-width':Math.max(12/scale,o.strokeWidth),'pointer-events':'stroke'}));
- const geometry=arrowGeometry(o);g.append(el('line',{...geometry.shaft,stroke:o.stroke,'stroke-width':o.strokeWidth,'stroke-dasharray':o.dashed?`${o.strokeWidth*4} ${o.strokeWidth*3}`:undefined,'stroke-linecap':'round'}));
+ const geometry=arrowGeometry(o);g.append(el('line',{...geometry.shaft,stroke:o.stroke,'stroke-width':o.strokeWidth,...lineStrokeAttributes(o)}));
  for(const head of geometry.heads)g.append(el(head.tag,{...head.attrs,'fill-opacity':1-(o.strokeTransparency??0)/100}));
  }else if(isPathObject(o)){
   if(o.w<=0||o.h<=0)return;const d=pathData(o);
   if(!full)g.append(el('path',{d,fill:'none',stroke:'transparent','stroke-width':Math.max(12/scale,o.strokeWidth),'pointer-events':'stroke'}));
-  g.append(el('path',{d,fill:o.closed?o.fill||'none':'none',stroke:o.stroke||'#263b44','stroke-width':o.strokeWidth,'stroke-dasharray':o.dashed?o.strokeWidth*4+' '+o.strokeWidth*3:undefined,'stroke-linecap':'round','stroke-linejoin':'round'}));
- }else {g.append(el(o.type==='ellipse'?'ellipse':'rect',o.type==='ellipse'?{cx:o.w/2,cy:o.h/2,rx:o.w/2,ry:o.h/2,fill:o.fill,stroke:o.stroke,'stroke-width':o.strokeWidth}:{width:o.w,height:o.h,fill:o.fill,stroke:o.stroke,'stroke-width':o.strokeWidth,rx:0}));}
+  g.append(el('path',{d,fill:o.closed?o.fill||'none':'none',stroke:o.stroke||'#263b44','stroke-width':o.strokeWidth,...lineStrokeAttributes(o),'stroke-linejoin':'round'}));
+ }else {g.append(el(o.type==='ellipse'?'ellipse':'rect',{...(o.type==='ellipse'?{cx:o.w/2,cy:o.h/2,rx:o.w/2,ry:o.h/2}:{width:o.w,height:o.h,rx:0}),fill:o.fill,stroke:o.stroke,'stroke-width':o.strokeWidth,...lineStrokeAttributes(o)}));}
 }
 function render(){
  syncFigure();renderFigureTabs();svg.setAttribute('viewBox',`0 0 ${doc.width} ${doc.height}`);$('#docName').value=doc.name;$('#pageWidth').value=toMM(doc.width).toFixed(1);$('#pageHeight').value=toMM(doc.height).toFixed(1);const figureLabel=$('#canvasFigureLabel');if(figureLabel){figureLabel.textContent=`Figure ${figures.findIndex(f=>f.id===doc.id)+1}`;figureLabel.title=doc.name;}
@@ -160,13 +163,13 @@ function renderInspector(){
  const showArrows=arr.length>0&&arr.every(object=>['line','arrow'].includes(object.type)),arrowEditable=showArrows?edits:[];$('#arrowProperties').hidden=!showArrows;
  for(const input of $$('#arrowProperties [data-prop]')){const p=input.dataset.prop;input.disabled=!arrowEditable.length||(!p.endsWith('Style')&&arrowEditable.every(object=>arrowEndpoint(object,p.startsWith('arrowStart')?'start':'end').style==='none'));const values=arr.map(object=>arrowPropertyValue(object,p));if(document.activeElement!==input)input.value=values.length&&values.every(value=>value===values[0])?values[0]:'';}
  arrowPicker.update(arr,{editableIds:arrowEditable.map(object=>object.id)});
+ lineStylePicker.update(arr,{editableIds:edits.map(object=>object.id)});
  for(const action of ['bold','italic','underline'])for(const button of $$('[data-action="'+action+'"]')){const active=texts.length>0&&texts.every(object=>object[action]);button.disabled=!textEdits.length;button.classList.toggle('active',active);button.setAttribute('aria-pressed',active?'true':texts.some(object=>object[action])?'mixed':'false');}
  for(const button of $$('[data-action]')){
   const action=button.dataset.action;
   if(['font-grow','font-shrink','font-up','font-down'].includes(action)||/^text-(left|center|right|justify)$/.test(action))button.disabled=!textEdits.length;
   if(/^text-(left|center|right|justify)$/.test(action)){const active=texts.length>0&&texts.every(object=>(object.textAlign||'left')===action.slice(5));button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active));}
   if(action==='no-fill')button.disabled=!edits.some(object=>['rect','ellipse'].includes(object.type)||['curve','freeform'].includes(object.type)&&object.closed);
-  if(action==='toggle-dash')button.disabled=!edits.some(object=>['line','arrow','curve','freeform','arc'].includes(object.type));
   if(['toggle-arrow-start','toggle-arrow-end'].includes(action))button.disabled=!edits.some(object=>['line','arrow'].includes(object.type));
   if(action==='edit-points'||action==='close-path'){button.disabled=arr.length!==1||!edits.length||!['curve','freeform'].includes(o.type);if(action==='close-path'&&!o?.closed&&(o?.points?.length??0)<3)button.disabled=true;button.setAttribute('aria-pressed',String(action==='edit-points'?pathEditId===o?.id:!!o?.closed));}
   if(['front','back','forward','backward','lock','duplicate','delete'].includes(action))button.disabled=!arr.length;
@@ -314,11 +317,10 @@ function execute(action,payload={}){
  if(action==='group')return change(()=>{if(editable().length<2)return;const id=uid();editable().forEach(o=>o.groupId=id);});
  if(action==='ungroup')return change(()=>editable().forEach(o=>o.groupId=null));
  if(action==='lock')return change(()=>{const value=!selected().every(o=>o.locked);selected().forEach(o=>o.locked=value);});
- if(action==='copy-format'){const o=selected()[0];if(o){formatClipboard=Object.fromEntries(['fill','stroke','fillTransparency','strokeTransparency','strokeWidth','strokeAlignment','textMode','fontSize','fontFamily','bold','italic','underline','textAlign','opacity'].filter(p=>o[p]!==undefined).map(p=>[p,o[p]]));toast('書式をコピーしました');}return;}
+ if(action==='copy-format'){const o=selected()[0];if(o){formatClipboard={...Object.fromEntries(['fill','stroke','fillTransparency','strokeTransparency','strokeWidth','strokeAlignment','textMode','fontSize','fontFamily','bold','italic','underline','textAlign','opacity'].filter(p=>o[p]!==undefined).map(p=>[p,o[p]])),...(supportsLineStyle(o)?{dashStyle:lineStyleValue(o),dashed:lineStyleValue(o)!=='solid'}:{})};toast('書式をコピーしました');}return;}
  if(action==='paste-format'){if(formatClipboard)change(()=>editable().forEach(o=>Object.assign(o,formatClipboard)));return;}
  if(action==='auto-grid'||action==='auto-hero')return change(()=>{let ids=selection;if(!ids.length)ids=doc.objects.filter(o=>o.type==='image'&&!o.locked).map(o=>o.id);autoLayout(doc,ids,action==='auto-grid'?'grid':'hero');});
  if(action==='no-fill')return change(()=>editable().filter(o=>['rect','ellipse'].includes(o.type)||['curve','freeform'].includes(o.type)&&o.closed).forEach(o=>o.fill='none'));
- if(action==='toggle-dash')return change(()=>editable().filter(o=>['line','arrow','curve','freeform','arc'].includes(o.type)).forEach(o=>o.dashed=!o.dashed));
  if(action==='toggle-arrow-start'||action==='toggle-arrow-end')return change(()=>editable().filter(o=>['line','arrow'].includes(o.type)).forEach(o=>{const end=action==='toggle-arrow-start'?'start':'end';setArrowProperty(o,end==='start'?'arrowStartStyle':'arrowEndStyle',arrowEndpoint(o,end).style==='none'?'triangle':'none');}));
  if(action==='labels')return addLabels();
  if(action==='toggle-selection-pane')return ribbon.toggleSelectionPane();

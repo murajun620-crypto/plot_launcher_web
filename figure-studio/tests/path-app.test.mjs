@@ -1,3 +1,4 @@
+import {lineStrokeAttributes} from '../line-styles.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
@@ -22,11 +23,11 @@ class XMLSerializer{
 }
 function drawing(objects=[]){
  const doc={...newDocument(),objects};
- return Function('el','isPathObject','pathData','doc','toMM','XMLSerializer',
+ return Function('el','isPathObject','pathData','doc','toMM','XMLSerializer','lineStrokeAttributes',
   `let editingId=null,scale=2,finished=0;const ns='http://www.w3.org/2000/svg';function finishText(){finished++;}`+
   section('function transform(','function font(')+section('function drawContent(','function render(){')+section('function buildExport(){','function validateBook(')+
   'return {drawContent,buildExport,get finished(){return finished;}};'
- )(el,isPathObject,pathData,doc,toMM,XMLSerializer);
+ )(el,isPathObject,pathData,doc,toMM,XMLSerializer,lineStrokeAttributes);
 }
 
 test('canvas paths use their real geometry and a separate transparent stroke hit target',()=>{
