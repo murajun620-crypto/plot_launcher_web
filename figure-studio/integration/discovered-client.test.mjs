@@ -82,3 +82,16 @@ test('foreign registry identities and stale bridge results cannot reach the acti
   await flush();assert.equal(received.length,1);assert.equal(env.opened.length,0);
  }finally{env.close();}
 });
+
+test('detached discovery session reconnects the same live editor with a fresh request instead of trusting stale loaded state',async()=>{
+ const env=environment();try{
+  const win=env.windowAt(),editor=env.editor(),states=[];setupSourceDiscovery({windowRef:win});await flush();
+  const first=env.open(win,{onStatus:value=>states.push(value.state)});await first.ready;
+  const original=editor.loads.at(-1),identity={panelId:original.panelId,requestId:original.requestId,editKey:original.editKey};
+  editor.reply('detached',{...identity,editKey:'old-edit-key'});await flush();assert.equal(first.window.closed,false);assert.equal(editor.cleanups,0);
+  editor.reply('detached',identity);await flush();assert.equal(first.window.closed,true);assert.equal(editor.cleanups,1);assert.ok(states.includes('detached'));
+  const fresh=env.open(win);assert.deepEqual(await fresh.ready,{connected:true});
+  assert.equal(editor.connectCount,2);assert.equal(editor.loads.length,2);assert.notEqual(editor.loads[1].requestId,original.requestId);assert.equal(env.opened.length,0);
+  editor.reply('detached',identity);await flush();assert.equal(fresh.window.closed,false);assert.equal(editor.cleanups,1);
+ }finally{env.close();}
+});

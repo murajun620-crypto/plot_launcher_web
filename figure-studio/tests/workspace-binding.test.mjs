@@ -1,24 +1,30 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
 import {validateWorkspaceBinding} from '../integration/bridge-host.mjs';
+import {readMifitoIdentity} from '../integration/mifito-sync.mjs';
 import {dataURLToBlob} from '../assets.mjs';
 
 // Run the actual app helpers without initializing Studio's canvas or browser storage.
 const source=await readFile(new URL('../app.js',import.meta.url),'utf8');
 function section(start,end){const at=source.indexOf(start);assert.ok(at>=0,start);const until=source.indexOf(end,at);assert.ok(until>at,end);return source.slice(at,until);}
 const keySource=section('function sourceEditKey(','const mifitoIdentities=');
-const savedEditorBindings=Function('validateWorkspaceBinding','dataURLToBlob',keySource+section('async function savedEditorBindings(','async function connectSavedEditors(')+'return savedEditorBindings;')(validateWorkspaceBinding,dataURLToBlob);
+const savedEditorBindings=Function('validateWorkspaceBinding','dataURLToBlob','readMifitoIdentity',keySource+section('async function savedEditorBindings(','async function connectSavedEditors(')+'return savedEditorBindings;')(validateWorkspaceBinding,dataURLToBlob,readMifitoIdentity);
 function connectHelper(book,editSource){return Function('figures','bookId','editSource',keySource+section('async function connectSavedEditors(','async function readProject(')+'return connectSavedEditors;')(book.figures,book.id,editSource);}
 const dataURL=bytes=>`data:application/octet-stream;base64,${Buffer.from(bytes).toString('base64')}`;
+function mifitoBytes(projectId='project-mifito-a1'){
+ const bytes=Buffer.from([1,2,3]),manifest={application:'MiFiTo',version:1,activeIndex:0,ui:projectId?{figureStudioProjectId:projectId}:{},images:[{name:'source.png',figureStudioImageId:'image-mifito-a001',sha256:createHash('sha256').update(bytes).digest('hex'),bytes:bytes.length,width:100,height:80,settings:{panelLabel:{text:'last reflected'}}}]};
+ const json=Buffer.from(JSON.stringify(manifest)),header=Buffer.alloc(12);header.write('MiFiTo\r\n');header.writeUInt32LE(json.length,8);return Buffer.concat([header,json,bytes]);
+}
 
 function fixture(){
  const book={id:'book-a',figures:[{id:'figure-plot',objects:[{id:'panel-plot',source:{app:'plot',assetId:'project-plot',name:'renamed.plotproject'}}]},{id:'figure-mifito',objects:[{id:'panel-mifito',source:{app:'mifito',assetId:'project-mifito',name:'renamed.mifito'}}]}]};
  const loaded=new Map(),editors={};
  for(const app of ['plot','mifito']){
-  const bytes=app==='plot'?'plot-baseline':'mifito-baseline';
+  const bytes=app==='plot'?'plot-baseline':mifitoBytes();
   loaded.set(`project-${app}`,{name:'same-name',dataUrl:dataURL(bytes)});
-  editors[app]={binding:{version:1,app,panelId:`panel-${app}`,editKey:`book-a/figure-${app}/panel-${app}/project-${app}`,baselineProject:new Blob([bytes]),sourceName:'old-name',...(app==='mifito'?{imageId:'image-a'}:{})}};
+  editors[app]={state:app==='mifito'?{ui:{figureStudioProjectId:'project-mifito-a1'},items:[{settings:{panelLabel:{text:'unreflected edit'}}}]}:{},binding:{version:1,app,panelId:`panel-${app}`,editKey:`book-a/figure-${app}/panel-${app}/project-${app}`,baselineProject:new Blob([bytes]),sourceName:'old-name',...(app==='mifito'?{imageId:'image-a'}:{})}};
  }
  return {book,loaded,decoded:{editors}};
 }
@@ -27,7 +33,7 @@ test('saved bindings require exact reflected bytes and use the actual attached p
  const {book,loaded,decoded}=fixture(),bindings=await savedEditorBindings(decoded,book,loaded);
  for(const app of ['plot','mifito']){
   assert.equal(bindings[app].editKey,decoded.editors[app].binding.editKey);
-  assert.equal(await bindings[app].baselineProject.text(),`${app}-baseline`);
+  assert.deepEqual(await bindings[app].baselineProject.arrayBuffer(),await decoded.editors[app].binding.baselineProject.arrayBuffer());
   assert.notEqual(bindings[app].baselineProject,decoded.editors[app].binding.baselineProject);
   assert.equal(bindings[app].sourceName,book.figures.find(f=>f.id===`figure-${app}`).objects[0].source.name);
  }
@@ -43,6 +49,25 @@ test('same-length changed bytes detach rather than accepting a matching filename
  assert.equal(bindings.plot,null);assert.ok(bindings.mifito);
  decoded.editors.mifito.binding.baselineProject=new Blob(['longer mifito baseline']);
  assert.deepEqual(await savedEditorBindings(decoded,book,loaded),{plot:null,mifito:null});
+});
+
+test('older workspace with current MiFiTo B and an exact A baseline detaches without altering either project',async()=>{
+ for(const currentId of ['project-mifito-b1',undefined,null]){
+  const f=fixture(),editor=f.decoded.editors.mifito;editor.state.ui.figureStudioProjectId=currentId;
+  const stateBefore=structuredClone(editor.state),bookBefore=structuredClone(f.book),assetBefore=f.loaded.get('project-mifito').dataUrl;
+  assert.equal((await readMifitoIdentity(editor.binding.baselineProject)).projectId,'project-mifito-a1');
+  const bindings=await savedEditorBindings(f.decoded,f.book,f.loaded);
+  assert.equal(bindings.mifito,null);assert.ok(bindings.plot);assert.deepEqual(editor.state,stateBefore);assert.deepEqual(f.book,bookBefore);assert.equal(f.loaded.get('project-mifito').dataUrl,assetBefore);
+ }
+});
+
+test('matching current project retains legitimate unreflected changes and legacy inferred identities',async()=>{
+ const f=fixture(),editor=f.decoded.editors.mifito;
+ assert.ok((await savedEditorBindings(f.decoded,f.book,f.loaded)).mifito);
+ assert.equal(editor.state.items[0].settings.panelLabel.text,'unreflected edit');
+ const bytes=mifitoBytes(null),baseline=new Blob([bytes]),identity=await readMifitoIdentity(baseline);
+ assert.equal(identity.legacy,true);editor.binding.baselineProject=baseline;editor.state.ui.figureStudioProjectId=identity.projectId;f.loaded.get('project-mifito').dataUrl=dataURL(bytes);
+ assert.ok((await savedEditorBindings(f.decoded,f.book,f.loaded)).mifito);
 });
 
 test('every book, figure, panel, and source asset key component must match independently',async()=>{

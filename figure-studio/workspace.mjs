@@ -1,5 +1,5 @@
-import {SOURCE_APPS} from './integration/bridge-client.mjs?v=workspace-save-v050-1';
-import {installWorkspacePersistence} from './workspace-session.mjs?v=workspace-save-v050-1';
+import {SOURCE_APPS} from './integration/bridge-client.mjs?v=project-switch-v051-1';
+import {installWorkspacePersistence} from './workspace-session.mjs?v=project-switch-v051-1';
 
 const APPS=['studio','plot','mifito'];
 

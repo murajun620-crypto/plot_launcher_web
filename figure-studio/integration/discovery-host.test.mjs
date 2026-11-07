@@ -6,11 +6,15 @@ import {createEditorDirectory,registerEditor} from './editor-discovery.mjs';
 const PROTOCOL='figure-studio-bridge-v1',origin='https://example.test',ownerId='12345678-1234-1234-1234-123456789012';
 const deferred=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};};
 function environment(options={}){
+ const {native=false,...hostOptions}=options;
  const elements=[],listeners=new Set(),changes=[],loads=[],loaded=[],accepted=[];let registration,registryClosed=false;
  const header={children:[],append(el){el.parent=this;this.children.push(el);}};
  const documentRef={body:header,querySelector:()=>header,createElement(tag){const handlers=new Map();const el={tag,style:{},children:[],disabled:false,textContent:'',append(...children){this.children.push(...children);},setAttribute(){},addEventListener(type,fn){handlers.set(type,fn);},remove(){if(this.parent)this.parent.children=this.parent.children.filter(el=>el!==this);},fire(type){return handlers.get(type)?.();}};elements.push(el);return el;}};
  const windowRef={location:{hash:'',origin,href:origin+'/editor/'},document:documentRef,opener:null,addEventListener(type,fn){if(type==='message')listeners.add(fn);},removeEventListener(type,fn){listeners.delete(fn);}};
- const host=setupFigureBridge({app:'plot',windowRef,hasContent:()=>false,isDirty:()=>true,loadProject:async(file,meta)=>loads.push({text:await file.text(),meta}),captureResult:()=>({project:new Blob(['edited']),preview:new Blob(['svg'],{type:'image/svg+xml'}),sourceName:'edited.plotproject'}),onProjectLoaded:meta=>loaded.push(meta),onAccepted:(result,meta)=>accepted.push({result,meta}),onConnectionChange:value=>changes.push(value),registerEditorRef:args=>{registration=args;return {update(){},close(){registryClosed=true;}};},...options});
+ const nativeSent=[],nativeNonce=crypto.randomUUID();
+ if(native){windowRef.opener={closed:false,postMessage(data,target){assert.equal(target,origin);nativeSent.push(data);}};windowRef.location.hash='#'+new URLSearchParams({figureBridge:nativeNonce,figureOrigin:origin,figureOwner:ownerId});}
+ const nativeLoad=(extra={})=>Promise.all([...listeners].map(fn=>fn({source:windowRef.opener,origin,data:{protocol:PROTOCOL,nonce:nativeNonce,app:'plot',type:'load',panelId:'panel-a',requestId:'request-a',editKey:'book/figure/panel-a/source-a',project:new Blob(['saved']),sourceName:'source.plotproject',...extra}})));
+ const host=setupFigureBridge({app:'plot',windowRef,hasContent:()=>false,isDirty:()=>true,loadProject:async(file,meta)=>loads.push({text:await file.text(),meta}),captureResult:()=>({project:new Blob(['edited']),preview:new Blob(['svg'],{type:'image/svg+xml'}),sourceName:'edited.plotproject'}),onProjectLoaded:meta=>loaded.push(meta),onAccepted:(result,meta)=>accepted.push({result,meta}),onConnectionChange:value=>changes.push(value),registerEditorRef:args=>{registration=args;return {update(){},close(){registryClosed=true;}};},...hostOptions});
  function connect(){
   const sent=[],handlers=new Set(),nonce=crypto.randomUUID();let cleanup;
   const parent={closed:false,postMessage(data,target){assert.equal(target,origin);sent.push(data);}};
@@ -20,7 +24,7 @@ function environment(options={}){
   const load=(extra={})=>emit('load',{panelId:'panel-a',requestId:'request-a',editKey:'book/figure/panel-a/source-a',project:new Blob(['saved']),sourceName:'source.plotproject',...extra});
   return {sent,parent,emit,load,close:()=>connection.close(),handlers};
  }
- return {host,connect,changes,loads,loaded,accepted,header,listeners,windowRef,get registration(){return registration;},get registryClosed(){return registryClosed;},button:elements.find(e=>e.id==='send-to-figure-studio'),message:elements.find(e=>e.tag==='span'),discard:elements.find(e=>e.textContent==='未反映の編集を取り消す')};
+ return {host,connect,changes,loads,loaded,accepted,header,listeners,windowRef,nativeLoad,nativeSent,get registration(){return registration;},get registryClosed(){return registryClosed;},button:elements.find(e=>e.id==='send-to-figure-studio'),message:elements.find(e=>e.tag==='span'),discard:elements.find(e=>e.textContent==='未反映の編集を取り消す')};
 }
 
 test('normal editors register without bridge UI and load an empty workspace through the claimed connection',async()=>{
@@ -161,5 +165,41 @@ test('invalid binding cannot detach a live editor, while reset clears associatio
   assert.equal(e.host.isConnected,true);assert.equal(e.loads.length,1);assert.equal((await e.host.captureWorkspaceBinding()).panelId,'panel-a');
   e.host.resetWorkspaceBinding();assert.equal(e.host.isConnected,false);assert.equal(await e.host.captureWorkspaceBinding(),null);assert.equal(e.loads.length,1);assert.equal(e.registration.getState().binding,null);
   assert.equal(validateWorkspaceBinding(null),null);
+ }finally{e.host.close();}
+});
+
+test('detaching a Studio-opened editor protects unsent replacement work, then adopts only its exact ACK snapshot',async()=>{
+ let content='initial',engineLoads=0;const requests=[];
+ const checkpoint={project:new Blob(['project-b']),bridgeState:{localIdentity:'b'}};
+ const e=environment({native:true,hasContent:()=>true,isDirty:()=>true,canAdoptAccepted:result=>result===checkpoint,
+  async loadProject(file,meta){requests.push(meta);if(!meta.reconnect){content=await file.text();engineLoads++;}}
+ });
+ try{
+  assert.equal(e.host.isConnected,true);await e.nativeLoad();assert.equal(content,'saved');assert.equal(engineLoads,1);
+  e.host.resetWorkspaceBinding();content='unsent project-b edits';assert.equal(e.host.isConnected,false);
+  const detached=e.nativeSent.at(-1);assert.equal(detached.type,'detached');assert.equal(detached.panelId,'panel-a');assert.equal(detached.requestId,'request-a');assert.equal(detached.editKey,'book/figure/panel-a/source-a');assert.equal(e.windowRef.opener.closed,false);
+  const wrong=e.connect();await wrong.load();
+  assert.equal(wrong.sent.at(-1).reason,'dirty-external');assert.equal(wrong.parent.closed,true);assert.equal(e.host.isConnected,false);
+  assert.equal(content,'unsent project-b edits');assert.equal(engineLoads,1);assert.equal(requests.length,1);
+  await e.host.rememberAccepted(checkpoint);
+  const current=e.connect(),request={panelId:'panel-b',requestId:'request-b',editKey:'book/figure/panel-b/source-b',project:new Blob(['project-b'])};
+  await current.load(request);
+  assert.equal(current.sent.at(-1).type,'loaded');assert.equal(requests.length,2);assert.equal(requests.at(-1).reconnect,true);
+  assert.equal(content,'unsent project-b edits');assert.equal(engineLoads,1);
+  const binding=await e.host.captureWorkspaceBinding();e.host.restoreWorkspaceBinding(binding);
+  const restored=e.connect();await restored.load({...request,requestId:'request-restored'});
+  assert.equal(restored.sent.at(-1).reused,true);assert.equal(requests.length,2);assert.equal(engineLoads,1);assert.equal(content,'unsent project-b edits');
+ }finally{e.host.close();}
+});
+
+test('startup with restored local work ignores a stale native URL route until a fresh safe claim',async()=>{
+ let content='restored unsent project-b';
+ const e=environment({native:true,startDetached:true,hasContent:()=>true,loadProject:async file=>{content=await file.text();e.loads.push(content);}});
+ try{
+  assert.equal(e.host.isConnected,false);assert.equal(e.header.children.length,0);assert.deepEqual(e.changes,[]);assert.equal(e.nativeSent.length,0);
+  assert.equal(e.registration.getState().ownerId,null);assert.equal(e.registration.getState().occupied,true);
+  await e.nativeLoad();assert.equal(e.loads.length,0);assert.equal(content,'restored unsent project-b');assert.equal(e.nativeSent.length,0);
+  const fresh=e.connect();await fresh.load();assert.equal(fresh.sent.at(-1).reason,'dirty-external');assert.equal(fresh.parent.closed,true);
+  assert.equal(e.loads.length,0);assert.equal(content,'restored unsent project-b');assert.equal(e.host.isConnected,false);assert.equal(e.header.children.length,0);
  }finally{e.host.close();}
 });

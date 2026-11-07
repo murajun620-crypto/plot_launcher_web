@@ -1,5 +1,5 @@
 /** Browser-only editing bridge. No project data is sent to a server. */
-import {transferResult,transferReceipt,isTransferImageId,getFigureWorkspace} from './direct-transfer.mjs?v=workspace-v040-1';
+import {transferResult,transferReceipt,isTransferImageId,getFigureWorkspace} from './direct-transfer.mjs?v=project-switch-v051-1';
 import {createEditorDirectory,studioOwnerId} from './editor-discovery.mjs?v=editor-reuse-v036-1';
 export const BRIDGE_PROTOCOL = 'figure-studio-bridge-v1';
 export const SOURCE_APPS = Object.freeze({
@@ -184,7 +184,14 @@ function openSourceSession({app, project, sourceName, panelId, editKey, imageId,
     const r=reuse?[pending,current].find(r=>r&&r.requestId===message.requestId):(pending||current);
     if(!r)return;
     if(reuse&&message.panelId!==r.panelId)return;
-    if (message.type === 'loaded') {
+    if(message.type==='detached'){
+      // A manual project replacement invalidates only this exact bridge route.
+      // Keep the editor alive; the next open must discover/reconnect it afresh.
+      if(!initialized||!activeHost||message.hostId!==activeHost||message.requestId!==r.requestId||message.panelId!==r.panelId||message.editKey!==r.editKey)return;
+      try{status(r,'detached',String(message.message||'編集画面との関連付けが解除されました。対象の図をもう一度開いてください。'));}
+      finally{close();}
+      return;
+    } else if (message.type === 'loaded') {
       if(r!==pending&&r!==current)return;
       current=r;if(pending===r)pending=null;r.loaded=true;
       status(r,'ready','元プロジェクトを開きました。修正後に「Figureへ反映」を押してください。');

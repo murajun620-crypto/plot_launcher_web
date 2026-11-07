@@ -1,5 +1,5 @@
 /** Source-editor bridge. The engine and tab stay alive when a different panel opens. */
-import {transferResult,transferReceipt,isTransferImageId,figureWorkspaceAPI,showFigureWorkspaceStudio} from './direct-transfer.mjs?v=workspace-v037-1';
+import {transferResult,transferReceipt,isTransferImageId,figureWorkspaceAPI,showFigureWorkspaceStudio} from './direct-transfer.mjs?v=project-switch-v051-1';
 import {registerEditor} from './editor-discovery.mjs?v=editor-reuse-v036-1';
 const PROTOCOL = 'figure-studio-bridge-v1';
 const MAX_PROJECT = 320 * 1024 * 1024;
@@ -32,13 +32,16 @@ export function getFigureBridgeContext(locationRef = location) {
  * onAccepted receives the exact captured result, including private extra
  * fields. Those extra fields stay in this editor and are never transmitted.
  */
-export function setupFigureBridge({app,loadProject,buildProject,renderPreview,captureResult,captureBatchResult,selectImage,isDirty=()=>false,hasContent,canAdoptAccepted=()=>false,onProjectLoaded,onAccepted,onConnectionChange=()=>{},
+export function setupFigureBridge({app,loadProject,buildProject,renderPreview,captureResult,captureBatchResult,selectImage,isDirty=()=>false,hasContent,canAdoptAccepted=()=>false,onProjectLoaded,onAccepted,onConnectionChange=()=>{},startDetached=false,
   windowRef=window,documentRef=windowRef.document,locationRef=windowRef.location,registerEditorRef=registerEditor,channelFactory}) {
   if(!['plot','mifito'].includes(app))return null;
-  const initialContext=getFigureBridgeContext(locationRef),workspace=new URLSearchParams(locationRef.search||'').get('figureWorkspace')==='1'?figureWorkspaceAPI(windowRef):null;
+  // An updater may restore local work that no longer belongs to the URL's old
+  // bridge. Keep that work unbound until a fresh discovery claim proves identity.
+  const initialContext=startDetached?null:getFigureBridgeContext(locationRef),workspace=new URLSearchParams(locationRef.search||'').get('figureWorkspace')==='1'?figureWorkspaceAPI(windowRef):null;
   const initialParent=workspace?.studioWindow||windowRef.opener;
   let context=initialContext&&initialParent?initialContext:null,parent=context?initialParent:null,connection=null,removeConnectionListener=null,registry=null,mounted=false;
-  const nativeOwner=context?(context.ownerId||crypto.randomUUID()):null,normalVisit=!context;
+  const nativeOwner=context?(context.ownerId||crypto.randomUUID()):null;
+  let normalVisit=!context;
   const hostId=crypto.randomUUID();
   let active={panelId:'',requestId:'',editKey:'',sourceName:''},revision=0,initialized=false,loaded=false,busy=false,awaiting=0,awaitTimer=0,captured=null,baseline=null,disposed=false,clientBatch=false,acceptedCheckpoint=null,loadingRequest=null;
   const send=(type,extra={})=>{if(!disposed&&context&&parent&&!parent.closed)parent.postMessage({protocol:PROTOCOL,nonce:context.nonce,hostId,app,type,panelId:active.panelId,requestId:active.requestId,editKey:active.editKey,...extra},context.origin);};
@@ -224,8 +227,12 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
   function resetWorkspaceBinding(){
     if(disposed)throw Error('編集画面との接続は終了しています。');
     if(busy||awaiting||loadingRequest)throw Error('読み込み・反映処理が終わってから、作業内容を復元してください。');
+    if(loaded&&active.panelId&&active.requestId)send('detached',{message:'編集画面の元プロジェクトが切り替わりました。対象の図を開くと再接続します。'});
     const previous=connection;removeConnectionListener?.();removeConnectionListener=null;connection=null;parent=null;context=null;previous?.close();unmount();
     clearTimeout(awaitTimer);awaitTimer=0;active={panelId:'',requestId:'',editKey:'',sourceName:''};revision=0;initialized=false;loaded=false;captured=null;baseline=null;clientBatch=false;acceptedCheckpoint=null;
+    // Detaching can follow a manual project replacement even in a tab originally
+    // opened by Studio. Its new local content now needs the normal adoption guard.
+    normalVisit=true;
     discard.hidden=true;setDisabled(true);setMessage('');registry?.update();
   }
   return {

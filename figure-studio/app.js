@@ -4,9 +4,9 @@ import {importedImageSize,replacedImageSize,replacedMiFiToImageSize,imageInserti
 import {saveDraft,loadDraft,saveProjectFileTarget,loadProjectFileTarget} from './storage.mjs?v=0.3.6-1';
 import {createDemo} from './demo.mjs';
 import {createShortcutHandler} from './shortcuts.mjs';
-import {openSource,SOURCE_APPS,setupSourceDiscovery,closeSourceSessions} from './integration/bridge-client.mjs?v=workspace-save-v050-1';
+import {openSource,SOURCE_APPS,setupSourceDiscovery,closeSourceSessions} from './integration/bridge-client.mjs?v=project-switch-v051-1';
 import {createFigureSidebar} from './thumbnails.mjs?v=0.3.0-1';
-import {setupTransferReceiver,getFigureWorkspace} from './integration/direct-transfer.mjs?v=workspace-save-v050-1';
+import {setupTransferReceiver,getFigureWorkspace} from './integration/direct-transfer.mjs?v=project-switch-v051-1';
 import {readMifitoIdentity} from './integration/mifito-sync.mjs?v=0.3.5-1';
 import {planMiFiToSync} from './mifito-batch.mjs?v=0.3.4-1';
 import {setupUpdateCheck} from './update-check.mjs';
@@ -18,10 +18,10 @@ import {createPreviewQuality} from './preview-quality.mjs?v=0.3.0-1';
 import {reorderFigures} from './figure-order.mjs';
 import {renumberFigureNames} from './figure-names.mjs?v=0.3.3-1';
 import {deleteFigures,duplicateFigures} from './figure-commands.mjs';
-import {ProjectFileSession,projectFilePickerOptions} from './project-file.mjs?v=workspace-save-v050-1';
-import {installWorkspacePersistence} from './workspace-session.mjs?v=workspace-save-v050-1';
-import {decodeWorkspaceState} from './workspace-state.mjs?v=workspace-save-v050-1';
-import {validateWorkspaceBinding} from './integration/bridge-host.mjs?v=workspace-save-v050-1';
+import {ProjectFileSession,projectFilePickerOptions} from './project-file.mjs?v=project-switch-v051-1';
+import {installWorkspacePersistence} from './workspace-session.mjs?v=project-switch-v051-1';
+import {decodeWorkspaceState} from './workspace-state.mjs?v=project-switch-v051-1';
+import {validateWorkspaceBinding} from './integration/bridge-host.mjs?v=project-switch-v051-1';
 
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 setupSourceDiscovery();
@@ -333,7 +333,15 @@ async function savedEditorBindings(decoded,next,loaded){
    const panel=figure.objects.find(o=>o.id===binding.panelId&&o.source?.app===app&&sourceEditKey(next.id,figure.id,o.id,o.source.assetId)===binding.editKey);
    if(!panel)continue;const asset=loaded.get(panel.source.assetId);if(!asset)continue;
    const baseline=dataURLToBlob(asset.dataUrl);
-   if(baseline.size===binding.baselineProject.size&&await digest(baseline)===await digest(binding.baselineProject))bindings[app]={...binding,baselineProject:baseline,sourceName:panel.source.name};
+   if(baseline.size===binding.baselineProject.size&&await digest(baseline)===await digest(binding.baselineProject)){
+    // Older workspaces could retain A's bridge after the editor opened B.
+    // Preserve those local edits while detaching only the stale association.
+    if(app==='mifito'){
+     const currentProjectId=decoded.editors.mifito.state?.ui?.figureStudioProjectId;
+     if(!currentProjectId||currentProjectId!==(await readMifitoIdentity(baseline)).projectId)break;
+    }
+    bindings[app]={...binding,baselineProject:baseline,sourceName:panel.source.name};
+   }
    break;
   }
  }

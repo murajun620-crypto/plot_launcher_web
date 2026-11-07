@@ -94,6 +94,20 @@ test('bulk teardown removes all retained listeners without closing source tabs',
  closeSourceSessions({windowRef:env.windowRef});assert.equal(env.listeners.size,0);assert.equal(a.window.closed,false);assert.equal(b.window.closed,false);assert.deepEqual(await a.ready,{connected:false,reason:'closed'});assert.deepEqual(await b.ready,{connected:false,reason:'closed'});
 });
 
+test('exact native detach evicts its pooled bridge without closing the source and rejects forged or stale identities',async()=>{
+ const env=environment(),states=[],first=env.open('a',{onStatus:value=>states.push(value.state)});let fresh;
+ try{
+  await env.ready();await env.loaded();const original=env.load(),identity={requestId:original.requestId,panelId:'a',editKey:'book/a/v1'};
+  for(const patch of [{nonce:'foreign'},{hostId:'foreign'},{app:'mifito'},{requestId:'old-request'},{panelId:'other'},{editKey:'book/a/old'}])await env.emit('detached',{...identity,...patch});
+  assert.equal(env.listeners.size,1);assert.equal(states.includes('detached'),false);
+  const before=env.sent.length;env.open('a');assert.equal(env.sent.length,before);assert.equal(env.opened.length,1);
+  await env.emit('detached',identity);assert.equal(env.listeners.size,0);assert.equal(first.window.closed,false);
+  fresh=env.open('a');assert.equal(env.listeners.size,1);assert.equal(env.opened.length,2);
+  await env.ready();assert.notEqual(env.load().requestId,original.requestId);await env.loaded();assert.deepEqual(await fresh.ready,{connected:true});
+  await env.emit('detached',identity,0);assert.equal(env.listeners.size,1);assert.equal(fresh.window.closed,false);
+ }finally{first.close();fresh?.close();}
+});
+
 test('legacy adapter stays usable and refuses destructive replacement',async()=>{
  const env=environment(),first=env.open();try{await env.emit('ready');await env.emit('loaded');const next=env.open('b');assert.deepEqual(await next.ready,{connected:false,reason:'adapter-outdated'});assert.equal(env.opened.length,1);assert.equal(env.sent.filter(m=>m.data.type==='load').length,1);}finally{first.close();}
 });

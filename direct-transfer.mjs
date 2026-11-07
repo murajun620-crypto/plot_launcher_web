@@ -153,7 +153,7 @@ export function createDirectSender({app,captureResult,captureBatchResult,onAccep
     if(record!==pending||record.acknowledging||m.transferId!==record.transferId||m.nonce!==record.nonce)return;
     clearTimeout(record.timer);record.timer=null;
     if(m.ok){
-      record.acknowledging=true;const receipt={ok:true,duplicate:!!m.duplicate,...transferReceipt(m)};let callbackFailed=false;
+      record.acknowledging=true;busy=true;const receipt={ok:true,duplicate:!!m.duplicate,...transferReceipt(m)};let callbackFailed=false;
       try{if(onAccepted)await onAccepted(record.captured,receipt);}catch{callbackFailed=true;}
       if(disposed||record!==pending)return;
       busy=false;pending=null;
@@ -232,7 +232,13 @@ export function createDirectSender({app,captureResult,captureBatchResult,onAccep
     }).catch(error=>{if(record===pending){busy=false;status('error',error.message);record.reject(error);}});
     return record.promise;
   }
-  return {send,get busy(){return busy;},close(){disposed=true;clearInterval(discovery);clearTimeout(pending?.timer);unsubscribe(channel,channelMessage);channel?.close();windowRef.removeEventListener('message',popupMessage);pending?.reject?.(new Error('送信を終了しました。'));pending=null;}};
+  function resetPending(){
+    if(busy)throw Error('送信が完了してから、別のプロジェクトを開いてください。');
+    const previous=pending;pending=null;clearTimeout(previous?.timer);
+    if(previous){previous.captured=null;previous.payload=null;previous.reject?.(new Error('プロジェクトが切り替わったため、前の送信を終了しました。'));}
+    status('idle','');
+  }
+  return {send,resetPending,get busy(){return busy;},close(){disposed=true;clearInterval(discovery);clearTimeout(pending?.timer);unsubscribe(channel,channelMessage);channel?.close();windowRef.removeEventListener('message',popupMessage);pending?.reject?.(new Error('送信を終了しました。'));pending=null;}};
 }
 
 /** Only the same-origin workspace shell may route between its embedded apps. */
@@ -254,8 +260,9 @@ export function showFigureWorkspaceStudio(windowRef=window){
 
 /** Workspace visits get send actions; standalone editors retain their full editor UI. */
 export function setupDirectSendButton({app,captureResult,captureBatchResult,onAccepted,container,studioUrl,isReady=()=>true,documentRef=document,windowRef=window}={}) {
-  if(new URLSearchParams(windowRef.location.hash.slice(1)).has('figureBridge'))return null;
-  if(new URLSearchParams(windowRef.location.search||'').get('figureWorkspace')!=='1'&&!figureWorkspaceAPI(windowRef))return null;
+  const params=new URLSearchParams(windowRef.location.hash.slice(1));
+  const bridgeVisit=/^[a-zA-Z0-9-]{16,100}$/.test(params.get('figureBridge')||'')&&params.get('figureOrigin')===windowRef.location.origin;
+  if(new URLSearchParams(windowRef.location.search||'').get('figureWorkspace')!=='1'&&!figureWorkspaceAPI(windowRef)&&!bridgeVisit)return null;
   const host=typeof container==='string'?documentRef.querySelector(container):container;
   if(!host)return null;
   const group=documentRef.createElement('div');group.style.cssText='display:inline-flex;align-items:center;gap:6px;position:relative';
@@ -266,7 +273,7 @@ export function setupDirectSendButton({app,captureResult,captureBatchResult,onAc
   group.append(button);if(batchButton)group.append(batchButton);group.append(message);host.append(group);
   let hideTimer,bridgeConnected=false;
   const sender=createDirectSender({app,captureResult,captureBatchResult,onAccepted,studioUrl,windowRef,onStatus:({state,message:text})=>{
-    clearTimeout(hideTimer);message.textContent=text;message.style.display='block';
+    clearTimeout(hideTimer);message.textContent=text;message.style.display=text?'block':'none';
     button.disabled=bridgeConnected||['preparing','waiting','sending'].includes(state)||!isReady();
     if(batchButton)batchButton.disabled=button.disabled;
     button.textContent=state==='retry'?'送信を再試行':state==='preparing'?'図を準備中…':'Figure Studioへ送る';

@@ -1,4 +1,4 @@
-import {encodeWorkspaceState,decodeWorkspaceState} from './workspace-state.mjs?v=workspace-save-v050-1';
+import {encodeWorkspaceState,decodeWorkspaceState} from './workspace-state.mjs?v=project-switch-v051-1';
 
 const APPS=['plot','mifito'];
 const empty=()=>({format:'figure-studio-workspace',version:1,active:'studio',editors:{plot:null,mifito:null}});

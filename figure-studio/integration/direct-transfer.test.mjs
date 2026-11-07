@@ -179,3 +179,31 @@ test('failed import retries the same payload and transfer ID, without recapturin
     assert.equal(captures,1);assert.equal(imports,2);assert.equal(deliveries[0].payload.transferId,deliveries[1].payload.transferId);
   }finally{sender.close();receiver.close();}
 });
+
+test('project replacement drops a timed-out payload and ignores its late acknowledgement',async()=>{
+ const bus=hub(),own=fakeWindow(),env=workspaceSource(own),imports=[],accepted=[];let current='A',release,started;
+ const gate=new Promise(resolve=>release=resolve),first=new Promise(resolve=>started=resolve);
+ const receiver=setupTransferReceiver({windowRef:own,channelFactory:()=>bus.factory(),onImport:async value=>{const project=await value.project.text();imports.push(project);if(project==='A'){started();await gate;}}});env.workspace.studioReceiverId=receiver.receiverId;
+ const sender=createDirectSender({app:'plot',windowRef:env.source,channelFactory:()=>bus.factory(),ackTimeoutMs:15,captureResult:()=>({...payload(),project:new Blob([current])}),onAccepted:async result=>accepted.push(await result.project.text())});
+ try{
+  await pause();const a=sender.send();const rejected=assert.rejects(a,/確認が届きません/);await first;await rejected;sender.resetPending();current='B';release();await pause();await pause();assert.deepEqual(accepted,[]);
+  await sender.send();assert.deepEqual(imports,['A','B']);assert.deepEqual(accepted,['B']);assert.equal(new Set(bus.messages.filter(m=>m.type==='deliver').map(m=>m.payload.transferId)).size,2);
+ }finally{release();sender.close();receiver.close();}
+});
+test('pending reset cannot interrupt capture or its acceptance callback',async()=>{
+ const bus=hub(),own=fakeWindow(),env=workspaceSource(own);let release,started,acceptRelease,acceptStarted;
+ const captureGate=new Promise(resolve=>release=resolve),capturing=new Promise(resolve=>started=resolve),acceptGate=new Promise(resolve=>acceptRelease=resolve),accepting=new Promise(resolve=>acceptStarted=resolve);
+ const receiver=setupTransferReceiver({windowRef:own,channelFactory:()=>bus.factory(),onImport:async()=>{}});env.workspace.studioReceiverId=receiver.receiverId;
+ const sender=createDirectSender({app:'plot',windowRef:env.source,channelFactory:()=>bus.factory(),captureResult:async()=>{started();await captureGate;return payload();},onAccepted:async()=>{acceptStarted();await acceptGate;}});
+ try{await pause();const sending=sender.send();await capturing;assert.throws(()=>sender.resetPending(),/送信が完了/);release();await accepting;assert.equal(sender.busy,true);assert.throws(()=>sender.resetPending(),/送信が完了/);acceptRelease();await sending;assert.doesNotThrow(()=>sender.resetPending());}
+ finally{release();acceptRelease();sender.close();receiver.close();}
+});
+
+test('a late successful acknowledgement is busy again until its checkpoint callback finishes',async()=>{
+ const bus=hub(),own=fakeWindow(),env=workspaceSource(own);let releaseImport,releaseAccept,started;
+ const importGate=new Promise(resolve=>releaseImport=resolve),acceptGate=new Promise(resolve=>releaseAccept=resolve),accepting=new Promise(resolve=>started=resolve);
+ const receiver=setupTransferReceiver({windowRef:own,channelFactory:()=>bus.factory(),onImport:()=>importGate});env.workspace.studioReceiverId=receiver.receiverId;
+ const sender=createDirectSender({app:'plot',windowRef:env.source,channelFactory:()=>bus.factory(),ackTimeoutMs:10,captureResult:payload,onAccepted:async()=>{started();await acceptGate;}});
+ try{await pause();await assert.rejects(sender.send(),/確認が届きません/);assert.equal(sender.busy,false);releaseImport();await accepting;assert.equal(sender.busy,true);assert.throws(()=>sender.resetPending(),/送信が完了/);releaseAccept();await pause();assert.equal(sender.busy,false);}
+ finally{releaseImport();releaseAccept();sender.close();receiver.close();}
+});

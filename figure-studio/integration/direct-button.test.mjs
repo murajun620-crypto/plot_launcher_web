@@ -23,9 +23,17 @@ test('a discovered bridge suspends the direct group and restores the same button
   }finally{direct.close();}
   assert.equal(ui.header.children.length,0);
 });
-test('URL bridge visits retain only the host controls',()=>{
+test('workspace bridge visits retain fallback send controls after the old project is detached',()=>{
   const ui=surface('#figureBridge=existing-connection');
-  assert.equal(setupDirectSendButton({app:'plot',captureResult:()=>{},...ui}),null);assert.equal(ui.header.children.length,0);
+  const direct=setupDirectSendButton({app:'mifito',captureResult:()=>{},captureBatchResult:()=>{},container:'.header-actions',...ui});
+  try{assert.ok(direct);const group=ui.header.children[0];direct.setBridgeConnected(true);assert.equal(group.style.display,'none');direct.setBridgeConnected(false);assert.equal(group.style.display,'inline-flex');assert.equal(direct.button.disabled,false);assert.equal(direct.batchButton.disabled,false);}
+  finally{direct.close();}
+});
+test('explicit same-origin bridge windows retain fallback controls while malformed standalone URLs do not',()=>{
+ const valid='#'+new URLSearchParams({figureBridge:crypto.randomUUID(),figureOrigin:'http://localhost:43421'});
+ const ui=surface(valid,''),direct=setupDirectSendButton({app:'mifito',captureResult:()=>{},container:'.header-actions',...ui});
+ try{assert.ok(direct);direct.setBridgeConnected(true);direct.setBridgeConnected(false);assert.equal(direct.button.disabled,false);}finally{direct.close();}
+ for(const hash of ['#figureBridge=existing-connection',valid.replace('localhost','other.test')]){const invalid=surface(hash,'');assert.equal(setupDirectSendButton({app:'mifito',captureResult:()=>{},container:'.header-actions',...invalid}),null);}
 });
 
 test('standalone source apps do not mount any send controls',()=>{
