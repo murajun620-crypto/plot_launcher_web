@@ -1,5 +1,6 @@
 /** Browser-only editing bridge. No project data is sent to a server. */
-import {transferResult,transferReceipt,isTransferImageId} from './direct-transfer.mjs?v=batch-v034-1';
+import {transferResult,transferReceipt,isTransferImageId,getFigureWorkspace} from './direct-transfer.mjs?v=workspace-v040-1';
+import {createEditorDirectory,studioOwnerId} from './editor-discovery.mjs?v=editor-reuse-v036-1';
 export const BRIDGE_PROTOCOL = 'figure-studio-bridge-v1';
 export const SOURCE_APPS = Object.freeze({
   plot: {name:'PlotLauncher Web', url:'https://murajun620-crypto.github.io/plot_launcher_web/', extension:'.plotproject'},
@@ -8,6 +9,57 @@ export const SOURCE_APPS = Object.freeze({
 const MAX_PROJECT = 320 * 1024 * 1024;
 // Each Figure Studio window keeps one live editor per source application/URL.
 const editorPools = new WeakMap();
+const directories=new WeakMap(),openingPools=new WeakMap();
+export function setupSourceDiscovery({windowRef=window}={}){
+ if(!directories.has(windowRef))directories.set(windowRef,createEditorDirectory({windowRef}));
+ return directories.get(windowRef);
+}
+
+// Discover already-open normal editors before creating a fallback tab. The
+// facade remains synchronous so callers can retain/cancel the pending session.
+export function openSource(options){
+ options={...options,onResult:options.onResult??(()=>{}),onStatus:options.onStatus??(()=>{})};
+ const windowRef=options.windowRef||window,spec=SOURCE_APPS[options.app];
+ if(!spec)return openSourceSession(options);
+ const target=new URL(options.url||spec.url,windowRef.location.href);target.hash='';
+ const key=`${options.app}:${target.href}`,existing=editorPools.get(windowRef)?.get(key);
+ if(existing&&!existing.window.closed&&!options.forceNew)return existing.open({...options,editKey:String(options.editKey??options.panelId)});
+ const directory=setupSourceDiscovery({windowRef});
+ if(!directory||target.origin!==windowRef.location.origin||options.forceNew)return openSourceSession(options);
+ let openings=openingPools.get(windowRef);if(!openings){openings=new Map();openingPools.set(windowRef,openings);}
+ const current=openings.get(key);
+ if(current){
+  if(current.options.panelId===options.panelId&&current.options.editKey===options.editKey){Object.assign(current.options,options);return current.facade;}
+  options.onStatus?.({state:'busy',message:'編集画面への接続が終わってから、もう一度対象の図を開いてください。'});
+  return {window:null,close(){},ready:Promise.resolve({connected:false,reason:'busy'})};
+ }
+ let real=null,cancelled=false,settle;
+ const record={options:{...options},facade:null};
+ const ready=new Promise(resolve=>{settle=resolve;});
+ const facade={get window(){return real?.window||null;},ready,downloadProject:()=>downloadBlob(record.options.project,record.options.sourceName||`source${spec.extension}`,windowRef.document),close(){cancelled=true;real?.close();settle({connected:false,reason:'closed'});if(openings.get(key)===record)openings.delete(key);}};
+ record.facade=facade;openings.set(key,record);
+ options.onStatus?.({state:'opening',message:`開いている${spec.name}を探しています…`});
+ const ownerId=studioOwnerId(windowRef);
+ const workspace=getFigureWorkspace(windowRef);
+ if(workspace?.openEditor)workspace.openEditor(options.app,{url:target.href,ownerId});
+ Promise.resolve().then(async()=>{
+  let projectHash;
+  try{projectHash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await options.project.arrayBuffer())),n=>n.toString(16).padStart(2,'0')).join('');}catch{}
+  const query={app:options.app,url:target.href,ownerId,editKey:options.editKey,projectHash,...(workspace?{workspace:true}:{})};
+  const deadline=Date.now()+timeoutForWorkspace(options);
+  let peer=await directory.find(query);
+  while(workspace&&!peer&&!cancelled&&Date.now()<deadline){await new Promise(resolve=>setTimeout(resolve,250));peer=await directory.find(query);}
+  if(workspace&&!peer)throw Error('編集画面の準備を確認できませんでした。対象の図をもう一度開くと、同じタブ内で再接続します。');
+  return peer;
+ }).then(peer=>{
+  if(cancelled)return;
+  real=openSourceSession({...record.options,windowRef,directoryPeer:peer,directory});
+  if(openings.get(key)===record)openings.delete(key);
+  return real.ready.then(settle);
+ }).catch(error=>{if(!cancelled){options.onStatus?.({state:'error',message:error.message});settle({connected:false,reason:'connection-failed'});}if(openings.get(key)===record)openings.delete(key);});
+ return facade;
+}
+function timeoutForWorkspace(options){return options.timeoutMs??30000;}
 
 export function downloadBlob(blob, name, documentRef = document) {
   const url = URL.createObjectURL(blob);
@@ -29,8 +81,8 @@ export function isBridgeMessage(event, context) {
  * onStatus receives {state,message,downloadProject}; ready always resolves.
  * url is an optional adapter-enabled copy of the source app (for development).
  */
-export function openSource({app, project, sourceName, panelId, editKey, imageId, onResult = () => {}, onStatus = () => {},
-  url, timeoutMs = 20000, windowRef = window}) {
+function openSourceSession({app, project, sourceName, panelId, editKey, imageId, onResult = () => {}, onStatus = () => {},
+  url, timeoutMs = 20000, loadTimeoutMs=210000, windowRef = window,directoryPeer,directory,forceNew=false}) {
   const spec = SOURCE_APPS[app];
   if (!spec) throw new Error('連携先が不明です。');
   if (!(project instanceof Blob) || !project.size || project.size > MAX_PROJECT) throw new Error('有効な元プロジェクトを添付してください（320 MB以内）。');
@@ -45,11 +97,15 @@ export function openSource({app, project, sourceName, panelId, editKey, imageId,
   let pool=editorPools.get(windowRef);if(!pool){pool=new Map();editorPools.set(windowRef,pool);}
   const args={project,panelId,editKey:String(editKey??panelId),imageId,sourceName,onResult,onStatus};
   const existing=pool.get(poolKey);
-  if(existing&&!existing.window.closed)return existing.open(args);
+  if(existing&&!existing.window.closed&&!forceNew)return existing.open(args);
   existing?.close();
   const nonce = crypto.randomUUID();
-  target.hash = new URLSearchParams({figureBridge:nonce, figureOrigin:origin}).toString();
-  const popup = windowRef.open(target.href, `figure-editor-${nonce}`);
+  const ownerId=studioOwnerId(windowRef);
+  target.hash = new URLSearchParams({figureBridge:nonce, figureOrigin:origin,figureOwner:ownerId}).toString();
+  let connection=null;
+  if(directoryPeer)connection=directory.connect(directoryPeer,{ownerId,nonce,onMessage:event=>receive(event),onLost:()=>{status(pending||current,'error','編集画面への接続が切れました。対象の図をもう一度開いて再接続してください。');close();}});
+  const workspace=getFigureWorkspace(windowRef);
+  const popup = connection?.window||(workspace?.openEditor?workspace.openEditor(app,{url:target.href,nonce,origin,ownerId}):windowRef.open(target.href, `figure-editor-${nonce}`));
   const safeName=value=>String(value||`source${spec.extension}`).replace(/[\\/]/g,'_');
   if (!popup) {
     const downloadProject=()=>downloadBlob(project,safeName(sourceName),windowRef.document);
@@ -61,18 +117,22 @@ export function openSource({app, project, sourceName, panelId, editKey, imageId,
   const retiredHosts=new Set();
   function request(options){
     let settle;const ready=new Promise(resolve=>{settle=resolve;});
-    return {...options,sourceName:safeName(options.sourceName),requestId:crypto.randomUUID(),ready,settle,loaded:false,latestRevision:0,applyingRevision:0};
+    return {...options,sourceName:safeName(options.sourceName),requestId:crypto.randomUUID(),ready,settle,loaded:false,latestRevision:0,applyingRevision:0,lastLoadAt:0,deadline:0,timedOut:false};
   }
   function downloadFor(r){return()=>downloadBlob(r.project,r.sourceName,windowRef.document);}
-  function status(r,state,message){r?.onStatus({state,message,downloadProject:downloadFor(r)});}
-  const send=(type,r,extra={})=>{if(!disposed&&!popup.closed)popup.postMessage({protocol:BRIDGE_PROTOCOL,nonce,app,hostId:activeHost,type,panelId:r?.panelId,requestId:r?.requestId,...extra},target.origin);};
+  function status(r,state,message){r?.onStatus({state,message,downloadProject:downloadFor(r),openInNewTab:workspace?undefined:()=>openSource({app,project:r.project,sourceName:r.sourceName,panelId:r.panelId,editKey:r.editKey,imageId:r.imageId,onResult:r.onResult,onStatus:r.onStatus,url,windowRef,forceNew:true})});}
+  const send=(type,r,extra={})=>{if(!disposed&&!popup.closed)try{popup.postMessage({protocol:BRIDGE_PROTOCOL,nonce,app,hostId:activeHost,type,panelId:r?.panelId,requestId:r?.requestId,...extra},target.origin);}catch{/* Discovery claims and reattachment can briefly be in flight. */}};
   function load(r,reconnect=false){
-    r.loaded=false;r.latestRevision=0;r.applyingRevision=0;pending=r;
-    send('load',r,{project:r.project,sourceName:r.sourceName,editKey:r.editKey,reconnect,capabilities:['batch-v1'],...(r.imageId?{imageId:r.imageId}:{})});
+    r.loaded=false;r.latestRevision=0;r.applyingRevision=0;pending=r;r.reconnect=reconnect;r.deadline=Date.now()+loadTimeoutMs;r.timedOut=false;
+    sendLoad(r);
     status(r,'loading',reconnect?'編集画面へ再接続しています…':'元プロジェクトを編集画面へ読み込んでいます…');
   }
+  function sendLoad(r){
+    r.lastLoadAt=Date.now();
+    send('load',r,{project:r.project,sourceName:r.sourceName,editKey:r.editKey,reconnect:!!r.reconnect,capabilities:['batch-v1'],...(r.imageId?{imageId:r.imageId}:{})});
+  }
   function facade(r){return {window:popup,close,ready:r.ready,downloadProject:downloadFor(r)};}
-  function focus(){try{popup.focus?.();}catch{}}
+  function focus(){try{workspace?.show(app);popup.focus?.();}catch{}}
   function open(options){
     focus();
     const same=(pending?[pending]:[current]).find(r=>r&&r.panelId===options.panelId&&r.editKey===options.editKey);
@@ -81,7 +141,7 @@ export function openSource({app, project, sourceName, panelId, editKey, imageId,
       if(options.imageId)same.imageId=options.imageId;
       if(same.loaded&&!pending&&!same.applyingRevision&&same.imageId)send('select-image',same,{imageId:same.imageId});
       if(same.loaded)status(same,'ready','開いている編集画面に戻りました。続けて編集できます。');
-      else status(same,'loading','編集画面で元プロジェクトを読み込んでいます…');
+      else {if(initialized){same.deadline=Date.now()+loadTimeoutMs;same.timedOut=false;sendLoad(same);}else send('ping',same);status(same,'loading','編集画面で元プロジェクトを読み込んでいます…');}
       return facade(same);
     }
     const r=request(options);
@@ -99,6 +159,11 @@ export function openSource({app, project, sourceName, panelId, editKey, imageId,
   }, timeoutMs);
   const interval = setInterval(() => {
     if (popup.closed) {status(pending||current,'closed','編集画面を閉じました。'); close();}
+    else if(pending&&initialized&&!pending.loaded){
+      if(Date.now()>pending.deadline&&!pending.timedOut){pending.timedOut=true;status(pending,'error','元プロジェクトの読み込みを確認できません。対象の図をもう一度開くと、同じタブで再試行します。');pending.settle({connected:false,reason:'load-timeout'});}
+      if(!pending.timedOut&&Date.now()-pending.lastLoadAt>2000)send('ping',pending);
+      if(!pending.timedOut&&Date.now()-pending.lastLoadAt>5000)sendLoad(pending);
+    }else if(!initialized)send('ping',pending);
   }, 1200);
 
   async function receive(event) {
@@ -165,12 +230,14 @@ export function openSource({app, project, sourceName, panelId, editKey, imageId,
   function close() {
     if (disposed) return;
     disposed = true; clearTimeout(timeout); clearInterval(interval);
+    connection?.close();
     windowRef.removeEventListener('message',receive);
     pending?.settle({connected:false,reason:'closed'});current?.settle({connected:false,reason:'closed'});
     if(pool.get(poolKey)===controller)pool.delete(poolKey);
   }
   const controller={window:popup,open,close};pool.set(poolKey,controller);
   windowRef.addEventListener('message',receive);
+  connection?.ready.then(()=>{focus();send('ping',pending);}).catch(error=>{if(!disposed){status(pending||current,'error',error.message||'編集画面に接続できませんでした。対象の図をもう一度開いてください。');close();}});
   status(pending,'opening',`${spec.name} を開いています…`);
   return facade(pending);
 }

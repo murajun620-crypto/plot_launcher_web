@@ -78,3 +78,10 @@
 .preview-quality-control{display:flex;align-items:center;gap:6px;white-space:nowrap;font-size:10px;color:var(--muted);margin-right:8px}.preview-quality-control select{height:27px;padding:3px 5px;font-size:11px;background:white}.canvas-footer #statusText{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.canvas-footer .zoom-controls{flex-shrink:0}
 /* Keep browser focus scrolling inside the inspector/sidebar, not the whole editor. */
 html{height:100%;overflow:clip}.app-shell{position:fixed;inset:0}
+.project-save-controls{display:inline-flex;align-items:center;gap:0}
+.project-save-controls>[data-action="save"]{border-top-right-radius:0;border-bottom-right-radius:0}
+.project-save-dropdown>summary{padding-left:6px;padding-right:6px;border-left:0;border-top-left-radius:0;border-bottom-left-radius:0}
+#projectSaveTarget{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:0}
+html[data-workspace-embedded="true"] .app-header>.brand{display:none}
+html[data-workspace-embedded="true"] .app-header{height:53px;gap:12px}
+html[data-workspace-embedded="true"] .document-title{border-left:0;padding-left:0}

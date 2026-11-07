@@ -134,7 +134,7 @@ export function setupTransferReceiver({onImport,onStatus=()=>{},windowRef=window
   }};
 }
 
-/** send() must be invoked directly from a user click. It opens a fallback tab before its first await. */
+/** Standalone send() opens a fallback tab before its first await; workspace sends stay in their own shell. */
 export function createDirectSender({app,captureResult,captureBatchResult,onAccepted,studioUrl,onStatus=()=>{},windowRef=window,channelFactory,ackTimeoutMs=30000}={}) {
   if(!APPS.has(app)||typeof captureResult!=='function')throw new Error('送信元アプリの設定が正しくありません。');
   const local=['localhost','127.0.0.1','[::1]'].includes(new URL(windowRef.location.href).hostname);
@@ -144,7 +144,10 @@ export function createDirectSender({app,captureResult,captureBatchResult,onAccep
   let pending=null,busy=false,disposed=false;
   const status=(state,message)=>onStatus({state,message});
   const broadcast=(type,extra={})=>channel?.postMessage({protocol:TRANSFER_PROTOCOL,type,senderId,...extra});
-  const findPeer=()=>[...peers.values()].filter(p=>Date.now()-p.seen<12000).sort((a,b)=>b.lastActive-a.lastActive)[0];
+  const findPeer=(workspaceOnly=false)=>{
+    let ownId=null;if(workspaceOnly)try{ownId=getFigureWorkspace(windowRef)?.studioReceiverId;}catch{}
+    return [...peers.values()].filter(p=>Date.now()-p.seen<12000&&(!workspaceOnly||p.receiverId===ownId)).sort((a,b)=>b.lastActive-a.lastActive)[0];
+  };
   const sendPopup=(record,type,extra={})=>record.popup?.postMessage({protocol:TRANSFER_PROTOCOL,type,app,transferId:record.transferId,nonce:record.nonce,...extra},target.origin);
   async function acknowledge(record,m) {
     if(record!==pending||record.acknowledging||m.transferId!==record.transferId||m.nonce!==record.nonce)return;
@@ -161,6 +164,7 @@ export function createDirectSender({app,captureResult,captureBatchResult,onAccep
   }
   function deliver(record) {
     if(record!==pending||!record.payload||record.delivered)return;
+    if(record.workspace){record.peer=findPeer(true);if(!record.peer)return;}
     if(record.batch&&(record.popup?record.receiverReady&&!record.receiverBatch:!record.peer?.batch)){rejectUnsupported(record);return;}
     if(record.popup){if(!record.receiverReady)return;sendPopup(record,'deliver',{payload:record.payload});}
     else broadcast('deliver',{to:record.peer.receiverId,nonce:record.nonce,payload:record.payload});
@@ -179,7 +183,10 @@ export function createDirectSender({app,captureResult,captureBatchResult,onAccep
   }
   function channelMessage(event) {
     const m=event.data;if(disposed||m?.protocol!==TRANSFER_PROTOCOL)return;
-    if(m.type==='presence'&&identifier(m.receiverId)&&Number.isFinite(m.lastActive)){peers.set(m.receiverId,{receiverId:m.receiverId,lastActive:m.lastActive,seen:Date.now(),batch:hasBatch(m)});}
+    if(m.type==='presence'&&identifier(m.receiverId)&&Number.isFinite(m.lastActive)){
+      peers.set(m.receiverId,{receiverId:m.receiverId,lastActive:m.lastActive,seen:Date.now(),batch:hasBatch(m)});
+      if(busy&&pending?.workspace&&!pending.delivered){pending.peer=findPeer(true);deliver(pending);}
+    }
     else if(m.type==='gone')peers.delete(m.receiverId);
     else if(m.type==='ack'&&m.to===senderId&&pending&&!pending.popup&&m.receiverId===pending.peer?.receiverId)acknowledge(pending,m);
   }
@@ -195,12 +202,12 @@ export function createDirectSender({app,captureResult,captureBatchResult,onAccep
     if(disposed)return Promise.reject(new Error('送信機能は終了しています。'));
     if(busy)return pending?.promise || Promise.resolve({ok:false});
     if(!pending&&batch&&(app!=='mifito'||typeof captureBatchResult!=='function'))return Promise.reject(new Error('一括送信には対応していません。'));
-    const record=pending || {transferId:crypto.randomUUID(),nonce:crypto.randomUUID(),payload:null,batch:!!batch};
+    const record=pending || {transferId:crypto.randomUUID(),nonce:crypto.randomUUID(),payload:null,batch:!!batch,workspace:!!getFigureWorkspace(windowRef)};
     const previousPopup=record.popup&&!record.popup.closed?record.popup:null,previousReady=record.receiverReady,previousBatch=record.receiverBatch;
-    clearTimeout(record.timer);record.timer=null;record.delivered=false;record.receiverReady=false;record.receiverBatch=false;record.peer=target.origin===windowRef.location.origin?findPeer():null;record.popup=null;
+    clearTimeout(record.timer);record.timer=null;record.delivered=false;record.receiverReady=false;record.receiverBatch=false;record.peer=target.origin===windowRef.location.origin?findPeer(record.workspace):null;record.popup=null;
     pending=record;busy=true;
     // Do not await data generation or discovery before opening a new tab.
-    if(!record.peer){
+    if(!record.peer&&!record.workspace){
       if(previousPopup){record.popup=previousPopup;record.receiverReady=previousReady;record.receiverBatch=previousBatch;previousPopup.focus?.();}
       else {
         const url=new URL(target.href),hash=new URLSearchParams(url.hash.slice(1));
@@ -209,6 +216,7 @@ export function createDirectSender({app,captureResult,captureBatchResult,onAccep
       }
       if(!record.popup){busy=false;status('error','Figure Studioを開けませんでした。ポップアップを許可して再試行してください。');return Promise.reject(new Error('Figure Studioを開けませんでした。'));}
     }
+    if(record.workspace&&!record.peer)broadcast('discover');
     record.promise=new Promise((resolve,reject)=>{record.resolve=resolve;record.reject=reject;});
     status('preparing','図と元プロジェクトを準備しています…');
     Promise.resolve().then(async()=>{
@@ -216,9 +224,9 @@ export function createDirectSender({app,captureResult,captureBatchResult,onAccep
       if(!record.payload){const result=await(record.batch?captureBatchResult():captureResult()),wire=transferResult(app,result,result.sourceName || (app==='plot'?'figure.plotproject':'figure.mifito'));if(!!wire.batch!==record.batch)throw Error('編集結果の一括反映形式を確認してください。');record.payload=validateTransferPayload({app,...wire,transferId:record.transferId});record.captured=result;}
       if(record===pending){
         deliver(record);
-        if(record.popup&&!record.receiverReady){
+        if(record.workspace&&!record.delivered||record.popup&&!record.receiverReady){
           status('waiting','Figure Studioの準備を待っています…');
-          record.timer=setTimeout(()=>{if(record===pending&&!record.receiverReady){busy=false;record.reject(new Error('Figure Studioの準備が完了しませんでした。再試行してください。'));status('retry','Figure Studioの準備が完了しませんでした。再試行してください。');}},ackTimeoutMs);
+          record.timer=setTimeout(()=>{if(record===pending&&!record.delivered){busy=false;record.reject(new Error('Figure Studioの準備が完了しませんでした。再試行してください。'));status('retry','Figure Studioの準備が完了しませんでした。再試行してください。');}},ackTimeoutMs);
         }
       }
     }).catch(error=>{if(record===pending){busy=false;status('error',error.message);record.reject(error);}});
@@ -227,9 +235,27 @@ export function createDirectSender({app,captureResult,captureBatchResult,onAccep
   return {send,get busy(){return busy;},close(){disposed=true;clearInterval(discovery);clearTimeout(pending?.timer);unsubscribe(channel,channelMessage);channel?.close();windowRef.removeEventListener('message',popupMessage);pending?.reject?.(new Error('送信を終了しました。'));pending=null;}};
 }
 
-/** Header button for normal editor visits. Bridge editing retains its existing return button. */
+/** Only the same-origin workspace shell may route between its embedded apps. */
+export function getFigureWorkspace(windowRef=window){
+  try{
+    if(new URLSearchParams(windowRef.location.search||'').get('figureWorkspace')!=='1')return null;
+    const parent=windowRef.parent,origin=windowRef.location.origin;
+    if(!parent||parent===windowRef||parent.location.origin!==origin)return null;
+    const api=parent.FigureStudioWorkspace,studio=api?.studioWindow;
+    return typeof api?.show==='function'&&typeof studio?.postMessage==='function'&&studio.location.origin===origin?api:null;
+  }catch{return null;}
+}
+export const figureWorkspaceAPI=getFigureWorkspace;
+
+export function showFigureWorkspaceStudio(windowRef=window){
+  const api=figureWorkspaceAPI(windowRef);if(!api)return;
+  try{const shown=api.show('studio');shown?.catch?.(()=>{});}catch{/* The edit has already been accepted; navigation is best effort. */}
+}
+
+/** Workspace visits get send actions; standalone editors retain their full editor UI. */
 export function setupDirectSendButton({app,captureResult,captureBatchResult,onAccepted,container,studioUrl,isReady=()=>true,documentRef=document,windowRef=window}={}) {
   if(new URLSearchParams(windowRef.location.hash.slice(1)).has('figureBridge'))return null;
+  if(new URLSearchParams(windowRef.location.search||'').get('figureWorkspace')!=='1'&&!figureWorkspaceAPI(windowRef))return null;
   const host=typeof container==='string'?documentRef.querySelector(container):container;
   if(!host)return null;
   const group=documentRef.createElement('div');group.style.cssText='display:inline-flex;align-items:center;gap:6px;position:relative';
@@ -238,16 +264,17 @@ export function setupDirectSendButton({app,captureResult,captureBatchResult,onAc
   if(batchButton){batchButton.id='send-all-to-figure-studio';batchButton.type='button';batchButton.className='button primary';batchButton.textContent='まとめてStudioへ送る';batchButton.title='変更した画像をまとめて反映し、未追加の画像を追加します。変更のない画像はそのまま残します。';}
   const message=documentRef.createElement('span');message.setAttribute('role','status');message.style.cssText='display:none;position:absolute;right:0;top:calc(100% + 8px);width:280px;z-index:10000;padding:10px 12px;background:#fff;color:#173c38;border:1px solid #b8cfcb;border-radius:8px;box-shadow:0 5px 18px #173c3825;font:12px/1.5 system-ui;';
   group.append(button);if(batchButton)group.append(batchButton);group.append(message);host.append(group);
-  let hideTimer;
+  let hideTimer,bridgeConnected=false;
   const sender=createDirectSender({app,captureResult,captureBatchResult,onAccepted,studioUrl,windowRef,onStatus:({state,message:text})=>{
     clearTimeout(hideTimer);message.textContent=text;message.style.display='block';
-    button.disabled=['preparing','waiting','sending'].includes(state)||!isReady();
+    button.disabled=bridgeConnected||['preparing','waiting','sending'].includes(state)||!isReady();
     if(batchButton)batchButton.disabled=button.disabled;
     button.textContent=state==='retry'?'送信を再試行':state==='preparing'?'図を準備中…':'Figure Studioへ送る';
-    if(state==='sent')hideTimer=setTimeout(()=>{message.style.display='none';},7000);
+    if(state==='sent'){hideTimer=setTimeout(()=>{message.style.display='none';},7000);showFigureWorkspaceStudio(windowRef);}
   }});
-  const sync=()=>{button.disabled=sender.busy||!isReady();if(batchButton)batchButton.disabled=button.disabled;};
-  button.addEventListener('click',()=>{if(isReady())sender.send().catch(()=>{});});sync();
-  batchButton?.addEventListener('click',()=>{if(isReady())sender.send({batch:true}).catch(()=>{});});
-  return {button,batchButton,sender,sync,close(){clearTimeout(hideTimer);sender.close();group.remove();}};
+  const sync=()=>{button.disabled=bridgeConnected||sender.busy||!isReady();if(batchButton)batchButton.disabled=button.disabled;};
+  const setBridgeConnected=connected=>{bridgeConnected=!!connected;group.style.display=bridgeConnected?'none':'inline-flex';if(bridgeConnected){clearTimeout(hideTimer);message.style.display='none';}sync();};
+  button.addEventListener('click',()=>{if(!bridgeConnected&&isReady())sender.send().catch(()=>{});});sync();
+  batchButton?.addEventListener('click',()=>{if(!bridgeConnected&&isReady())sender.send({batch:true}).catch(()=>{});});
+  return {button,batchButton,sender,sync,setBridgeConnected,close(){clearTimeout(hideTimer);sender.close();group.remove();}};
 }

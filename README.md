@@ -1,5 +1,21 @@
 # PlotLauncher Web
 
+## Studio・MiFiToと一つの画面で編集（v2.4.20）
+
+[Figure Studio統合画面](https://murajun620-crypto.github.io/plot_launcher_web/figure-studio/)のPlotLauncherタブでグラフを編集し、トップバーの「Figure Studioへ送る」で図と元プロジェクトを反映します。受信完了後はStudioタブへ自動で戻ります。Studioの図をダブルクリックすればPlotLauncherへ戻って編集でき、一度開いた画面はタブ切替で再読み込みしません。
+
+[PlotLauncher単独](https://murajun620-crypto.github.io/plot_launcher_web/)も引き続き使えます。単独起動時はStudio送信ボタンを表示しません。統合画面は同じHTML・JavaScript・描画エンジンを読み込み、別実装のコピーを持ちません。[Studio単独](https://murajun620-crypto.github.io/plot_launcher_web/figure-studio/studio.html)からの編集では、既存の接続可能な編集タブも再利用します。
+
+対応版はFigure Studio v0.4.0・PlotLauncher v2.4.20・MiFiTo v1.9.4です。Studioのプロジェクト保存はMiFiToと同様に、初回はフォルダー・ファイル名を選択し、以後は上書き保存します。保存メニューから「名前を付けて保存」も選べます。
+
+以下は過去の更新履歴です。現在のStudio連携は上記の統合画面を利用してください。
+
+## 開いているタブでFigure Studioの編集を続ける（v2.4.19）
+
+Figure Studioの図をダブルクリックすると、同じ配信元の通常起動タブも再利用します。Studioへの送信が完了した同じプロジェクトなら、送信後の編集を保持して接続し、描画エンジンを起動し直しません。Studioを再読み込みした後も再接続でき、通信の再試行で同じプロジェクトを何度も開き直しません。
+
+別の内容や未反映の編集がある場合は置き換えを止めます。元の編集を残して進める場合は、Studioの「新しい編集タブで開く」を選んでください。通常時はトップバーの送信ボタンを使い、接続・送信結果や対応が必要な場合だけ案内を表示します。Figure Studio v0.3.6・PlotLauncher v2.4.19・MiFiTo v1.9.3へそれぞれ更新してください。
+
 ## Figure Studioへの送信をトップバーに統一（v2.4.18）
 
 通常起動でもFigure Studioの図から開いた場合でも、トップバーの「Figure Studioへ送る」を使えます。通常起動では現在のグラフと元プロジェクトをStudioへ追加し、Studioから開いた編集画面では関連付けた元の図を更新します。配置とグラフの倍率を保ったまま、修正した画像・元プロジェクトを反映します。

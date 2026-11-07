@@ -1,10 +1,10 @@
 import {PT_PER_MM,mm,toMM,uid,clone,newDocument,makeObject,bounds,objectBounds,expandSelection,align,distribute,reorder,autoLayout,History,validateDocument} from './model.mjs';
 import {imageAsset,imagePhysicalSize,imageMiFiToBodySize,blobToDataURL,dataURLToBlob,download,sanitizeSVG} from './assets.mjs?v=0.3.5-1';
 import {importedImageSize,replacedImageSize,replacedMiFiToImageSize,imageInsertionPoint} from './image-placement.mjs?v=0.3.5-1';
-import {saveDraft,loadDraft} from './storage.mjs';
+import {saveDraft,loadDraft,saveProjectFileTarget,loadProjectFileTarget} from './storage.mjs?v=0.3.6-1';
 import {createDemo} from './demo.mjs';
 import {createShortcutHandler} from './shortcuts.mjs';
-import {openSource,SOURCE_APPS} from './integration/bridge-client.mjs?v=0.3.4-1';
+import {openSource,SOURCE_APPS,setupSourceDiscovery} from './integration/bridge-client.mjs?v=0.3.6-1';
 import {createFigureSidebar} from './thumbnails.mjs?v=0.3.0-1';
 import {setupTransferReceiver} from './integration/direct-transfer.mjs?v=batch-v034-1';
 import {readMifitoIdentity} from './integration/mifito-sync.mjs?v=0.3.5-1';
@@ -18,12 +18,17 @@ import {createPreviewQuality} from './preview-quality.mjs?v=0.3.0-1';
 import {reorderFigures} from './figure-order.mjs';
 import {renumberFigureNames} from './figure-names.mjs?v=0.3.3-1';
 import {deleteFigures,duplicateFigures} from './figure-commands.mjs';
+import {ProjectFileSession,projectFilePickerOptions} from './project-file.mjs';
 
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+setupSourceDiscovery();
 const ns='http://www.w3.org/2000/svg';
 const el=(tag,attrs={},text)=>{const n=document.createElementNS(ns,tag);for(const[k,v]of Object.entries(attrs))if(v!==undefined)n.setAttribute(k,v);if(text!==undefined)n.textContent=text;return n;};
 let doc=newDocument(),assets=new Map(),selection=[],tool='select',scale=1.5,history=new History(),gesture=null,textBefore=null,editingId=null,dirty=false,saveTimer,revision=0,clipboard=null,formatClipboard=null,frame=0,spaceDown=false,manualSavedRevision=-1,bridge=null;
 let figures=[doc],bookId=uid(),initialDemo=false,transferQueue=Promise.resolve(),updateReloading=false;
+let projectSaving=false,projectOpening=false;
+const projectFiles=new ProjectFileSession({host:window,fallback:(blob,name)=>download(blob,name)});
+if(new URLSearchParams(location.search).get('figureWorkspace')==='1')document.documentElement.dataset.workspaceEmbedded='true';
 function syncFigure(){const i=figures.findIndex(f=>f.id===doc.id);if(i>=0)figures[i]=doc;else figures.push(doc);}
 function snapshot(){syncFigure();return clone({format:'figure-studio-book',version:1,id:bookId,activeId:doc.id,figures});}
 function restoreBook(state){figures=clone(state.figures);bookId=state.id;doc=figures.find(f=>f.id===state.activeId)||figures[0];selection=[];}
@@ -82,7 +87,7 @@ function render(){
  const ids=new Set(doc.objects.map(o=>o.id));for(const[id,n]of nodes)if(!ids.has(id)){n.remove();nodes.delete(id);}for(const o of doc.objects){let g=nodes.get(o.id);if(!g){g=el('g');nodes.set(o.id,g);}drawContent(o,g);objects.append(g);}selection=selection.filter(id=>ids.has(id));
  setScale(scale);renderInspector();renderLayers();updateToolbar();document.title=`${doc.name} · Figure Studio`;
 }
-function updateToolbar(){for(const b of $$('[data-tool]')){b.classList.toggle('active',b.dataset.tool===tool);b.setAttribute('aria-pressed',String(b.dataset.tool===tool));}const undo=$('[data-action="undo"]'),redo=$('[data-action="redo"]');if(undo)undo.disabled=!history.past.length;if(redo)redo.disabled=!history.future.length;}
+function updateToolbar(){for(const b of $$('[data-tool]')){b.classList.toggle('active',b.dataset.tool===tool);b.setAttribute('aria-pressed',String(b.dataset.tool===tool));}const undo=$('[data-action="undo"]'),redo=$('[data-action="redo"]');if(undo)undo.disabled=!history.past.length;if(redo)redo.disabled=!history.future.length;updateProjectFileUI();}
 function renderFast(){for(const o of editable()){const g=nodes.get(o.id);if(!g)continue;if(gesture?.kind==='resize'||gesture?.kind==='endpoint')drawContent(o,g);else g.setAttribute('transform',transform(o));}renderOverlay();}
 function queueFast(){if(!frame)frame=requestAnimationFrame(()=>{frame=0;renderFast();});}
 function renderOverlay(){overlays.replaceChildren();const all=selected(),b=bounds(all);if(!b)return;const ink='#0c888d',u=1/scale;
@@ -201,7 +206,7 @@ function execute(action,payload={}){
  if(action==='toggle-arrow-start'||action==='toggle-arrow-end')return change(()=>editable().filter(o=>['line','arrow'].includes(o.type)).forEach(o=>{const end=action==='toggle-arrow-start'?'start':'end';setArrowProperty(o,end==='start'?'arrowStartStyle':'arrowEndStyle',arrowEndpoint(o,end).style==='none'?'triangle':'none');}));
  if(action==='labels')return addLabels();
  if(action==='fit')return fit();if(action==='help')return $('#helpDialog').showModal();
- if(action==='import')return $('#imageInput').click();if(action==='open')return $('#projectInput').click();if(action==='save')return saveProject();
+ if(action==='import')return $('#imageInput').click();if(action==='open')return openProject();if(action==='save'||action==='save-as')return saveProject(action==='save-as');
  if(action==='next-figure'||action==='previous-figure'){syncFigure();const index=figures.findIndex(f=>f.id===doc.id);switchFigure(figures[(index+(action==='next-figure'?1:-1)+figures.length)%figures.length].id);return;}
  if(action==='new-figure'){
   if(figures.length>=100){toast('1プロジェクトのFigureは100枚までです');return;}finishText();const before=snapshot();const insertionIndex=figures.findIndex(f=>f.id===doc.id)+1,next=newDocument();next.name='Fig. '+(figures.length+1);figures.splice(insertionIndex,0,next);doc=next;selection=[];record(before);figureSidebar.select([doc.id],doc.id);fit();return;
@@ -220,7 +225,7 @@ function execute(action,payload={}){
 }
 const shortcut=createShortcutHandler({execute,isEditing:e=>e.target===editor?'canvas-text':e.target.isContentEditable||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName),isCanvasActive:()=>!document.querySelector('dialog[open]')&&(document.activeElement===svg||document.activeElement===document.body||document.activeElement===editor||!!document.activeElement?.closest('#figureTabs')),onHint:text=>{$('#keyHint').textContent=text;$('#keyHint').hidden=!text;}});
 window.addEventListener('keydown',shortcut);document.addEventListener('pointerdown',()=>shortcut.reset());
-document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b||b.disabled)return;const action=b.dataset.action;execute(action);for(const d of $$('details[open]'))d.open=false;if(['new-figure','duplicate-figure','delete-figure','move-figure-left','move-figure-right'].includes(action)){focusFigure();return;}if(!['help','open','import','save','attach-source','edit-source','export-pdf'].includes(action)&&!editingId)svg.focus({preventScroll:true});});
+document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b||b.disabled)return;const action=b.dataset.action;execute(action);for(const d of $$('details[open]'))d.open=false;if(['new-figure','duplicate-figure','delete-figure','move-figure-left','move-figure-right'].includes(action)){focusFigure();return;}if(!['help','open','import','save','save-as','attach-source','edit-source','export-pdf'].includes(action)&&!editingId)svg.focus({preventScroll:true});});
 for(const b of $$('[data-action="bold"],[data-action="italic"],[data-action="underline"]'))b.addEventListener('pointerdown',e=>{if(editingId)e.preventDefault();});
 $('#docName').addEventListener('input',e=>{const name=e.target.value||'Untitled Figure';change(()=>doc.name=name);});
 for(const [id,key]of [['pageWidth','width'],['pageHeight','height']])$('#'+id).addEventListener('change',e=>{const v=Number(e.target.value);if(v>=10&&v<=2000){change(()=>doc[key]=mm(v));fit();}else{toast('用紙サイズは10〜2000 mmです');renderInspector();}});
@@ -260,7 +265,7 @@ async function importDirectFigure(payload){
 }
 $('#imageInput').addEventListener('change',async e=>{await importImages([...e.target.files]);e.target.value='';});
 viewport.addEventListener('dragover',e=>{e.preventDefault();viewport.classList.add('drag-over');});viewport.addEventListener('dragleave',()=>viewport.classList.remove('drag-over'));
-viewport.addEventListener('drop',async e=>{e.preventDefault();viewport.classList.remove('drag-over');const files=[...e.dataTransfer.files];if(files.length===1&&/\.(figurestudio|json)$/i.test(files[0].name))await readProject(files[0]);else await importImages(files,svgPoint(e));});
+viewport.addEventListener('drop',async e=>{e.preventDefault();viewport.classList.remove('drag-over');const files=[...e.dataTransfer.files];if(files.length===1&&/\.(figurestudio|json)$/i.test(files[0].name)){if(projectSaving||projectOpening||updateReloading)return;projectOpening=true;updateProjectFileUI();try{await readProject(files[0]);}finally{projectOpening=false;updateProjectFileUI();}}else await importImages(files,svgPoint(e));});
 function clipboardActive(e){return !editingId&&!e.target.isContentEditable&&!/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)&&!document.querySelector('dialog[open]')&&(document.activeElement===svg||document.activeElement===document.body);}
 document.addEventListener('copy',e=>{if(!clipboardActive(e)||!selection.length)return;clipboard=clone(selected());e.clipboardData.setData('application/x-figure-studio',JSON.stringify(clipboard));e.clipboardData.setData('text/plain','Figure Studio objects');e.preventDefault();toast('コピーしました');});
 document.addEventListener('cut',e=>{if(!clipboardActive(e)||!selection.length)return;clipboard=clone(selected());e.clipboardData.setData('application/x-figure-studio',JSON.stringify(clipboard));e.clipboardData.setData('text/plain','Figure Studio objects');e.preventDefault();execute('delete');});
@@ -268,9 +273,40 @@ document.addEventListener('paste',async e=>{if(!clipboardActive(e))return;const 
 
 function assetIds(){syncFigure();return new Set(figures.flatMap(f=>f.objects.flatMap(o=>[o.assetId,o.source?.assetId])).filter(Boolean));}
 function packageProject(){const used={};for(const id of assetIds()){const a=assets.get(id);if(a){const {previewUrl,persisted,...rest}=a;used[id]=rest;}}return {...snapshot(),assets:used};}
-async function saveProject(){finishText();try{const blob=new Blob([JSON.stringify(packageProject())],{type:'application/json'});if(blob.size>400*1024*1024)throw Error('400 MBを超えています。不要なFigureや画像を減らすか、元画像を縮小してください。');download(blob,`${safeName(figures[0].name)}${figures.length>1?`_and_${figures.length}_figures`:""}.figurestudio`);dirty=false;manualSavedRevision=revision;toast('配置・画像・元プロジェクトをまとめて保存しました');}catch(e){toast(`保存できませんでした: ${e.message}`);}svg.focus();}
-async function readProject(file){try{if(file.size>400*1024*1024)throw Error('プロジェクトは400 MB以内で開いてください。');const raw=JSON.parse(await file.text());const next=raw.format==='figure-studio-book'?validateBook(raw):{format:'figure-studio-book',version:1,id:uid(),activeId:raw.id,figures:[validateDocument(raw)]},loaded=new Map(),imageIds=new Set(next.figures.flatMap(f=>f.objects.filter(o=>o.type==='image').map(o=>o.assetId)));for(const[id,a]of Object.entries(raw.assets||{})){if(typeof a.dataUrl!=='string'||!a.dataUrl.startsWith('data:'))throw Error('素材データが不正です。');if(imageIds.has(id)){const restored=await imageAsset(dataURLToBlob(a.dataUrl),a.name);loaded.set(id,{...restored,id});}else loaded.set(id,{...a,id});}for(const o of next.figures.flatMap(f=>f.objects))if(o.assetId&&!loaded.has(o.assetId)||o.source?.assetId&&!loaded.has(o.source.assetId))throw Error('必要な素材がありません。');delete next.assets;next.figures.forEach(f=>delete f.assets);if(gesture)endGesture(null,true);finishText();if(dirty&&!confirm('現在のFigureを閉じて、選択したプロジェクトを開きますか？'))return;restoreBook(next);renumberFigureNames(figures);assets=loaded;previewQuality.clear();history.reset();selection=[];dirty=false;revision++;scheduleSave();render();fit();toast('プロジェクトを開きました');}catch(e){toast(`開けませんでした: ${e.message}`);}}
-$('#projectInput').addEventListener('change',async e=>{if(e.target.files[0])await readProject(e.target.files[0]);e.target.value='';});
+function updateProjectFileUI(){
+ const target=projectFiles.target(bookId),busy=projectSaving||projectOpening,button=$('[data-action="save"]');
+ button.disabled=busy;$('[data-action="save-as"]').disabled=busy;$('[data-action="open"]').disabled=busy;
+ $('#projectSaveLabel').textContent=projectSaving?'保存中…':target?.handle?'上書き保存':'保存';
+ button.title=target?.handle?`${target.name} に上書き保存 (Ctrl+S)`:'保存先を選んでプロジェクトを保存 (Ctrl+S)';
+ $('#projectSaveTarget').textContent=target?.name||'保存先を選択';
+ $('#projectSaveTarget').title=target?.name||'';
+}
+async function saveProject(saveAs=false){
+ if(projectSaving||projectOpening||updateReloading)return;
+ if(gesture)endGesture(null,false);finishText();
+ const capturedBook=bookId,capturedRevision=revision;
+ try{
+  const blob=new Blob([JSON.stringify(packageProject())],{type:'application/json'});
+  if(blob.size>400*1024*1024)throw Error('400 MBを超えています。不要なFigureや画像を減らすか、元画像を縮小してください。');
+  const name=`${safeName(figures[0].name)}${figures.length>1?`_and_${figures.length}_figures`:''}.figurestudio`;
+  projectSaving=true;updateProjectFileUI();
+  const saved=await projectFiles.save({bookId:capturedBook,revision:capturedRevision,blob,name,saveAs});
+  try{await saveProjectFileTarget(saved.bookId,{handle:saved.handle,name:saved.name});}catch{}
+  if(bookId===saved.bookId&&revision===saved.revision&&!editingId&&!gesture){dirty=false;manualSavedRevision=saved.revision;toast(`${saved.name} に配置・画像・元プロジェクトを保存しました`);}
+  else{if(bookId===saved.bookId)dirty=true;toast(`${saved.name} を保存しました。保存開始後の編集は次の保存で反映されます`);}
+ }catch(error){toast(error.name==='AbortError'?'保存をキャンセルしました':`保存できませんでした: ${error.message}`);}
+ finally{projectSaving=false;updateProjectFileUI();if(!editingId&&!gesture&&document.activeElement?.closest('#projectSaveControls'))svg.focus();}
+}
+async function openProject(){
+ if(projectSaving||projectOpening||updateReloading)return;
+ if(typeof window.showOpenFilePicker!=='function'){return $('#projectInput').click();}
+ projectOpening=true;updateProjectFileUI();
+ try{const [handle]=await window.showOpenFilePicker(projectFilePickerOptions({open:true,startIn:projectFiles.target(bookId)?.handle}));if(handle)await readProject(await handle.getFile(),handle);}
+ catch(error){if(error.name!=='AbortError')toast(`開けませんでした: ${error.message}`);}
+ finally{projectOpening=false;updateProjectFileUI();}
+}
+async function readProject(file,handle=null){try{if(file.size>400*1024*1024)throw Error('プロジェクトは400 MB以内で開いてください。');const raw=JSON.parse(await file.text());const next=raw.format==='figure-studio-book'?validateBook(raw):{format:'figure-studio-book',version:1,id:uid(),activeId:raw.id,figures:[validateDocument(raw)]},loaded=new Map(),imageIds=new Set(next.figures.flatMap(f=>f.objects.filter(o=>o.type==='image').map(o=>o.assetId)));for(const[id,a]of Object.entries(raw.assets||{})){if(typeof a.dataUrl!=='string'||!a.dataUrl.startsWith('data:'))throw Error('素材データが不正です。');if(imageIds.has(id)){const restored=await imageAsset(dataURLToBlob(a.dataUrl),a.name);loaded.set(id,{...restored,id});}else loaded.set(id,{...a,id});}for(const o of next.figures.flatMap(f=>f.objects))if(o.assetId&&!loaded.has(o.assetId)||o.source?.assetId&&!loaded.has(o.source.assetId))throw Error('必要な素材がありません。');delete next.assets;next.figures.forEach(f=>delete f.assets);if(gesture)endGesture(null,true);finishText();if(dirty&&!confirm('現在のFigureを閉じて、選択したプロジェクトを開きますか？'))return;restoreBook(next);renumberFigureNames(figures);assets=loaded;previewQuality.clear();history.reset();selection=[];dirty=false;revision++;manualSavedRevision=revision;projectFiles.opened(bookId,{handle,name:file.name});const openedBook=bookId;scheduleSave();render();fit();try{await saveProjectFileTarget(openedBook,{handle,name:file.name});}catch{}toast('プロジェクトを開きました');}catch(e){toast(`開けませんでした: ${e.message}`);}}
+$('#projectInput').addEventListener('change',async e=>{const file=e.target.files[0];e.target.value='';if(!file||projectSaving||projectOpening||updateReloading)return;projectOpening=true;updateProjectFileUI();try{await readProject(file);}finally{projectOpening=false;updateProjectFileUI();}});
 $('#sourceInput').addEventListener('change',async e=>{const f=e.target.files[0],o=selected()[0];e.target.value='';if(!f||!o)return;const documentId=doc.id,panelId=o.id;try{if(f.size>280*1024*1024)throw Error('元プロジェクトは280 MB以内です。');const app=/\.mifito$/i.test(f.name)?'mifito':'plot',a={id:uid(),name:f.name,mime:'application/octet-stream',dataUrl:await blobToDataURL(f)};if(doc.id!==documentId)return;const target=doc.objects.find(n=>n.id===panelId);if(!target)return;assets.set(a.id,a);change(()=>target.source={app,name:f.name,assetId:a.id});toast('元プロジェクトを関連付けました');}catch(error){toast(error.message);}});
 function sourceEditKey(book,figure,panel,sourceAsset){return [book,figure,panel,sourceAsset].join('/');}
 const mifitoIdentities=new Map();
@@ -369,7 +405,7 @@ function editSource(o){
  bridge=openSource({app,project:dataURLToBlob(asset.dataUrl),sourceName:o.source.name,panelId,imageId:o.source.imageId,
   editKey:sourceEditKey(editingBook,documentId,panelId,expectedSourceAsset),
   url:local?new URL(new URL(SOURCE_APPS[app].url).pathname,location.href).href:undefined,
-  onStatus:({state,message,downloadProject})=>{toast(message);if(state==='unavailable'){const box=$('#sourceSummary');box.textContent='編集元アプリを更新してください。';const b=document.createElement('button');b.type='button';b.textContent='元プロジェクトを保存';b.onclick=downloadProject;box.append(b);}},
+  onStatus:({state,message,downloadProject,openInNewTab})=>{toast(message);if(['unavailable','blocked','error'].includes(state)){const box=$('#sourceSummary');box.textContent=message;if(downloadProject){const b=document.createElement('button');b.type='button';b.textContent='元プロジェクトを保存';b.onclick=downloadProject;box.append(b);}if(openInNewTab){const b=document.createElement('button');b.type='button';b.textContent='新しい編集タブで開く';b.onclick=()=>{bridge=openInNewTab();};box.append(b);}}},
   onResult:async result=>{
    try{
     if(app==='mifito'&&(result.batch||result.image)){
@@ -398,13 +434,26 @@ function exportPDF(){const s=buildExport(),win=window.open('','figure-studio-pri
 
 svg.addEventListener('contextmenu',e=>{e.preventDefault();finishText();const id=e.target.closest('[data-id]')?.dataset.id;if(id&&!selection.includes(id))setSelection([id]);const menu=$('#contextMenu');menu.replaceChildren();for(const[label,action,key]of [['複製','duplicate','Ctrl+D'],['最前面へ','front','Alt → 3'],['最背面へ','back','Alt → 4'],['一段前へ','forward',''],['一段後ろへ','backward',''],['左揃え','align-left','Alt → 5 → L'],['グループ化','group','Ctrl+G'],['グループ解除','ungroup','Ctrl+Shift+G'],['固定 / 解除','lock',''],['元アプリで編集','edit-source',''],['削除','delete','Delete']]){const b=document.createElement('button');b.type='button';b.textContent=label;const k=document.createElement('kbd');k.textContent=key;b.append(k);b.onclick=()=>{menu.hidden=true;execute(action);svg.focus();};menu.append(b);}menu.hidden=false;menu.style.left=`${Math.min(e.clientX,innerWidth-250)}px`;menu.style.top=`${Math.min(e.clientY,innerHeight-450)}px`;});
 document.addEventListener('pointerdown',e=>{if(!e.target.closest('#contextMenu'))$('#contextMenu').hidden=true;for(const d of $$('details[open]'))if(!d.contains(e.target))d.open=false;});
-window.addEventListener('beforeunload',e=>{if(dirty||(editingId&&textBefore&&JSON.stringify(snapshot())!==JSON.stringify(textBefore))){e.preventDefault();e.returnValue='';}});
+window.addEventListener('beforeunload',e=>{if(projectSaving||dirty||(editingId&&textBefore&&JSON.stringify(snapshot())!==JSON.stringify(textBefore))){e.preventDefault();e.returnValue='';}});
 window.addEventListener('resize',()=>{if(!gesture)renderOverlay();});
 try{const restored=await loadDraft();if(restored){if(restored.doc.format==='figure-studio-book')restoreBook(validateBook(restored.doc));else{doc=validateDocument(restored.doc);figures=[doc];}assets=restored.assets;$('#saveStatus').textContent='ブラウザから復元';}else{const demo=createDemo();doc=demo.doc;figures=[doc];assets=demo.assets;initialDemo=true;$('#saveStatus').textContent='デモ · 模擬データ';}}catch{const demo=createDemo();doc=demo.doc;figures=[doc];assets=demo.assets;initialDemo=true;$('#saveStatus').textContent='自動保存を利用できません';}
+try{const target=await loadProjectFileTarget(bookId);if(target)projectFiles.opened(bookId,target);}catch{}
 renumberFigureNames(figures);render();fit();setTool('select');
-setupTransferReceiver({onImport:receiveDirectFigure,onStatus:({state,message})=>{if(state==='error')toast(message);}});
+const workspaceReceiver=setupTransferReceiver({onImport:receiveDirectFigure,onStatus:({state,message})=>{if(state==='error')toast(message);}});
+window.FigureStudioWorkspaceReceiverId=workspaceReceiver.receiverId;
 setupUpdateCheck({onStatus:toast,beforeReload:async()=>{
+ if(projectSaving||projectOpening)throw Error('プロジェクトの保存・読み込みが完了してから更新してください。');
  updateReloading=true;
  try{await transferQueue;if(gesture)endGesture(null,true);finishText();const rev=revision;clearTimeout(saveTimer);await saveDraft(snapshot(),assets);if(rev!==revision)throw Error('保存中に変更がありました。もう一度「更新する」を押してください。');dirty=false;return true;}
  catch(error){updateReloading=false;throw error;}
 }});
+window.FigureStudioWorkspaceSave=async()=>{
+ if(projectSaving||projectOpening)throw Error('プロジェクトの保存・読み込みが完了してから更新してください。');
+ await transferQueue;
+ if(projectSaving||projectOpening)throw Error('プロジェクトの保存・読み込みが完了してから更新してください。');
+ if(gesture)endGesture(null,false);finishText();syncFigure();
+ const saved={bookId,revision};clearTimeout(saveTimer);
+ await saveDraft(snapshot(),assets);
+ if(bookId!==saved.bookId||revision!==saved.revision||projectSaving||projectOpening||editingId||gesture)throw Error('保存中に変更がありました。もう一度「更新する」を押してください。');
+ return true;
+};

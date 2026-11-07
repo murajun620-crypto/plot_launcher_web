@@ -4,16 +4,32 @@ import {setupFigureBridge} from './bridge-host.mjs';
 
 const PROTOCOL='figure-studio-bridge-v1',nonce='12345678-1234-1234-1234-123456789012',origin='https://example.test';
 function deferred(){let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b});return {promise,resolve,reject};}
-function environment(options={}){
- const sent=[],listeners=new Set(),loads=[],accepted=[],elements=[];
- const parent={closed:false,postMessage(data,target){sent.push({data,target});}};
+function environment(options={},embedded=false){
+ const sent=[],listeners=new Set(),loads=[],accepted=[],elements=[],shown=[];
+ const parent={closed:false,location:{origin},postMessage(data,target){sent.push({data,target});}};
  const documentRef={body:{append(el){this.child=el;}},createElement(tag){const handlers=new Map();const el={tag,style:{},children:[],attributes:{},disabled:false,textContent:'',append(...children){this.children.push(...children);},setAttribute(k,v){this.attributes[k]=v;},addEventListener(type,fn){handlers.set(type,fn);},remove(){this.removed=true;},fire(type){return handlers.get(type)?.();}};elements.push(el);return el;}};
- const windowRef={opener:parent,document:documentRef,location:{hash:`#figureBridge=${nonce}&figureOrigin=${encodeURIComponent(origin)}`},addEventListener(type,fn){if(type==='message')listeners.add(fn);},removeEventListener(type,fn){listeners.delete(fn);}};
+ const windowRef={opener:embedded?null:parent,document:documentRef,location:{origin,search:embedded?'?figureWorkspace=1':'',hash:`#figureBridge=${nonce}&figureOrigin=${encodeURIComponent(origin)}`},addEventListener(type,fn){if(type==='message')listeners.add(fn);},removeEventListener(type,fn){listeners.delete(fn);}};
+ windowRef.parent=embedded?{location:{origin},FigureStudioWorkspace:{studioWindow:parent,show:tab=>shown.push(tab)}}:windowRef;
  const host=setupFigureBridge({app:'plot',windowRef,loadProject:async(file,meta)=>loads.push({text:await file.text(),meta}),captureResult:async()=>({project:new Blob(['updated']),preview:new Blob(['<svg/>'],{type:'image/svg+xml'}),bridgeState:{revision:3}}),onAccepted:async(result,meta)=>accepted.push({result,meta}),...options});
  const emit=(type,extra={},event={})=>Promise.all([...listeners].map(fn=>fn({source:parent,origin,data:{protocol:PROTOCOL,nonce,app:'plot',type,...extra},...event})));
  const load=(id='a',extra={})=>emit('load',{requestId:'request-'+id,panelId:id,editKey:'book:'+id+':source-1',sourceName:id+'.plotproject',project:new Blob([id]),...extra});
- return {host,sent,listeners,loads,accepted,parent,documentRef,windowRef,emit,load,button:elements.find(e=>e.tag==='button'),discard:elements.find(e=>e.tag==='button'&&e.textContent==='未反映の編集を取り消す'),message:elements.find(e=>e.tag==='span')};
+ return {host,sent,listeners,loads,accepted,parent,documentRef,windowRef,shown,emit,load,button:elements.find(e=>e.tag==='button'),discard:elements.find(e=>e.tag==='button'&&e.textContent==='未反映の編集を取り消す'),message:elements.find(e=>e.tag==='span')};
 }
+
+test('workspace iframe uses the shell Studio window without an opener and returns only after accepted edits',async()=>{
+ const e=environment({},true);try{
+  assert.equal(e.windowRef.opener,null);assert.equal(e.host.isConnected,true);assert.equal(e.sent[0].data.type,'ready');assert.deepEqual(e.shown,[]);
+  await e.load('a');await e.button.fire('click');assert.equal(e.sent.at(-1).data.type,'result');assert.deepEqual(e.shown,[]);
+  await e.emit('rejected',{panelId:'a',requestId:'request-a',revision:1,message:'Try again'});assert.deepEqual(e.shown,[]);
+  await e.button.fire('click');await e.emit('accepted',{panelId:'a',requestId:'request-a',revision:2});assert.deepEqual(e.shown,['studio']);assert.equal(e.accepted.length,1);
+ }finally{e.host.close();}
+});
+
+test('workspace navigation failure cannot turn a committed bridge edit into a rejection',async()=>{
+ const e=environment({},true);e.windowRef.parent.FigureStudioWorkspace.show=()=>{throw Error('UI unavailable');};
+ try{await e.load('a');await e.button.fire('click');await e.emit('accepted',{panelId:'a',requestId:'request-a',revision:1});assert.equal(e.accepted.length,1);assert.equal(e.button.disabled,false);assert.equal(e.sent.some(m=>m.data.type==='error'),false);}
+ finally{e.host.close();}
+});
 
 test('host advertises reuse and loads another project without replacing the tab or UI',async()=>{
  const e=environment();try{

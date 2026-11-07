@@ -8,7 +8,7 @@ function storage(){const values=new Map();return {getItem:k=>values.get(k)||null
 function locks(){const pending=new Map();return {request(name,fn){const p=(pending.get(name)||Promise.resolve()).catch(()=>{}).then(fn);pending.set(name,p);return p;}};}
 function fakeWindow(path='/plot_launcher_web/figure-studio/'){
   const listeners=new Map(),url=new URL(path,'http://localhost:43421');
-  const w={location:{href:url.href,origin:url.origin,hash:url.hash},opener:null,navigator:{},localStorage:storage(),closed:false,
+  const w={location:{href:url.href,origin:url.origin,hash:url.hash,search:url.search},opener:null,navigator:{},localStorage:storage(),closed:false,
     history:{replaceState(a,b,href){const u=new URL(href);Object.assign(w.location,{href:u.href,origin:u.origin,hash:u.hash});}},
     addEventListener(type,fn){if(!listeners.has(type))listeners.set(type,new Set());listeners.get(type).add(fn);},
     removeEventListener(type,fn){listeners.get(type)?.delete(fn);},
@@ -23,6 +23,46 @@ function hub(){
     postMessage(data){messages.push(data);for(const other of channels)if(other!==c)queueMicrotask(()=>{for(const fn of other.listeners)fn({data});});},listeners
   };channels.add(c);return c;}};
 }
+function workspaceSource(studio){
+  const source=fakeWindow('/plot_launcher_web/?figureWorkspace=1'),workspace={studioWindow:studio,show(){}};let opens=0;
+  studio.postMessage=()=>{};source.parent={location:{origin:source.location.origin},FigureStudioWorkspace:workspace};source.open=()=>{opens++;return null;};
+  return {source,workspace,get opens(){return opens;}};
+}
+
+test('workspace sends only to its own Studio frame even when another Studio is more recently active',async()=>{
+  const bus=hub(),own=fakeWindow(),other=fakeWindow(),env=workspaceSource(own);let ownImports=0,otherImports=0;
+  const receiver=setupTransferReceiver({windowRef:own,channelFactory:()=>bus.factory(),onImport:()=>{ownImports++;}}),foreign=setupTransferReceiver({windowRef:other,channelFactory:()=>bus.factory(),onImport:()=>{otherImports++;}});
+  env.workspace.studioReceiverId=receiver.receiverId;
+  const sender=createDirectSender({app:'plot',windowRef:env.source,channelFactory:()=>bus.factory(),captureResult:payload});
+  try{await pause();await new Promise(r=>setTimeout(r,3));await other.emit('focus');await pause();await sender.send();assert.equal(ownImports,1);assert.equal(otherImports,0);assert.equal(env.opens,0);}
+  finally{sender.close();receiver.close();foreign.close();}
+});
+
+test('workspace capture waits for its own receiver to appear and never falls back to another tab',async()=>{
+  const bus=hub(),own=fakeWindow(),env=workspaceSource(own);let foreignImports=0,ownImports=0,captures=0,receiver;
+  const foreign=setupTransferReceiver({windowRef:fakeWindow(),channelFactory:()=>bus.factory(),onImport:()=>{foreignImports++;}});
+  const sender=createDirectSender({app:'plot',windowRef:env.source,channelFactory:()=>bus.factory(),captureResult:()=>{captures++;return payload();}});
+  try{
+    await pause();const sending=sender.send();await pause();assert.equal(sender.busy,true);assert.equal(captures,1);assert.equal(env.opens,0);assert.equal(foreignImports,0);assert.equal(bus.messages.some(m=>m.type==='deliver'),false);
+    receiver=setupTransferReceiver({windowRef:own,channelFactory:()=>bus.factory(),onImport:()=>{ownImports++;}});env.workspace.studioReceiverId=receiver.receiverId;
+    await sending;assert.equal(ownImports,1);assert.equal(foreignImports,0);assert.equal(captures,1);assert.equal(env.opens,0);
+  }finally{sender.close();receiver?.close();foreign.close();}
+});
+
+test('workspace readiness timeout retains its capture for explicit retry without opening a popup',async()=>{
+  const bus=hub(),own=fakeWindow(),env=workspaceSource(own),statuses=[];let captures=0,imports=0,receiver;
+  const sender=createDirectSender({app:'plot',windowRef:env.source,channelFactory:()=>bus.factory(),captureResult:()=>{captures++;return payload();},ackTimeoutMs:10,onStatus:status=>statuses.push(status.state)});
+  try{
+    await assert.rejects(sender.send(),/準備が完了/);assert.equal(sender.busy,false);assert.equal(statuses.at(-1),'retry');assert.equal(env.opens,0);
+    receiver=setupTransferReceiver({windowRef:own,channelFactory:()=>bus.factory(),onImport:()=>{imports++;}});env.workspace.studioReceiverId=receiver.receiverId;
+    await pause();assert.equal(imports,0);await sender.send();assert.equal(imports,1);assert.equal(captures,1);assert.equal(env.opens,0);
+  }finally{sender.close();receiver?.close();}
+});
+
+test('a workspace without BroadcastChannel reports retry instead of creating a separate Studio',async()=>{
+  const env=workspaceSource(fakeWindow()),sender=createDirectSender({app:'plot',windowRef:env.source,channelFactory:()=>null,captureResult:payload,ackTimeoutMs:5});
+  try{await assert.rejects(sender.send(),/準備が完了/);assert.equal(env.opens,0);}finally{sender.close();}
+});
 
 test('payload checks identifiers, source names, MIME type and binary size caps',()=>{
   const p=payload();assert.equal(validateTransferPayload(p),p);

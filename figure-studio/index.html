@@ -4,201 +4,30 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#147d73">
-  <meta name="description" content="グラフと画像をまとめる、軽快な論文Figureエディター。">
-  <meta name="figure-studio-version" content="0.3.5">
-  <meta name="figure-studio-build" content="source-header-v035-1">
-  <title>Figure Studio — v0.3.5</title>
-  <link rel="icon" type="image/svg+xml" href="./favicon.svg?v=0.3.5-1">
-  <link rel="stylesheet" href="./styles.css?v=0.3.5-1">
-  <link rel="stylesheet" href="./arrow-picker.css?v=0.3.5-1">
-  <link rel="stylesheet" href="./sidebar-selection.css?v=0.3.5-1">
+  <meta name="description" content="グラフ・画像の編集から論文Figureのレイアウトまで、一つの作業画面で。">
+  <meta name="figure-studio-version" content="0.4.0">
+  <meta name="figure-studio-build" content="workspace-v040-1">
+  <title>Figure Studio — v0.4.0</title>
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg?v=workspace-v040-1">
+  <link rel="stylesheet" href="./workspace.css?v=workspace-v040-1">
 </head>
 <body>
-  <svg class="icon-defs" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>
-    <symbol id="i-select" viewBox="0 0 24 24"><path d="m5 3 14 10-7 1-3 7z"/></symbol>
-    <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r="1.5"/><path d="m3 17 5-5 4 4 4-6 5 7"/></symbol>
-    <symbol id="i-text" viewBox="0 0 24 24"><path d="M4 6V3h16v3M12 3v18M8 21h8"/></symbol>
-    <symbol id="i-line" viewBox="0 0 24 24"><path d="m4 20 16-16"/></symbol>
-    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="m4 20 16-16M9 4h11v11"/></symbol>
-    <symbol id="i-rect" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="1"/></symbol>
-    <symbol id="i-ellipse" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="9" ry="7"/></symbol>
-    <symbol id="i-undo" viewBox="0 0 24 24"><path d="m8 4-5 5 5 5M3 9h11a7 7 0 0 1 0 14" transform="translate(0 -2)"/></symbol>
-    <symbol id="i-redo" viewBox="0 0 24 24"><path d="m16 4 5 5-5 5M21 9H10a7 7 0 0 0 0 14" transform="translate(0 -2)"/></symbol>
-    <symbol id="i-save" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12l4 4v12a2 2 0 0 1-2 2Z"/><path d="M7 3v6h10V3M7 21v-8h10v8"/></symbol>
-    <symbol id="i-open" viewBox="0 0 24 24"><path d="M3 8V5a2 2 0 0 1 2-2h5l3 3h6a2 2 0 0 1 2 2M3 8h18l-2 12H5Z"/></symbol>
-    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></symbol>
-    <symbol id="i-left" viewBox="0 0 24 24"><path d="M4 3v18M8 7h12v4H8zM8 15h8v4H8z"/></symbol>
-    <symbol id="i-center" viewBox="0 0 24 24"><path d="M12 2v20M4 6h16v4H4zM7 14h10v4H7z"/></symbol>
-    <symbol id="i-right" viewBox="0 0 24 24"><path d="M20 3v18M4 7h12v4H4zM8 15h8v4H8z"/></symbol>
-    <symbol id="i-top" viewBox="0 0 24 24"><path d="M3 4h18M6 8h4v12H6zM14 8h4v8h-4z"/></symbol>
-    <symbol id="i-middle" viewBox="0 0 24 24"><path d="M2 12h20M6 4h4v16H6zM14 7h4v10h-4z"/></symbol>
-    <symbol id="i-bottom" viewBox="0 0 24 24"><path d="M3 20h18M6 4h4v12H6zM14 8h4v8h-4z"/></symbol>
-    <symbol id="i-dist-h" viewBox="0 0 24 24"><path d="M3 3v18M21 3v18M9 6h6v12H9z"/></symbol>
-    <symbol id="i-dist-v" viewBox="0 0 24 24"><path d="M3 3h18M3 21h18M6 9h12v6H6z"/></symbol>
-    <symbol id="i-front" viewBox="0 0 24 24"><rect x="3" y="3" width="12" height="12" rx="1"/><path d="M19 9h2v12H9v-2M7 11l4-4m-4 0h4v4"/></symbol>
-    <symbol id="i-back" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="1"/><path d="M15 5V3H3v12h2M17 13l-4 4m4 0h-4v-4"/></symbol>
-    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 4V3H3v13h1"/></symbol>
-    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></symbol>
-    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></symbol>
-    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>
-    <symbol id="i-hero" viewBox="0 0 24 24"><rect x="3" y="3" width="10" height="18" rx="1"/><rect x="17" y="3" width="4" height="7" rx="1"/><rect x="17" y="14" width="4" height="7" rx="1"/></symbol>
-    <symbol id="i-link" viewBox="0 0 24 24"><path d="m10 13 4-4M8 16l-1 1a4 4 0 0 1-6-6l4-4a4 4 0 0 1 6 0M16 8l1-1a4 4 0 0 1 6 6l-4 4a4 4 0 0 1-6 0" transform="translate(0 0) scale(.95)"/></symbol>
-    <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 3h7v7M10 14 21 3M10 3H3v18h18v-7"/></symbol>
-    <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9h.1M10 9h.1M14 9h.1M18 9h.1M6 12h.1M10 12h.1M14 12h.1M18 12h.1M7 15h10"/></symbol>
-    <symbol id="i-fit" viewBox="0 0 24 24"><path d="M9 3H3v6M15 3h6v6M21 15v6h-6M9 21H3v-6"/><rect x="7" y="7" width="10" height="10" rx="1"/></symbol>
-    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 4v16M4 12h16"/></symbol>
-    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></symbol>
-    <symbol id="i-group" viewBox="0 0 24 24"><path d="M3 8V3h5M16 3h5v5M21 16v5h-5M8 21H3v-5"/><rect x="7" y="7" width="6" height="6"/><rect x="11" y="11" width="6" height="6"/></symbol>
-    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6.2 6.2A8 8 0 0 1 19.5 9M4.5 15a8 8 0 0 0 13.3 2.8"/></symbol>
-  </defs></svg>
-
-  <div class="app-shell">
-    <header class="app-header">
-      <div class="brand"><span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span><span>Figure Studio</span><span class="version">v0.3.5</span><button id="checkUpdateButton" class="update-check-button" type="button" title="新しいバージョンを確認" aria-label="新しいバージョンを確認"><svg class="icon small" aria-hidden="true"><use href="#i-refresh"/></svg><span class="update-check-label">更新確認</span></button></div>
-      <div class="document-title"><input id="docName" aria-label="Figureの名前" value="Untitled figure" spellcheck="false"><span id="saveStatus" class="save-status">準備中</span></div>
-      <div class="header-actions">
-        <button class="button compact" data-action="new" title="新規Figure"><svg class="icon"><use href="#i-plus"/></svg><span class="optional-label">新規</span></button>
-        <button class="button compact" data-action="open" title="プロジェクトを開く (Ctrl+O)"><svg class="icon"><use href="#i-open"/></svg><span class="optional-label">開く</span></button>
-        <button class="button compact" data-action="save" title="プロジェクトを保存 (Ctrl+S)"><svg class="icon"><use href="#i-save"/></svg><span>保存</span></button>
-        <span class="separator"></span>
-        <button class="button" data-action="import" title="画像・SVGを追加"><svg class="icon"><use href="#i-image"/></svg><span>図を追加</span></button>
-        <details class="menu-dropdown export-dropdown"><summary class="button primary"><svg class="icon"><use href="#i-download"/></svg>書き出し<svg class="icon small"><use href="#i-chevron"/></svg></summary><div class="dropdown-panel">
-          <div class="menu-title">FIGUREを書き出す</div>
-          <button data-action="export-svg"><span>SVG</span><span class="menu-detail">ベクター形式</span></button>
-          <button data-action="export-png"><span>PNG</span><span class="menu-detail">画像形式</span></button>
-          <button data-action="export-pdf"><span>PDF</span><span class="menu-detail">印刷から保存</span></button>
-          <label class="export-dpi">PNG解像度<select id="exportDpi"><option value="300">300 dpi</option><option value="600" selected>600 dpi</option><option value="1200">1200 dpi</option></select></label>
-        </div></details>
-      </div>
-    </header>
-
-    <div class="ribbon" aria-label="編集ツールバー">
-      <nav class="creation-tools" aria-label="作成ツール">
-        <button class="tool-button active" data-action="select" data-tool="select" title="選択 (V)" aria-label="選択" aria-pressed="true"><svg class="icon"><use href="#i-select"/></svg><span>選択</span></button>
-        <span class="creation-divider" aria-hidden="true"></span>
-        <button class="tool-button" data-action="text" data-tool="text" title="テキスト (T)" aria-label="テキスト"><svg class="icon"><use href="#i-text"/></svg><span>文字</span></button>
-        <button class="tool-button" data-action="line" data-tool="line" title="線 (L)" aria-label="線"><svg class="icon"><use href="#i-line"/></svg><span>線</span></button>
-        <button class="tool-button" data-action="arrow" data-tool="arrow" title="矢印 (A)" aria-label="矢印"><svg class="icon"><use href="#i-arrow"/></svg><span>矢印</span></button>
-        <button class="tool-button" data-action="rect" data-tool="rect" title="四角形 (R)" aria-label="四角形"><svg class="icon"><use href="#i-rect"/></svg><span>四角</span></button>
-        <button class="tool-button" data-action="ellipse" data-tool="ellipse" title="楕円 (E)" aria-label="楕円"><svg class="icon"><use href="#i-ellipse"/></svg><span>楕円</span></button>
-        <span class="creation-divider" aria-hidden="true"></span>
-        <button class="tool-button" data-action="import" title="画像・SVGを追加" aria-label="画像・SVGを追加"><svg class="icon"><use href="#i-image"/></svg><span>画像</span></button>
-        <button class="tool-button" data-action="sample" title="サンプルFigureを開く" aria-label="サンプルFigureを開く"><svg class="icon"><use href="#i-grid"/></svg><span>作例</span></button>
-      </nav>
-      <span class="separator"></span>
-      <div class="toolbar-group history-tools">
-        <button class="icon-button" data-action="undo" title="元に戻す (Ctrl+Z)" aria-label="元に戻す"><svg class="icon"><use href="#i-undo"/></svg></button>
-        <button class="icon-button" data-action="redo" title="やり直す (Ctrl+Y)" aria-label="やり直す"><svg class="icon"><use href="#i-redo"/></svg></button>
-      </div>
-      <span class="separator"></span>
-      <div class="toolbar-group alignment-tools">
-        <label class="sr-only" for="alignTarget">整列の基準</label><select id="alignTarget" class="small-select" title="整列の基準"><option value="selection">選択範囲に揃える</option><option value="page">ページに揃える</option></select>
-        <button class="icon-button" data-action="align-left" title="左揃え (Alt → 5 → L)" aria-label="左揃え"><svg class="icon"><use href="#i-left"/></svg></button>
-        <button class="icon-button" data-action="align-center" title="左右中央揃え (Alt → 5 → C)" aria-label="左右中央揃え"><svg class="icon"><use href="#i-center"/></svg></button>
-        <button class="icon-button" data-action="align-right" title="右揃え (Alt → 5 → R)" aria-label="右揃え"><svg class="icon"><use href="#i-right"/></svg></button>
-        <button class="icon-button" data-action="align-top" title="上揃え (Alt → 5 → T)" aria-label="上揃え"><svg class="icon"><use href="#i-top"/></svg></button>
-        <button class="icon-button" data-action="align-middle" title="上下中央揃え (Alt → 5 → M)" aria-label="上下中央揃え"><svg class="icon"><use href="#i-middle"/></svg></button>
-        <button class="icon-button" data-action="align-bottom" title="下揃え (Alt → 5 → B)" aria-label="下揃え"><svg class="icon"><use href="#i-bottom"/></svg></button>
-        <button class="icon-button" data-action="distribute-h" title="左右に等間隔 (Alt → 5 → H)" aria-label="左右に等間隔"><svg class="icon"><use href="#i-dist-h"/></svg></button>
-        <button class="icon-button" data-action="distribute-v" title="上下に等間隔 (Alt → 5 → V)" aria-label="上下に等間隔"><svg class="icon"><use href="#i-dist-v"/></svg></button>
-      </div>
-      <span class="separator"></span>
-      <div class="toolbar-group order-tools">
-        <button class="icon-button" data-action="front" title="最前面へ (Alt → 3)" aria-label="最前面へ"><svg class="icon"><use href="#i-front"/></svg></button>
-        <button class="icon-button" data-action="back" title="最背面へ (Alt → 4)" aria-label="最背面へ"><svg class="icon"><use href="#i-back"/></svg></button>
-        <details class="menu-dropdown"><summary class="icon-button" title="重なり順とグループ" aria-label="重なり順とグループ"><svg class="icon small"><use href="#i-chevron"/></svg></summary><div class="dropdown-panel">
-          <button data-action="forward">一段前へ</button><button data-action="backward">一段後ろへ</button><hr>
-          <button data-action="group"><span>グループ化</span><kbd>Ctrl+G</kbd></button><button data-action="ungroup"><span>グループ解除</span><kbd>Ctrl+Shift+G</kbd></button>
-          <button data-action="lock">固定／固定解除</button>
-        </div></details>
-      </div>
-      <span class="separator"></span>
-      <div class="toolbar-group layout-tools">
-        <details class="menu-dropdown"><summary class="button subtle"><svg class="icon"><use href="#i-grid"/></svg><span>自動配置</span><svg class="icon small"><use href="#i-chevron"/></svg></summary><div class="dropdown-panel">
-          <div class="menu-title">選択した図を並べる</div>
-          <button data-action="auto-grid"><span>グリッド</span><svg class="icon"><use href="#i-grid"/></svg></button>
-          <button data-action="auto-hero"><span>左を大きく</span><svg class="icon"><use href="#i-hero"/></svg></button>
-          <hr><button data-action="labels">パネルラベル A, B, C…</button>
-        </div></details>
-      </div>
-      <div class="toolbar-spacer"></div>
-      <button class="button subtle help-button" data-action="help" title="ショートカット一覧 (F1)"><svg class="icon"><use href="#i-keyboard"/></svg><span>ショートカット</span></button>
-    </div>
-
-    <main class="workspace">
-      <aside class="figure-rail" aria-label="Figureの一覧と管理">
-        <div class="figure-rail-header"><h2>Figures</h2><button class="figure-add" data-action="new-figure" title="Figureを追加" aria-label="Figureを追加"><svg class="icon small"><use href="#i-plus"/></svg></button></div>
-        <nav id="figureTabs" aria-label="Figure一覧"></nav>
-        <div class="figure-rail-footer figure-actions" aria-label="Figureの管理">
-          <button class="icon-button" data-action="duplicate-figure" title="このFigureを複製" aria-label="このFigureを複製"><svg class="icon small"><use href="#i-copy"/></svg></button>
-          <button class="icon-button danger" data-action="delete-figure" title="選択したFigureを削除" aria-label="選択したFigureを削除"><svg class="icon small"><use href="#i-trash"/></svg></button>
-          <span class="toolbar-spacer"></span>
-          <details class="menu-dropdown figure-order-menu"><summary class="icon-button" title="Figureの順序" aria-label="Figureの順序"><svg class="icon small"><use href="#i-chevron"/></svg></summary><div class="dropdown-panel"><div class="menu-title">Figureの順序</div><button data-action="move-figure-left">ひとつ上へ移動</button><button data-action="move-figure-right">ひとつ下へ移動</button></div></details>
-        </div>
-      </aside>
-
-      <section class="canvas-workspace" aria-label="Figure編集画面">
-        <div class="canvas-topbar"><span class="canvas-label"><span class="canvas-dot"></span><span id="canvasFigureLabel">Figure 1</span></span><div class="page-dimensions"><label for="pageWidth">幅</label><input id="pageWidth" type="number" value="180" min="10" max="2000" step="1" aria-label="ページの幅 mm"><span>×</span><label for="pageHeight">高さ</label><input id="pageHeight" type="number" value="140" min="10" max="2000" step="1" aria-label="ページの高さ mm"><span>mm</span></div></div>
-        <div id="viewport" tabindex="0" aria-label="Figureキャンバス。クリックして選択、ドラッグして移動。">
-          <div id="paperWrap"><svg id="canvas" xmlns="http://www.w3.org/2000/svg" width="680" height="529" viewBox="0 0 510.236 396.85" role="img" aria-label="編集可能なFigure"><g id="objects"></g><g id="overlays"></g></svg><textarea id="textEditor" aria-label="テキストを編集" hidden spellcheck="false"></textarea></div>
-        </div>
-        <div class="canvas-footer"><span id="statusText">空白をドラッグで囲み選択 · 上部のツールで描画</span><div class="zoom-controls"><label class="preview-quality-control" title="編集画面の画質。1は元画像、1/2・1/4は縦横それぞれの解像度。書き出し画質には影響しません。"><span>画質</span><select id="previewQuality" aria-label="プレビュー画質"><option value="1">1（フル）</option><option value="0.5">1/2</option><option value="0.25">1/4</option></select></label><button class="icon-button" data-action="fit" title="画面に合わせる" aria-label="画面に合わせる"><svg class="icon small"><use href="#i-fit"/></svg></button><input id="zoom" type="range" min="25" max="500" step="5" value="100" aria-label="表示倍率"><output id="zoomLabel" for="zoom">100%</output></div></div>
-      </section>
-
-      <aside class="inspector" aria-label="選択項目の設定">
-        <div class="inspector-heading"><h1>プロパティ</h1><span id="selectionInfo">未選択</span></div>
-        <div class="inspector-scroll">
-          <section class="inspector-section"><div class="section-heading"><h2>位置とサイズ</h2><span class="unit">mm</span></div>
-            <div class="field-grid geometry-fields"><label class="inline-field"><span>X</span><input id="propX" data-prop="x" type="number" step="0.1" aria-label="X位置 mm"></label><label class="inline-field"><span>Y</span><input id="propY" data-prop="y" type="number" step="0.1" aria-label="Y位置 mm"></label><label class="inline-field"><span>W</span><input id="propW" data-prop="w" type="number" min="0.1" step="0.1" aria-label="幅 mm"></label><label class="inline-field"><span>H</span><input id="propH" data-prop="h" type="number" min="0.1" step="0.1" aria-label="高さ mm"></label><label class="inline-field"><span>角度</span><input id="propRotation" data-prop="rotation" type="number" step="1" aria-label="回転角度 度"><span>°</span></label><label class="inline-field"><span>濃さ</span><input id="propOpacity" data-prop="opacity" type="number" min="0" max="100" step="1" value="100" aria-label="不透明度 パーセント"><span>%</span></label></div>
-          </section>
-          <section class="inspector-section text-properties"><div class="section-heading"><h2>テキスト</h2></div>
-            <label class="sr-only" for="propText">テキストの内容</label><textarea id="propText" data-prop="text" rows="2" placeholder="テキストを選択して編集"></textarea>
-            <div class="font-row"><label class="sr-only" for="propFontFamily">フォント</label><select id="propFontFamily" data-prop="fontFamily"><option value="Arial">Arial</option><option value="Helvetica">Helvetica</option><option value="Times New Roman">Times New Roman</option><option value="Georgia">Georgia</option><option value="Yu Gothic">游ゴシック</option><option value="Meiryo">メイリオ</option></select><label class="font-size-field"><input id="propFontSize" data-prop="fontSize" type="number" min="1" max="400" step="0.5" value="10" aria-label="文字サイズ pt"><span>pt</span></label></div>
-            <div class="text-formatting"><div class="segmented-controls"><button class="format-button" data-action="bold" title="太字 (Ctrl+B)" aria-label="太字"><b>B</b></button><button class="format-button" data-action="italic" title="斜体 (Ctrl+I)" aria-label="斜体"><i>I</i></button><button class="format-button" data-action="underline" title="下線 (Ctrl+U)" aria-label="下線"><u>U</u></button></div><label class="sr-only" for="propAlign">文字揃え</label><select id="propAlign" data-prop="textAlign"><option value="left">左揃え</option><option value="center">中央揃え</option><option value="right">右揃え</option><option value="justify">両端揃え</option></select></div>
-          </section>
-          <section class="inspector-section"><div class="section-heading"><h2>色と線</h2></div>
-            <div class="field-grid"><label class="color-field"><span>文字・塗り</span><input id="propFill" data-prop="fill" type="color" value="#1d2b34" aria-label="文字色・塗り色"></label><label class="color-field"><span>線</span><input id="propStroke" data-prop="stroke" type="color" value="#1d2b34" aria-label="線の色"></label><label class="inline-field stroke-field"><span>線幅</span><input id="propStrokeWidth" data-prop="strokeWidth" type="number" min="0" max="30" step="0.1" value="1" aria-label="線幅 pt"><span>pt</span></label></div>
-          </section>
-          <section class="inspector-section"><div class="source-actions"><button class="button compact" data-action="no-fill">塗りなし</button><button class="button compact" data-action="toggle-dash">実線 / 破線</button></div></section>
-          <section id="arrowProperties" class="inspector-section arrow-properties" hidden><div class="section-heading"><h2>矢印の先端</h2></div>
-            <fieldset class="arrow-endpoint"><legend>始点</legend><label class="arrow-style-field"><span>種類</span><select id="propArrowStartStyle" data-prop="arrowStartStyle" aria-label="始点の矢印の種類"><option value="" disabled>複数の値</option><option value="none">なし</option><option value="triangle">三角</option><option value="open">開いた矢印</option><option value="stealth">ステルス</option><option value="diamond">ひし形</option><option value="oval">円</option></select></label><div class="arrow-size-fields"><label><span>幅</span><select id="propArrowStartWidth" data-prop="arrowStartWidth" aria-label="始点の矢印の幅"><option value="" disabled>複数の値</option><option value="narrow">狭い</option><option value="medium">標準</option><option value="wide">広い</option></select></label><label><span>長さ</span><select id="propArrowStartLength" data-prop="arrowStartLength" aria-label="始点の矢印の長さ"><option value="" disabled>複数の値</option><option value="short">短い</option><option value="medium">標準</option><option value="long">長い</option></select></label></div></fieldset>
-            <fieldset class="arrow-endpoint"><legend>終点</legend><label class="arrow-style-field"><span>種類</span><select id="propArrowEndStyle" data-prop="arrowEndStyle" aria-label="終点の矢印の種類"><option value="" disabled>複数の値</option><option value="none">なし</option><option value="triangle">三角</option><option value="open">開いた矢印</option><option value="stealth">ステルス</option><option value="diamond">ひし形</option><option value="oval">円</option></select></label><div class="arrow-size-fields"><label><span>幅</span><select id="propArrowEndWidth" data-prop="arrowEndWidth" aria-label="終点の矢印の幅"><option value="" disabled>複数の値</option><option value="narrow">狭い</option><option value="medium">標準</option><option value="wide">広い</option></select></label><label><span>長さ</span><select id="propArrowEndLength" data-prop="arrowEndLength" aria-label="終点の矢印の長さ"><option value="" disabled>複数の値</option><option value="short">短い</option><option value="medium">標準</option><option value="long">長い</option></select></label></div></fieldset>
-          </section>
-          <section class="inspector-section source-section"><div class="section-heading"><h2>編集元</h2><svg class="icon small"><use href="#i-link"/></svg></div><p id="sourceSummary" class="source-summary">図に元プロジェクトを関連付けできます</p><label class="sr-only" for="sourceApp">編集元アプリ</label><select id="sourceApp" disabled><option value="plot">PlotLauncher Web</option><option value="mifito">MiFiTo Web</option></select><div class="source-actions"><button class="button compact" data-action="attach-source"><svg class="icon small"><use href="#i-link"/></svg>関連付け</button><button class="button compact" data-action="edit-source"><svg class="icon small"><use href="#i-external"/></svg>元を編集</button></div></section>
-          <section class="inspector-section layers-section"><div class="section-heading"><h2>レイヤー</h2><span class="unit">上が最前面</span></div><div id="layers" role="list" aria-label="重なり順の一覧"></div><div class="layer-actions"><button class="icon-button" data-action="group" title="グループ化 (Ctrl+G)" aria-label="グループ化"><svg class="icon small"><use href="#i-group"/></svg></button><button class="icon-button" data-action="duplicate" title="複製 (Ctrl+D)" aria-label="複製"><svg class="icon small"><use href="#i-copy"/></svg></button><button class="icon-button" data-action="lock" title="固定／固定解除" aria-label="固定／固定解除"><svg class="icon small"><use href="#i-lock"/></svg></button><span class="toolbar-spacer"></span><button class="icon-button danger" data-action="delete" title="削除 (Delete)" aria-label="削除"><svg class="icon small"><use href="#i-trash"/></svg></button></div></section>
-        </div>
-      </aside>
-    </main>
-  </div>
-
-  <input id="imageInput" type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" multiple hidden>
-  <input id="projectInput" type="file" accept=".figurestudio,.json" hidden>
-  <input id="sourceInput" type="file" accept=".plotproject,.mifito" hidden>
-  <div id="toast" role="status" aria-live="polite" hidden></div>
-  <div id="keyHint" class="key-hint" role="status" aria-live="polite" hidden></div>
-  <div id="contextMenu" role="menu" hidden></div>
-  <dialog id="helpDialog" aria-labelledby="helpTitle"><div class="dialog-heading"><div><span class="eyebrow">KEYBOARD FIRST</span><h2 id="helpTitle">いつもの操作を、キーボードで。</h2></div><form method="dialog"><button class="dialog-close" aria-label="閉じる">×</button></form></div><p class="dialog-lead">Altの操作は、キーを順番に押せます。キャンバスをクリックしてから操作してください。</p><div class="shortcut-table-wrap"><table class="shortcut-table"><thead><tr><th>操作</th><th>ショートカット</th></tr></thead><tbody>
-    <tr><td>Figure追加 / 前 / 次</td><td><kbd>Ctrl+M</kbd> / <kbd>Ctrl+PageUp</kbd> / <kbd>Ctrl+PageDown</kbd></td></tr>
-    <tr><td>サムネイルの複数選択</td><td><kbd>Ctrl</kbd>＋クリック / <kbd>Shift</kbd>＋クリック / <kbd>Ctrl+A</kbd></td></tr>
-    <tr><td>Figureの並べ替え / 削除</td><td>サムネイルをドラッグ / <kbd>Delete</kbd>（<kbd>Ctrl+Z</kbd>で復元）</td></tr>
-    <tr><td>サイドバーでFigure追加</td><td><kbd>Enter</kbd>（現在のFigureの次）</td></tr>
-    <tr><td>囲み選択 / 選択に追加</td><td>空白をドラッグ / <kbd>Shift</kbd>＋ドラッグ</td></tr>
-    <tr><td>最前面／最背面</td><td><kbd>Alt</kbd> → <kbd>3</kbd> ／ <kbd>Alt</kbd> → <kbd>4</kbd></td></tr>
-    <tr><td>左／左右中央／右揃え</td><td><kbd>Alt</kbd> → <kbd>5</kbd> → <kbd>L</kbd> / <kbd>C</kbd> / <kbd>R</kbd></td></tr>
-    <tr><td>上／上下中央／下揃え</td><td><kbd>Alt</kbd> → <kbd>5</kbd> → <kbd>T</kbd> / <kbd>M</kbd> / <kbd>B</kbd></td></tr>
-    <tr><td>左右／上下に等間隔</td><td><kbd>Alt</kbd> → <kbd>5</kbd> → <kbd>H</kbd> / <kbd>V</kbd></td></tr>
-    <tr><td>文字を大きく／小さく</td><td><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>&gt;</kbd> / <kbd>&lt;</kbd></td></tr>
-    <tr><td>太字／斜体／下線</td><td><kbd>Ctrl</kbd> + <kbd>B</kbd> / <kbd>I</kbd> / <kbd>U</kbd></td></tr>
-    <tr><td>文字の左／中央／右揃え</td><td><kbd>Ctrl</kbd> + <kbd>L</kbd> / <kbd>E</kbd> / <kbd>R</kbd></td></tr>
-    <tr><td>元に戻す／やり直す</td><td><kbd>Ctrl</kbd> + <kbd>Z</kbd> / <kbd>Y</kbd></td></tr>
-    <tr><td>複製／すべて選択／削除</td><td><kbd>Ctrl+D</kbd> / <kbd>Ctrl+A</kbd> / <kbd>Delete</kbd></td></tr>
-    <tr><td>コピー／切り取り／貼り付け</td><td><kbd>Ctrl+C</kbd> / <kbd>Ctrl+X</kbd> / <kbd>Ctrl+V</kbd></td></tr>
-    <tr><td>グループ化／解除</td><td><kbd>Ctrl+G</kbd> / <kbd>Ctrl+Shift+G</kbd></td></tr>
-    <tr><td>移動／大きく移動</td><td><kbd>矢印</kbd> ／ <kbd>Shift</kbd> + <kbd>矢印</kbd></td></tr>
-    <tr><td>保存／開く</td><td><kbd>Ctrl+S</kbd> / <kbd>Ctrl+O</kbd></td></tr>
-    <tr><td>選択／文字／線／矢印／四角／楕円</td><td><kbd>V</kbd> / <kbd>T</kbd> / <kbd>L</kbd> / <kbd>A</kbd> / <kbd>R</kbd> / <kbd>E</kbd></td></tr>
-    <tr><td>キャンセル／ショートカット一覧</td><td><kbd>Esc</kbd> / <kbd>F1</kbd></td></tr>
-  </tbody></table></div><p class="dialog-note">Alt + 数字は、ご指定のPowerPoint設定に合わせた割り当てです。ブラウザやOSが優先する操作は、画面のボタンからも実行できます。</p></dialog>
-  <script type="module" src="./app.js?v=0.3.5-1"></script>
+  <header class="workspace-header">
+    <div class="workspace-brand"><span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span><span>Figure Studio</span></div>
+    <nav class="workspace-tabs" role="tablist" aria-label="作業画面">
+      <button id="workspace-tab-studio" class="workspace-tab" type="button" role="tab" data-app="studio" aria-selected="true" aria-controls="workspace-panel-studio" tabindex="0"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="8" height="18" rx="1"/><rect x="15" y="3" width="6" height="7" rx="1"/><rect x="15" y="14" width="6" height="7" rx="1"/></svg><span>Studio</span></button>
+      <button id="workspace-tab-plot" class="workspace-tab" type="button" role="tab" data-app="plot" aria-selected="false" aria-controls="workspace-panel-plot" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3v17h17M7 15l4-6 4 3 5-7"/></svg><span>PlotLauncher</span></button>
+      <button id="workspace-tab-mifito" class="workspace-tab" type="button" role="tab" data-app="mifito" aria-selected="false" aria-controls="workspace-panel-mifito" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r="1.5"/><path d="m3 17 5-5 4 4 4-6 5 7"/></svg><span>MiFiTo</span></button>
+    </nav>
+    <div class="workspace-release"><span class="workspace-version">v0.4.0</span><button id="checkUpdateButton" class="update-check-button" type="button" title="新しいバージョンを確認" aria-label="新しいバージョンを確認"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6.2 6.2A8 8 0 0 1 19.5 9M4.5 15a8 8 0 0 0 13.3 2.8"/></svg><span class="update-check-label">更新確認</span></button></div>
+  </header>
+  <main id="workspace-panels" class="workspace-panels">
+    <section id="workspace-panel-studio" class="workspace-panel" role="tabpanel" aria-labelledby="workspace-tab-studio" aria-hidden="false"><iframe id="studio-frame" title="Figureのレイアウト" src="./studio.html?figureWorkspace=1"></iframe></section>
+    <section id="workspace-panel-plot" class="workspace-panel" role="tabpanel" aria-labelledby="workspace-tab-plot" aria-hidden="true" inert></section>
+    <section id="workspace-panel-mifito" class="workspace-panel" role="tabpanel" aria-labelledby="workspace-tab-mifito" aria-hidden="true" inert></section>
+  </main>
+  <div id="workspace-status" class="workspace-status" role="status" aria-live="polite" hidden></div>
+  <noscript>Figure Studioを利用するにはJavaScriptを有効にしてください。</noscript>
+  <script type="module" src="./workspace.mjs?v=workspace-v040-1"></script>
 </body>
 </html>
