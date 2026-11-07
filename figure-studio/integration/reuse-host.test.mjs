@@ -48,6 +48,53 @@ test('reopening a panel preserves its current edits and does not deserialize aga
  }finally{e.host.close();}
 });
 
+test('a reconnect flag cannot preserve a different panel or a replaced source snapshot',async()=>{
+ let content='';const metadata=[];
+ const e=environment({async loadProject(file,meta){metadata.push(meta);if(!meta.reconnect)content=await file.text();}});
+ try{
+  await e.load('later');assert.equal(content,'later');
+  await e.load('earlier',{reconnect:true});assert.equal(content,'earlier');
+  await e.load('earlier',{requestId:'replacement',editKey:'book:earlier:source-2',project:new Blob(['earlier-replaced']),reconnect:true});
+  assert.equal(content,'earlier-replaced');assert.deepEqual(metadata.map(m=>m.reconnect),[false,false,false]);
+  await e.button.fire('click');assert.equal(e.sent.at(-1).data.panelId,'earlier');assert.equal(e.sent.at(-1).data.requestId,'replacement');
+ }finally{e.host.close();}
+});
+
+test('reopening the same linked panel selects its image again before acknowledging reuse',async()=>{
+ let visible='first';const selections=[];const e=environment({selectImage:async id=>{selections.push(id);visible=id;}});
+ try{
+  await e.load('a',{imageId:'image-first'});visible='image-later';
+  await e.load('a',{imageId:'image-first',requestId:'new-request'});
+  assert.equal(visible,'image-first');assert.deepEqual(selections,['image-first']);assert.equal(e.loads.length,1);
+  assert.equal((await e.host.captureWorkspaceBinding()).imageId,'image-first');
+  visible='image-later';await e.load('a',{imageId:'image-first',requestId:'new-request'});
+  assert.equal(visible,'image-first');assert.equal(selections.length,2);assert.equal(e.loads.length,1);
+ }finally{e.host.close();}
+});
+
+test('asynchronous image reselection cannot acknowledge or accept an edit before the requested image is ready',async()=>{
+ const selection=deferred();const e=environment({selectImage:()=>selection.promise});
+ try{
+  await e.load('a',{imageId:'image-first'});const n=e.sent.length;
+  const selecting=e.load('a',{imageId:'image-first',requestId:'new-request'});
+  assert.equal(e.button.disabled,true);assert.equal(e.sent.slice(n).some(m=>m.data.type==='loaded'),false);
+  await e.button.fire('click');assert.equal(e.sent.slice(n).some(m=>m.data.type==='result'),false);
+  selection.resolve();await selecting;assert.equal(e.sent.at(-1).data.type,'loaded');assert.equal(e.sent.at(-1).data.requestId,'new-request');assert.equal(e.button.disabled,false);
+ }finally{selection.resolve();e.host.close();}
+});
+
+test('failed image reselection never reports a successful open or leaves Apply enabled for the previous image',async()=>{
+ const e=environment({selectImage:async()=>{throw Error('image missing');}});
+ try{
+  await e.load('a',{imageId:'image-first'});const n=e.sent.length;
+  await e.load('a',{imageId:'image-first',requestId:'new-request'});
+  assert.equal(e.sent.slice(n).some(m=>m.data.type==='loaded'),false);
+  const failure=e.sent.at(-1).data;assert.equal(failure.type,'error');assert.equal(failure.code,'load-failed');assert.equal(failure.requestId,'new-request');assert.equal(e.button.disabled,true);
+  assert.equal(await e.host.captureWorkspaceBinding(),null);
+  await e.button.fire('click');assert.equal(e.sent.at(-1).data.type,'error');
+ }finally{e.host.close();}
+});
+
 test('unreflected edits block a different panel and preserve result routing',async()=>{
  const e=environment({isDirty:async()=>true});try{
   await e.load('a');await e.load('b');const blocked=e.sent.at(-1).data;

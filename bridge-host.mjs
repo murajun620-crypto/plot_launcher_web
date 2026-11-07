@@ -73,6 +73,23 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
     return checkpoint===acceptedCheckpoint&&sameWorkspace===true?checkpoint:null;
   }
   const matchesActive=data=>data.panelId===active.panelId&&(data.requestId||'')===active.requestId;
+  async function reuseLoaded(data){
+    busy=true;setDisabled(true);discard.disabled=true;
+    try{
+      // The user may have selected another image inside the warm editor.
+      // Reusing a project must still resolve the image requested by Studio.
+      if(data.imageId&&typeof selectImage==='function')await selectImage(data.imageId);
+      if(disposed)return;
+      active.requestId=data.requestId||'';
+      if(data.imageId)active.imageId=data.imageId;
+      clientBatch=Array.isArray(data.capabilities)&&data.capabilities.includes('batch-v1');
+      setMessage('');send('loaded',{reused:true});
+    }catch(error){
+      if(disposed)return;
+      loaded=false;setMessage(error.message||'対象の画像を表示できませんでした。');
+      send('error',{panelId:data.panelId,requestId:data.requestId||'',code:'load-failed',loaded:false,message:message.textContent});
+    }finally{busy=false;if(!disposed){setDisabled(!loaded||!!awaiting);discard.disabled=!loaded||!!awaiting;registry?.update();}}
+  }
   function block(data,reason,text){
     setMessage(text);
     if((reason==='dirty'||reason==='dirty-check-failed')&&loaded&&baseline){discard.hidden=false;discard.disabled=false;}
@@ -102,7 +119,7 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
       }
       // A retry never interrupts its own load or pending result.
       if(initialized&&(loaded||busy||awaiting)&&matchesActive(data)&&(!data.editKey||data.editKey===active.editKey)){
-        if(loaded)send('loaded',{reused:true});return;
+        if(loaded&&!busy&&!awaiting)await reuseLoaded(data);return;
       }
       if(loadingRequest&&data.panelId===loadingRequest.panelId&&(data.requestId||'')===loadingRequest.requestId&&data.editKey===loadingRequest.editKey)return;
       if(busy||awaiting){block(data,'busy','読み込み・反映処理中です。完了してから次のグラフを開いてください。');return;}
@@ -111,7 +128,7 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
       try{
         // Reopening this snapshot keeps all in-progress work in the warm tab.
         if(loaded&&data.panelId===active.panelId&&data.editKey&&data.editKey===active.editKey){
-          active.requestId=data.requestId||'';clientBatch=Array.isArray(data.capabilities)&&data.capabilities.includes('batch-v1');setMessage('');send('loaded',{reused:true});return;
+          await reuseLoaded(data);return;
         }
         let adoptedCheckpoint=null;
         if(normalVisit&&!initialized){
@@ -130,7 +147,10 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
         }
         active={panelId:data.panelId,requestId:data.requestId||'',editKey:data.editKey||'',sourceName:String(data.sourceName||(app==='plot'?'figure.plotproject':'figure.mifito')).replace(/[\\/]/g,'_'),...(data.imageId?{imageId:data.imageId}:{})};
         clientBatch=Array.isArray(data.capabilities)&&data.capabilities.includes('batch-v1');
-        const reconnect=!!adoptedCheckpoint||(!normalVisit&&!!data.reconnect);
+        // Transport reconnection does not prove that this editor contains the
+        // requested project. Exact bound snapshots were handled above; only a
+        // byte-checked adoption may preserve content in a newly bound route.
+        const reconnect=!!adoptedCheckpoint;
         // An adopted normal workspace is not bound until its asynchronous
         // preparation has revalidated the exact same source identity.
         initialized=!adoptedCheckpoint;loaded=false;captured=null;baseline=null;revision=0;discard.hidden=true;
