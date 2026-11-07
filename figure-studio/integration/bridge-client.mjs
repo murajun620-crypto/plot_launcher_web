@@ -1,11 +1,11 @@
 /** Browser-only editing bridge. No project data is sent to a server. */
+import {transferResult,transferReceipt,isTransferImageId} from './direct-transfer.mjs?v=batch-v034-1';
 export const BRIDGE_PROTOCOL = 'figure-studio-bridge-v1';
 export const SOURCE_APPS = Object.freeze({
   plot: {name:'PlotLauncher Web', url:'https://murajun620-crypto.github.io/plot_launcher_web/', extension:'.plotproject'},
   mifito: {name:'MiFiTo Web', url:'https://murajun620-crypto.github.io/Microscopy_figure_tools_web/', extension:'.mifito'}
 });
 const MAX_PROJECT = 320 * 1024 * 1024;
-const MAX_PREVIEW = 96 * 1024 * 1024;
 // Each Figure Studio window keeps one live editor per source application/URL.
 const editorPools = new WeakMap();
 
@@ -29,12 +29,13 @@ export function isBridgeMessage(event, context) {
  * onStatus receives {state,message,downloadProject}; ready always resolves.
  * url is an optional adapter-enabled copy of the source app (for development).
  */
-export function openSource({app, project, sourceName, panelId, editKey, onResult = () => {}, onStatus = () => {},
+export function openSource({app, project, sourceName, panelId, editKey, imageId, onResult = () => {}, onStatus = () => {},
   url, timeoutMs = 20000, windowRef = window}) {
   const spec = SOURCE_APPS[app];
   if (!spec) throw new Error('連携先が不明です。');
   if (!(project instanceof Blob) || !project.size || project.size > MAX_PROJECT) throw new Error('有効な元プロジェクトを添付してください（320 MB以内）。');
   if (!panelId || typeof panelId !== 'string') throw new Error('図の識別子が必要です。');
+  if(imageId!==undefined&&!isTransferImageId(imageId))throw Error('画像の識別子が正しくありません。');
   const origin = windowRef.location.origin;
   if (!/^https?:\/\//.test(origin)) throw new Error('Web連携はHTTPまたはHTTPSで開いて利用してください。');
   const target = new URL(url || spec.url, windowRef.location.href);
@@ -42,7 +43,7 @@ export function openSource({app, project, sourceName, panelId, editKey, onResult
   target.hash='';
   const poolKey=`${app}:${target.href}`;
   let pool=editorPools.get(windowRef);if(!pool){pool=new Map();editorPools.set(windowRef,pool);}
-  const args={project,panelId,editKey:String(editKey??panelId),sourceName,onResult,onStatus};
+  const args={project,panelId,editKey:String(editKey??panelId),imageId,sourceName,onResult,onStatus};
   const existing=pool.get(poolKey);
   if(existing&&!existing.window.closed)return existing.open(args);
   existing?.close();
@@ -67,7 +68,7 @@ export function openSource({app, project, sourceName, panelId, editKey, onResult
   const send=(type,r,extra={})=>{if(!disposed&&!popup.closed)popup.postMessage({protocol:BRIDGE_PROTOCOL,nonce,app,hostId:activeHost,type,panelId:r?.panelId,requestId:r?.requestId,...extra},target.origin);};
   function load(r,reconnect=false){
     r.loaded=false;r.latestRevision=0;r.applyingRevision=0;pending=r;
-    send('load',r,{project:r.project,sourceName:r.sourceName,editKey:r.editKey,reconnect});
+    send('load',r,{project:r.project,sourceName:r.sourceName,editKey:r.editKey,reconnect,capabilities:['batch-v1'],...(r.imageId?{imageId:r.imageId}:{})});
     status(r,'loading',reconnect?'編集画面へ再接続しています…':'元プロジェクトを編集画面へ読み込んでいます…');
   }
   function facade(r){return {window:popup,close,ready:r.ready,downloadProject:downloadFor(r)};}
@@ -77,6 +78,8 @@ export function openSource({app, project, sourceName, panelId, editKey, onResult
     const same=(pending?[pending]:[current]).find(r=>r&&r.panelId===options.panelId&&r.editKey===options.editKey);
     if(same){
       same.onResult=options.onResult;same.onStatus=options.onStatus;
+      if(options.imageId)same.imageId=options.imageId;
+      if(same.loaded&&!pending&&!same.applyingRevision&&same.imageId)send('select-image',same,{imageId:same.imageId});
       if(same.loaded)status(same,'ready','開いている編集画面に戻りました。続けて編集できます。');
       else status(same,'loading','編集画面で元プロジェクトを読み込んでいます…');
       return facade(same);
@@ -137,20 +140,21 @@ export function openSource({app, project, sourceName, panelId, editKey, onResult
       }
     } else if (message.type === 'result' && initialized) {
       if (message.panelId !== r.panelId || !Number.isSafeInteger(message.revision) || message.revision <= r.latestRevision || r.applyingRevision) return;
-      if (!(message.project instanceof Blob) || !message.project.size || message.project.size > MAX_PROJECT ||
-          !(message.preview instanceof Blob) || !message.preview.size || message.preview.size > MAX_PREVIEW ||
-          !['image/svg+xml','image/png','image/jpeg','image/webp'].includes(message.preview.type)) {
+      let result;
+      try{result=transferResult(app,message,message.sourceName||r.sourceName);}catch{
         send('rejected',r,{revision:message.revision,message:'編集結果の形式・サイズを確認してください。'});
         status(r,'error','編集結果の形式・サイズが対応範囲外です。'); return;
       }
       r.applyingRevision = message.revision;const host=activeHost;
       try {
-        const applied=await r.onResult({project:message.project,preview:message.preview,sourceName:message.sourceName || r.sourceName,panelId:r.panelId,app,revision:message.revision});
+        const applied=await r.onResult({...result,panelId:r.panelId,app,revision:message.revision});
         if(disposed||activeHost!==host)return;
         r.latestRevision = message.revision;r.project = message.project;r.sourceName=safeName(message.sourceName||r.sourceName);
         if(typeof applied?.editKey==='string')r.editKey=applied.editKey;
-        send('accepted',r,{revision:message.revision,editKey:r.editKey});
-        status(r,'updated','配置を保って編集結果を反映しました。');
+        if(isTransferImageId(applied?.imageId))r.imageId=applied.imageId;
+        const receipt=transferReceipt(applied);
+        send('accepted',r,{revision:message.revision,editKey:r.editKey,...receipt,...(r.imageId?{imageId:r.imageId}:{})});
+        status(r,'updated',receipt.message||'配置を保って編集結果を反映しました。');
       } catch (error) {
         if(disposed||activeHost!==host)return;
         send('rejected',r,{revision:message.revision,message:error.message || 'Figureへの反映に失敗しました。'});

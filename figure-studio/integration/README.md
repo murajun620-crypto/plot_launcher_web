@@ -10,7 +10,7 @@ PlotLauncher Web / MiFiTo Webに連携アダプターを適用して利用しま
 
 ## 作成アプリから直接送る
 
-対応するPlotLauncher Web / MiFiTo Webでは、上部の「Figure Studioへ送る」で現在の図と元プロジェクトをまとめて追加します。途中でプロジェクトファイルを保存する操作は不要です。
+対応するPlotLauncher Web / MiFiTo Webでは、上部の「Figure Studioへ送る」で現在の図と元プロジェクトをまとめて追加します。MiFiTo v1.9.1の「まとめてStudioへ送る」は複数画像の追加・更新に対応します。途中でプロジェクトファイルを保存する操作は不要です。
 
 - 同じブラウザで開いているFigure Studioが見つかれば、最後に操作したタブへ追加します。既存のFigureを読み直しません。
 - 見つからない場合は、クリック直後に新しいFigure Studioタブを開き、準備できてからデータを渡します。
@@ -21,8 +21,9 @@ Figure Studio側は、現在のドラフトを復元してから受信を開始�
 ```js
 import {setupTransferReceiver} from './integration/direct-transfer.mjs';
 setupTransferReceiver({
-  async onImport({app,project,preview,sourceName,transferId}) {
-    // 現在のFigureに追加し、元プロジェクトとtransferIdを保存する。
+  async onImport({app,project,preview,image,batch,sourceName,transferId}) {
+    // 単体はpreview、MiFiTo一括はbatch.imagesの画像を処理する。
+    // 元プロジェクトとtransferId、MiFiToのprojectId/imageIdを保存する。
     // 追加できなければ例外を投げる。処理が完了するまでawaitする。
   },
   onStatus({state,message}) { /* 状態表示 */ }
@@ -52,6 +53,8 @@ node integration/apply-bridge.mjs mifito C:\path\to\Microscopy_figure_tools_web
 
 通常のURLで開いた場合は「Figure Studioへ送る」を上部へ追加します。Figureから元プロジェクトを開いた場合は「Figureへ反映」を表示します。新しいバージョンのコードでは適用前に差分の確認が必要です。
 
+MiFiToの一括対応を移植する場合は、最新の `app.js` / `project.js` にある識別情報の保存・復元と `mifito-sync.mjs` も必要です。`captureBatchResult` を渡すと、通常画面には「まとめてStudioへ送る」、連携編集画面には「変更画像をまとめて反映」を追加します。
+
 ## Figure Studioから呼ぶ
 
 ```js
@@ -70,7 +73,15 @@ const session = openSource({
 
 呼出しはクリックなどのユーザー操作内で行います。戻り値の `ready` は接続結果をresolveし、`close()` は受信を終了します。`downloadProject()` は受け渡すプロジェクトを保存します。アダプターを入れたローカルコピーを試す場合は、`url:'http://localhost:PORT/'` を指定できます。
 
-プロジェクトの中で現在選択されているグラフ／画像を反映します。異なるパネルは別の編集セッションとして開きます。編集中にFigure側のパネルを削除・置換した場合は、呼出側が `onResult` で整合性を確認し、適用できなければ例外で拒否してください。
+単体反映では現在選択中のグラフ／画像を反映します。編集用タブはアプリごとに再利用し、MiFiToでは `imageId` を指定して該当画像を開きます。編集中にFigure側のパネルを削除・置換した場合は、呼出側が `onResult` で整合性を確認し、適用できなければ例外で拒否してください。
+
+## MiFiToの一括同期
+
+Figure Studio v0.3.4 / MiFiTo v1.9.1では、共通のプロジェクトBlobと `batch: {projectId, images: [{imageId, name, fingerprint, preview}]}` を渡します。プロジェクト・画像IDは `.mifito` へ保存し、旧形式では元画像情報から補完します。ファイル名や画像の並び順だけで既存パネルを置換しません。
+
+受信側は画像ごとの内容・描画設定の指紋を照合し、変更のないプレビューを差し替えません。変更画像は別のFigureにあっても配置・サイズを維持して更新し、未追加の画像は受信中のFigure、または連携編集を開いた元のFigureへ追加します。元プロジェクトは共有して関連付け、一括変更を1つのUndo履歴として扱います。送信元にない画像をStudioから自動削除する処理はありません。受信結果の `summary: {updated, added, unchanged}` で処理件数を返します。
+
+一括機能は `batch-v1` の対応確認後に使用します。変更のない画像は送信元でもプレビューを再利用し、反映確認後にだけ同期済みの状態を更新します。
 
 ## 確認
 

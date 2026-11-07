@@ -5,15 +5,56 @@ export const DEFAULT_STUDIO_URL = 'https://murajun620-crypto.github.io/plot_laun
 const RECEIPT_PREFIX = 'figure-studio:received:';
 const PROJECT_LIMIT = 320 * 1024 * 1024, PREVIEW_LIMIT = 96 * 1024 * 1024;
 const APPS = new Set(['plot','mifito']);
+const PREVIEW_TYPES = new Set(['image/svg+xml','image/png','image/jpeg','image/webp']);
+export const isTransferImageId = value => typeof value==='string' && /^[a-zA-Z0-9-]{1,200}$/.test(value);
+const cleanName = value => typeof value==='string' && value.length<=255 && !/[\u0000-\u001f]/.test(value);
+const previewValid = value => value instanceof Blob && value.size>0 && value.size<=PREVIEW_LIMIT && PREVIEW_TYPES.has(value.type);
+const hasBatch = value => Array.isArray(value?.capabilities)&&value.capabilities.includes('batch-v1');
+
+/** Validate and copy only public wire fields. Private capture state stays local. */
+export function transferResult(app,value,sourceName=value?.sourceName){
+  if(!APPS.has(app)||!(value?.project instanceof Blob)||!value.project.size||value.project.size>PROJECT_LIMIT)throw Error('元プロジェクトは320 MB以内にしてください。');
+  if(!cleanName(sourceName))throw Error('元プロジェクト名が正しくありません。');
+  const result={project:value.project,sourceName};
+  const imageInfo=(image,projectId)=>{
+    if(!isTransferImageId(projectId)||!isTransferImageId(image?.imageId)||!cleanName(image.name)||!/^[a-f0-9]{64}$/.test(image.fingerprint))throw Error('画像の識別情報が正しくありません。');
+    return {imageId:image.imageId,name:image.name,fingerprint:image.fingerprint};
+  };
+  if(value.batch!==undefined){
+    if(app!=='mifito'||value.image!==undefined||!isTransferImageId(value.batch?.projectId)||!Array.isArray(value.batch.images)||!value.batch.images.length||value.batch.images.length>100)throw Error('一括反映の画像情報が正しくありません（最大100枚）。');
+    let bytes=0;const ids=new Set();
+    const images=value.batch.images.map(image=>{
+      const info=imageInfo(image,value.batch.projectId);
+      if(image.unchanged!==undefined&&typeof image.unchanged!=='boolean')throw Error('画像の変更情報が正しくありません。');
+      if(ids.has(info.imageId)||!previewValid(image.preview)||(bytes+=image.preview.size)>PREVIEW_LIMIT)throw Error('一括反映の画像が重複しているか、形式・合計サイズが対応範囲外です（96 MB以内）。');
+      ids.add(info.imageId);return {...info,preview:image.preview,...(image.unchanged!==undefined?{unchanged:image.unchanged}:{})};
+    });
+    result.batch={projectId:value.batch.projectId,images};
+  }else{
+    if(!previewValid(value.preview))throw Error('表示用画像の形式・サイズが対応範囲外です（96 MB以内）。');
+    result.preview=value.preview;
+    if(value.image!==undefined){
+      if(app!=='mifito')throw Error('画像の識別情報が正しくありません。');
+      result.image={projectId:value.image.projectId,...imageInfo(value.image,value.image.projectId)};
+    }
+  }
+  return result;
+}
+
+/** Ignore arbitrary callback/remote fields; summary is informative, not authority. */
+export function transferReceipt(value){
+  const result={};
+  if(typeof value?.message==='string'&&value.message.length<=1000&&!/[\u0000-\u001f]/.test(value.message))result.message=value.message;
+  if(value?.summary&&['updated','added','unchanged'].every(key=>Number.isSafeInteger(value.summary[key])&&value.summary[key]>=0&&value.summary[key]<=300000))result.summary={updated:value.summary.updated,added:value.summary.added,unchanged:value.summary.unchanged};
+  return result;
+}
 const identifier = value => typeof value === 'string' && /^[a-zA-Z0-9-]{16,100}$/.test(value);
 const isOrigin = value => {
   try {const u = new URL(value);return u.origin === value && (u.protocol === 'https:' || u.protocol === 'http:' && ['localhost','127.0.0.1','[::1]'].includes(u.hostname));} catch {return false;}
 };
 export function validateTransferPayload(value) {
   if (!value || !APPS.has(value.app) || !identifier(value.transferId)) throw new Error('受信した図の識別情報が正しくありません。');
-  if (!(value.project instanceof Blob) || !value.project.size || value.project.size > PROJECT_LIMIT) throw new Error('元プロジェクトは320 MB以内にしてください。');
-  if (!(value.preview instanceof Blob) || !value.preview.size || value.preview.size > PREVIEW_LIMIT || !['image/svg+xml','image/png','image/jpeg','image/webp'].includes(value.preview.type)) throw new Error('表示用画像の形式・サイズが対応範囲外です（96 MB以内）。');
-  if (typeof value.sourceName !== 'string' || value.sourceName.length > 255 || /[\u0000-\u001f]/.test(value.sourceName)) throw new Error('元プロジェクト名が正しくありません。');
+  transferResult(value.app,value);
   return value;
 }
 export function directTransferContext(locationRef) {
@@ -36,7 +77,7 @@ export function setupTransferReceiver({onImport,onStatus=()=>{},windowRef=window
   const locks=lockManager === undefined ? windowRef.navigator?.locks : lockManager;
   const inFlight=new Map(),accepted=new Set();let closed=false,lastActive=Date.now();
   const sendChannel=(type,extra={})=>channel?.postMessage({protocol:TRANSFER_PROTOCOL,type,receiverId,...extra});
-  const presence=()=>{if(!closed)sendChannel('presence',{lastActive,at:Date.now()});};
+  const presence=()=>{if(!closed)sendChannel('presence',{lastActive,at:Date.now(),capabilities:['batch-v1']});};
   const activate=()=>{lastActive=Date.now();presence();};
   const known=id=>{if(accepted.has(id))return true;try{return !!store?.getItem(RECEIPT_PREFIX+id);}catch{return false;}};
   const remember=id=>{accepted.add(id);try{store?.setItem(RECEIPT_PREFIX+id,String(Date.now()));}catch{/* Current-session idempotence remains available. */}};
@@ -47,10 +88,10 @@ export function setupTransferReceiver({onImport,onStatus=()=>{},windowRef=window
     const run=async()=>{
       if(known(payload.transferId))return {duplicate:true};
       onStatus({state:'receiving',message:`${payload.app==='plot'?'PlotLauncher':'MiFiTo'}から図を受け取っています…`});
-      await onImport(payload);
+      const applied=transferReceipt(await onImport(payload));
       remember(payload.transferId);
-      onStatus({state:'received',message:'元プロジェクト付きの図を追加しました。'});
-      return {duplicate:false};
+      onStatus({state:'received',message:applied.message||'元プロジェクト付きの図を追加しました。'});
+      return {duplicate:false,...applied};
     };
     const promise=Promise.resolve().then(()=>locks?.request ? locks.request(`figure-studio-import-${payload.transferId}`,run) : run());
     inFlight.set(payload.transferId,promise);
@@ -84,8 +125,8 @@ export function setupTransferReceiver({onImport,onStatus=()=>{},windowRef=window
   }
   subscribe(channel,handleChannel);windowRef.addEventListener('message',handlePopup);
   windowRef.addEventListener('focus',activate);windowRef.addEventListener('pointerdown',activate);windowRef.addEventListener('keydown',activate);
-  const heartbeat=setInterval(presence,3000),readyTimer=context&&opener?setInterval(()=>{if(!popupDelivered)popupSend('receiver-ready');},650):null;
-  presence();if(context&&opener)popupSend('receiver-ready');
+  const heartbeat=setInterval(presence,3000),readyTimer=context&&opener?setInterval(()=>{if(!popupDelivered)popupSend('receiver-ready',{capabilities:['batch-v1']});},650):null;
+  presence();if(context&&opener)popupSend('receiver-ready',{capabilities:['batch-v1']});
   return {receiverId,close(){
     if(closed)return;sendChannel('gone');closed=true;clearInterval(heartbeat);clearInterval(readyTimer);
     unsubscribe(channel,handleChannel);channel?.close();windowRef.removeEventListener('message',handlePopup);
@@ -94,7 +135,7 @@ export function setupTransferReceiver({onImport,onStatus=()=>{},windowRef=window
 }
 
 /** send() must be invoked directly from a user click. It opens a fallback tab before its first await. */
-export function createDirectSender({app,captureResult,studioUrl,onStatus=()=>{},windowRef=window,channelFactory,ackTimeoutMs=30000}={}) {
+export function createDirectSender({app,captureResult,captureBatchResult,onAccepted,studioUrl,onStatus=()=>{},windowRef=window,channelFactory,ackTimeoutMs=30000}={}) {
   if(!APPS.has(app)||typeof captureResult!=='function')throw new Error('送信元アプリの設定が正しくありません。');
   const local=['localhost','127.0.0.1','[::1]'].includes(new URL(windowRef.location.href).hostname);
   const target=new URL(studioUrl || (local ? new URL(DEFAULT_STUDIO_URL).pathname : DEFAULT_STUDIO_URL),windowRef.location.href);
@@ -105,14 +146,22 @@ export function createDirectSender({app,captureResult,studioUrl,onStatus=()=>{},
   const broadcast=(type,extra={})=>channel?.postMessage({protocol:TRANSFER_PROTOCOL,type,senderId,...extra});
   const findPeer=()=>[...peers.values()].filter(p=>Date.now()-p.seen<12000).sort((a,b)=>b.lastActive-a.lastActive)[0];
   const sendPopup=(record,type,extra={})=>record.popup?.postMessage({protocol:TRANSFER_PROTOCOL,type,app,transferId:record.transferId,nonce:record.nonce,...extra},target.origin);
-  function acknowledge(record,m) {
-    if(record!==pending||m.transferId!==record.transferId||m.nonce!==record.nonce)return;
+  async function acknowledge(record,m) {
+    if(record!==pending||record.acknowledging||m.transferId!==record.transferId||m.nonce!==record.nonce)return;
     clearTimeout(record.timer);record.timer=null;
-    if(m.ok){busy=false;status('sent',m.duplicate?'この図はすでにFigure Studioへ追加されています。':'元プロジェクト付きの図をFigure Studioへ追加しました。');record.resolve?.({ok:true,duplicate:!!m.duplicate});pending=null;}
+    if(m.ok){
+      record.acknowledging=true;const receipt={ok:true,duplicate:!!m.duplicate,...transferReceipt(m)};let callbackFailed=false;
+      try{if(onAccepted)await onAccepted(record.captured,receipt);}catch{callbackFailed=true;}
+      if(disposed||record!==pending)return;
+      busy=false;pending=null;
+      status('sent',callbackFailed?'Figure Studioへの反映は完了しました。同期状態を確認してから次の送信を行ってください。':receipt.message||(m.duplicate?'この図はすでにFigure Studioへ追加されています。':'元プロジェクト付きの図をFigure Studioへ追加しました。'));
+      record.resolve?.(receipt);record.captured=null;
+    }
     else{busy=false;record.reject?.(new Error(m.message||'Figure Studioへの追加に失敗しました。'));status('error',m.message||'Figure Studioへの追加に失敗しました。');}
   }
   function deliver(record) {
     if(record!==pending||!record.payload||record.delivered)return;
+    if(record.batch&&(record.popup?record.receiverReady&&!record.receiverBatch:!record.peer?.batch)){rejectUnsupported(record);return;}
     if(record.popup){if(!record.receiverReady)return;sendPopup(record,'deliver',{payload:record.payload});}
     else broadcast('deliver',{to:record.peer.receiverId,nonce:record.nonce,payload:record.payload});
     clearTimeout(record.timer);
@@ -123,30 +172,36 @@ export function createDirectSender({app,captureResult,studioUrl,onStatus=()=>{},
       status('retry','Figure Studioからの確認が届きません。もう一度押して再試行してください。');
     },ackTimeoutMs);
   }
+  function rejectUnsupported(record){
+    clearTimeout(record.timer);record.timer=null;busy=false;
+    const message='Figure Studioを最新版へ更新してから、一括送信を再試行してください。';
+    status('unavailable',message);record.reject?.(new Error(message));
+  }
   function channelMessage(event) {
     const m=event.data;if(disposed||m?.protocol!==TRANSFER_PROTOCOL)return;
-    if(m.type==='presence'&&identifier(m.receiverId)&&Number.isFinite(m.lastActive)){peers.set(m.receiverId,{receiverId:m.receiverId,lastActive:m.lastActive,seen:Date.now()});}
+    if(m.type==='presence'&&identifier(m.receiverId)&&Number.isFinite(m.lastActive)){peers.set(m.receiverId,{receiverId:m.receiverId,lastActive:m.lastActive,seen:Date.now(),batch:hasBatch(m)});}
     else if(m.type==='gone')peers.delete(m.receiverId);
     else if(m.type==='ack'&&m.to===senderId&&pending&&!pending.popup&&m.receiverId===pending.peer?.receiverId)acknowledge(pending,m);
   }
   function popupMessage(event) {
     const m=event.data,record=pending;
     if(disposed||!record?.popup||event.source!==record.popup||event.origin!==target.origin||m?.protocol!==TRANSFER_PROTOCOL||m.transferId!==record.transferId||m.nonce!==record.nonce||m.app!==app)return;
-    if(m.type==='receiver-ready'){record.receiverReady=true;deliver(record);}
+    if(m.type==='receiver-ready'){record.receiverReady=true;record.receiverBatch=hasBatch(m);deliver(record);}
     else if(m.type==='ack')acknowledge(record,m);
   }
   subscribe(channel,channelMessage);windowRef.addEventListener('message',popupMessage);broadcast('discover');
   const discovery=setInterval(()=>broadcast('discover'),4000);
-  function send() {
+  function send({batch=false}={}) {
     if(disposed)return Promise.reject(new Error('送信機能は終了しています。'));
     if(busy)return pending?.promise || Promise.resolve({ok:false});
-    const record=pending || {transferId:crypto.randomUUID(),nonce:crypto.randomUUID(),payload:null};
-    const previousPopup=record.popup&&!record.popup.closed?record.popup:null,previousReady=record.receiverReady;
-    clearTimeout(record.timer);record.timer=null;record.delivered=false;record.receiverReady=false;record.peer=target.origin===windowRef.location.origin?findPeer():null;record.popup=null;
+    if(!pending&&batch&&(app!=='mifito'||typeof captureBatchResult!=='function'))return Promise.reject(new Error('一括送信には対応していません。'));
+    const record=pending || {transferId:crypto.randomUUID(),nonce:crypto.randomUUID(),payload:null,batch:!!batch};
+    const previousPopup=record.popup&&!record.popup.closed?record.popup:null,previousReady=record.receiverReady,previousBatch=record.receiverBatch;
+    clearTimeout(record.timer);record.timer=null;record.delivered=false;record.receiverReady=false;record.receiverBatch=false;record.peer=target.origin===windowRef.location.origin?findPeer():null;record.popup=null;
     pending=record;busy=true;
     // Do not await data generation or discovery before opening a new tab.
     if(!record.peer){
-      if(previousPopup){record.popup=previousPopup;record.receiverReady=previousReady;previousPopup.focus?.();}
+      if(previousPopup){record.popup=previousPopup;record.receiverReady=previousReady;record.receiverBatch=previousBatch;previousPopup.focus?.();}
       else {
         const url=new URL(target.href),hash=new URLSearchParams(url.hash.slice(1));
         for(const [key,value] of Object.entries({figureTransfer:record.transferId,sourceNonce:record.nonce,sourceOrigin:windowRef.location.origin,sourceApp:app}))hash.set(key,value);
@@ -157,7 +212,8 @@ export function createDirectSender({app,captureResult,studioUrl,onStatus=()=>{},
     record.promise=new Promise((resolve,reject)=>{record.resolve=resolve;record.reject=reject;});
     status('preparing','図と元プロジェクトを準備しています…');
     Promise.resolve().then(async()=>{
-      if(!record.payload){const result=await captureResult();record.payload=validateTransferPayload({app,project:result.project,preview:result.preview,sourceName:result.sourceName || (app==='plot'?'figure.plotproject':'figure.mifito'),transferId:record.transferId});}
+      if(record.batch&&record.peer&&!record.peer.batch){rejectUnsupported(record);return;}
+      if(!record.payload){const result=await(record.batch?captureBatchResult():captureResult()),wire=transferResult(app,result,result.sourceName || (app==='plot'?'figure.plotproject':'figure.mifito'));if(!!wire.batch!==record.batch)throw Error('編集結果の一括反映形式を確認してください。');record.payload=validateTransferPayload({app,...wire,transferId:record.transferId});record.captured=result;}
       if(record===pending){
         deliver(record);
         if(record.popup&&!record.receiverReady){
@@ -172,22 +228,26 @@ export function createDirectSender({app,captureResult,studioUrl,onStatus=()=>{},
 }
 
 /** Header button for normal editor visits. Bridge editing retains its existing return button. */
-export function setupDirectSendButton({app,captureResult,container,studioUrl,isReady=()=>true,documentRef=document,windowRef=window}={}) {
+export function setupDirectSendButton({app,captureResult,captureBatchResult,onAccepted,container,studioUrl,isReady=()=>true,documentRef=document,windowRef=window}={}) {
   if(new URLSearchParams(windowRef.location.hash.slice(1)).has('figureBridge'))return null;
   const host=typeof container==='string'?documentRef.querySelector(container):container;
   if(!host)return null;
   const group=documentRef.createElement('div');group.style.cssText='display:inline-flex;align-items:center;gap:6px;position:relative';
   const button=documentRef.createElement('button');button.id='send-to-figure-studio';button.type='button';button.className='button primary';button.textContent='Figure Studioへ送る';button.title='表示中の図と元プロジェクトを、開いているFigure Studioへ追加します。';
+  const batchButton=app==='mifito'&&typeof captureBatchResult==='function'?documentRef.createElement('button'):null;
+  if(batchButton){batchButton.id='send-all-to-figure-studio';batchButton.type='button';batchButton.className='button primary';batchButton.textContent='まとめてStudioへ送る';batchButton.title='変更した画像をまとめて反映し、未追加の画像を追加します。変更のない画像はそのまま残します。';}
   const message=documentRef.createElement('span');message.setAttribute('role','status');message.style.cssText='display:none;position:absolute;right:0;top:calc(100% + 8px);width:280px;z-index:10000;padding:10px 12px;background:#fff;color:#173c38;border:1px solid #b8cfcb;border-radius:8px;box-shadow:0 5px 18px #173c3825;font:12px/1.5 system-ui;';
-  group.append(button,message);host.append(group);
+  group.append(button);if(batchButton)group.append(batchButton);group.append(message);host.append(group);
   let hideTimer;
-  const sender=createDirectSender({app,captureResult,studioUrl,windowRef,onStatus:({state,message:text})=>{
+  const sender=createDirectSender({app,captureResult,captureBatchResult,onAccepted,studioUrl,windowRef,onStatus:({state,message:text})=>{
     clearTimeout(hideTimer);message.textContent=text;message.style.display='block';
     button.disabled=['preparing','waiting','sending'].includes(state)||!isReady();
+    if(batchButton)batchButton.disabled=button.disabled;
     button.textContent=state==='retry'?'送信を再試行':state==='preparing'?'図を準備中…':'Figure Studioへ送る';
     if(state==='sent')hideTimer=setTimeout(()=>{message.style.display='none';},7000);
   }});
-  const sync=()=>{button.disabled=sender.busy||!isReady();};
+  const sync=()=>{button.disabled=sender.busy||!isReady();if(batchButton)batchButton.disabled=button.disabled;};
   button.addEventListener('click',()=>{if(isReady())sender.send().catch(()=>{});});sync();
-  return {button,sender,sync,close(){clearTimeout(hideTimer);sender.close();group.remove();}};
+  batchButton?.addEventListener('click',()=>{if(isReady())sender.send({batch:true}).catch(()=>{});});
+  return {button,batchButton,sender,sync,close(){clearTimeout(hideTimer);sender.close();group.remove();}};
 }
