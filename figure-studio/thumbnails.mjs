@@ -174,7 +174,7 @@ export function createFigureSidebar({root,onSelect,onCommand,onReorder,onSelecti
     const card={button,preview,image,number,name,count,figure:f,signature:null,version:0,dirty:true,visible:false};
     cards.set(f.id,card);root.append(button);observer.observe(button);return card;
   }
-  return {getSelectedIds:()=>[...selectedIds],select(ids,nextActive){
+  return {invalidate(ids){for(const id of ids){const card=cards.get(id);if(card){card.signature=null;card.dirty=true;card.version++;}}schedule();},getSelectedIds:()=>[...selectedIds],select(ids,nextActive){
     if(nextActive&&order.includes(nextActive)){activeId=nextActive;focusedId=nextActive;anchorId=nextActive;}
     setSelection(ids);
   },update(figures,nextActive){

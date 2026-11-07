@@ -1,5 +1,6 @@
 // MathJax is loaded only when a text object actually contains TeX. The pinned
 // SVG bundle includes its font paths, so rendering and export also work offline.
+import {installNativeMathFont} from './native-math-font.mjs?v=live-v062-1';
 const engineLoads=new WeakMap();
 const MAX_SOURCE=50000,MAX_NODES=30000;
 const numericList=value=>String(value??'').trim().split(/[\s,]+/).filter(Boolean).map(Number);
@@ -122,7 +123,7 @@ export async function makeTexLayout(object,{measure,convert}){
  const o={...object},fontSize=Number(o.fontSize),width=Math.max(1,Number(o.w)-2);
  if(!Number.isFinite(fontSize)||fontSize<=0||!Number.isFinite(width))throw new Error('数式の文字サイズが不正です。');
  const source=String(o.text??'');if(source.length>MAX_SOURCE)throw new Error('数式のテキストが長すぎます。');
- const pieces=splitTex(source,o.textMode),segments=await Promise.all(pieces.map(async piece=>piece.type==='math'?{...piece,geometry:await convert(piece.text,piece.display)}:piece));
+ const pieces=splitTex(source,o.textMode),segments=await Promise.all(pieces.map(async piece=>piece.type==='math'?{...piece,geometry:await convert(piece.text,piece.display,o)}:piece));
  const rows=[];let row={runs:[],width:0,ascent:fontSize*.95,descent:fontSize*.3};
  const nextRow=()=>{rows.push(row);row={runs:[],width:0,ascent:fontSize*.95,descent:fontSize*.3};};
  const measured=text=>{const value=Number(measure(text,o));if(!Number.isFinite(value)||value<0)throw new Error('文字の幅を計算できませんでした。');return value;};
@@ -168,18 +169,18 @@ export function createTexRenderer({measure=(text,o)=>[...text].length*o.fontSize
  const cache=new Map(),mathCache=new Map();let queue=Promise.resolve();
  const key=o=>JSON.stringify([o.textMode||'auto',String(o.text??''),o.fontSize,o.fontFamily||'Arial',!!o.bold,!!o.italic,!!o.underline,o.w,o.textAlign||'left']);
  const hasMath=o=>o?.type==='text'&&o.textMode!=='plain'&&(o.textMode==='tex'||splitTex(o.text,o.textMode).some(piece=>piece.type==='math'));
- async function convertMath(source,display){
-  const mathKey=JSON.stringify([source,display]);if(mathCache.has(mathKey))return mathCache.get(mathKey);
+ async function convertMath(source,display,object){
+  const mathKey=JSON.stringify([source,display,object.fontFamily||'Arial',!!object.bold,!!object.italic]);if(mathCache.has(mathKey))return mathCache.get(mathKey);
   const work=queue.then(async()=>{
-   if(convert)return convert(source,display);
+   if(convert)return convert(source,display,object);
    const engine=await loadEngine(documentRef);
    // TeX definitions are local to an object. Reusing an input Jax would let a
    // previous object's \newcommand change a later object's meaning and invalidate its
    // cache key. Fonts/output remain shared; no script or font is reloaded.
    engine.startup.input=engine.startup.getInputJax();
    engine.startup.document=engine.startup.getDocument();
-   const output=await engine.tex2svgPromise(source,{display});
-   return geometryFromMathSvg(output.querySelector('svg'));
+   const restore=installNativeMathFont(Array.isArray(engine.startup.output)?engine.startup.output[0]:engine.startup.output,object,{documentRef});
+   try{const output=await engine.tex2svgPromise(source,{display});return geometryFromMathSvg(output.querySelector('svg'));}finally{restore();}
   });
   queue=work.catch(()=>{});mathCache.set(mathKey,work);
   if(mathCache.size>512)mathCache.delete(mathCache.keys().next().value);

@@ -35,8 +35,8 @@
 #studioRibbon .ribbon-command[aria-expanded=true],#studioRibbon .ribbon-menu[open]>summary{background:#e7f1ee;color:var(--accent)}
 #studioRibbon .ribbon-menu>summary>.icon:last-child{width:12px;height:12px;margin-left:auto}
 .ribbon-history{display:flex;gap:2px}
-.ribbon-edit-group{width:80px;padding-inline:8px}
-.ribbon-font-group{width:344px}
+.ribbon-edit-group{width:69px;padding-inline:6px}
+.ribbon-font-group{width:300px}
 #studioRibbon .font-row{gap:5px;margin:0}
 #studioRibbon .font-row select{height:29px;flex:1;padding:4px 7px;font-size:12px;background:#fff;border-color:#cfd6db;border-radius:3px}
 #studioRibbon .font-size-field{width:69px;flex:0 0 69px;height:29px;border-radius:3px;border-color:#cfd6db;background:#fff}
@@ -45,16 +45,16 @@
 #studioRibbon .ribbon-text-menu{margin-left:auto}
 #studioRibbon .ribbon-text-menu>summary{width:31px;justify-content:center;padding:4px}
 #studioRibbon .ribbon-text-menu>summary>span,#studioRibbon .ribbon-text-menu>summary>.icon:last-child{display:none}
-.ribbon-paragraph-group{width:108px}
+.ribbon-paragraph-group{width:100px}
 .ribbon-paragraph-buttons{display:flex;align-items:center;justify-content:space-between;gap:1px}
 #studioRibbon .ribbon-paragraph-buttons .icon-button{width:26px}
 #studioRibbon #propAlign{height:29px;width:100%;font-size:11px;border-radius:3px;background:#fff;padding:4px 5px}
-.ribbon-drawing-group{width:240px}
+.ribbon-drawing-group{width:226px}
 .ribbon-tool-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3px}
 #studioRibbon .tool-button{display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:4px;min-height:29px;height:29px;width:auto;padding:4px;border-radius:3px;white-space:nowrap}
 #studioRibbon .tool-button .icon{width:17px;height:17px}
 #studioRibbon .tool-button span{font-size:10px;letter-spacing:0;line-height:17px}
-.ribbon-arrange-group{width:138px}
+.ribbon-arrange-group{width:116px}
 .ribbon-figure-group{width:118px}
 #studioRibbon .ribbon-menu .dropdown-panel{position:fixed;top:180px;right:auto;left:12px;z-index:160;overflow:auto;padding:7px;border-color:#d5dcdf;border-radius:5px;box-shadow:0 7px 24px #26363826}
 #studioRibbon .ribbon-menu .dropdown-panel .ribbon-command{width:100%;min-height:32px;padding:5px 8px;justify-content:flex-start}
@@ -77,23 +77,34 @@
 #studioRibbon #propTextMode{flex:1;min-width:0;height:29px;padding:3px 6px;border-radius:3px;background:#fff;font-size:11px}
 .text-mode-example{margin:7px 0 0;color:#74808a;font-size:10px;line-height:1.5}
 .text-mode-example code{font-family:Consolas,monospace;color:#53626b;font-size:11px}
+.tex-live-panel{position:fixed;right:22px;bottom:48px;width:min(660px,calc(100vw - 32px));z-index:200;background:#fff;border:1px solid #cad5d8;border-radius:8px;box-shadow:0 10px 40px #172f3633;overflow:hidden}
+.tex-live-panel>header{display:flex;align-items:center;gap:12px;min-height:36px;padding:5px 10px;background:#f5f8f9;border-bottom:1px solid #e0e7e9;font-size:12px}
+#texPreviewStatus{flex:1;font-size:11px;color:#61717b}
+#finishTextEdit{border:1px solid #c8dcda;border-radius:4px;background:#edf6f3;color:var(--accent);padding:4px 12px}
+.tex-preview-body{display:grid;grid-template-columns:45% 55%;min-height:176px;max-height:calc(100vh - 300px)}
+.tex-source-slot{position:relative;border-right:1px solid #e1e7e9;min-height:176px;padding:6px 9px;font-size:10px;color:#74808a}
+.tex-preview-result{display:flex;align-items:center;justify-content:center;min-width:0;overflow:auto;padding:10px}
+#texPreviewSvg{display:block;width:100%;max-height:156px;overflow:visible}
+.tex-live-panel[data-source=ribbon]{width:min(460px,calc(100vw - 32px))}
+.tex-live-panel[data-source=ribbon] .tex-preview-body{grid-template-columns:1fr}
+.tex-live-panel[data-state=incomplete] #texPreviewStatus{color:#996e25}
 .ribbon-inline-group .ribbon-group-body{flex-direction:row;align-items:center;justify-content:flex-start;gap:8px}
 #studioRibbon .ribbon-large-button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;min-width:68px;min-height:62px;padding:7px 10px;border:1px solid transparent;border-radius:4px;font-size:11px;white-space:nowrap}
 #studioRibbon .ribbon-large-button .icon{width:24px;height:24px}
 #studioRibbon [data-ribbon-panel=insert] .tool-button{flex-direction:column;justify-content:center;gap:7px;min-width:65px;height:62px;padding:7px}
 #studioRibbon [data-ribbon-panel=insert] .tool-button .icon{width:23px;height:23px}
 .ribbon-insert-shapes{display:flex;gap:3px}
-.ribbon-geometry-group{width:252px}
+.ribbon-geometry-group{width:214px}
 #studioRibbon .geometry-fields{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
 #studioRibbon .inline-field{height:29px;min-width:0;padding:0 6px;gap:4px;border-radius:3px;background:#fff;border-color:#d4dade}
 #studioRibbon .inline-field>span{font-size:10px;color:#61717b}
 #studioRibbon .inline-field>input{font-size:11px;padding:4px 0}
-.ribbon-style-group{width:220px}
+.ribbon-style-group{width:200px}
 #studioRibbon .ribbon-style-group>.ribbon-group-body{display:grid;grid-template-rows:29px 29px;align-content:center;gap:5px}
 #studioRibbon .ribbon-style-group .field-grid{grid-template-columns:minmax(0,116px) minmax(0,1fr);gap:8px;align-items:center}
 #studioRibbon .color-field{gap:4px;padding:0;color:#53626b;font-size:10px}
 #studioRibbon .color-field input{width:27px;height:26px;padding:2px;border-radius:3px}
-.ribbon-style-actions{display:grid;grid-template-columns:82px 50px minmax(0,1fr);align-items:center;gap:4px}
+.ribbon-style-actions{display:grid;grid-template-columns:74px 48px minmax(0,1fr);align-items:center;gap:4px}
 /* Reset the old inspector rule: span 2 created an extra row and clipped icons. */
 #studioRibbon .ribbon-style-group .stroke-field{grid-column:auto;margin:0;min-width:0}
 #studioRibbon .ribbon-style-group .stroke-field input{padding-left:0;text-align:right}

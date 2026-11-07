@@ -97,6 +97,13 @@ test('invalid TeX fails export once per key without repaint retry or unhandled r
  assert.equal(calls,1);assert.equal(errors,1);assert.ok(renderer.getError(bad) instanceof Error);
 });
 
+test('formula geometry caches are separated by selected family and font weight',async()=>{
+ const seen=[],renderer=createTexRenderer({measure,convert:async(source,display,o)=>{seen.push([o.fontFamily,!!o.bold]);return geometry;}});
+ const first=object({text:'$E=mc^2$',fontFamily:'Arial'});await renderer.prepare([first]);
+ await renderer.prepare([{...first,fontFamily:'Times New Roman'}]);await renderer.prepare([{...first,bold:true}]);await renderer.prepare([first]);
+ assert.deepEqual(seen,[['Arial',false],['Times New Roman',false],['Arial',true]]);
+});
+
 function dom(tag,attrs={},children=[],text=''){
  const node={localName:tag,attributes:Object.entries(attrs).map(([name,value])=>({name,value:String(value)})),children,childNodes:[...(text?[{nodeType:3,nodeValue:text}]:[]),...children],getAttribute(name){return Object.hasOwn(attrs,name)?String(attrs[name]):null;},querySelector(){return null;},querySelectorAll(){return this.children.flatMap(child=>[child,...child.querySelectorAll()]).filter(child=>child.getAttribute('id'));}};
  return node;
