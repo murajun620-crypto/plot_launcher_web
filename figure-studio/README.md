@@ -1,6 +1,8 @@
-# Figure Studio Web v0.6.4
+# Figure Studio Web v0.6.5
 
 論文のFigureを、元の編集プロジェクトと一緒に組み立てるWebアプリです。GitHub Pagesで配信できる静的HTML/JavaScriptで、ビルドやサーバー処理は不要です。
+
+v0.6.5／PlotLauncher v2.4.24では、PlotLauncherで別の `.plotproject` や新しい元データ・サンプルを開いた場合に前の図への接続を解除します。次の送信は新しい図としてStudioへ追加し、Studioから元編集を開いた場合は既存の図を更新します。読み込み失敗時は元の図と接続を保持し、変更のないグラフを未反映として扱う問題も修正しました。
 
 [統合画面を開く](https://murajun620-crypto.github.io/plot_launcher_web/figure-studio/)と、上部のStudio／PlotLauncher／MiFiToタブで作図・画像編集・レイアウトを切り替えられます。一度開いた編集画面はタブ切替で再読み込みせず、そのまま保持します。図をStudioへ送ると、受信完了後にStudioタブへ戻ります。
 
