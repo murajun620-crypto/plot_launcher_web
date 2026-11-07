@@ -1,5 +1,6 @@
 /* Office-style editing controls. The canvas engine keeps its existing IDs. */
 :root{--chrome:#f8f9fa;--line:#dfe3e6;--figures:168px;--inspector:256px}
+#canvas[data-canvas-tool]:not([data-canvas-tool="select"]),#canvas[data-canvas-tool]:not([data-canvas-tool="select"]) *{cursor:crosshair!important}
 .app-shell{min-width:0;width:100%}
 .app-header{height:54px;min-height:54px;flex-wrap:nowrap;gap:16px;padding:0 16px;background:#fafbfc}
 .document-title{min-width:100px}
@@ -34,7 +35,7 @@
 #studioRibbon .ribbon-command[aria-expanded=true],#studioRibbon .ribbon-menu[open]>summary{background:#e7f1ee;color:var(--accent)}
 #studioRibbon .ribbon-menu>summary>.icon:last-child{width:12px;height:12px;margin-left:auto}
 .ribbon-history{display:flex;gap:2px}
-.ribbon-edit-group{width:86px}
+.ribbon-edit-group{width:80px;padding-inline:8px}
 .ribbon-font-group{width:344px}
 #studioRibbon .font-row{gap:5px;margin:0}
 #studioRibbon .font-row select{height:29px;flex:1;padding:4px 7px;font-size:12px;background:#fff;border-color:#cfd6db;border-radius:3px}
@@ -44,15 +45,16 @@
 #studioRibbon .ribbon-text-menu{margin-left:auto}
 #studioRibbon .ribbon-text-menu>summary{width:31px;justify-content:center;padding:4px}
 #studioRibbon .ribbon-text-menu>summary>span,#studioRibbon .ribbon-text-menu>summary>.icon:last-child{display:none}
-.ribbon-paragraph-group{width:116px}
+.ribbon-paragraph-group{width:108px}
 .ribbon-paragraph-buttons{display:flex;align-items:center;justify-content:space-between;gap:1px}
+#studioRibbon .ribbon-paragraph-buttons .icon-button{width:26px}
 #studioRibbon #propAlign{height:29px;width:100%;font-size:11px;border-radius:3px;background:#fff;padding:4px 5px}
-.ribbon-drawing-group{width:254px}
+.ribbon-drawing-group{width:240px}
 .ribbon-tool-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3px}
 #studioRibbon .tool-button{display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:4px;min-height:29px;height:29px;width:auto;padding:4px;border-radius:3px;white-space:nowrap}
 #studioRibbon .tool-button .icon{width:17px;height:17px}
 #studioRibbon .tool-button span{font-size:10px;letter-spacing:0;line-height:17px}
-.ribbon-arrange-group{width:147px}
+.ribbon-arrange-group{width:138px}
 .ribbon-figure-group{width:118px}
 #studioRibbon .ribbon-menu .dropdown-panel{position:fixed;top:180px;right:auto;left:12px;z-index:160;overflow:auto;padding:7px;border-color:#d5dcdf;border-radius:5px;box-shadow:0 7px 24px #26363826}
 #studioRibbon .ribbon-menu .dropdown-panel .ribbon-command{width:100%;min-height:32px;padding:5px 8px;justify-content:flex-start}
@@ -70,22 +72,31 @@
 .arrange-grid{display:grid;grid-template-columns:1fr 1fr;gap:2px}
 #studioRibbon .ribbon-text-menu .dropdown-panel{width:300px;padding:10px}
 #studioRibbon #propText{display:block;min-height:90px;width:100%;margin:0;padding:8px;font-size:13px;resize:vertical}
+.text-mode-field{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:11px;color:#53626b}
+.text-mode-field>span{flex:none;white-space:nowrap}
+#studioRibbon #propTextMode{flex:1;min-width:0;height:29px;padding:3px 6px;border-radius:3px;background:#fff;font-size:11px}
+.text-mode-example{margin:7px 0 0;color:#74808a;font-size:10px;line-height:1.5}
+.text-mode-example code{font-family:Consolas,monospace;color:#53626b;font-size:11px}
 .ribbon-inline-group .ribbon-group-body{flex-direction:row;align-items:center;justify-content:flex-start;gap:8px}
 #studioRibbon .ribbon-large-button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;min-width:68px;min-height:62px;padding:7px 10px;border:1px solid transparent;border-radius:4px;font-size:11px;white-space:nowrap}
 #studioRibbon .ribbon-large-button .icon{width:24px;height:24px}
 #studioRibbon [data-ribbon-panel=insert] .tool-button{flex-direction:column;justify-content:center;gap:7px;min-width:65px;height:62px;padding:7px}
 #studioRibbon [data-ribbon-panel=insert] .tool-button .icon{width:23px;height:23px}
 .ribbon-insert-shapes{display:flex;gap:3px}
-.ribbon-geometry-group{width:322px}
-#studioRibbon .geometry-fields{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+.ribbon-geometry-group{width:252px}
+#studioRibbon .geometry-fields{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
 #studioRibbon .inline-field{height:29px;min-width:0;padding:0 6px;gap:4px;border-radius:3px;background:#fff;border-color:#d4dade}
 #studioRibbon .inline-field>span{font-size:10px;color:#61717b}
 #studioRibbon .inline-field>input{font-size:11px;padding:4px 0}
-.ribbon-style-group{width:320px}
-#studioRibbon .ribbon-style-group .field-grid{grid-template-columns:120px 70px 91px;gap:8px;align-items:center}
+.ribbon-style-group{width:220px}
+#studioRibbon .ribbon-style-group>.ribbon-group-body{display:grid;grid-template-rows:29px 29px;align-content:center;gap:5px}
+#studioRibbon .ribbon-style-group .field-grid{grid-template-columns:minmax(0,116px) minmax(0,1fr);gap:8px;align-items:center}
 #studioRibbon .color-field{gap:4px;padding:0;color:#53626b;font-size:10px}
 #studioRibbon .color-field input{width:27px;height:26px;padding:2px;border-radius:3px}
-.ribbon-style-actions{display:flex;align-items:center;justify-content:space-between;gap:5px}
+.ribbon-style-actions{display:grid;grid-template-columns:82px 50px minmax(0,1fr);align-items:center;gap:4px}
+/* Reset the old inspector rule: span 2 created an extra row and clipped icons. */
+#studioRibbon .ribbon-style-group .stroke-field{grid-column:auto;margin:0;min-width:0}
+#studioRibbon .ribbon-style-group .stroke-field input{padding-left:0;text-align:right}
 #studioRibbon .ribbon-style-actions .ribbon-command{font-size:10px;padding:3px 5px;min-height:26px}
 .ribbon-arc-group{width:145px}
 .ribbon-path-group{width:151px}
@@ -107,7 +118,7 @@
 
 /* Familiar theme, standard and recent palettes share one keyboard-friendly layout. */
 .color-palette-dropdown{min-width:0}
-#studioRibbon .color-palette-trigger{height:29px;gap:5px;padding:3px 4px;font-size:10px}
+#studioRibbon .color-palette-trigger{height:29px;gap:5px;padding:2px 4px;font-size:10px}
 #studioRibbon .color-palette-font,#studioRibbon .color-palette-text-stroke{flex:0 0 40px;width:40px;margin-inline:1px}
 #studioRibbon .color-palette-font>.color-palette-trigger,#studioRibbon .color-palette-text-stroke>.color-palette-trigger{gap:3px}
 #studioRibbon .color-palette-trigger[aria-disabled=true]{opacity:.4;cursor:default}

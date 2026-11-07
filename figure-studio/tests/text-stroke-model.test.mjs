@@ -4,9 +4,10 @@ import {STROKE_ALIGNMENTS,makeObject,newDocument,validateDocument,History,clone}
 
 const documentWith=objects=>({...newDocument(),objects});
 
-test('new text has centered stroke geometry but retains no-outline defaults',()=>{
- const text=makeObject('text');assert.equal(text.strokeAlignment,'center');assert.equal(text.stroke,'none');assert.equal(text.strokeWidth,1);assert.equal(text.fill,'#172f36');
+test('new text defaults its stroke outside while retaining no-outline paint and legacy shape defaults',()=>{
+ const text=makeObject('text');assert.equal(text.strokeAlignment,'outside');assert.equal(text.stroke,'none');assert.equal(text.strokeWidth,1);assert.equal(text.fill,'#172f36');
  assert.equal(text.fillTransparency,0);assert.equal(text.strokeTransparency,0);assert.equal(text.opacity,1);
+ assert.equal(makeObject('rect').strokeAlignment,'center');assert.equal(makeObject('text',{strokeAlignment:'center'}).strokeAlignment,'center');
  assert.deepEqual(STROKE_ALIGNMENTS,['outside','inside','center']);assert.equal(Object.isFrozen(STROKE_ALIGNMENTS),true);
 });
 

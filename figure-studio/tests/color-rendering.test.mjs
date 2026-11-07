@@ -23,10 +23,10 @@ function harness(objects=[]){
  let exported;
  class Serializer{serializeToString(node){exported=node;return serialize(node);}}
  const image={dataUrl:'data:image/png;base64,AQID',previewUrl:'data:image/png;base64,BAUG'},assets=new Map([['raster',image]]),doc={...newDocument(),objects};
- const api=Function('el','isPathObject','pathData','arrowGeometry','assets','doc','toMM','XMLSerializer','renderTextPaint','uid',
+ const api=Function('el','isPathObject','pathData','arrowGeometry','assets','doc','toMM','XMLSerializer','renderTextPaint','uid','texRenderer',
   `let editingId=null,scale=2;const ns='http://www.w3.org/2000/svg',measure={measureText:text=>({width:text.length*6})},previewQuality={getURL:asset=>asset.previewUrl};function finishText(){}`+
   section('function transform(','function drawContent(')+section('function drawContent(','function render(){')+section('function buildExport(){','function validateBook(')+'return {drawContent,buildExport};'
- )(el,isPathObject,pathData,arrowGeometry,assets,doc,toMM,Serializer,renderTextPaint,()=> 'text-paint-test');
+ )(el,isPathObject,pathData,arrowGeometry,assets,doc,toMM,Serializer,renderTextPaint,()=> 'text-paint-test',{hasMath:()=>false,getLayout:()=>null});
  return {...api,image,get exported(){return exported;},draw(object,full=false){const group=el('g');api.drawContent(object,group,full);return group;}};
 }
 const inherit=(node,name,fallback)=>{for(let current=node;current;current=current.parent){const value=current.getAttribute(name);if(value!==null)return value;}return fallback;};
@@ -106,7 +106,7 @@ test('inside and outside text outlines inherit overall opacity once while mask a
 });
 
 test('SVG export and canvas/thumbnail share paint attributes for every type while images retain original raster data',()=>{
- const types=['image','text','line','arrow','rect','ellipse','curve','freeform','arc'],objects=types.map(type=>makeObject(type,{assetId:'raster',closed:true,fill:'#debc9a',stroke:'#123456',fillTransparency:80,strokeTransparency:30,opacity:.55,arrowStartStyle:'open',arrowEndStyle:'triangle'})),app=harness(objects),markup=app.buildExport(),groups=app.exported.children.filter(node=>node.tag==='g');
+ const types=['image','text','line','arrow','rect','ellipse','curve','freeform','arc'],objects=types.map(type=>makeObject(type,{assetId:'raster',closed:true,fill:'#debc9a',stroke:'#123456',strokeAlignment:'center',fillTransparency:80,strokeTransparency:30,opacity:.55,arrowStartStyle:'open',arrowEndStyle:'triangle'})),app=harness(objects),markup=app.buildExport(),groups=app.exported.children.filter(node=>node.tag==='g');
  assert.equal(groups.length,types.length);assert.doesNotMatch(markup,/data-hit=|stroke="transparent"|data-id=|NaN|Infinity/);
  groups.forEach((exported,index)=>{
   const preview=app.draw(objects[index]),thumbnail=app.draw(objects[index],'thumbnail');
