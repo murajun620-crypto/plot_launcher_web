@@ -84,6 +84,8 @@ class TextAnnotation(AnnotationBase):
     font_family: str = "Arial"
     bold: bool = False
     italic: bool = False
+    underline: bool = False
+    text_align: str = "left"
     horizontal_alignment: str = "left"
     vertical_alignment: str = "baseline"
 
@@ -112,6 +114,8 @@ class TextAnnotation(AnnotationBase):
             font_family=_coerce_text(data.get("font_family"), "Arial"),
             bold=bold,
             italic=italic,
+            underline=_coerce_bool(data.get("underline"), False),
+            text_align=_coerce_text(data.get("text_align"), _coerce_text(data.get("horizontal_alignment"), "left")),
             horizontal_alignment=_coerce_text(data.get("horizontal_alignment"), "left"),
             vertical_alignment=_coerce_text(data.get("vertical_alignment"), "baseline"),
         )

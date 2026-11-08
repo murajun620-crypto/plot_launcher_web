@@ -14,7 +14,7 @@ const functions=[
  section('function renderInspector(){','function renderLayers('),
  section('function positionEditor(){',"editor.addEventListener("),
  section('function restoreTextCaret(){',"editor.addEventListener('blur'"),
- section('function applyTextStyle(', 'const sizes='),
+ section('function applyTextStyle(', 'function changeFont('),
  section('function commitPropertyInput(',"for(const input of $$('[data-prop]')){"),
 ].join('\n');
 

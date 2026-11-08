@@ -4,13 +4,16 @@ import {identifyPlotProject,plotSheetIndex,mergePlotCheckpoint,samePlotCheckpoin
 import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=9127ec4c4f31";
 import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=9127ec4c4f31";
 import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9127ec4c4f31";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=ed862a544434";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=ed862a544434";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=ed862a544434";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=61d158587773";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=61d158587773";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=61d158587773";
 
+import {createAnnotationTextEditor} from './annotation-editor.mjs?v=61d158587773';
+import {createShortcutHandler} from './shortcuts.mjs?v=61d158587773';
+import {formatText,TEXT_FORMAT_ACTIONS} from './text-format.mjs?v=61d158587773';
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
-const APP_BUILD = 'ed862a544434';
+const APP_BUILD = '61d158587773';
 function makeProject(settings,data,fonts,workspace={}){
   const live=sourceData&&data.filename===sourceData.filename&&(data.bytes===sourceData.bytes||data.files&&data.files===sourceData.files);
   const projectId=workspace.figureStudioProjectId||data.figureStudioProjectId||(live?(sourceData.figureStudioProjectId||=crypto.randomUUID()):crypto.randomUUID());
@@ -389,7 +392,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=ed862a544434", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=61d158587773", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -1002,6 +1005,7 @@ function drawAnnotations() {
     input.title=`Enterで改行できます。${MICRO_HINT}`;
     // HTML strips one leading newline in a textarea; restore the exact text.
     input.value=config.annotations[Number(input.closest('[data-annotation-index]').dataset.annotationIndex)]?.text ?? '';
+    input.addEventListener('focus',()=>beginPlotAnnotationText(config.annotations[Number(input.closest('[data-annotation-index]').dataset.annotationIndex)]?.id));
   });
   syncOpacityControls();
   enhanceColorInputs();
@@ -2566,15 +2570,43 @@ async function loadFontFiles(files) {
   } catch (error) { status(error.message, "error"); fontMessage(error.message, true); return false; }
   finally { loading = false; updateButtons(); if (renderWanted) renderPreview(); }
 }
+const plotTextEditor=createAnnotationTextEditor();let plotFormatClipboard=null;
+function plotTextValue(item){return {text:item.text,fontSize:item.font_size,fontFamily:item.font_family,bold:item.bold,italic:item.italic,underline:item.underline,textAlign:item.text_align||item.horizontal_alignment};}
+function plotTextPatch(item,value){Object.assign(item,{text:value.text,font_size:value.fontSize,font_family:value.fontFamily,bold:value.bold,italic:value.italic,underline:value.underline,text_align:value.textAlign,horizontal_alignment:value.textAlign==='justify'?'left':value.textAlign,font_weight:value.bold?'bold':'normal',font_style:value.italic?'italic':'normal'});}
+function previewAnnotationChange(){const previous=restoring;restoring=true;try{changed(180);}finally{restoring=previous;}}
+function beginPlotAnnotationText(id){
+ if(loading||exporting)return;plotTextEditor.finish(false,{focus:false});const item=config.annotations?.find(a=>a.id===id);if(!item||item.type!=='text'||item.locked)return;
+ if($('#element-editor').open)$('#element-editor').close();selected=new Set([id]);const before=structuredClone(config),source=sourceData,sheet=metadata.sheetIndex;
+ plotTextEditor.open({value:plotTextValue(item),fonts:[...loadedFonts],maxLength:10000,anchor:()=>$('#figure-interactions [data-drag-id="'+CSS.escape(id)+'"]')?.getBoundingClientRect()||$('#figure-image').getBoundingClientRect(),focus:()=>$('#figure-interactions').focus({preventScroll:true}),onSave:()=>$('#save-project').click(),onDetails:()=>openElementEditor('annotation',config.annotations.findIndex(a=>a.id===id)),
+  onInput:value=>{if(sourceData!==source||metadata?.sheetIndex!==sheet)return;const target=config.annotations?.find(a=>a.id===id);if(target){plotTextPatch(target,value);previewAnnotationChange();}},
+  onFinish:({cancel})=>{if(sourceData!==source||metadata?.sheetIndex!==sheet)return;const next=structuredClone(config),modified=JSON.stringify(next)!==JSON.stringify(before);config=before;lastState=structuredClone(before);if(modified){if(!cancel){config=next;changed(0);}else previewAnnotationChange();}drawAnnotations();positionInteractions();}});
+}
+function annotationCommand(action,payload){
+ if(TEXT_FORMAT_ACTIONS.includes(action)){for(const item of config.annotations||[])if(selected.has(item.id)&&item.type==='text'&&!item.locked)plotTextPatch(item,formatText(plotTextValue(item),action));drawAnnotations();changed();return;}
+ if(action==='edit-text'){const item=config.annotations?.find(a=>selected.has(a.id));return item&&beginPlotAnnotationText(item.id);}
+ if(action==='text'||action==='line'||action==='arrow')return $(`[data-add-annotation="${action==='line'?'segment':action}"]`).click();
+ if(action==='escape'||action==='select'){selected.clear();drawAnnotations();positionInteractions();return;}
+ if(action==='duplicate'){copyAnnotations();pasteAnnotations();return;}if(action==='delete')return deleteAnnotations();
+ if(action==='front'||action==='back')return $(`[data-layer="${action}"]`).click();
+ if(action.startsWith('align-')||action.startsWith('distribute-')){const key=action.startsWith('align-')?({center:'center_h',middle:'center_v'})[action.slice(6)]||action.slice(6):action.endsWith('h')?'distribute_h':'distribute_v';return $(`[data-align="${key}"]`).click();}
+ if(action==='cycle-selection'){const list=(config.annotations||[]).filter(a=>a.visible),index=list.findIndex(a=>selected.has(a.id));if(list.length)selectAnnotation(list[(index+payload.direction+list.length)%list.length].id);return;}
+ if(action==='nudge'){if(!figureResult||![config.axes.width,config.axes.height].every(value=>Number.isFinite(Number(value))&&Number(value)>0))return;for(const item of config.annotations||[])if(selected.has(item.id)&&!item.locked)for(const key of item.type==='text'?['x','y']:['x1','y1','x2','y2']){const axis=key[0],delta=(axis==='x'?payload.dx:-payload.dy)/(Number(config.axes[axis==='x'?'width':'height'])/2.54*72);item[key]=shiftCoordinate(item[key],delta,figureResult?.[`${axis}Range`]||[0,1],axis==='y'?figureResult?.yDataScale||config.axes.yScale:config.axes.xScale,item.coordinate_system);}drawAnnotations();changed(0);return;}
+ if(action==='copy-format'){const item=config.annotations?.find(a=>selected.has(a.id)&&a.type==='text');if(item)plotFormatClipboard=plotTextValue(item);return;}
+ if(action==='paste-format'&&plotFormatClipboard){for(const item of config.annotations||[])if(selected.has(item.id)&&item.type==='text'&&!item.locked)plotTextPatch(item,{...plotFormatClipboard,text:item.text});drawAnnotations();changed();}
+}
+const annotationShortcut=createShortcutHandler({execute:annotationCommand,isEditing:()=>false,isCanvasActive:()=>!plotTextEditor.active,supportsAction:action=>TEXT_FORMAT_ACTIONS.includes(action)||['edit-text','escape','text','select','line','arrow','front','back','cycle-selection','nudge','duplicate','delete','copy-format','paste-format'].includes(action)||action.startsWith('align-')||action.startsWith('distribute-'),onHint:text=>{if(text)status(text);}});
+document.addEventListener('pointerdown',()=>annotationShortcut.reset(),true);window.addEventListener('blur',()=>annotationShortcut.reset());
+
 $$('[data-add-annotation]').forEach(button => button.addEventListener("click", () => {
   config.annotations ||= [];
   if (config.annotations.length >= 200) return;
   const type = button.dataset.addAnnotation;
   const offset=(config.annotations.length % 6)*.04;
   const base = { id: crypto.randomUUID(), type, axes_id: "primary", coordinate_system: "axes_fraction", visible: true, locked: false, zorder: 20, color: "#222222", opacity: 1 };
-  config.annotations.push(type === "text" ? { ...base, x: .15+offset, y: .8-offset, text: "テキスト", font_size: 7, font_family: config.axes.fontFamily, rotation: 0, horizontal_alignment: "left", vertical_alignment: "baseline", bold: false, italic: false } : { ...base, x1: .2+offset, y1: .7-offset, x2: .4+offset, y2: .7-offset, line_width: .5, line_style: "-", arrow_style: "->", arrow_size: 7 });
+  config.annotations.push(type === "text" ? { ...base, x: .15+offset, y: .8-offset, text: "テキスト", font_size: 9, font_family: config.axes.fontFamily, rotation: 0, horizontal_alignment: "left", vertical_alignment: "baseline", bold: false, italic: false,underline:false } : { ...base, x1: .2+offset, y1: .7-offset, x2: .4+offset, y2: .7-offset, line_width: .5, line_style: "-", arrow_style: "->", arrow_size: 7 });
   selected=new Set([base.id]);
   drawAnnotations(); changed();
+  if(type==='text')beginPlotAnnotationText(base.id);
 }));
 $("#annotation-list").addEventListener("click", event => {
   const select=event.target.closest('[data-select-annotation]');
@@ -2587,7 +2619,7 @@ $("#annotation-list").addEventListener("click", event => {
 
 function openElementEditor(part,index=0) {
   const switchingSeries=$('#element-editor').open && ['series','seriesAll'].includes(part);
-  if(!metadata || loading || exporting || (renderRunning || renderedRevision!==revision) && !switchingSeries&&!figureWorkspaceRestoring)return;
+  if(!metadata || loading || exporting || (renderRunning || renderedRevision!==revision) && !switchingSeries&&!figureWorkspaceRestoring&&part!=='annotation')return;
   const fields=$('#element-editor-fields');fields.dataset.workspacePart=part;fields.dataset.workspaceIndex=String(index);let sources=[],title='';
   if(part==='seriesAll') {
     if(!editableXY(config.plotType) || !config.series[index])return;
@@ -2661,6 +2693,7 @@ function openElementEditor(part,index=0) {
       data.fill?config.options.fills[Number(input.closest('[data-fill-index]').dataset.fillIndex)][data.fill]:config.options?.[data.option] ?? input.value;
     if(input.type==='checkbox')input.checked=data.invert==='true'?!value:Boolean(value);else input.value=data.axis?axisControlValue(data.axis,value):data.seriesField?seriesControlValue(data.seriesField,value):value;
   });
+  fields.querySelectorAll('[data-annotation-field="text"]').forEach(input=>{input.readOnly=true;input.tabIndex=-1;input.title='文字を編集するにはクリックまたはF2';});
   $('#element-editor-title').textContent=title;
   if(part==='seriesAll')fields.querySelectorAll('[data-series-field]').forEach(input=>{
     input.dataset.seriesAll='true';
@@ -2672,6 +2705,7 @@ function openElementEditor(part,index=0) {
   });
   showDialog('#element-editor');enhanceColorInputs();syncAxisAutomaticControls();syncUnitControls();syncOpacityControls();syncProcessingControls();syncLegendColorControls();
 }
+$('#element-editor-fields').addEventListener('focusin',event=>{if(event.target.matches('[data-annotation-field="text"]'))beginPlotAnnotationText(config.annotations?.[Number(event.target.closest('[data-annotation-index]')?.dataset.annotationIndex)]?.id);});
 $('#element-editor-fields').addEventListener('input',applyControlInput);
 for(const root of [$('#plot-form'),$('#element-editor-fields')])root.addEventListener('focusout',event=>{if(event.target.dataset.seriesField==='detrendSlope')syncProcessingControls();});
 $('#edit-all-series').addEventListener('click',()=>openElementEditor('seriesAll'));
@@ -2945,7 +2979,7 @@ function deleteAnnotations(){
   const hideLegend=[...selected].some(isLegendId);
   if(selected.has('legend'))config.axes.legend=false;
   for(const id of selected){const entry=legendEntry(id);if(entry)legendEntryState(entry)[entry.seriesIndex!==null && entry.seriesIndex!==undefined?'legendVisible':'visible']=false;}
-  config.annotations=(config.annotations||[]).filter(item=>!selected.has(item.id));
+  config.annotations=(config.annotations||[]).filter(item=>item.locked||!selected.has(item.id));
   selected.clear();
   if(hideLegend)drawControls();else drawAnnotations();
   positionInteractions();changed();
@@ -2978,7 +3012,7 @@ $$('[data-align]').forEach(button=>button.addEventListener('click',async()=>{
   catch(error){status(error.message,'error');}
   finally{loading=false;updateButtons();if(renderWanted)renderPreview();}
 }));
-$$('[data-layer]').forEach(button=>button.addEventListener('click',()=>{const items=config.annotations||[],top=Math.max(20,...items.map(item=>item.zorder||20)),bottom=Math.min(20,...items.map(item=>item.zorder||20));items.filter(item=>selected.has(item.id)).forEach((item,i)=>item.zorder=button.dataset.layer==='front'?top+1+i:bottom-1-i);changed();}));
+$$('[data-layer]').forEach(button=>button.addEventListener('click',()=>{const items=config.annotations||[],top=Math.max(20,...items.map(item=>item.zorder||20)),bottom=Math.min(20,...items.map(item=>item.zorder||20));items.filter(item=>selected.has(item.id)&&!item.locked).forEach((item,i)=>item.zorder=button.dataset.layer==='front'?top+1+i:bottom-1-i);changed();}));
 function restoreHistory(redo=false){
   const source=redo?future:history,destination=redo?history:future;if(!source.length)return;
   destination.push(structuredClone(config));config=source.pop();restoring=true;selected.clear();drawControls();changed();restoring=false;
@@ -3056,7 +3090,7 @@ function editPreviewElement(event) {
   const target=event.target.closest('[data-drag-id]');if(!target)return;
   event.preventDefault();
   if(isLegendId(target.dataset.dragId))openElementEditor('legend',target.dataset.dragId);
-  else openElementEditor('annotation',(config.annotations||[]).findIndex(item=>item.id===target.dataset.dragId));
+  else {const item=(config.annotations||[]).find(item=>item.id===target.dataset.dragId);if(item?.type==='text')beginPlotAnnotationText(item.id);else openElementEditor('annotation',(config.annotations||[]).indexOf(item));}
 }
 $('#figure-interactions').addEventListener('dblclick',editPreviewElement);
 $('#figure-paper').addEventListener('dblclick', event => {
@@ -3067,7 +3101,7 @@ $('#figure-paper').addEventListener('dblclick', event => {
   if (px>=x && px<=x+w && py>=y && py<=y+h) return;
   event.preventDefault();openElementEditor('figureBackground');
 });
-$('#figure-interactions').addEventListener('keydown',event=>{if(event.key==='Enter' || event.key===' ')editPreviewElement(event);});
+$('#figure-interactions').addEventListener('keydown',event=>{if(!event.isComposing&&event.keyCode!==229&&!event.getModifierState?.('AltGraph')&&(event.key==='Enter'||event.key==='F2'))editPreviewElement(event);});
 // Each glyph retains its own small hit area; highlight every number on that axis.
 function highlightTicks(event,active){
   const target=event.target.closest('[data-axis-kind="ticks"]');if(!target)return;
@@ -3078,12 +3112,15 @@ function highlightTicks(event,active){
 for(const name of ['pointerover','focusin'])$('#figure-interactions').addEventListener(name,event=>highlightTicks(event,true));
 for(const name of ['pointerout','focusout'])$('#figure-interactions').addEventListener(name,event=>highlightTicks(event,false));
 window.addEventListener('keydown',event=>{
+  if(event.defaultPrevented||event.isComposing||event.keyCode===229||event.getModifierState?.('AltGraph'))return;
   if($('#color-panel').open || $('#axis-editor').open || $('#element-editor').open || $('#save-dialog').open || $('#paste-dialog').open || $('#data-import-dialog').open)return;
   if(event.target.matches('input,textarea,select') || event.target.isContentEditable)return;
+  if(!loading&&!exporting&&metadata&&(event.target===document.body||event.target.closest('#figure-paper,#annotation-list,[data-add-annotation]'))&&annotationShortcut(event))return;
   const control=event.ctrlKey||event.metaKey,key=event.key.toLowerCase();
   if(key==='delete'||key==='backspace'){if(selected.size){event.preventDefault();deleteAnnotations();}}
   else if(key==='escape'){selected.clear();drawAnnotations();positionInteractions();}
   else if(control&&key==='c'){if(selected.size){event.preventDefault();copyAnnotations();}}
+  else if(control&&key==='x'){if(selected.size){event.preventDefault();copyAnnotations();deleteAnnotations();}}
   else if(control&&key==='a'){event.preventDefault();selected=new Set((config.annotations||[]).filter(item=>item.visible).map(item=>item.id));drawAnnotations();positionInteractions();}
   else if(control&&key==='v'){if(event.altKey){event.preventDefault();openPasteDialog();}else if(clipboard.length){event.preventDefault();pasteAnnotations();}}
   else if(control&&key==='z'){event.preventDefault();restoreHistory(event.shiftKey);}
@@ -3099,7 +3136,7 @@ catch (error) { fatal(`描画機能を開始できませんでした。ブラウ
 
 // Figure Studio bridge: included in the source application's module scope.
 let figureBridgeBaseline=null,figureBridgePreservedOnReconnect=false;
-const figureBridgePendingInput=()=>$$('[data-axis],[data-option],[data-series-field],[data-annotation-field],[data-legend-field],[data-fill]').some(input=>!input.disabled&&input.getClientRects().length>0&&incompleteNumberInput(input));
+const figureBridgePendingInput=()=>plotTextEditor.active||$$('[data-axis],[data-option],[data-series-field],[data-annotation-field],[data-legend-field],[data-fill]').some(input=>!input.disabled&&input.getClientRects().length>0&&incompleteNumberInput(input));
 async function figureBridgeIsDirty(){
   if(loading||exporting||renderRunning||renderedRevision!==revision||dragging||colormapApplying||pendingDataFiles||figureBridgePendingInput())return true;
   try{return !samePlotCheckpoint(figureBridgeBaseline,(await collectPlotGraphs()).checkpoint);}catch{return true;}

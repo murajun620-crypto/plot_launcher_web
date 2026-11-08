@@ -7,6 +7,9 @@ from typing import Any
 
 from matplotlib.lines import Line2D
 from matplotlib.patches import FancyArrowPatch, Rectangle
+from matplotlib.text import Text
+from matplotlib.path import Path as MplPath
+from matplotlib.transforms import IdentityTransform
 
 from annotation_model import (
     AnnotationCollection,
@@ -22,6 +25,56 @@ from annotation_model import (
 ANNOTATION_HANDLE_MARKERSIZE = 3.5
 ANNOTATION_HANDLE_PICKER = 8
 ANNOTATION_HANDLE_EDGEWIDTH = 0.9
+
+
+class SharedAnnotationText(Text):
+    """Studio-style underline and multiline justification in every export backend."""
+    def __init__(self, *args, underline=False, justify=False, **kwargs):
+        self.shared_underline, self.shared_justify = underline, justify
+        super().__init__(*args, **kwargs)
+
+    def draw(self, renderer):
+        if not self.get_visible() or not self.get_text():
+            return
+        if not self.shared_underline and not self.shared_justify:
+            return super().draw(renderer)
+        angle = self.get_rotation()
+        try:
+            self.set_rotation(0)
+            _, lines, _ = self._get_layout(renderer)
+        finally:
+            self.set_rotation(angle)
+        origin = self.get_transform().transform(self.get_unitless_position())
+        cosine, sine = math.cos(math.radians(angle)), math.sin(math.radians(angle))
+        def point(x, y):
+            return origin[0] + x * cosine - y * sine, origin[1] + x * sine + y * cosine
+        width = max((extent[0] for _, extent, _, _ in lines), default=0)
+        for index, (line, extent, x, y) in enumerate(lines):
+            words = line.split(' ')
+            justify = self.shared_justify and index < len(lines)-1 and len(words)>1 and '$' not in line
+            if justify:
+                sizes = [renderer.get_text_width_height_descent(word, self.get_fontproperties(), False)[0] for word in words]
+                gap = (width - sum(sizes)) / (len(words)-1)
+            else:
+                words, sizes, gap = [line], [extent[0]], 0
+            offset = 0
+            for word, advance in zip(words, sizes):
+                child = Text(*point(x+offset, y), text=word, fontproperties=self.get_fontproperties(), color=self.get_color(), alpha=self.get_alpha(), rotation=angle, rotation_mode='anchor', ha='left', va='baseline', transform=IdentityTransform(), usetex=self.get_usetex(), parse_math=self.get_parse_math())
+                child.set_figure(self.get_figure())
+                child.draw(renderer)
+                offset += advance + gap
+            if self.shared_underline and line:
+                below = renderer.points_to_pixels(self.get_fontsize()) * .12
+                path = MplPath([point(x, y-below), point(x+(width if justify else extent[0]), y-below)])
+                gc = renderer.new_gc()
+                try:
+                    gc.set_foreground(self.get_color())
+                    gc.set_alpha(self.get_alpha())
+                    gc.set_linewidth(max(.4, self.get_fontsize()/16))
+                    renderer.draw_path(gc, path, IdentityTransform())
+                finally:
+                    gc.restore()
+        self.stale = False
 
 
 class AnnotationManager:
@@ -472,7 +525,7 @@ class AnnotationManager:
             return None
         try:
             if isinstance(annotation, TextAnnotation):
-                return ax.text(
+                artist = SharedAnnotationText(
                     annotation.x,
                     annotation.y,
                     annotation.text,
@@ -490,7 +543,11 @@ class AnnotationManager:
                     zorder=annotation.zorder,
                     visible=annotation.visible,
                     clip_on=False,
+                    underline=annotation.underline,
+                    justify=annotation.text_align == "justify",
                 )
+                ax.add_artist(artist)
+                return artist
             if isinstance(annotation, ArrowAnnotation):
                 arrow_style, start_circle, end_circle = self._resolved_arrow_style(annotation.arrow_style)
                 artist = FancyArrowPatch(

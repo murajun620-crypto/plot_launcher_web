@@ -6,7 +6,7 @@ import {importedImageSize,replacedImageSize,replacedMiFiToImageSize,imageInserti
 import {rasterResolution} from './image-resolution.mjs?v=image-quality-v066-1';
 import {saveDraft,loadDraft,saveProjectFileTarget,loadProjectFileTarget} from './storage.mjs?v=0.3.6-1';
 import {createDemo} from './demo.mjs';
-import {createShortcutHandler} from './shortcuts.mjs?v=ribbon-v060-1';
+import {createShortcutHandler} from './shortcuts.mjs?v=annotation-input-v071-1';
 import {createRibbon} from './ribbon.mjs?v=source-batch-v070-1';
 import {createColorPickers} from './colors.mjs?v=ribbon-v060-1';
 import {renderTextPaint} from './text-paint.mjs?v=tex-v061-1';
@@ -27,6 +27,7 @@ import {lineStrokeAttributes,lineStyleValue,setLineStyle,supportsLineStyle} from
 import {createLineStylePicker} from './line-style-picker.mjs?v=lines-v064-1';
 import {createPreviewQuality} from './preview-quality.mjs?v=image-quality-v066-1';
 import {createSelectionWheelZoom,resetSelectionZoom} from './selection-zoom.mjs?v=selection-zoom-v067-1';
+import {fontSizeForAction} from './text-format.mjs?v=annotation-input-v071-1';
 import {selectionPNG,writeSelectionImage,studioPasteObjects,matchesSelectionPNG} from './image-clipboard.mjs?v=source-batch-v070-1';
 import {reorderFigures} from './figure-order.mjs';
 import {renumberFigureNames} from './figure-names.mjs?v=0.3.3-1';
@@ -311,8 +312,7 @@ window.addEventListener('keydown',e=>{if(!e.defaultPrevented&&e.code==='Space'&&
 
 function duplicate(){const old=selected();if(!old.length)return;change(()=>{const groups=new Map();const added=old.map(o=>{const n=clone(o);n.id=uid();n.x+=mm(3);n.y+=mm(3);n.locked=false;if(n.groupId){if(!groups.has(n.groupId))groups.set(n.groupId,uid());n.groupId=groups.get(n.groupId);}return n;});doc.objects.push(...added);selection=added.map(o=>o.id);});}
 function applyTextStyle(property,value){if(editingId){const o=doc.objects.find(o=>o.id===editingId);o[property]=typeof value==='function'?value(o[property],o):value;if(property==='text')editor.value=o.text;positionEditor();renderInspector();return;}change(()=>editable().filter(o=>o.type==='text').forEach(o=>o[property]=typeof value==='function'?value(o[property],o):value));}
-const sizes=[6,7,8,9,10,11,12,14,16,18,20,22,24,28,32,36,40,44,48,54,60,66,72,80,88,96];
-function changeFont(action){applyTextStyle('fontSize',v=>action==='font-up'?Math.min(1000,v+1):action==='font-down'?Math.max(1,v-1):action==='font-grow'?(sizes.find(n=>n>v)||Math.min(1000,v+8)):([...sizes].reverse().find(n=>n<v)||Math.max(1,v-1)));}
+function changeFont(action){applyTextStyle('fontSize',v=>fontSizeForAction(v,action));}
 function addLabels(){change(()=>{const targets=editable().filter(o=>o.type==='image');const list=targets.length?targets:doc.objects.filter(o=>o.type==='image'&&!o.locked);list.forEach((o,i)=>doc.objects.push(makeObject('text',{x:o.x,y:o.y-mm(6),w:mm(9),h:mm(6),fontSize:9,bold:true,text:i<26?String.fromCharCode(65+i):String(i+1),name:'Panel label'})));});}
 function execute(action,payload={}){
  if(pathDrawing?.drawing){if(action==='save'||action==='save-as'){if(!pathDrawing.finish()){toast('2点以上を指定してから保存してください');return;}}else if(['undo','redo','new','sample','new-figure','open','next-figure','previous-figure'].includes(action)){pathDrawing.cancel();if(action==='undo')return;}}

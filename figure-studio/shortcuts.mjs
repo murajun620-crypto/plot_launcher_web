@@ -81,6 +81,7 @@ export function createShortcutHandler({
   isEditing = defaultEditing,
   isCanvasActive = () => true,
   onHint = () => {},
+  supportsAction = () => true,
 } = {}) {
   if (typeof execute !== 'function') throw new TypeError('execute must be a function');
   let sequence = '';
@@ -90,6 +91,7 @@ export function createShortcutHandler({
     sequence = '';
   };
   const consume = (event, action, payload) => {
+    if(action&&!supportsAction(action,payload)){reset();return false;}
     event.preventDefault?.();
     event.stopPropagation?.();
     reset();

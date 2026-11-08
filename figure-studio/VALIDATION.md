@@ -1,4 +1,14 @@
-# Figure Studio Web v0.7.0 検証記録
+# Figure Studio Web v0.7.1 検証記録
+
+## v0.7.1の追加確認
+
+- Studio 446件、PlotLauncher 21件、MiFiTo 56件のNodeテストが成功。
+- 文字注釈のキー定義とサイズ段階を共通化。Launcher／MiFiToの同じ文字入力部品で、F2再編集・Enter改行・Ctrl+Enter確定・Esc取消を実ブラウザで確認。
+- Ctrl+B/I/U、Ctrl+]/[、Ctrl+Shift+>/<、文字揃えを検証。Launcherの描画で下線・複数行の両端揃えが表示されることを確認。
+- 確定後のUndoは編集前の文字・書式へ1回で戻り、Redoで復元。取消した入力は残らない。入力中のUndoと文字のコピー／貼り付けも標準操作を維持。
+- 共通入力部品のテスト画面でcompositionstart～compositionendを発生させ、変換中のCtrl+Enter／Escが終了処理を呼ばず、最終文字「日本語」が一度の確定に含まれることを確認。
+- MiFiToで注釈の入力途中にStudioへ切り替えて戻り、入力した文字が確定されていることを確認。Launcher／MiFiToの編集した注釈をStudioへ送信。
+- Launcherの複数ファイル重ね描きで単独送信・一括再送信を実ブラウザで確認。workerの単一ファイル／複数ファイルの参照保持を回帰テスト。先行修正2.4.26は公開済み、2.4.27にも含む。
 
 ## v0.7.0の追加確認
 
