@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {makeObject,newDocument,clone,objectBounds,History} from '../model.mjs';
-import {inferImageArray,arrangeImageArray} from '../image-array.mjs';
+import {makeObject,newDocument,clone,objectBounds,bounds,History} from '../model.mjs';
+import {inferImageArray,arrangeImageArray,imageArrayUnits} from '../image-array.mjs';
 
 const image=(id,x,y,w=30,h=20,extra={})=>makeObject('image',{id,x,y,w,h,assetId:'asset-'+id,...extra});
 const documentWith=(...objects)=>({...newDocument(),objects});
@@ -45,15 +45,43 @@ test('vacant cells retain their column rather than flowing left',()=>{
  assert.deepEqual(doc.objects.map(o=>[o.x,o.y]),[[0,0],[68,0],[0,26],[34,26],[68,26]]);
 });
 
-test('grouped labels travel by the same delta but image edges anchor the grid',()=>{
+test('whole group bounds anchor spacing and grouped labels travel by the same delta',()=>{
  const a=image('a',10,20,30,20,{groupId:'g'}),label=makeObject('text',{id:'label',x:6,y:10,w:8,h:7,groupId:'g'});
  const b=image('b',70,22),other=makeObject('rect',{id:'other',x:5,y:5});
  const doc=documentWith(a,label,b,other),before=clone(doc);arrange(doc,5,8,['a','b','other']);
- assert.deepEqual([a.x,a.y,b.x,b.y],[10,20,45,20]);
+ assert.deepEqual([a.x,a.y,b.x,b.y],[10,20,45,10]);
  assert.deepEqual(label,before.objects[1]);assert.deepEqual(other,before.objects[3]);
  // Move the entire selected group when it occupies a later column.
  const reverse=documentWith(image('first',0,20),a,label);a.x=70;label.x=66;arrange(reverse,5,8,['first','a']);
- assert.deepEqual([a.x,label.x,a.y-label.y],[35,31,10]);
+ assert.deepEqual([a.x,label.x,a.y-label.y],[39,35,10]);
+});
+
+test('multiple image groups move as complete units with their internal spacing intact',()=>{
+ const doc=documentWith(image('a',10,10,30,20,{groupId:'g1'}),image('b',50,11,30,20,{groupId:'g1'}),makeObject('text',{id:'label',x:8,y:5,w:8,h:6,groupId:'g1'}),image('c',120,12,30,20,{groupId:'g2'}),image('d',160,13,30,20,{groupId:'g2'}));
+ const before=clone(doc),layout=inferImageArray(doc,['a','c']);
+ assert.equal(layout.withinGroup,false);assert.equal(layout.items.length,2);assert.equal(layout.columns.length,2);assert.equal(layout.rows.length,1);
+ arrange(doc,5,5,['a','c']);
+ const units=imageArrayUnits(doc,['a','c']),[a,b]=units.map(bounds);near(b.x-a.x-a.w,5);near(a.y,b.y);
+ for(const unit of units){const origin=before.objects.find(o=>o.id===unit[0].id),dx=unit[0].x-origin.x,dy=unit[0].y-origin.y;for(const o of unit){const old=before.objects.find(v=>v.id===o.id);near(o.x-old.x,dx);near(o.y-old.y,dy);assert.equal(o.groupId,old.groupId);}}
+});
+
+test('a single selected image group arranges its individual images without ungrouping',()=>{
+ const doc=documentWith(image('a',0,0,30,20,{groupId:'g'}),image('b',60,2,30,20,{groupId:'g'}),image('c',1,60,30,20,{groupId:'g'}),image('d',59,61,30,20,{groupId:'g'}),makeObject('text',{id:'label',x:-5,y:-8,w:10,h:6,groupId:'g'}),image('unselected',200,200));
+ const label=clone(doc.objects[4]),outside=clone(doc.objects[5]),layout=inferImageArray(doc,['a']);
+ assert.equal(layout.withinGroup,true);assert.equal(layout.items.length,4);assert.equal(imageArrayUnits(doc,['a']).length,4);
+ arrange(doc,5,5,['a']);assert.deepEqual(doc.objects.slice(0,4).map(o=>[o.x,o.y,o.groupId]),[[0,0,'g'],[35,0,'g'],[0,25,'g'],[35,25,'g']]);
+ assert.deepEqual(doc.objects[4],label);assert.deepEqual(doc.objects[5],outside);
+});
+
+test('one image group plus standalone images uses individual images',()=>{
+ const doc=documentWith(image('a',0,0,30,20,{groupId:'g'}),image('b',60,0,30,20,{groupId:'g'}),image('c',120,0));
+ assert.equal(inferImageArray(doc,ids(doc)).withinGroup,true);arrange(doc,5,5);assert.deepEqual(doc.objects.map(o=>o.x),[0,35,70]);
+});
+
+test('a fixed second selected group cannot unexpectedly cause an internal rearrangement',()=>{
+ const doc=documentWith(image('a',0,0,30,20,{groupId:'g'}),image('b',60,0,30,20,{groupId:'g'}),image('c',120,0,30,20,{groupId:'fixed',locked:true})),before=clone(doc);
+ const layout=inferImageArray(doc,ids(doc));assert.equal(layout.withinGroup,false);assert.equal(layout.items.length,1);assert.match(layout.error,/2つ以上/);
+ assert.throws(()=>arrange(doc));assert.deepEqual(doc,before);
 });
 
 test('locked images, locked groups and unselected images are untouched',()=>{

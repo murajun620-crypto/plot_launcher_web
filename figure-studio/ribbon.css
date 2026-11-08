@@ -259,5 +259,8 @@ html[data-selection-pane=open] #toast{left:calc((100% + var(--figures) - var(--i
 .image-array-fields label>div{display:flex;align-items:center;gap:9px;margin-top:8px}
 .image-array-fields input{width:100%;min-width:0;padding:10px;font-size:15px;font-variant-numeric:tabular-nums}
 .image-array-fields span{font-size:12px;color:var(--muted)}
+.image-array-fields [data-array-horizontal-label]{font-size:12px;color:inherit}
+.image-array-separate{display:flex;align-items:center;gap:7px;font-size:12px}
+.image-array-separate input{accent-color:var(--accent)}
 .image-array-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:22px}
 .image-array-error{color:#ae3933;font-size:12px;line-height:1.6}

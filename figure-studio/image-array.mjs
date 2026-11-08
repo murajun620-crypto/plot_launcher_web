@@ -1,8 +1,18 @@
-import {bounds,selectionUnits} from './model.mjs?v=image-array-v073-1';
+import {bounds,selectionUnits,expandSelection} from './model.mjs?v=image-array-v074-1';
 
-/** Images anchor the grid; grouped labels and arrows travel with their image. */
+/** Multiple selected groups stay whole; one image group can be arranged inside. */
+export function imageArraySelection(doc,ids){
+ const selected=new Set(expandSelection(doc,ids));
+ // Count locked selected groups too: skipping a fixed group must not change mode.
+ const groups=new Set(doc.objects.filter(object=>selected.has(object.id)&&object.type==='image'&&object.groupId).map(object=>object.groupId));
+ let units=selectionUnits(doc,ids).filter(unit=>unit.some(object=>object.type==='image'));
+ const withinGroup=groups.size===1&&units.some(unit=>unit.filter(object=>object.type==='image').length>1);
+ if(withinGroup)units=units.flatMap(unit=>unit.filter(object=>object.type==='image').length>1?unit.filter(object=>object.type==='image').map(object=>[object]):[unit]);
+ return {units,withinGroup,groupCount:groups.size};
+}
+
 export function imageArrayUnits(doc,ids){
- return selectionUnits(doc,ids).filter(unit=>unit.some(object=>object.type==='image'));
+ return imageArraySelection(doc,ids).units;
 }
 
 function axisBands(items,position,size){
@@ -28,18 +38,20 @@ function axisBands(items,position,size){
 
 /** Detect both tracks independently so vacant cells retain their place. */
 export function inferImageArray(doc,ids){
- const items=imageArrayUnits(doc,ids).map(unit=>({unit,key:unit.map(object=>object.id).sort().join('\0'),box:bounds(unit.filter(object=>object.type==='image'))}));
- if(items.length<2)return {items,rows:[],columns:[],error:'固定されていない画像を2枚以上選択してください。'};
+ const {units,withinGroup,groupCount}=imageArraySelection(doc,ids);
+ const items=units.map(unit=>({unit,key:unit.map(object=>object.id).sort().join('\0'),box:bounds(unit)}));
+ const mode={withinGroup,groupCount};
+ if(items.length<2)return {...mode,items,rows:[],columns:[],error:'固定されていない画像を2枚以上、または画像グループを2つ以上選択してください。'};
  const rows=axisBands(items,'y','h'),columns=axisBands(items,'x','w');
  const cells=new Set();
  rows.forEach((row,index)=>row.items.forEach(item=>item.row=index));
  columns.forEach((column,index)=>column.items.forEach(item=>item.column=index));
  for(const item of items){
   const cell=`${item.row}:${item.column}`;
-  if(cells.has(cell))return {items,rows,columns,error:'画像が重なっていて行・列を判定できません。おおまかに並べてから実行してください。'};
+  if(cells.has(cell))return {...mode,items,rows,columns,error:'画像が重なっていて行・列を判定できません。おおまかに並べてから実行してください。'};
   cells.add(cell);
  }
- return {items,rows,columns,error:null};
+ return {...mode,items,rows,columns,error:null};
 }
 
 /** Translate only, using maximum image widths/heights per track. Units are pt. */
