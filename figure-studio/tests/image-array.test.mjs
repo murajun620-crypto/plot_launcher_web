@@ -73,9 +73,22 @@ test('a single selected image group arranges its individual images without ungro
  assert.deepEqual(doc.objects[4],label);assert.deepEqual(doc.objects[5],outside);
 });
 
-test('one image group plus standalone images uses individual images',()=>{
+test('one image group plus a standalone image arranges two units and keeps the group intact',()=>{
  const doc=documentWith(image('a',0,0,30,20,{groupId:'g'}),image('b',60,0,30,20,{groupId:'g'}),image('c',120,0));
- assert.equal(inferImageArray(doc,ids(doc)).withinGroup,true);arrange(doc,5,5);assert.deepEqual(doc.objects.map(o=>o.x),[0,35,70]);
+ const layout=inferImageArray(doc,ids(doc));assert.equal(layout.withinGroup,false);assert.equal(layout.mixed,true);assert.equal(layout.imageUnitCount,1);assert.equal(layout.groupUnitCount,1);assert.equal(layout.items.length,2);
+ arrange(doc,1,1);assert.deepEqual(doc.objects.map(o=>o.x),[0,60,91]);assert.equal(doc.objects[1].x-doc.objects[0].x,60);
+});
+
+test('mixed groups and standalone images retain a two-row arrangement and grouped labels',()=>{
+ const doc=documentWith(image('a',0,5,20,20,{groupId:'g1'}),image('b',25,5,20,20,{groupId:'g1'}),makeObject('text',{id:'caption',x:0,y:0,w:10,h:5,groupId:'g1'}),image('c',80,1,45,25),image('d',2,80,45,25),image('e',81,81,20,20,{groupId:'g2'}),image('f',106,81,20,20,{groupId:'g2'}));
+ const layout=inferImageArray(doc,ids(doc));assert.equal(layout.mixed,true);assert.equal(layout.imageUnitCount,2);assert.equal(layout.groupUnitCount,2);assert.equal(layout.items.length,4);assert.equal(layout.rows.length,2);assert.equal(layout.columns.length,2);
+ arrange(doc,1,1);const [g1,c,d,g2]=imageArrayUnits(doc,ids(doc)).map(bounds);near(c.x-g1.x-g1.w,1);near(d.y-g1.y-g1.h,1);near(g2.x-d.x-d.w,1);near(g2.y-c.y-c.h,1);
+ near(doc.objects[1].x-doc.objects[0].x,25);near(doc.objects[0].y-doc.objects[2].y,5);near(doc.objects[6].x-doc.objects[5].x,25);
+});
+
+test('a fixed standalone image does not unexpectedly switch a mixed selection into internal layout',()=>{
+ const doc=documentWith(image('a',0,0,30,20,{groupId:'g'}),image('b',60,0,30,20,{groupId:'g'}),image('fixed',120,0,30,20,{locked:true})),before=clone(doc);
+ const layout=inferImageArray(doc,ids(doc));assert.equal(layout.withinGroup,false);assert.equal(layout.items.length,1);assert.throws(()=>arrange(doc));assert.deepEqual(doc,before);
 });
 
 test('a fixed second selected group cannot unexpectedly cause an internal rearrangement',()=>{

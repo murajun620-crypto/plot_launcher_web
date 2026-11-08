@@ -1,14 +1,16 @@
-import {bounds,selectionUnits,expandSelection} from './model.mjs?v=image-array-v074-1';
+import {bounds,selectionUnits,expandSelection} from './model.mjs?v=image-array-v075-1';
 
-/** Multiple selected groups stay whole; one image group can be arranged inside. */
+/** A group stays whole in mixed selections; only a group selected alone opens up. */
 export function imageArraySelection(doc,ids){
  const selected=new Set(expandSelection(doc,ids));
  // Count locked selected groups too: skipping a fixed group must not change mode.
  const groups=new Set(doc.objects.filter(object=>selected.has(object.id)&&object.type==='image'&&object.groupId).map(object=>object.groupId));
+ const hasStandalone=doc.objects.some(object=>selected.has(object.id)&&object.type==='image'&&!object.groupId);
  let units=selectionUnits(doc,ids).filter(unit=>unit.some(object=>object.type==='image'));
- const withinGroup=groups.size===1&&units.some(unit=>unit.filter(object=>object.type==='image').length>1);
+ const groupUnitCount=units.filter(unit=>unit[0].groupId).length,imageUnitCount=units.length-groupUnitCount;
+ const withinGroup=groups.size===1&&!hasStandalone&&units.some(unit=>unit.filter(object=>object.type==='image').length>1);
  if(withinGroup)units=units.flatMap(unit=>unit.filter(object=>object.type==='image').length>1?unit.filter(object=>object.type==='image').map(object=>[object]):[unit]);
- return {units,withinGroup,groupCount:groups.size};
+ return {units,withinGroup,groupCount:groups.size,groupUnitCount,imageUnitCount,mixed:groupUnitCount>0&&imageUnitCount>0};
 }
 
 export function imageArrayUnits(doc,ids){
@@ -38,9 +40,8 @@ function axisBands(items,position,size){
 
 /** Detect both tracks independently so vacant cells retain their place. */
 export function inferImageArray(doc,ids){
- const {units,withinGroup,groupCount}=imageArraySelection(doc,ids);
+ const {units,...mode}=imageArraySelection(doc,ids);
  const items=units.map(unit=>({unit,key:unit.map(object=>object.id).sort().join('\0'),box:bounds(unit)}));
- const mode={withinGroup,groupCount};
  if(items.length<2)return {...mode,items,rows:[],columns:[],error:'固定されていない画像を2枚以上、または画像グループを2つ以上選択してください。'};
  const rows=axisBands(items,'y','h'),columns=axisBands(items,'x','w');
  const cells=new Set();

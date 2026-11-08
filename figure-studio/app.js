@@ -6,10 +6,10 @@ import {importedImageSize,replacedImageSize,replacedMiFiToImageSize,imageInserti
 import {rasterResolution} from './image-resolution.mjs?v=image-quality-v066-1';
 import {saveDraft,loadDraft,saveProjectFileTarget,loadProjectFileTarget} from './storage.mjs?v=0.3.6-1';
 import {createDemo} from './demo.mjs';
-import {createShortcutHandler} from './shortcuts.mjs?v=image-array-v074-1';
+import {createShortcutHandler} from './shortcuts.mjs?v=image-array-v075-1';
 import {createRibbon} from './ribbon.mjs?v=source-batch-v070-1';
-import {imageArrayUnits,arrangeImageArray} from './image-array.mjs?v=image-array-v074-1';
-import {createImageArrayDialog} from './image-array-dialog.mjs?v=image-array-v074-1';
+import {imageArrayUnits,arrangeImageArray} from './image-array.mjs?v=image-array-v075-1';
+import {createImageArrayDialog} from './image-array-dialog.mjs?v=image-array-v075-1';
 import {createColorPickers} from './colors.mjs?v=ribbon-v060-1';
 import {renderTextPaint} from './text-paint.mjs?v=tex-v061-1';
 import {createTexRenderer} from './tex.mjs?v=live-v062-1';
