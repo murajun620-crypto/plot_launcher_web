@@ -250,3 +250,14 @@ html[data-selection-pane=open] #toast{left:calc((100% + var(--figures) - var(--i
   #studioRibbon,#ribbonSelectionPane{display:none!important}
   .workspace,.workspace:has(#ribbonSelectionPane:not([hidden])){display:block}
 }
+
+/* Selected image spacing, preserving the current row and column arrangement. */
+#imageArrayDialog{width:min(500px,calc(100vw - 32px));padding:24px}
+#imageArrayDialog .dialog-heading h2{margin:0;font-size:19px}
+.image-array-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin:22px 0}
+.image-array-fields label{font-size:12px;font-weight:600}
+.image-array-fields label>div{display:flex;align-items:center;gap:9px;margin-top:8px}
+.image-array-fields input{width:100%;min-width:0;padding:10px;font-size:15px;font-variant-numeric:tabular-nums}
+.image-array-fields span{font-size:12px;color:var(--muted)}
+.image-array-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:22px}
+.image-array-error{color:#ae3933;font-size:12px;line-height:1.6}

@@ -13,6 +13,7 @@ export const SHORTCUTS = Object.freeze([
   ['左／中央／右揃え', 'Alt → 5 → L / C / R'],
   ['上／中央／下揃え', 'Alt → 5 → T / M / B'],
   ['左右／上下に等間隔', 'Alt → 5 → H / V'],
+  ['間隔を指定して配列', 'Alt → 5 → G'],
   ['保存／開く', 'Ctrl + S / O'],
   ['Figureを追加', 'Ctrl + M'],
   ['次／前のFigure', 'Ctrl + PageDown / PageUp'],
@@ -35,7 +36,7 @@ export const SHORTCUTS = Object.freeze([
 const ALIGN_KEYS = Object.freeze({
   l: 'align-left', c: 'align-center', r: 'align-right',
   t: 'align-top', m: 'align-middle', b: 'align-bottom',
-  h: 'distribute-h', v: 'distribute-v',
+  h: 'distribute-h', v: 'distribute-v', g: 'image-array',
 });
 
 const TOOL_KEYS = Object.freeze({
@@ -48,7 +49,7 @@ const FORMAT_KEYS = Object.freeze({
 });
 
 const ALT_HINT = 'Alt: 3 最前面 · 4 最背面 · 5 配置 · Esc 閉じる';
-const ALIGN_HINT = '配置: L 左 · C 中央 · R 右 · T 上 · M 上下中央 · B 下 · H 左右等間隔 · V 上下等間隔';
+const ALIGN_HINT = '配置: L 左 · C 中央 · R 右 · T 上 · M 上下中央 · B 下 · H 左右等間隔 · V 上下等間隔 · G 間隔を指定して配列';
 
 function defaultEditing(event) {
   const target = event?.target;

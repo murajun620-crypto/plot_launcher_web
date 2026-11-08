@@ -44,6 +44,14 @@ test('held Alt+5 then L and direct Alt+3/Alt+4 work', () => {
   assert.deepEqual(s.calls.map(c => c[0]), ['align-left', 'front', 'back']);
 });
 
+test('image spacing uses Alt 5 G and leaves an open modal in control',()=>{
+ const s=setup();s.press('Alt');s.press('5');s.press('g');
+ assert.deepEqual(s.calls.map(c=>c[0]),['image-array']);
+ s.state.active=false;
+ for(const key of ['Escape','Enter','Delete','g'])assert.equal(s.press(key).defaultPrevented,false);
+ assert.equal(s.calls.length,1);
+});
+
 test('all alignment sequence keys dispatch distinct actions', () => {
   const s = setup();
   for (const key of ['l','c','r','t','m','b','h','v']) {

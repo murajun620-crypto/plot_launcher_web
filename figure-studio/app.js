@@ -6,8 +6,10 @@ import {importedImageSize,replacedImageSize,replacedMiFiToImageSize,imageInserti
 import {rasterResolution} from './image-resolution.mjs?v=image-quality-v066-1';
 import {saveDraft,loadDraft,saveProjectFileTarget,loadProjectFileTarget} from './storage.mjs?v=0.3.6-1';
 import {createDemo} from './demo.mjs';
-import {createShortcutHandler} from './shortcuts.mjs?v=annotation-input-v071-1';
+import {createShortcutHandler} from './shortcuts.mjs?v=image-array-v073-1';
 import {createRibbon} from './ribbon.mjs?v=source-batch-v070-1';
+import {imageArrayUnits,arrangeImageArray} from './image-array.mjs?v=image-array-v073-1';
+import {createImageArrayDialog} from './image-array-dialog.mjs?v=image-array-v073-1';
 import {createColorPickers} from './colors.mjs?v=ribbon-v060-1';
 import {renderTextPaint} from './text-paint.mjs?v=tex-v061-1';
 import {createTexRenderer} from './tex.mjs?v=live-v062-1';
@@ -62,6 +64,7 @@ function renderFigureTabs(){figureSidebar.update(figures,doc.id);}
 const nodes=new Map(),svg=$('#canvas'),objects=$('#objects'),overlays=$('#overlays'),viewport=$('#viewport'),paper=$('#paperWrap'),editor=$('#textEditor');
 svg.setAttribute('tabindex','0');svg.setAttribute('role','application');svg.setAttribute('aria-label','Figure編集キャンバス');
 const ribbon=createRibbon({onResize:()=>{renderOverlay();positionEditor();},onFocusCanvas:()=>svg.focus({preventScroll:true})});
+const imageArrayDialog=createImageArrayDialog({root:$('#imageArrayDialog'),getDocument:()=>doc,getSelection:()=>selection,onApply:(ids,gaps)=>{let result;change(()=>{result=arrangeImageArray(doc,ids,gaps);});toast(`${result.rows}行 × ${result.columns}列に配列しました · Ctrl+Zで戻せます`);},onClose:()=>svg.focus({preventScroll:true})});
 const colorPickers=createColorPickers();
 pathDrawing=createPathDrawing({svg,point:svgPoint,scale:()=>scale,onDraft:draft=>{pathDraft=draft;if(!pathPreviewFrame)pathPreviewFrame=requestAnimationFrame(()=>{pathPreviewFrame=0;renderOverlay();});},onCommit:commitDrawnPath,onCancel:()=>{if(!pathToolTransition)setTool('select');},onHint:message=>{if(message)$('#statusText').textContent=message;}});
 const measure=document.createElement('canvas').getContext('2d');
@@ -181,6 +184,7 @@ function renderInspector(){
   if(action==='edit-points'||action==='close-path'){button.disabled=arr.length!==1||!edits.length||!['curve','freeform'].includes(o.type);if(action==='close-path'&&!o?.closed&&(o?.points?.length??0)<3)button.disabled=true;button.setAttribute('aria-pressed',String(action==='edit-points'?pathEditId===o?.id:!!o?.closed));}
   if(['front','back','forward','backward','lock','duplicate','delete'].includes(action))button.disabled=!arr.length;
   if(action==='group')button.disabled=edits.length<2;
+  if(action==='image-array')button.disabled=imageArrayUnits(doc,selection).length<2;
   if(action==='ungroup')button.disabled=!edits.some(object=>object.groupId);
   if(action==='attach-source')button.disabled=arr.length!==1||o.type!=='image';
   if(action==='edit-source')button.disabled=arr.length!==1||!o.source;
@@ -340,6 +344,7 @@ function execute(action,payload={}){
  if(action==='copy-format'){const o=selected()[0];if(o){formatClipboard={...Object.fromEntries(['fill','stroke','fillTransparency','strokeTransparency','strokeWidth','strokeAlignment','textMode','fontSize','fontFamily','bold','italic','underline','textAlign','opacity'].filter(p=>o[p]!==undefined).map(p=>[p,o[p]])),...(supportsLineStyle(o)?{dashStyle:lineStyleValue(o),dashed:lineStyleValue(o)!=='solid'}:{})};toast('書式をコピーしました');}return;}
  if(action==='paste-format'){if(formatClipboard)change(()=>editable().forEach(o=>Object.assign(o,formatClipboard)));return;}
  if(action==='auto-grid'||action==='auto-hero')return change(()=>{let ids=selection;if(!ids.length)ids=doc.objects.filter(o=>o.type==='image'&&!o.locked).map(o=>o.id);autoLayout(doc,ids,action==='auto-grid'?'grid':'hero');});
+ if(action==='image-array'){finishText();return imageArrayDialog.show();}
  if(action==='no-fill')return change(()=>editable().filter(o=>['rect','ellipse'].includes(o.type)||['curve','freeform'].includes(o.type)&&o.closed).forEach(o=>o.fill='none'));
  if(action==='toggle-arrow-start'||action==='toggle-arrow-end')return change(()=>editable().filter(o=>['line','arrow'].includes(o.type)).forEach(o=>{const end=action==='toggle-arrow-start'?'start':'end';setArrowProperty(o,end==='start'?'arrowStartStyle':'arrowEndStyle',arrowEndpoint(o,end).style==='none'?'triangle':'none');}));
  if(action==='labels')return addLabels();
@@ -367,7 +372,7 @@ function execute(action,payload={}){
 }
 const shortcut=createShortcutHandler({execute,isEditing:e=>e.target===editor?'canvas-text':e.target.isContentEditable||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName),isCanvasActive:()=>document.querySelector('dialog[open]')?false:document.activeElement?.closest('#studioRibbon,#ribbonSelectionPane,.app-header')?'ribbon':(document.activeElement===svg||document.activeElement===document.body||document.activeElement===editor||!!document.activeElement?.closest('#figureTabs')),onHint:text=>{$('#keyHint').textContent=text;$('#keyHint').hidden=!text;}});
 window.addEventListener('keydown',shortcut);document.addEventListener('pointerdown',()=>shortcut.reset());
-document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b||b.disabled)return;const action=b.dataset.action;execute(action);for(const d of $$('details:not(.sidebar-text-panel)[open]'))d.open=false;if(['new-figure','duplicate-figure','delete-figure','move-figure-left','move-figure-right'].includes(action)){focusFigure();return;}if(!['help','open','import','save','save-as','attach-source','edit-source','export-pdf','toggle-selection-pane','show-text-pane'].includes(action)&&!editingId)svg.focus({preventScroll:true});});
+document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b||b.disabled)return;const action=b.dataset.action;execute(action);for(const d of $$('details:not(.sidebar-text-panel)[open]'))d.open=false;if(['new-figure','duplicate-figure','delete-figure','move-figure-left','move-figure-right'].includes(action)){focusFigure();return;}if(!['image-array','help','open','import','save','save-as','attach-source','edit-source','export-pdf','toggle-selection-pane','show-text-pane'].includes(action)&&!editingId)svg.focus({preventScroll:true});});
 for(const button of $$('#studioRibbon [data-action],#ribbonSelectionPane [data-action]'))button.addEventListener('pointerdown',event=>{if(editingId&&isRibbonTextControl(button))event.preventDefault();});
 $('#docName').addEventListener('input',e=>{const name=e.target.value||'Untitled Figure';change(()=>doc.name=name);});
 for(const [id,key]of [['pageWidth','width'],['pageHeight','height']])$('#'+id).addEventListener('change',e=>{const v=Number(e.target.value);if(v>=10&&v<=2000){change(()=>doc[key]=mm(v));fit();}else{toast('用紙サイズは10〜2000 mmです');renderInspector();}});

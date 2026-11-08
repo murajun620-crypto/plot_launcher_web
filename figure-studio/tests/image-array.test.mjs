@@ -1,0 +1,95 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {makeObject,newDocument,clone,objectBounds,History} from '../model.mjs';
+import {inferImageArray,arrangeImageArray} from '../image-array.mjs';
+
+const image=(id,x,y,w=30,h=20,extra={})=>makeObject('image',{id,x,y,w,h,assetId:'asset-'+id,...extra});
+const documentWith=(...objects)=>({...newDocument(),objects});
+const ids=doc=>doc.objects.map(object=>object.id);
+const near=(value,expected)=>assert.ok(Math.abs(value-expected)<1e-7,`${value} != ${expected}`);
+const arrange=(doc,h=4,v=6,selected=ids(doc))=>arrangeImageArray(doc,selected,{horizontalGap:h,verticalGap:v});
+
+test('preserves a roughly arranged 2 x 3 grid, sizes, z order and top-left anchor',()=>{
+ const doc=documentWith(image('f',95,60),image('a',10,11),image('d',12,61),image('c',96,10),image('b',52,12),image('e',53,59));
+ const before=clone(doc),layout=inferImageArray(doc,ids(doc));
+ assert.equal(layout.error,null);assert.equal(layout.rows.length,2);assert.equal(layout.columns.length,3);
+ assert.deepEqual(arrange(doc),{rows:2,columns:3,count:6});
+ const byId=Object.fromEntries(doc.objects.map(o=>[o.id,o]));
+ for(const [id,x,y]of [['a',10,10],['b',44,10],['c',78,10],['d',10,36],['e',44,36],['f',78,36]])assert.deepEqual([byId[id].x,byId[id].y],[x,y]);
+ assert.deepEqual(doc.objects.map(o=>({...o,x:0,y:0})),before.objects.map(o=>({...o,x:0,y:0})));
+ const once=clone(doc);arrange(doc);assert.deepEqual(doc,once);
+});
+
+test('uses maximum width per column and height per row for unequal images',()=>{
+ const doc=documentWith(image('a',10,10,20,15),image('b',55,12,35,25),image('c',12,60,30,30),image('d',57,61,20,10));
+ arrange(doc,3,8);
+ assert.deepEqual(doc.objects.map(o=>[o.x,o.y,o.w,o.h]),[[10,10,20,15],[43,10,35,25],[10,43,30,30],[43,43,20,10]]);
+});
+
+test('detects center and bottom aligned images of different heights as one row',()=>{
+ const doc=documentWith(image('a',0,0,20,40),image('b',40,10,20,20),image('c',80,20,20,20));
+ assert.equal(inferImageArray(doc,ids(doc)).rows.length,1);arrange(doc,0,0);
+ assert.deepEqual(doc.objects.map(o=>[o.x,o.y]),[[0,0],[20,0],[40,0]]);
+});
+
+test('single columns, zero gaps, decimal gaps and negative starting positions work',()=>{
+ const doc=documentWith(image('a',-10,-20),image('b',-9,15),image('c',-11,60));
+ assert.deepEqual(arrange(doc,.25,0),{rows:3,columns:1,count:3});
+ assert.deepEqual(doc.objects.map(o=>[o.x,o.y]),[[-11,-20],[-11,0],[-11,20]]);
+ const row=documentWith(image('a',0,0),image('b',50,0));arrange(row,2.75,0);near(row.objects[1].x,32.75);
+});
+
+test('vacant cells retain their column rather than flowing left',()=>{
+ const doc=documentWith(image('a',0,0),image('c',100,0),image('d',0,50),image('e',50,50),image('f',100,50));
+ arrange(doc);
+ assert.deepEqual(doc.objects.map(o=>[o.x,o.y]),[[0,0],[68,0],[0,26],[34,26],[68,26]]);
+});
+
+test('grouped labels travel by the same delta but image edges anchor the grid',()=>{
+ const a=image('a',10,20,30,20,{groupId:'g'}),label=makeObject('text',{id:'label',x:6,y:10,w:8,h:7,groupId:'g'});
+ const b=image('b',70,22),other=makeObject('rect',{id:'other',x:5,y:5});
+ const doc=documentWith(a,label,b,other),before=clone(doc);arrange(doc,5,8,['a','b','other']);
+ assert.deepEqual([a.x,a.y,b.x,b.y],[10,20,45,20]);
+ assert.deepEqual(label,before.objects[1]);assert.deepEqual(other,before.objects[3]);
+ // Move the entire selected group when it occupies a later column.
+ const reverse=documentWith(image('first',0,20),a,label);a.x=70;label.x=66;arrange(reverse,5,8,['first','a']);
+ assert.deepEqual([a.x,label.x,a.y-label.y],[35,31,10]);
+});
+
+test('locked images, locked groups and unselected images are untouched',()=>{
+ const fixed=image('locked',120,100,30,20,{locked:true}),a=image('a',0,0),b=image('b',60,1),c=image('c',200,200,30,20,{groupId:'g'});
+ const label=makeObject('text',{id:'label',x:200,y:190,groupId:'g',locked:true}),other=image('other',300,300);
+ const doc=documentWith(fixed,a,b,c,label,other),unchanged=clone([fixed,c,label,other]);arrange(doc,5,5,['locked','a','b','c']);
+ assert.deepEqual([fixed,c,label,other],unchanged);assert.equal(b.x,35);
+});
+
+test('rotated images use visible bounds without changing their dimensions or rotation',()=>{
+ const doc=documentWith(image('a',10,10,40,20,{rotation:90}),image('b',80,2,30,30,{rotation:45}));
+ const before=clone(doc);arrange(doc,4.5,3);const [a,b]=doc.objects.map(objectBounds);
+ near(b.x-a.x-a.w,4.5);near(a.y,b.y);
+ assert.deepEqual(doc.objects.map(o=>[o.w,o.h,o.rotation]),before.objects.map(o=>[o.w,o.h,o.rotation]));
+});
+
+test('overlapping images in the same inferred cell fail without any mutation',()=>{
+ const doc=documentWith(image('a',0,0),image('b',2,1)),before=clone(doc);
+ assert.match(inferImageArray(doc,ids(doc)).error,/重なって/);assert.throws(()=>arrange(doc),/重なって/);assert.deepEqual(doc,before);
+});
+
+test('invalid, overflowing and insufficient selections fail atomically',()=>{
+ for(const horizontalGap of [-1,NaN,Infinity,'2',1e8]){
+  const doc=documentWith(image('a',0,0),image('b',60,0)),before=clone(doc);
+  assert.throws(()=>arrangeImageArray(doc,ids(doc),{horizontalGap,verticalGap:3}));assert.deepEqual(doc,before);
+ }
+ for(const selected of [[],['a']]){const doc=documentWith(image('a',0,0),image('b',60,0)),before=clone(doc);assert.throws(()=>arrange(doc,3,3,selected),/2枚以上/);assert.deepEqual(doc,before);}
+});
+
+test('selection and layer order do not change the detected layout',()=>{
+ const a=documentWith(image('a',0,0),image('b',50,2),image('c',2,50),image('d',52,48)),b=clone(a);b.objects.reverse();
+ arrange(a);arrange(b,4,6,ids(b).reverse());
+ assert.deepEqual([...a.objects].sort((x,y)=>x.id.localeCompare(y.id)),[...b.objects].sort((x,y)=>x.id.localeCompare(y.id)));
+});
+
+test('one history entry restores and reapplies the complete arrangement',()=>{
+ const doc=documentWith(image('a',0,0),image('b',50,2),image('c',2,50),image('d',52,48)),before=clone(doc),history=new History();
+ arrange(doc);const after=clone(doc);assert.equal(history.push(before,doc),true);assert.deepEqual(history.undo(doc),before);assert.deepEqual(history.redo(before),after);
+});
