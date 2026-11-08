@@ -6,10 +6,11 @@ import {importedImageSize,replacedImageSize,replacedMiFiToImageSize,imageInserti
 import {rasterResolution} from './image-resolution.mjs?v=image-quality-v066-1';
 import {saveDraft,loadDraft,saveProjectFileTarget,loadProjectFileTarget} from './storage.mjs?v=0.3.6-1';
 import {createDemo} from './demo.mjs';
-import {createShortcutHandler} from './shortcuts.mjs?v=image-array-v076-1';
+import {createShortcutHandler,shortcutLabel} from './shortcuts.mjs?v=mac-shortcuts-v077-1';
+import {installShortcutUI} from './shortcut-ui.mjs?v=mac-shortcuts-v077-1';
 import {createRibbon} from './ribbon.mjs?v=source-batch-v070-1';
-import {imageArrayUnits,arrangeImageArray} from './image-array.mjs?v=image-array-v076-1';
-import {createImageArrayDialog} from './image-array-dialog.mjs?v=image-array-v076-1';
+import {imageArrayUnits,arrangeImageArray} from './image-array.mjs?v=mac-shortcuts-v077-1';
+import {createImageArrayDialog} from './image-array-dialog.mjs?v=mac-shortcuts-v077-1';
 import {createColorPickers} from './colors.mjs?v=ribbon-v060-1';
 import {renderTextPaint} from './text-paint.mjs?v=tex-v061-1';
 import {createTexRenderer} from './tex.mjs?v=live-v062-1';
@@ -41,6 +42,7 @@ import {validateWorkspaceBinding} from './integration/bridge-host.mjs?v=force-sw
 
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 setupSourceDiscovery();
+installShortcutUI();
 const ns='http://www.w3.org/2000/svg';
 const el=(tag,attrs={},text)=>{const n=document.createElementNS(ns,tag);for(const[k,v]of Object.entries(attrs))if(v!==undefined)n.setAttribute(k,v);if(text!==undefined)n.textContent=text;return n;};
 let doc=newDocument(),assets=new Map(),selection=[],tool='select',scale=1.5,history=new History(),gesture=null,textBefore=null,editingId=null,dirty=false,saveTimer,revision=0,clipboard=null,formatClipboard=null,frame=0,spaceDown=false,manualSavedRevision=-1,bridge=null;
@@ -86,7 +88,7 @@ function moveFigures(ids,beforeId){
 }
 function figureIds(payload){return payload.figureIds??figureSidebar.getSelectedIds();}
 function focusFigure(){const id=doc.id;$('#figureTabs').querySelector('[data-figure-id="'+id+'"]')?.focus({preventScroll:true});}
-function toast(message){$('#toast').textContent=message;$('#toast').hidden=false;clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('#toast').hidden=true,4200);$('#statusText').textContent=message;}
+function toast(message){message=shortcutLabel(message);$('#toast').textContent=message;$('#toast').hidden=false;clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('#toast').hidden=true,4200);$('#statusText').textContent=message;}
 function selected(){const s=new Set(selection);return doc.objects.filter(o=>s.has(o.id));}
 function editable(){const lockedGroups=new Set(doc.objects.filter(o=>o.locked&&o.groupId).map(o=>o.groupId));return selected().filter(o=>!o.locked&&!lockedGroups.has(o.groupId));}
 function setSelection(ids,{focus=true}={}){selection=expandSelection(doc,ids);if(!selection.includes(pathEditId))pathEditId=null;renderOverlay();renderInspector();renderLayers();if(focus&&!editingId)svg.focus({preventScroll:true});}
@@ -365,7 +367,7 @@ function execute(action,payload={}){
   const ids=figureIds(payload);if(!ids.length)return;finishText();const before=snapshot(),result=deleteFigures(figures,ids,doc.id);if(result.figures===figures)return;figures=result.figures;doc=figures.find(f=>f.id===result.activeId);selection=[];record(before);figureSidebar.select([doc.id],doc.id);fit();focusFigure();toast(ids.length+'枚のFigureを削除しました · Ctrl+Zで戻せます');return;
  }
  if(action==='move-figure-left'||action==='move-figure-right'){finishText();const before=snapshot(),i=figures.findIndex(f=>f.id===doc.id),j=i+(action==='move-figure-left'?-1:1);if(j>=0&&j<figures.length){[figures[i],figures[j]]=[figures[j],figures[i]];record(before);}return;}
- if(action==='new'||action==='sample'){finishText();if(dirty&&!confirm('現在のFigureを閉じます。必要な場合は先にCtrl+Sで保存してください。続けますか？'))return;const before=snapshot();if(action==='sample'){const demo=createDemo();doc=demo.doc;for(const [k,v]of demo.assets)assets.set(k,v);}else{doc=newDocument();doc.name='Fig. 1';}bookId=uid();preservedWorkspace=null;figures=[doc];selection=[];previewQuality.clear();record(before);fit();return;}
+ if(action==='new'||action==='sample'){finishText();if(dirty&&!confirm(shortcutLabel('現在のFigureを閉じます。必要な場合は先にCtrl+Sで保存してください。続けますか？')))return;const before=snapshot();if(action==='sample'){const demo=createDemo();doc=demo.doc;for(const [k,v]of demo.assets)assets.set(k,v);}else{doc=newDocument();doc.name='Fig. 1';}bookId=uid();preservedWorkspace=null;figures=[doc];selection=[];previewQuality.clear();record(before);fit();return;}
  if(action==='export-svg')return exportSVG();if(action==='export-png')return exportPNG();if(action==='export-pdf')return exportPDF();
  if(action==='attach-source'){if(selected().length!==1||selected()[0].type!=='image'){toast('画像・グラフを1つ選択してください');return;}$('#sourceInput').click();return;}
  if(action==='edit-source'){const o=selected()[0];if(o?.source)editSource(o);else toast('先に「元プロジェクトを関連付け」で .plotproject / .mifito を選択してください');return;}
@@ -493,7 +495,7 @@ function updateProjectFileUI(){
  const target=projectFiles.target(bookId),busy=projectSaving||projectOpening,button=$('[data-action="save"]');
  button.disabled=busy;$('[data-action="save-as"]').disabled=busy;$('[data-action="open"]').disabled=busy;
  $('#projectSaveLabel').textContent=projectSaving?'保存中…':target?.handle?'上書き保存':'保存';
- button.title=target?.handle?`${target.name} に上書き保存 (Ctrl+S)`:'保存先を選んでプロジェクトを保存 (Ctrl+S)';
+ button.title=shortcutLabel(target?.handle?`${target.name} に上書き保存 (Ctrl+S)`:'保存先を選んでプロジェクトを保存 (Ctrl+S)');
  $('#projectSaveTarget').textContent=target?.name||'保存先を選択';
  $('#projectSaveTarget').title=target?.name||'';
 }
@@ -740,7 +742,7 @@ function withPNGResolution(blob,dpi){return blob.arrayBuffer().then(buffer=>{con
 async function exportPNG(){try{await prepareFigureExport();const dpi=Number($('#exportDpi').value),w=Math.round(doc.width/72*dpi),h=Math.round(doc.height/72*dpi);if(w*h>100000000||w>16384||h>16384)throw Error('出力が大きすぎます。DPIまたは用紙サイズを下げてください。');toast('PNGを書き出しています…');const s=buildExport(),url=URL.createObjectURL(new Blob([s],{type:'image/svg+xml'}));try{const img=new Image();img.src=url;await img.decode();const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);const blob=await new Promise(resolve=>c.toBlob(resolve,'image/png'));if(!blob)throw Error('PNGの生成に失敗しました');download(await withPNGResolution(blob,dpi),`${safeName(doc.name)}_${dpi}dpi.png`);c.width=c.height=1;toast(`${w} × ${h} px・${dpi} dpiで保存しました`);}finally{URL.revokeObjectURL(url);}}catch(e){toast(e.message);}}
 async function exportPDF(){const win=window.open('','figure-studio-print');if(!win){toast('PDF保存用の別タブを許可してください');return;}try{await prepareFigureExport();const s=buildExport();win.document.open();win.document.write(`<!doctype html><html><head><title>Figure PDF</title><style>@page{size:${toMM(doc.width)}mm ${toMM(doc.height)}mm;margin:0}html,body{margin:0;padding:0}svg{display:block;width:${toMM(doc.width)}mm;height:${toMM(doc.height)}mm}@media screen{body{background:#ddd;padding:20px}svg{background:white}}</style></head><body>${s}</body></html>`);win.document.close();Promise.all([win.document.fonts.ready,...[...win.document.querySelectorAll('svg image')].map(i=>{const image=new win.Image();image.src=i.getAttribute('href');return image.decode();})]).then(()=>win.print()).catch(()=>toast('画像の読み込みが完了しませんでした。SVG保存をお使いください'));toast('印刷画面で「PDFに保存」、倍率100%、余白なしを選んでください');}catch(error){win.close();toast(error.message);}}
 
-svg.addEventListener('contextmenu',e=>{e.preventDefault();finishText();const id=e.target.closest('[data-id]')?.dataset.id;if(id&&!selection.includes(id))setSelection([id]);const menu=$('#contextMenu');menu.replaceChildren();for(const[label,action,key]of [['複製','duplicate','Ctrl+D'],['最前面へ','front','Alt → 3'],['最背面へ','back','Alt → 4'],['一段前へ','forward',''],['一段後ろへ','backward',''],['左揃え','align-left','Alt → 5 → L'],['グループ化','group','Ctrl+G'],['グループ解除','ungroup','Ctrl+Shift+G'],['固定 / 解除','lock',''],['元アプリで編集','edit-source',''],['削除','delete','Delete']]){const b=document.createElement('button');b.type='button';b.textContent=label;const k=document.createElement('kbd');k.textContent=key;b.append(k);b.onclick=()=>{menu.hidden=true;execute(action);svg.focus();};menu.append(b);}menu.hidden=false;menu.style.left=`${Math.min(e.clientX,innerWidth-250)}px`;menu.style.top=`${Math.min(e.clientY,innerHeight-450)}px`;});
+svg.addEventListener('contextmenu',e=>{e.preventDefault();finishText();const id=e.target.closest('[data-id]')?.dataset.id;if(id&&!selection.includes(id))setSelection([id]);const menu=$('#contextMenu');menu.replaceChildren();for(const[label,action,key]of [['複製','duplicate','Ctrl+D'],['最前面へ','front','Alt → 3'],['最背面へ','back','Alt → 4'],['一段前へ','forward',''],['一段後ろへ','backward',''],['左揃え','align-left','Alt → 5 → L'],['グループ化','group','Ctrl+G'],['グループ解除','ungroup','Ctrl+Shift+G'],['固定 / 解除','lock',''],['元アプリで編集','edit-source',''],['削除','delete','Delete']]){const b=document.createElement('button');b.type='button';b.textContent=label;const k=document.createElement('kbd');k.textContent=shortcutLabel(key);b.append(k);b.onclick=()=>{menu.hidden=true;execute(action);svg.focus();};menu.append(b);}menu.hidden=false;menu.style.left=`${Math.min(e.clientX,innerWidth-250)}px`;menu.style.top=`${Math.min(e.clientY,innerHeight-450)}px`;});
 document.addEventListener('pointerdown',e=>{if(!e.target.closest('#contextMenu'))$('#contextMenu').hidden=true;for(const d of $$('details:not(.sidebar-text-panel)[open]'))if(!d.contains(e.target))d.open=false;});
 window.addEventListener('beforeunload',e=>{if(projectSaving||dirty||pathDrawing?.drawing||(editingId&&textBefore&&JSON.stringify(snapshot())!==JSON.stringify(textBefore))){e.preventDefault();e.returnValue='';}});
 window.addEventListener('resize',()=>{if(!gesture)renderOverlay();});

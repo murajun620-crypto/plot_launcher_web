@@ -1,4 +1,13 @@
-# Figure Studio Web v0.7.6 検証記録
+# Figure Studio Web v0.7.7 検証記録
+
+## v0.7.7の追加確認
+
+- Studio Nodeテスト482件が成功。MacのOption＋5／Gが∞・©として届く場合や、各整列キーが記号となる場合も物理キーで認識。順押し、Alt保持、Mac／Windows、文字入力・IME・AltGraph・モーダル保護を検証。
+- MacのCommandで保存・開く・文字書式・グループ化、⌘＋Z／⌘＋Shift＋ZでUndo／Redo。ネイティブのクリップボード／文字編集Undoを維持。Option＋矢印の0.1pt微調整を確認。
+- 専用の実ブラウザにテスト用Macプラットフォーム設定を使い、⌘＋A、⌘＋D（6→12要素）、⌘＋Z（6）、⌘＋Shift＋Z（12）、Option＋矢印（0.1pt）、⌘＋B／⌘＋Enterの文字編集確定を確認。
+- 公開KeyboardEventから∞／©を含むOption操作を送り、配列ダイアログが開くことを確認。保存・文字書式のツールチップ、配列ダイアログ、ヘルプがCommand／Option表示となり、ブラウザの警告・エラーなし。
+- Mac実機・macOSブラウザのOS予約キーの動作は未検証。Figure追加はOSの最小化操作を避けるControl＋Mを表示。既存Windowsのキー操作は維持。
+
 
 ## v0.7.6の追加確認
 

@@ -51,6 +51,17 @@ const FORMAT_KEYS = Object.freeze({
 const ALT_HINT = 'Alt: 3 最前面 · 4 最背面 · 5 配置 · Esc 閉じる';
 const ALIGN_HINT = '配置: L 左 · C 中央 · R 右 · T 上 · M 上下中央 · B 下 · H 左右等間隔 · V 上下等間隔 · G 間隔を指定して配列';
 
+export const keyboardPlatform=()=>globalThis.navigator?.userAgentData?.platform||globalThis.navigator?.platform||'';
+export const isMacPlatform=(platform=keyboardPlatform())=>/mac|iphone|ipad|ipod/i.test(platform);
+export function shortcutLabel(text,platform=keyboardPlatform()){
+ if(!isMacPlatform(platform))return text;
+ return text.replace(/Ctrl\s*\+\s*Y\b/gi,'⌘ + Shift + Z').replace(/\bCtrl\b/g,'⌘').replace(/\bAlt\b/g,'Option');
+}
+export function shortcutRows(platform=keyboardPlatform()){
+ const mac=isMacPlatform(platform);
+ return SHORTCUTS.map(([name,keys])=>[name,mac&&name==='元に戻す／やり直す'?'⌘ + Z / ⌘ + Shift + Z':mac&&name==='Figureを追加'?'Control + M':mac&&name==='移動／大きく移動／微調整'?'矢印 / Shift + 矢印 / Option + 矢印':shortcutLabel(keys,platform)]);
+}
+
 function defaultEditing(event) {
   const target = event?.target;
   if (!target) return false;
@@ -58,7 +69,14 @@ function defaultEditing(event) {
   return Boolean(target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName || ''));
 }
 
-function normalizedKey(event) {
+function physicalKey(event){
+ const code=String(event.code||'');
+ if(/^Key[A-Z]$/.test(code))return code.slice(3).toLowerCase();
+ if(/^Digit[0-9]$/.test(code))return code.slice(5);
+ return '';
+}
+function normalizedKey(event,physicalOption=false) {
+ if(physicalOption&&physicalKey(event))return physicalKey(event);
   const key = String(event.key || '').toLowerCase();
   if (key && key !== 'unidentified') return key;
   const code = String(event.code || '');
@@ -83,9 +101,11 @@ export function createShortcutHandler({
   isCanvasActive = () => true,
   onHint = () => {},
   supportsAction = () => true,
+  platform = keyboardPlatform(),
 } = {}) {
   if (typeof execute !== 'function') throw new TypeError('execute must be a function');
   let sequence = '';
+  const mac=isMacPlatform(platform);
 
   const reset = () => {
     if (sequence) onHint('');
@@ -106,12 +126,14 @@ export function createShortcutHandler({
       reset();
       return false;
     }
-    const key = normalizedKey(event);
     const editing = isEditing(event);
     const canvasText = editing === 'canvas-text';
     const surface = isCanvasActive(event);
     const active = Boolean(surface), ribbon = surface === 'ribbon';
     const primary = Boolean(event.ctrlKey || event.metaKey);
+    // Option produces characters such as ∞, © and ¬ on macOS. Only command
+    // scopes use physical keys; text inputs, IME and AltGraph keep native input.
+    const key = normalizedKey(event,mac&&event.altKey&&!editing&&!primary);
 
     // Modal dialogs and native form fields own their focus and navigation.
     if (!active) {
@@ -129,6 +151,12 @@ export function createShortcutHandler({
       return consume(event, ribbon ? 'focus-canvas' : 'escape');
     }
 
+    if(mac&&event.altKey&&!primary&&!editing&&sequence!=='align'&&/^arrow(left|right|up|down)$/.test(key)){
+      if(ribbon){reset();return false;}
+      const steps={arrowleft:[-.1,0],arrowright:[.1,0],arrowup:[0,-.1],arrowdown:[0,.1]};
+      const [dx,dy]=steps[key];return consume(event,'nudge',{dx,dy});
+    }
+
     // Key Tips never interfere with text composition/caret navigation.
     if (!editing && !primary) {
       if (key === 'alt') {
@@ -136,7 +164,7 @@ export function createShortcutHandler({
         event.stopPropagation?.();
         if (event.repeat) return true;
         if (sequence) reset();
-        else { sequence = 'root'; onHint(ALT_HINT); }
+        else { sequence = 'root'; onHint(shortcutLabel(ALT_HINT,platform)); }
         return true;
       }
       if (sequence || event.altKey) {
