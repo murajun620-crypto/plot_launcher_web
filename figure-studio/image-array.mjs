@@ -1,4 +1,4 @@
-import {bounds,selectionUnits,expandSelection} from './model.mjs?v=image-array-v075-1';
+import {bounds,selectionUnits,expandSelection} from './model.mjs?v=image-array-v076-1';
 
 /** A group stays whole in mixed selections; only a group selected alone opens up. */
 export function imageArraySelection(doc,ids){
@@ -41,7 +41,9 @@ function axisBands(items,position,size){
 /** Detect both tracks independently so vacant cells retain their place. */
 export function inferImageArray(doc,ids){
  const {units,...mode}=imageArraySelection(doc,ids);
- const items=units.map(unit=>({unit,key:unit.map(object=>object.id).sort().join('\0'),box:bounds(unit)}));
+ // Only original images/graphs define tracks and gaps. Grouped annotations still
+ // travel with the unit, even when they extend beyond the image rectangle.
+ const items=units.map(unit=>({unit,key:unit.map(object=>object.id).sort().join('\0'),box:bounds(unit.filter(object=>object.type==='image'))}));
  if(items.length<2)return {...mode,items,rows:[],columns:[],error:'固定されていない画像を2枚以上、または画像グループを2つ以上選択してください。'};
  const rows=axisBands(items,'y','h'),columns=axisBands(items,'x','w');
  const cells=new Set();

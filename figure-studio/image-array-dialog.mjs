@@ -1,5 +1,5 @@
-import {mm} from './model.mjs?v=image-array-v075-1';
-import {inferImageArray} from './image-array.mjs?v=image-array-v075-1';
+import {mm} from './model.mjs?v=image-array-v076-1';
+import {inferImageArray} from './image-array.mjs?v=image-array-v076-1';
 
 export function createImageArrayDialog({root,getDocument,getSelection,onApply,onClose=()=>{}}){
  const form=root.querySelector('form'),horizontal=root.querySelector('[name="horizontalGap"]'),vertical=root.querySelector('[name="verticalGap"]'),separate=root.querySelector('[name="separateGaps"]'),verticalField=root.querySelector('[data-array-vertical-field]'),horizontalLabel=root.querySelector('[data-array-horizontal-label]'),summary=root.querySelector('[data-array-summary]'),note=root.querySelector('[data-array-note]'),error=root.querySelector('[data-array-error]'),apply=root.querySelector('[type="submit"]');
@@ -14,7 +14,7 @@ export function createImageArrayDialog({root,getDocument,getSelection,onApply,on
   const layout=inferImageArray(openedDocument,ids);
   const target=layout.withinGroup?`グループ内の画像 ${layout.items.length}枚`:layout.mixed?`個別画像 ${layout.imageUnitCount}枚 ＋ グループ ${layout.groupUnitCount}組`:layout.groupCount?`グループ単位 ${layout.items.length}組`:`画像 ${layout.items.length}枚`;
   summary.textContent=layout.items.length>=2?`${target} · ${layout.rows.length}行 × ${layout.columns.length}列（現在の並びを保持）`:'画像を複数選択してから実行してください。';
-  note.textContent=(layout.withinGroup?'グループ化を保ち、画像を個別に動かします。文字・図形の位置は保持します。':layout.mixed?'個別画像とグループをそれぞれ1つの単位として並べます。グループ内の配置は保持します。':layout.groupCount?'グループ内の配置を保ち、文字・図形を含むグループの外枠を基準に動かします。':'')+'画像サイズは変えず、各列・行の最大サイズを基準に左上揃えで並べます。';
+  note.textContent=(layout.withinGroup?'グループ化を保ち、画像を個別に動かします。文字・図形の位置は保持します。':layout.mixed?'個別画像とグループをそれぞれ1つの単位として並べます。グループ内の配置は保持します。':layout.groupCount?'グループ内の配置を保って移動します。':'')+'元画像・グラフの範囲を基準に行・列と隙間を決めます。はみ出した文字・図形は隙間に含めません。画像サイズは変えず、各列・行の最大サイズで左上揃えにします。';
   error.textContent=layout.error||'';error.hidden=!layout.error;apply.disabled=!!layout.error;
   horizontal.value=String(lastGaps.horizontal);vertical.value=String(lastGaps.vertical);separate.checked=lastGaps.separate;syncGaps();
   root.showModal();horizontal.focus();horizontal.select();

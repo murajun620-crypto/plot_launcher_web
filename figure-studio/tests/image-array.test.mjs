@@ -8,6 +8,7 @@ const documentWith=(...objects)=>({...newDocument(),objects});
 const ids=doc=>doc.objects.map(object=>object.id);
 const near=(value,expected)=>assert.ok(Math.abs(value-expected)<1e-7,`${value} != ${expected}`);
 const arrange=(doc,h=4,v=6,selected=ids(doc))=>arrangeImageArray(doc,selected,{horizontalGap:h,verticalGap:v});
+const imageBounds=unit=>bounds(unit.filter(object=>object.type==='image'));
 
 test('preserves a roughly arranged 2 x 3 grid, sizes, z order and top-left anchor',()=>{
  const doc=documentWith(image('f',95,60),image('a',10,11),image('d',12,61),image('c',96,10),image('b',52,12),image('e',53,59));
@@ -45,15 +46,15 @@ test('vacant cells retain their column rather than flowing left',()=>{
  assert.deepEqual(doc.objects.map(o=>[o.x,o.y]),[[0,0],[68,0],[0,26],[34,26],[68,26]]);
 });
 
-test('whole group bounds anchor spacing and grouped labels travel by the same delta',()=>{
+test('original image bounds anchor spacing and grouped labels travel by the same delta',()=>{
  const a=image('a',10,20,30,20,{groupId:'g'}),label=makeObject('text',{id:'label',x:6,y:10,w:8,h:7,groupId:'g'});
  const b=image('b',70,22),other=makeObject('rect',{id:'other',x:5,y:5});
  const doc=documentWith(a,label,b,other),before=clone(doc);arrange(doc,5,8,['a','b','other']);
- assert.deepEqual([a.x,a.y,b.x,b.y],[10,20,45,10]);
+ assert.deepEqual([a.x,a.y,b.x,b.y],[10,20,45,20]);
  assert.deepEqual(label,before.objects[1]);assert.deepEqual(other,before.objects[3]);
  // Move the entire selected group when it occupies a later column.
  const reverse=documentWith(image('first',0,20),a,label);a.x=70;label.x=66;arrange(reverse,5,8,['first','a']);
- assert.deepEqual([a.x,label.x,a.y-label.y],[39,35,10]);
+ assert.deepEqual([a.x,label.x,a.y-label.y],[35,31,10]);
 });
 
 test('multiple image groups move as complete units with their internal spacing intact',()=>{
@@ -61,7 +62,7 @@ test('multiple image groups move as complete units with their internal spacing i
  const before=clone(doc),layout=inferImageArray(doc,['a','c']);
  assert.equal(layout.withinGroup,false);assert.equal(layout.items.length,2);assert.equal(layout.columns.length,2);assert.equal(layout.rows.length,1);
  arrange(doc,5,5,['a','c']);
- const units=imageArrayUnits(doc,['a','c']),[a,b]=units.map(bounds);near(b.x-a.x-a.w,5);near(a.y,b.y);
+ const units=imageArrayUnits(doc,['a','c']),[a,b]=units.map(imageBounds);near(b.x-a.x-a.w,5);near(a.y,b.y);
  for(const unit of units){const origin=before.objects.find(o=>o.id===unit[0].id),dx=unit[0].x-origin.x,dy=unit[0].y-origin.y;for(const o of unit){const old=before.objects.find(v=>v.id===o.id);near(o.x-old.x,dx);near(o.y-old.y,dy);assert.equal(o.groupId,old.groupId);}}
 });
 
@@ -80,10 +81,23 @@ test('one image group plus a standalone image arranges two units and keeps the g
 });
 
 test('mixed groups and standalone images retain a two-row arrangement and grouped labels',()=>{
- const doc=documentWith(image('a',0,5,20,20,{groupId:'g1'}),image('b',25,5,20,20,{groupId:'g1'}),makeObject('text',{id:'caption',x:0,y:0,w:10,h:5,groupId:'g1'}),image('c',80,1,45,25),image('d',2,80,45,25),image('e',81,81,20,20,{groupId:'g2'}),image('f',106,81,20,20,{groupId:'g2'}));
+ const doc=documentWith(image('a',0,5,20,25,{groupId:'g1'}),image('b',25,5,20,25,{groupId:'g1'}),makeObject('text',{id:'caption',x:0,y:0,w:10,h:5,groupId:'g1'}),image('c',80,1,45,25),image('d',2,80,45,25),image('e',81,81,20,25,{groupId:'g2'}),image('f',106,81,20,25,{groupId:'g2'}));
  const layout=inferImageArray(doc,ids(doc));assert.equal(layout.mixed,true);assert.equal(layout.imageUnitCount,2);assert.equal(layout.groupUnitCount,2);assert.equal(layout.items.length,4);assert.equal(layout.rows.length,2);assert.equal(layout.columns.length,2);
- arrange(doc,1,1);const [g1,c,d,g2]=imageArrayUnits(doc,ids(doc)).map(bounds);near(c.x-g1.x-g1.w,1);near(d.y-g1.y-g1.h,1);near(g2.x-d.x-d.w,1);near(g2.y-c.y-c.h,1);
+ arrange(doc,1,1);const [g1,c,d,g2]=imageArrayUnits(doc,ids(doc)).map(imageBounds);near(c.x-g1.x-g1.w,1);near(d.y-g1.y-g1.h,1);near(g2.x-d.x-d.w,1);near(g2.y-c.y-c.h,1);
  near(doc.objects[1].x-doc.objects[0].x,25);near(doc.objects[0].y-doc.objects[2].y,5);near(doc.objects[6].x-doc.objects[5].x,25);
+});
+
+test('overhanging shapes cannot change inferred rows, columns, spacing or image anchor',()=>{
+ const doc=documentWith();
+ for(let i=0;i<4;i++){
+  const x=10+(i%2)*80,y=20+Math.floor(i/2)*70,groupId='g'+i;
+  doc.objects.push(image('image'+i,x,y,40,30,{groupId,source:{app:i%2?'plot':'mifito'}}),makeObject('rect',{id:'shape'+i,x:x-100,y:y-90,w:250,h:220,groupId}),makeObject('arrow',{id:'arrow'+i,x:x-20,y:y+40,w:160,h:-120,rotation:35,groupId}));
+ }
+ const before=clone(doc),layout=inferImageArray(doc,ids(doc));
+ assert.equal(layout.error,null);assert.equal(layout.rows.length,2);assert.equal(layout.columns.length,2);
+ arrange(doc,1,1);const boxes=imageArrayUnits(doc,ids(doc)).map(imageBounds);
+ assert.deepEqual(boxes.map(b=>[b.x,b.y]),[[10,20],[51,20],[10,51],[51,51]]);
+ for(const unit of imageArrayUnits(doc,ids(doc))){const oldImage=before.objects.find(o=>o.id===unit[0].id),dx=unit[0].x-oldImage.x,dy=unit[0].y-oldImage.y;for(const o of unit){const old=before.objects.find(v=>v.id===o.id);near(o.x-old.x,dx);near(o.y-old.y,dy);assert.deepEqual({...o,x:0,y:0},{...old,x:0,y:0});}}
 });
 
 test('a fixed standalone image does not unexpectedly switch a mixed selection into internal layout',()=>{
