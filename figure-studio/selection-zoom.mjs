@@ -1,4 +1,4 @@
-import {bounds} from './model.mjs';
+import {bounds} from './model.mjs?v=group-selection-v078-1';
 
 /** Leave enough scrollable space to center even a panel at a page edge. */
 export function centerSelectionInViewport(viewport,paper,point,scale){

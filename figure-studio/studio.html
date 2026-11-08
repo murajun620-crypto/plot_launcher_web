@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#147d73">
   <meta name="description" content="グラフと画像をまとめる、軽快な論文Figureエディター。">
-  <meta name="figure-studio-version" content="0.7.7">
-  <meta name="figure-studio-build" content="mac-shortcuts-v077-1">
-  <title>Figure Studio — v0.7.7</title>
-  <link rel="icon" type="image/svg+xml" href="./favicon.svg?v=0.7.7-1">
-  <link rel="stylesheet" href="./styles.css?v=0.7.7-1">
-  <link rel="stylesheet" href="./arrow-picker.css?v=0.7.7-1">
-  <link rel="stylesheet" href="./sidebar-selection.css?v=0.7.7-1">
-  <link rel="stylesheet" href="./ribbon.css?v=mac-shortcuts-v077-1">
+  <meta name="figure-studio-version" content="0.7.8">
+  <meta name="figure-studio-build" content="group-selection-v078-1">
+  <title>Figure Studio — v0.7.8</title>
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg?v=0.7.8-1">
+  <link rel="stylesheet" href="./styles.css?v=0.7.8-1">
+  <link rel="stylesheet" href="./arrow-picker.css?v=0.7.8-1">
+  <link rel="stylesheet" href="./sidebar-selection.css?v=0.7.8-1">
+  <link rel="stylesheet" href="./ribbon.css?v=group-selection-v078-1">
 </head>
 <body>
   <svg class="icon-defs" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>
@@ -72,7 +72,7 @@
 
   <div class="app-shell">
     <header class="app-header">
-      <div class="brand"><span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span><span>Figure Studio</span><span class="version">v0.7.7</span><button id="checkUpdateButton" class="update-check-button" type="button" title="新しいバージョンを確認" aria-label="新しいバージョンを確認"><svg class="icon small" aria-hidden="true"><use href="#i-refresh"/></svg><span class="update-check-label">更新確認</span></button></div>
+      <div class="brand"><span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span><span>Figure Studio</span><span class="version">v0.7.8</span><button id="checkUpdateButton" class="update-check-button" type="button" title="新しいバージョンを確認" aria-label="新しいバージョンを確認"><svg class="icon small" aria-hidden="true"><use href="#i-refresh"/></svg><span class="update-check-label">更新確認</span></button></div>
       <div class="document-title"><input id="docName" aria-label="Figureの名前" value="Untitled figure" spellcheck="false"><span id="saveStatus" class="save-status">準備中</span></div>
       <div class="header-actions">
         <button class="button compact" data-action="new" title="新規Figure"><svg class="icon"><use href="#i-plus"/></svg><span class="optional-label">新規</span></button>
@@ -91,7 +91,7 @@
     </header>
 
     <section id="studioRibbon" class="ribbon office-ribbon" aria-label="編集リボン">
-      <div class="ribbon-tab-row"><div class="ribbon-tabs" role="tablist" aria-label="リボンのタブ"><button type="button" id="ribbonTab-home" role="tab" data-ribbon-tab="home" aria-controls="ribbonPanel-home" aria-selected="true" tabindex="0">ホーム</button><button type="button" id="ribbonTab-insert" role="tab" data-ribbon-tab="insert" aria-controls="ribbonPanel-insert" aria-selected="false" tabindex="-1">挿入</button><button type="button" id="ribbonTab-view" role="tab" data-ribbon-tab="view" aria-controls="ribbonPanel-view" aria-selected="false" tabindex="-1">表示</button></div><span id="selectionInfo" class="ribbon-selection-info" aria-live="polite">未選択</span><button id="rightSidebarToggle" type="button" class="sidebar-toggle" data-action="toggle-selection-pane" aria-controls="ribbonSelectionPane" aria-expanded="true" title="右サイドバーを表示／非表示"><svg class="icon small" aria-hidden="true"><use href="#i-layers"/></svg><span>右サイドバー</span></button></div>
+      <div class="ribbon-tab-row"><div class="ribbon-tabs" role="tablist" aria-label="リボンのタブ"><button type="button" id="ribbonTab-home" role="tab" data-ribbon-tab="home" aria-controls="ribbonPanel-home" aria-selected="true" tabindex="0">ホーム</button><button type="button" id="ribbonTab-insert" role="tab" data-ribbon-tab="insert" aria-controls="ribbonPanel-insert" aria-selected="false" tabindex="-1">挿入</button><button type="button" id="ribbonTab-view" role="tab" data-ribbon-tab="view" aria-controls="ribbonPanel-view" aria-selected="false" tabindex="-1">表示</button></div><span id="selectionInfo" class="ribbon-selection-info" aria-live="polite">未選択</span><button id="selectWholeGroupButton" type="button" class="selection-scope-button" data-action="select-group" title="グループ全体を選択 (Esc)" hidden>グループ全体へ</button><button id="rightSidebarToggle" type="button" class="sidebar-toggle" data-action="toggle-selection-pane" aria-controls="ribbonSelectionPane" aria-expanded="true" title="右サイドバーを表示／非表示"><svg class="icon small" aria-hidden="true"><use href="#i-layers"/></svg><span>右サイドバー</span></button></div>
       <div id="ribbonPanel-home" class="ribbon-panel" role="tabpanel" data-ribbon-panel="home" aria-labelledby="ribbonTab-home">
         <section class="ribbon-group ribbon-edit-group" aria-label="編集"><div class="ribbon-group-body"><div class="ribbon-history"><button type="button" class="icon-button" data-action="undo" title="元に戻す" aria-label="元に戻す" ><svg class="icon" aria-hidden="true"><use href="#i-undo"/></svg><span>元に戻す</span></button><button type="button" class="icon-button" data-action="redo" title="やり直す" aria-label="やり直す" ><svg class="icon" aria-hidden="true"><use href="#i-redo"/></svg><span>やり直す</span></button></div><button type="button" class="ribbon-command" data-action="duplicate" title="複製" aria-label="複製" ><svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg><span>複製</span></button></div><h2 class="ribbon-group-label">編集</h2></section>
         <section class="ribbon-group ribbon-font-group text-properties" aria-label="フォント"><div class="ribbon-group-body"><div class="font-row"><label class="sr-only" for="propFontFamily">フォント</label><select id="propFontFamily" data-prop="fontFamily"><option value="Arial">Arial</option><option value="Helvetica">Helvetica</option><option value="Times New Roman">Times New Roman</option><option value="Georgia">Georgia</option><option value="Yu Gothic">游ゴシック</option><option value="Meiryo">メイリオ</option></select><label class="font-size-field"><input id="propFontSize" data-prop="fontSize" type="number" min="1" max="400" step="0.5" value="9" aria-label="文字サイズ pt"><span>pt</span></label></div><div class="ribbon-font-format"><div class="segmented-controls"><button type="button" class="format-button" data-action="bold" title="太字 (Ctrl+B)" aria-label="太字"><b>B</b></button><button type="button" class="format-button" data-action="italic" title="斜体 (Ctrl+I)" aria-label="斜体"><i>I</i></button><button type="button" class="format-button" data-action="underline" title="下線 (Ctrl+U)" aria-label="下線"><u>U</u></button></div>
@@ -245,6 +245,6 @@
     <tr><td>選択／文字／線／矢印／四角／楕円</td><td><kbd>V</kbd> / <kbd>T</kbd> / <kbd>L</kbd> / <kbd>A</kbd> / <kbd>R</kbd> / <kbd>E</kbd></td></tr>
     <tr><td>キャンセル／ショートカット一覧</td><td><kbd>Esc</kbd> / <kbd>F1</kbd></td></tr>
   <tr><td>間隔を指定して配列</td><td><kbd>Alt</kbd> → <kbd>5</kbd> → <kbd>G</kbd></td></tr></tbody></table></div><p class="dialog-note">Alt + 数字は、ご指定のPowerPoint設定に合わせた割り当てです。ブラウザやOSが優先する操作は、画面のボタンからも実行できます。</p></dialog>
-  <script type="module" src="./app.js?v=mac-shortcuts-v077-1"></script>
+  <script type="module" src="./app.js?v=group-selection-v078-1"></script>
 </body>
 </html>

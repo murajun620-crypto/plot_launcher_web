@@ -16,25 +16,25 @@ export function objectBounds(o){
  return {x:Math.min(...p.map(v=>v.x)),y:Math.min(...p.map(v=>v.y)),w:Math.max(...p.map(v=>v.x))-Math.min(...p.map(v=>v.x)),h:Math.max(...p.map(v=>v.y))-Math.min(...p.map(v=>v.y))};
 }
 export function bounds(objects){if(!objects.length)return null;const bs=objects.map(objectBounds);const x=Math.min(...bs.map(o=>o.x)),y=Math.min(...bs.map(o=>o.y));return {x,y,w:Math.max(...bs.map(o=>o.x+o.w))-x,h:Math.max(...bs.map(o=>o.y+o.h))-y};}
-export function selectionUnits(doc,ids){
- const selected=new Set(expandSelection(doc,ids)),units=new Map();
- for(const o of doc.objects){if(!selected.has(o.id))continue;const key=o.groupId||o.id;if(!units.has(key))units.set(key,[]);units.get(key).push(o);}
+export function selectionUnits(doc,ids,{individual=false}={}){
+ const selected=new Set(individual?ids:expandSelection(doc,ids)),units=new Map(),lockedGroups=new Set(doc.objects.filter(object=>object.locked&&object.groupId).map(object=>object.groupId));
+ for(const o of doc.objects){if(!selected.has(o.id))continue;const key=individual?o.id:o.groupId||o.id;if(!units.has(key))units.set(key,[]);units.get(key).push(o);}
  // A group remains one transform unit, including when a member is locked.
- return [...units.values()].filter(unit=>!unit.some(o=>o.locked));
+ return [...units.values()].filter(unit=>!unit.some(o=>o.locked||lockedGroups.has(o.groupId)));
 }
 export function expandSelection(doc,ids){const set=new Set(ids),groups=new Set(doc.objects.filter(o=>set.has(o.id)&&o.groupId).map(o=>o.groupId));for(const o of doc.objects)if(o.groupId&&groups.has(o.groupId))set.add(o.id);return [...set];}
-export function align(doc,ids,mode,target='selection'){
- const units=selectionUnits(doc,ids);if(!units.length)return;
+export function align(doc,ids,mode,target='selection',options={}){
+ const units=selectionUnits(doc,ids,options);if(!units.length)return;
  const b=target==='page'?{x:0,y:0,w:doc.width,h:doc.height}:bounds(units.flat());
  for(const unit of units){const q=bounds(unit);let dx=0,dy=0;
  if(mode==='left')dx=b.x-q.x;if(mode==='center')dx=b.x+b.w/2-q.x-q.w/2;if(mode==='right')dx=b.x+b.w-q.x-q.w;
  if(mode==='top')dy=b.y-q.y;if(mode==='middle')dy=b.y+b.h/2-q.y-q.h/2;if(mode==='bottom')dy=b.y+b.h-q.y-q.h;
  for(const o of unit){o.x+=dx;o.y+=dy;}}
 }
-export function distribute(doc,ids,axis){const units=selectionUnits(doc,ids);if(units.length<3)return;const p=axis==='h'?'x':'y',s=axis==='h'?'w':'h';units.sort((a,b)=>bounds(a)[p]-bounds(b)[p]);const first=bounds(units[0]),last=bounds(units.at(-1));const gap=(last[p]+last[s]-first[p]-units.reduce((sum,u)=>sum+bounds(u)[s],0))/(units.length-1);let pos=first[p];for(const unit of units){const b=bounds(unit),d=pos-b[p];unit.forEach(o=>o[p]+=d);pos+=b[s]+gap;}}
-export function reorder(doc,ids,mode){const set=new Set(selectionUnits(doc,ids).flat().map(o=>o.id));if(mode==='front')doc.objects=[...doc.objects.filter(o=>!set.has(o.id)),...doc.objects.filter(o=>set.has(o.id))];if(mode==='back')doc.objects=[...doc.objects.filter(o=>set.has(o.id)),...doc.objects.filter(o=>!set.has(o.id))];if(mode==='forward')for(let i=doc.objects.length-2;i>=0;i--)if(set.has(doc.objects[i].id)&&!set.has(doc.objects[i+1].id))[doc.objects[i],doc.objects[i+1]]=[doc.objects[i+1],doc.objects[i]];if(mode==='backward')for(let i=1;i<doc.objects.length;i++)if(set.has(doc.objects[i].id)&&!set.has(doc.objects[i-1].id))[doc.objects[i],doc.objects[i-1]]=[doc.objects[i-1],doc.objects[i]];}
-export function autoLayout(doc,ids,kind='grid'){
- const units=selectionUnits(doc,ids);if(!units.length)return;const m=Math.min(mm(8),Math.min(doc.width,doc.height)*.1),W=doc.width-2*m,H=doc.height-2*m;
+export function distribute(doc,ids,axis,options={}){const units=selectionUnits(doc,ids,options);if(units.length<3)return;const p=axis==='h'?'x':'y',s=axis==='h'?'w':'h';units.sort((a,b)=>bounds(a)[p]-bounds(b)[p]);const first=bounds(units[0]),last=bounds(units.at(-1));const gap=(last[p]+last[s]-first[p]-units.reduce((sum,u)=>sum+bounds(u)[s],0))/(units.length-1);let pos=first[p];for(const unit of units){const b=bounds(unit),d=pos-b[p];unit.forEach(o=>o[p]+=d);pos+=b[s]+gap;}}
+export function reorder(doc,ids,mode,options={}){const set=new Set(selectionUnits(doc,ids,options).flat().map(o=>o.id));if(mode==='front')doc.objects=[...doc.objects.filter(o=>!set.has(o.id)),...doc.objects.filter(o=>set.has(o.id))];if(mode==='back')doc.objects=[...doc.objects.filter(o=>set.has(o.id)),...doc.objects.filter(o=>!set.has(o.id))];if(mode==='forward')for(let i=doc.objects.length-2;i>=0;i--)if(set.has(doc.objects[i].id)&&!set.has(doc.objects[i+1].id))[doc.objects[i],doc.objects[i+1]]=[doc.objects[i+1],doc.objects[i]];if(mode==='backward')for(let i=1;i<doc.objects.length;i++)if(set.has(doc.objects[i].id)&&!set.has(doc.objects[i-1].id))[doc.objects[i],doc.objects[i-1]]=[doc.objects[i-1],doc.objects[i]];}
+export function autoLayout(doc,ids,kind='grid',options={}){
+ const units=selectionUnits(doc,ids,options);if(!units.length)return;const m=Math.min(mm(8),Math.min(doc.width,doc.height)*.1),W=doc.width-2*m,H=doc.height-2*m;
  const cols=Math.max(1,Math.min(units.length,Math.ceil(Math.sqrt(units.length*W/H)))),rows=Math.ceil(units.length/cols);
  // Preserve positive cells for small pages and large selections.
  const gap=Math.min(mm(5),W/(cols*4),H/((kind==='hero'?units.length:rows)*4));

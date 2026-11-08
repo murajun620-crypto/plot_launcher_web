@@ -21,6 +21,8 @@ export const SHORTCUTS = Object.freeze([
   ['コピー／切り取り／貼り付け', 'Ctrl + C / X / V'],
   ['複製', 'Ctrl + D'],
   ['グループ化／解除', 'Ctrl + G / Ctrl + Shift + G'],
+  ['グループ内を個別選択', 'Ctrl + クリック（またはグループ選択後にもう一度クリック）'],
+  ['グループ全体へ戻る', 'Esc'],
   ['文字を拡大／縮小', 'Ctrl + Shift + > / <'],
   ['文字を1 pt拡大／縮小', 'Ctrl + ] / ['],
   ['太字／斜体／下線', 'Ctrl + B / I / U'],

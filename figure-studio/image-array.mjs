@@ -1,20 +1,20 @@
-import {bounds,selectionUnits,expandSelection} from './model.mjs?v=image-array-v076-1';
+import {bounds,selectionUnits,expandSelection} from './model.mjs?v=group-selection-v078-1';
 
 /** A group stays whole in mixed selections; only a group selected alone opens up. */
-export function imageArraySelection(doc,ids){
- const selected=new Set(expandSelection(doc,ids));
+export function imageArraySelection(doc,ids,{individual=false}={}){
+ const selected=new Set(individual?ids:expandSelection(doc,ids));
  // Count locked selected groups too: skipping a fixed group must not change mode.
  const groups=new Set(doc.objects.filter(object=>selected.has(object.id)&&object.type==='image'&&object.groupId).map(object=>object.groupId));
  const hasStandalone=doc.objects.some(object=>selected.has(object.id)&&object.type==='image'&&!object.groupId);
- let units=selectionUnits(doc,ids).filter(unit=>unit.some(object=>object.type==='image'));
+ let units=selectionUnits(doc,ids,{individual}).filter(unit=>unit.some(object=>object.type==='image'));
  const groupUnitCount=units.filter(unit=>unit[0].groupId).length,imageUnitCount=units.length-groupUnitCount;
- const withinGroup=groups.size===1&&!hasStandalone&&units.some(unit=>unit.filter(object=>object.type==='image').length>1);
+ const withinGroup=individual||groups.size===1&&!hasStandalone&&units.some(unit=>unit.filter(object=>object.type==='image').length>1);
  if(withinGroup)units=units.flatMap(unit=>unit.filter(object=>object.type==='image').length>1?unit.filter(object=>object.type==='image').map(object=>[object]):[unit]);
  return {units,withinGroup,groupCount:groups.size,groupUnitCount,imageUnitCount,mixed:groupUnitCount>0&&imageUnitCount>0};
 }
 
-export function imageArrayUnits(doc,ids){
- return imageArraySelection(doc,ids).units;
+export function imageArrayUnits(doc,ids,options={}){
+ return imageArraySelection(doc,ids,options).units;
 }
 
 function axisBands(items,position,size){
@@ -39,8 +39,8 @@ function axisBands(items,position,size){
 }
 
 /** Detect both tracks independently so vacant cells retain their place. */
-export function inferImageArray(doc,ids){
- const {units,...mode}=imageArraySelection(doc,ids);
+export function inferImageArray(doc,ids,options={}){
+ const {units,...mode}=imageArraySelection(doc,ids,options);
  // Only original images/graphs define tracks and gaps. Grouped annotations still
  // travel with the unit, even when they extend beyond the image rectangle.
  const items=units.map(unit=>({unit,key:unit.map(object=>object.id).sort().join('\0'),box:bounds(unit.filter(object=>object.type==='image'))}));
@@ -58,9 +58,9 @@ export function inferImageArray(doc,ids){
 }
 
 /** Translate only, using maximum image widths/heights per track. Units are pt. */
-export function arrangeImageArray(doc,ids,{horizontalGap,verticalGap}){
+export function arrangeImageArray(doc,ids,{horizontalGap,verticalGap,individual=false}){
  if(!Number.isFinite(horizontalGap)||!Number.isFinite(verticalGap)||horizontalGap<0||verticalGap<0)throw Error('隙間は0以上の数値で指定してください。');
- const layout=inferImageArray(doc,ids);
+ const layout=inferImageArray(doc,ids,{individual});
  if(layout.error)throw Error(layout.error);
  const trackPositions=(bands,position,size,gap)=>{
   let next=Math.min(...layout.items.map(item=>item.box[position]));
