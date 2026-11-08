@@ -1,4 +1,4 @@
-import {SOURCE_APPS} from './integration/bridge-client.mjs?v=source-batch-v070-1';
+import {SOURCE_APPS} from './integration/bridge-client.mjs?v=force-switch-v072-1';
 import {installWorkspacePersistence} from './workspace-session.mjs?v=project-switch-v051-1';
 
 const APPS=['studio','plot','mifito'];

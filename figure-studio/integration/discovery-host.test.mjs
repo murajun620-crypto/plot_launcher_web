@@ -38,6 +38,16 @@ test('normal editors register without bridge UI and load an empty workspace thro
  assert.equal(e.registryClosed,true);assert.equal(e.listeners.size,0);assert.equal(e.header.children.length,0);assert.deepEqual(e.changes,[true,false]);
 });
 
+test('dirty manually opened editor can confirm a forced load on its first Studio connection',async()=>{
+ let prompts=0;const e=environment({hasContent:()=>true,confirmDiscard:()=>{prompts++;return true;}});
+ try{const c=e.connect();await c.load({imageId:'image-a'});assert.equal(prompts,1);assert.equal(e.loads.length,1);assert.deepEqual(e.loads[0].meta,{reconnect:false,force:true,imageId:'image-a'});assert.equal(c.sent.at(-1).type,'loaded');assert.equal(e.host.isConnected,true);}finally{e.host.close();}
+});
+
+test('cancelling a dirty manual editor keeps it detached and permits a later confirmed attempt',async()=>{
+ let answer=false;const e=environment({hasContent:()=>true,confirmDiscard:()=>answer});
+ try{const c=e.connect();await c.load();assert.equal(e.loads.length,0);assert.equal(c.sent.at(-1).cancelled,true);assert.equal(e.host.isConnected,false);answer=true;const next=e.connect();await next.load();assert.equal(e.loads.length,1);assert.equal(e.loads[0].meta.force,true);assert.equal(next.sent.at(-1).type,'loaded');}finally{e.host.close();}
+});
+
 test('an exact direct ACK snapshot adopts the same workspace while preserving later unsaved edits',async()=>{
  let content='unsaved editing',proof;
  const checkpoint={project:new Blob(['saved']),bridgeState:{privateSource:{}}};

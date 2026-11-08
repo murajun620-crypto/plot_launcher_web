@@ -24,6 +24,16 @@ test('same panel reuses one live tab and waits for fresh target acknowledgement'
  }finally{first.close();}assert.equal(env.listeners.size,0);
 });
 
+test('cancelled switch settles only the target and retains the original result callback',async()=>{
+ const e=environment(),results=[],states=[],first=e.open('a',{onResult:value=>results.push(value)});
+ try{await e.ready();await e.loaded();const original=e.load(),target=e.open('b',{onStatus:value=>states.push(value.state)}),request=e.load();await e.emit('switch-confirmation',{requestId:request.requestId,panelId:'b'});await e.emit('switch-blocked',{requestId:request.requestId,panelId:'b',cancelled:true,message:'Cancelled'});assert.deepEqual(await target.ready,{connected:false,reason:'switch-cancelled'});assert.deepEqual(states.slice(-2),['confirming','cancelled']);await e.emit('result',result(original));assert.equal(results.length,1);assert.equal(e.opened.length,1);}finally{first.close();}
+});
+
+test('confirmation wait pauses the load timer and resumes it only after the editor confirms replacement',async()=>{
+ const e=environment(),states=[],first=e.open('a',{loadTimeoutMs:5,onStatus:value=>states.push(value.state)});
+ try{await e.ready();const request=e.load();await e.emit('switch-confirmation',{requestId:request.requestId,panelId:'a'});let settled=false;first.ready.then(()=>settled=true);await new Promise(resolve=>setTimeout(resolve,1300));assert.equal(settled,false);assert.equal(states.includes('error'),false);assert.equal(e.sent.filter(m=>m.data.type==='load').length,1);await e.emit('switch-confirmed',{requestId:request.requestId,panelId:'a'});await e.loaded();assert.deepEqual(await first.ready,{connected:true});}finally{first.close();}
+});
+
 test('different panel uses load messages on the retained tab and routes only its result',async()=>{
  const env=environment(),a=[],b=[];const first=env.open('a',{onResult:r=>a.push(r)});
  try{await env.ready();await env.loaded();const old=env.load(),second=env.open('b',{onResult:r=>b.push(r)}),next=env.load();

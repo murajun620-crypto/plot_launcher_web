@@ -1,5 +1,5 @@
 /** Source-editor bridge. The engine and tab stay alive when a different panel opens. */
-import {transferResult,transferReceipt,isTransferImageId,figureWorkspaceAPI,showFigureWorkspaceStudio} from './direct-transfer.mjs?v=dd5569f5b97e';
+import {transferResult,transferReceipt,isTransferImageId,figureWorkspaceAPI,showFigureWorkspaceStudio} from './direct-transfer.mjs?v=8cb497d103c4';
 import {registerEditor} from './editor-discovery.mjs?v=editor-reuse-v036-1';
 const PROTOCOL = 'figure-studio-bridge-v1';
 const MAX_PROJECT = 320 * 1024 * 1024;
@@ -32,7 +32,7 @@ export function getFigureBridgeContext(locationRef = location) {
  * onAccepted receives the exact captured result, including private extra
  * fields. Those extra fields stay in this editor and are never transmitted.
  */
-export function setupFigureBridge({app,loadProject,buildProject,renderPreview,captureResult,captureBatchResult,selectImage,isDirty=()=>false,hasContent,canReuseProject,canAdoptAccepted=()=>false,onProjectLoaded,onAccepted,onConnectionChange=()=>{},startDetached=false,
+export function setupFigureBridge({app,loadProject,buildProject,renderPreview,captureResult,captureBatchResult,selectImage,isDirty=()=>false,hasContent,canReuseProject,canAdoptAccepted=()=>false,confirmDiscard,onProjectLoaded,onAccepted,onConnectionChange=()=>{},startDetached=false,
   windowRef=window,documentRef=windowRef.document,locationRef=windowRef.location,registerEditorRef=registerEditor,channelFactory}) {
   if(!['plot','mifito'].includes(app))return null;
   // An updater may restore local work that no longer belongs to the URL's old
@@ -43,6 +43,7 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
   const nativeOwner=context?(context.ownerId||crypto.randomUUID()):null;
   let normalVisit=!context;
   const hostId=crypto.randomUUID();
+  let dismissConfirmation=null;
   let active={panelId:'',requestId:'',editKey:'',sourceName:''},revision=0,initialized=false,loaded=false,busy=false,awaiting=0,awaitTimer=0,captured=null,baseline=null,disposed=false,clientBatch=false,acceptedCheckpoint=null,loadingRequest=null;
   const send=(type,extra={})=>{if(!disposed&&context&&parent&&!parent.closed)parent.postMessage({protocol:PROTOCOL,nonce:context.nonce,hostId,app,type,panelId:active.panelId,requestId:active.requestId,editKey:active.editKey,...extra},context.origin);};
   const ready=()=>send('ready',{capabilities:['reuse-v1',...(captureBatchResult?['batch-v1']:[])],loaded,busy:busy||!!awaiting});
@@ -90,12 +91,37 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
       send('error',{panelId:data.panelId,requestId:data.requestId||'',code:'load-failed',loaded:false,message:message.textContent});
     }finally{busy=false;if(!disposed){setDisabled(!loaded||!!awaiting);discard.disabled=!loaded||!!awaiting;registry?.update();}}
   }
-  function block(data,reason,text){
+  function block(data,reason,text,{cancelled=false}={}){
     setMessage(text);
-    if((reason==='dirty'||reason==='dirty-check-failed')&&loaded&&baseline){discard.hidden=false;discard.disabled=false;}
+    if(cancelled)discard.hidden=true;
+    else if((reason==='dirty'||reason==='dirty-check-failed')&&loaded&&baseline){discard.hidden=false;discard.disabled=false;}
     const external=normalVisit&&!initialized&&!loaded;
-    send('switch-blocked',{requestId:data.requestId||'',panelId:data.panelId,editKey:data.editKey||'',activePanelId:active.panelId,activeRequestId:active.requestId,reason:external?'dirty-external':reason,message:text});
+    send('switch-blocked',{requestId:data.requestId||'',panelId:data.panelId,editKey:data.editKey||'',activePanelId:active.panelId,activeRequestId:active.requestId,reason:external?'dirty-external':reason,message:text,...(cancelled?{cancelled:true}:{})});
     if(external&&connection){const previous=connection;removeConnectionListener?.();removeConnectionListener=null;connection=null;parent=null;context=null;unmount();previous.close();}
+  }
+  async function confirmReplacement(data,blockedText){
+    const owner=context,requestParent=parent;
+    let prompt;
+    try{prompt=documentRef.createElement('dialog');}catch{}
+    const ask=confirmDiscard||(typeof prompt?.showModal==='function'?text=>new Promise(resolve=>{
+      let done=false;const finish=value=>{if(done)return;done=true;dismissConfirmation=null;try{prompt.close();}catch{}prompt.remove();resolve(value);};dismissConfirmation=()=>finish(false);
+      prompt.id='figure-studio-switch-confirm';prompt.setAttribute('aria-labelledby','figure-studio-switch-title');
+      prompt.style.cssText='box-sizing:border-box;width:460px;max-width:calc(100vw - 32px);max-height:calc(100vh - 32px);padding:22px;border:1px solid #adcac3;border-radius:12px;background:#fff;color:#203c39;box-shadow:0 12px 40px #173c3840;font:14px/1.7 Arial,sans-serif;';
+      const title=documentRef.createElement('h2');title.id='figure-studio-switch-title';title.textContent='未反映の編集があります';title.style.cssText='margin:0 0 12px;font-size:18px;';
+      const body=documentRef.createElement('p');body.textContent=text;body.style.cssText='margin:0 0 20px;white-space:pre-line;overflow-wrap:anywhere;';
+      const actions=documentRef.createElement('div');actions.style.cssText='display:flex;justify-content:flex-end;gap:10px;';
+      for(const [label,value]of [['キャンセル',false],['OK',true]]){const button=documentRef.createElement('button');button.type='button';button.className=value?'button primary':'button quiet';button.textContent=label;button.addEventListener('click',()=>finish(value));actions.append(button);}
+      prompt.append(title,body,actions);prompt.addEventListener('cancel',event=>{event.preventDefault();finish(false);});prompt.addEventListener('close',()=>finish(false));documentRef.body.append(prompt);
+      try{prompt.showModal();actions.children[0].focus();}catch{finish(false);}
+    }):typeof windowRef.confirm==='function'?text=>windowRef.confirm(text):null);
+    if(!ask){block(data,'dirty',blockedText);return false;}
+    const name=String(data.sourceName||(app==='plot'?'figure.plotproject':'figure.mifito')).replace(/[\x00-\x1f\x7f]/g,' ').slice(0,255);
+    const warning=`${app==='plot'?'PlotLauncher':'MiFiTo'}に未反映の編集があります。\n\n現在開いているプロジェクトの編集（ほかの画像・シートの編集を含む）を破棄して、Studio側の「${name}」を開きますか？\n\nOK：編集を破棄して開く\nキャンセル：現在の編集を続ける`;
+    send('switch-confirmation',{requestId:data.requestId||'',panelId:data.panelId});
+    let accepted=false;try{accepted=await ask(warning,{app,panelId:data.panelId,sourceName:name})===true;}catch{}
+    if(disposed||context!==owner||parent!==requestParent)return false;
+    if(!accepted){block(data,'dirty','切り替えをキャンセルしました。現在の編集内容はそのままです。',{cancelled:true});return false;}
+    return true;
   }
   async function receive(event){
     const data=event.data;
@@ -124,9 +150,10 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
       if(loadingRequest&&data.panelId===loadingRequest.panelId&&(data.requestId||'')===loadingRequest.requestId&&data.editKey===loadingRequest.editKey)return;
       if(busy||awaiting){block(data,'busy','読み込み・反映処理中です。完了してから次のグラフを開いてください。');return;}
       loadingRequest={panelId:data.panelId,requestId:data.requestId||'',editKey:data.editKey};
+      let releaseInteraction=null;
       busy=true;setDisabled(true);discard.disabled=true;
       try{
-        let adoptedCheckpoint=null,reuseProject=false;
+        let adoptedCheckpoint=null,reuseProject=false,forceProject=false;
         if(typeof canReuseProject==='function')try{reuseProject=await canReuseProject(data)===true;}catch{}
         if(disposed)return;
         // Reopening this snapshot keeps all in-progress work in the warm tab.
@@ -138,26 +165,41 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
           try{occupied=hasContent?await hasContent():await isDirty();adoptedCheckpoint=occupied?await adoptionProof(data.project):null;}
           catch{block(data,'dirty-check-failed','開いている編集内容を確認できません。元アプリの編集内容を保存してから、もう一度お試しください。');return;}
           if(disposed)return;
-          if(occupied&&!adoptedCheckpoint&&!reuseProject){block(data,'dirty','この編集画面には別の内容が開いています。現在の内容を保存してから、対象のプロジェクトを開き直してください。');return;}
+          if(occupied&&!adoptedCheckpoint&&!reuseProject){
+            if(!await confirmReplacement(data,'この編集画面には別の内容が開いています。現在の内容を保存してから、対象のプロジェクトを開き直してください。'))return;
+            forceProject=true;
+          }
         }
-        if(loaded&&!reuseProject){
+        if(loaded&&!reuseProject&&!forceProject){
           let dirty;
           try{dirty=await isDirty();}
           catch{block(data,'dirty-check-failed','編集中の内容を確認できません。Figureへ反映するか、未反映の編集を取り消してから、次のグラフをもう一度開いてください。');return;}
           if(disposed)return;
-          if(dirty){block(data,'dirty','未反映の編集があります。Figureへ反映するか、未反映の編集を取り消してから、次のグラフをもう一度開いてください。');return;}
+          if(dirty){
+            if(!await confirmReplacement(data,'未反映の編集があります。Figureへ反映するか、未反映の編集を取り消してから、次のグラフをもう一度開いてください。'))return;
+            forceProject=true;
+          }
         }
         active={panelId:data.panelId,requestId:data.requestId||'',editKey:data.editKey||'',sourceName:String(data.sourceName||(app==='plot'?'figure.plotproject':'figure.mifito')).replace(/[\\/]/g,'_'),...(data.imageId?{imageId:data.imageId}:{})};
         clientBatch=Array.isArray(data.capabilities)&&data.capabilities.includes('batch-v1');
         // Transport reconnection does not prove that this editor contains the
         // requested project. Exact bound snapshots were handled above; only a
         // byte-checked adoption may preserve content in a newly bound route.
-        const reconnect=!!adoptedCheckpoint||reuseProject;
+        const reconnect=!forceProject&&(!!adoptedCheckpoint||reuseProject);
         // An adopted normal workspace is not bound until its asynchronous
         // preparation has revalidated the exact same source identity.
         initialized=!adoptedCheckpoint;loaded=false;captured=null;baseline=null;revision=0;discard.hidden=true;
         setMessage('開いている編集画面へ元プロジェクトを読み込んでいます…');
-        await loadProject(new File([data.project],active.sourceName,{type:data.project.type||'application/octet-stream'}),{reconnect,...(active.imageId?{imageId:active.imageId}:{})});
+        if(forceProject)send('switch-confirmed');
+        // Keep the loaded baseline exact while decoding/rendering and preparing
+        // its checkpoint. Edits entered during that wait must not be marked clean.
+        const body=documentRef.body;
+        if(body&&typeof body.inert==='boolean'){
+          const previous=body.inert,blockInput=event=>{event.preventDefault();event.stopImmediatePropagation();};body.inert=true;
+          windowRef.addEventListener('keydown',blockInput,true);
+          releaseInteraction=()=>{body.inert=previous;windowRef.removeEventListener('keydown',blockInput,true);};
+        }
+        await loadProject(new File([data.project],active.sourceName,{type:data.project.type||'application/octet-stream'}),{reconnect,...(forceProject?{force:true}:{}),...(active.imageId?{imageId:active.imageId}:{})});
         if(disposed)return;
         if(adoptedCheckpoint){
           const sameWorkspace=await canAdoptAccepted(adoptedCheckpoint.result);
@@ -173,7 +215,7 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
         // Disable Apply, instead of attaching that content to the previous panel.
         loaded=false;setMessage(error.message||'元プロジェクトを開けませんでした。');
         send('error',{code:'load-failed',loaded:false,message:message.textContent});
-      }finally{loadingRequest=null;busy=false;if(!disposed){setDisabled(!loaded||!!awaiting);discard.disabled=!loaded||!!awaiting;registry?.update();}}
+      }finally{releaseInteraction?.();loadingRequest=null;busy=false;if(!disposed){setDisabled(!loaded||!!awaiting);discard.disabled=!loaded||!!awaiting;registry?.update();}}
       return;
     }
     if(!loaded||!matchesActive(data)||!awaiting||data.revision!==awaiting)return;
@@ -201,6 +243,7 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
     mount();ready();
     return ()=>{
       if(connection!==next)return;
+      dismissConfirmation?.();
       removeConnectionListener?.();removeConnectionListener=null;connection=null;parent=null;context=null;unmount();
     };
   }
@@ -281,7 +324,7 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
       if(disposed||acceptedCheckpoint!==checkpoint)return false;
       registry?.update();return true;
     },
-    close(){if(disposed)return;disposed=true;clearInterval(readyTimer);clearTimeout(awaitTimer);windowRef.removeEventListener('message',receive);removeConnectionListener?.();connection?.close();registry?.close();unmount();acceptedCheckpoint=null;}
+    close(){if(disposed)return;disposed=true;dismissConfirmation?.();clearInterval(readyTimer);clearTimeout(awaitTimer);windowRef.removeEventListener('message',receive);removeConnectionListener?.();connection?.close();registry?.close();unmount();acceptedCheckpoint=null;}
   };
 }
 

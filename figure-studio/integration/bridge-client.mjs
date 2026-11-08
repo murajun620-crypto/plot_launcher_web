@@ -117,13 +117,13 @@ function openSourceSession({app, project, sourceName, panelId, editKey, imageId,
   const retiredHosts=new Set();
   function request(options){
     let settle;const ready=new Promise(resolve=>{settle=resolve;});
-    return {...options,sourceName:safeName(options.sourceName),requestId:crypto.randomUUID(),ready,settle,loaded:false,latestRevision:0,applyingRevision:0,lastLoadAt:0,deadline:0,timedOut:false};
+    return {...options,sourceName:safeName(options.sourceName),requestId:crypto.randomUUID(),ready,settle,loaded:false,latestRevision:0,applyingRevision:0,lastLoadAt:0,deadline:0,timedOut:false,confirming:false};
   }
   function downloadFor(r){return()=>downloadBlob(r.project,r.sourceName,windowRef.document);}
   function status(r,state,message){r?.onStatus({state,message,downloadProject:downloadFor(r),openInNewTab:workspace?undefined:()=>openSource({app,project:r.project,sourceName:r.sourceName,panelId:r.panelId,editKey:r.editKey,imageId:r.imageId,onResult:r.onResult,onStatus:r.onStatus,url,windowRef,forceNew:true})});}
   const send=(type,r,extra={})=>{if(!disposed&&!popup.closed)try{popup.postMessage({protocol:BRIDGE_PROTOCOL,nonce,app,hostId:activeHost,type,panelId:r?.panelId,requestId:r?.requestId,...extra},target.origin);}catch{/* Discovery claims and reattachment can briefly be in flight. */}};
   function load(r,reconnect=false){
-    r.loaded=false;r.latestRevision=0;r.applyingRevision=0;pending=r;r.reconnect=reconnect;r.deadline=Date.now()+loadTimeoutMs;r.timedOut=false;
+    r.loaded=false;r.latestRevision=0;r.applyingRevision=0;pending=r;r.reconnect=reconnect;r.deadline=Date.now()+loadTimeoutMs;r.timedOut=false;r.confirming=false;
     sendLoad(r);
     status(r,'loading',reconnect?'編集画面へ再接続しています…':'元プロジェクトを編集画面へ読み込んでいます…');
   }
@@ -159,6 +159,7 @@ function openSourceSession({app, project, sourceName, panelId, editKey, imageId,
   const interval = setInterval(() => {
     if (popup.closed) {status(pending||current,'closed','編集画面を閉じました。'); close();}
     else if(pending&&initialized&&!pending.loaded){
+      if(pending.confirming)return;
       if(Date.now()>pending.deadline&&!pending.timedOut){pending.timedOut=true;status(pending,'error','元プロジェクトの読み込みを確認できません。対象の図をもう一度開くと、同じタブで再試行します。');pending.settle({connected:false,reason:'load-timeout'});}
       if(!pending.timedOut&&Date.now()-pending.lastLoadAt>2000)send('ping',pending);
       if(!pending.timedOut&&Date.now()-pending.lastLoadAt>5000)sendLoad(pending);
@@ -192,16 +193,25 @@ function openSourceSession({app, project, sourceName, panelId, editKey, imageId,
       return;
     } else if (message.type === 'loaded') {
       if(r!==pending&&r!==current)return;
-      current=r;if(pending===r)pending=null;r.loaded=true;
+      current=r;if(pending===r)pending=null;r.loaded=true;r.confirming=false;
       status(r,'ready','元プロジェクトを開きました。修正後に「Figureへ反映」を押してください。');
       r.settle({connected:true});
+    } else if(message.type==='switch-confirmation'){
+      if(r!==pending)return;
+      r.confirming=true;r.deadline=Infinity;
+      status(r,'confirming','未反映の編集を破棄して開くか、確認しています…');
+    } else if(message.type==='switch-confirmed'){
+      if(r!==pending||!r.confirming)return;
+      r.confirming=false;r.deadline=Date.now()+loadTimeoutMs;r.lastLoadAt=Date.now();
+      status(r,'loading','指定した元プロジェクトを開いています…');
     } else if(message.type==='switch-blocked'){
       if(r!==pending)return;
-      pending=null;status(r,'blocked',String(message.message||'編集画面の内容を「Figureへ反映」してから、もう一度対象の図を開いてください。'));
-      r.settle({connected:false,reason:'switch-blocked'});
+      pending=null;r.confirming=false;status(r,message.cancelled===true?'cancelled':'blocked',String(message.message||'編集画面の内容を「Figureへ反映」してから、もう一度対象の図を開いてください。'));
+      r.settle({connected:false,reason:message.cancelled===true?'switch-cancelled':'switch-blocked'});
     } else if (message.type === 'applying') {
       status(r,'applying','編集結果を受け取っています…');
     } else if (message.type === 'error') {
+      r.confirming=false;
       status(r,'error',String(message.message || '連携処理に失敗しました。'));
       r.settle({connected:false,reason:'editor-error'});
       if(message.code==='load-failed'){

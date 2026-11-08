@@ -133,6 +133,31 @@ test('failed import disables Apply under the old identity and allows a new retry
  }finally{e.host.close();}
 });
 
+test('approved dirty switch reloads the exact target with force and rebinds Apply after loading',async()=>{
+ const prompts=[],e=environment({isDirty:()=>true,confirmDiscard:(message,target)=>{prompts.push({message,target});return true;}});
+ try{await e.load('a');await e.load('b',{imageId:'image-b',reconnect:true});assert.equal(prompts.length,1);assert.match(prompts[0].message,/未反映/);assert.match(prompts[0].message,/破棄/);assert.match(prompts[0].message,/b.plotproject/);assert.equal(e.loads.length,2);assert.deepEqual(e.loads[1].meta,{reconnect:false,force:true,imageId:'image-b'});assert.ok(e.sent.some(m=>m.data.type==='switch-confirmation'&&m.data.requestId==='request-b'));assert.ok(e.sent.some(m=>m.data.type==='switch-confirmed'&&m.data.requestId==='request-b'));assert.equal(e.sent.at(-1).data.type,'loaded');await e.button.fire('click');assert.equal(e.sent.at(-1).data.panelId,'b');assert.equal(e.sent.at(-1).data.requestId,'request-b');}finally{e.host.close();}
+});
+
+test('cancel keeps current project, original Apply route and unsent work even if a client requests force',async()=>{
+ let prompts=0;const e=environment({isDirty:()=>true,confirmDiscard:()=>{prompts++;return false;}});
+ try{await e.load('a');await e.load('b',{force:true});assert.equal(prompts,1);assert.equal(e.loads.length,1);assert.equal(e.sent.at(-1).data.type,'switch-blocked');assert.equal(e.sent.at(-1).data.cancelled,true);assert.equal(e.discard.hidden,true);const binding=await e.host.captureWorkspaceBinding();assert.equal(binding.panelId,'a');assert.equal(await binding.baselineProject.text(),'a');await e.button.fire('click');assert.equal(e.sent.at(-1).data.type,'result');assert.equal(e.sent.at(-1).data.panelId,'a');}finally{e.host.close();}
+});
+
+test('one pending confirmation rejects duplicate prompts and competing targets',async()=>{
+ const answer=deferred();let prompts=0;const e=environment({isDirty:()=>true,confirmDiscard:()=>{prompts++;return answer.promise;}});
+ try{await e.load('a');const switching=e.load('b');await new Promise(setImmediate);assert.equal(prompts,1);assert.equal(e.button.disabled,true);await e.load('b');await e.load('c');assert.equal(prompts,1);assert.equal(e.sent.at(-1).data.reason,'busy');assert.equal(e.loads.length,1);answer.resolve(true);await switching;assert.deepEqual(e.loads.map(l=>l.text),['a','b']);assert.equal(e.sent.at(-1).data.panelId,'b');}finally{answer.resolve(false);e.host.close();}
+});
+
+test('same-project reuse preserves dirty work without asking to discard, and in-flight Apply never prompts',async()=>{
+ let prompts=0;const e=environment({isDirty:()=>true,canReuseProject:()=>true,confirmDiscard:()=>{prompts++;return true;}});
+ try{await e.load('a');await e.load('b');assert.equal(prompts,0);assert.equal(e.loads[1].meta.reconnect,true);assert.equal(e.loads[1].meta.force,undefined);await e.button.fire('click');await e.load('c');assert.equal(e.sent.at(-1).data.reason,'busy');assert.equal(prompts,0);}finally{e.host.close();}
+});
+
+test('loading holds interaction until the new checkpoint is established and restores prior inert state',async()=>{
+ const checkpoint=deferred();let duringLoad;const e=environment({loadProject:async()=>{duringLoad=e.documentRef.body.inert;},onProjectLoaded:()=>checkpoint.promise});e.documentRef.body.inert=false;
+ try{const loading=e.load('a');await new Promise(setImmediate);assert.equal(duringLoad,true);assert.equal(e.documentRef.body.inert,true);assert.notEqual(e.sent.at(-1).data.type,'loaded');checkpoint.resolve();await loading;assert.equal(e.documentRef.body.inert,false);assert.equal(e.sent.at(-1).data.type,'loaded');}finally{checkpoint.resolve();e.host.close();}
+});
+
 test('successful import establishes baseline before loaded and accepts legacy initial messages',async()=>{
  const phases=[],e=environment({loadProject:async()=>phases.push('load'),onProjectLoaded:async info=>{phases.push('baseline');assert.equal(info.panelId,'a');}});try{
   await e.emit('load',{panelId:'a',project:new Blob(['old-project'])});assert.deepEqual(phases,['load','baseline']);assert.equal(e.sent.at(-1).data.type,'loaded');assert.equal(e.sent.at(-1).data.requestId,'');

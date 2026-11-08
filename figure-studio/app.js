@@ -12,7 +12,7 @@ import {createColorPickers} from './colors.mjs?v=ribbon-v060-1';
 import {renderTextPaint} from './text-paint.mjs?v=tex-v061-1';
 import {createTexRenderer} from './tex.mjs?v=live-v062-1';
 import {createLiveTexPreview} from './live-tex-preview.mjs?v=live-v062-1';
-import {openSource,SOURCE_APPS,setupSourceDiscovery,closeSourceSessions} from './integration/bridge-client.mjs?v=source-batch-v070-1';
+import {openSource,SOURCE_APPS,setupSourceDiscovery,closeSourceSessions} from './integration/bridge-client.mjs?v=force-switch-v072-1';
 import {createFigureSidebar} from './thumbnails.mjs?v=live-v062-1';
 import {setupTransferReceiver,getFigureWorkspace} from './integration/direct-transfer.mjs?v=source-batch-v070-1';
 import {readMifitoIdentity} from './integration/mifito-sync.mjs?v=0.3.5-1';
@@ -35,7 +35,7 @@ import {deleteFigures,duplicateFigures} from './figure-commands.mjs';
 import {ProjectFileSession,projectFilePickerOptions} from './project-file.mjs?v=project-switch-v051-1';
 import {installWorkspacePersistence} from './workspace-session.mjs?v=project-switch-v051-1';
 import {decodeWorkspaceState} from './workspace-state.mjs?v=project-switch-v051-1';
-import {validateWorkspaceBinding} from './integration/bridge-host.mjs?v=source-batch-v070-1';
+import {validateWorkspaceBinding} from './integration/bridge-host.mjs?v=force-switch-v072-1';
 
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 setupSourceDiscovery();
