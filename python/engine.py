@@ -525,12 +525,17 @@ class PlotEngine:
             raise
 
     @contextmanager
-    def sheet_data(self, path, filename, sheet_index, header_row):
+    def sheet_data(self, path, filename, sheet_index, header_row, sources=None):
         """Read/export another sheet without replacing the editable preview."""
         previous = dict(self.__dict__)
         self.figure = None
         try:
-            yield self.load(path, filename, sheet_index, header_row)
+            if sources:
+                if sheet_index != 0:
+                    raise ValueError("重ね描きのシートは先頭を選んでください。")
+                yield self.load_many(sources, filename)
+            else:
+                yield self.load(path, filename, sheet_index, header_row)
         finally:
             if self.figure is not None and self.figure is not previous.get("figure"):
                 plt.close(self.figure)
@@ -1912,7 +1917,7 @@ class PlotEngine:
         elif operation == "load":
             result = self.load(**args)
         elif operation in {"sheet-info", "sheet-export"}:
-            with self.sheet_data(args["path"], args["filename"], args["sheet_index"], args["header_row"]) as metadata:
+            with self.sheet_data(args["path"], args["filename"], args["sheet_index"], args["header_row"], args.get("sources")) as metadata:
                 result = metadata if operation == "sheet-info" else self.export(args["config"], args["format"], args.get("dpi", 1200))
         elif operation == "render":
             result = self.render(args["config"])

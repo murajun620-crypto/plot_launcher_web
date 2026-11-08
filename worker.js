@@ -1,4 +1,4 @@
-import { restoreSettings } from "./state.js?v=dd5569f5b97e";
+import { restoreSettings } from "./state.js?v=ed862a544434";
 // All user data stays in this worker's in-memory filesystem.
 const PYODIDE_VERSION = "0.29.3";
 const INDEX_URL = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
@@ -22,7 +22,7 @@ async function initialize() {
   await pyodide.runPythonAsync("import micropip\nawait micropip.install(['openpyxl==3.1.5', 'xlrd==2.0.2'])");
   progress("日本語フォントと描画設定を読み込んでいます…");
   const files = await Promise.all([
-    fetchAsset("./python/engine.py"), fetchAsset("./python/plot_utils.py"),
+    fetchAsset("./python/engine.py?v=ed862a544434"), fetchAsset("./python/plot_utils.py"),
     fetchAsset("./python/generic_xy_base.py"), fetchAsset("./assets/fonts/NotoSansJP.ttf", true),
     ...["Regular", "Bold", "Italic", "BoldItalic"].map(style => fetchAsset(`./assets/fonts/LiberationSans-${style}.ttf`, true)),
     fetchAsset("./python/annotation_model.py"), fetchAsset("./python/annotation_manager.py"),
@@ -93,7 +93,7 @@ self.onmessage = ({ data }) => {
         payload = { path };
       }
       if (operation === 'sheet-info' || operation === 'sheet-export') {
-        payload = {path:currentPath, filename:args.filename, sheet_index:args.sheetIndex, header_row:args.headerRow, config:args.config, format:args.format, dpi:args.dpi};
+        payload = {path:currentPath,...(currentSources.length?{sources:currentSources}:{}),filename:args.filename, sheet_index:args.sheetIndex, header_row:args.headerRow, config:args.config, format:args.format, dpi:args.dpi};
       }
       let result = JSON.parse(dispatch(dispatchOperation, JSON.stringify(payload)));
       if (operation === "project") {
