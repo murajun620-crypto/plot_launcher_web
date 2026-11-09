@@ -245,6 +245,17 @@ def plot_environment(values, frame, sheet_name, filename):
         # Matplotlib expands a generic sans-serif name to just one face.
         # Explicit families allow per-glyph Japanese fallback in Agg/SVG/PDF.
         matplotlib.rcParams["font.family"] = matplotlib.rcParams["font.sans-serif"]
+        # Mathtext otherwise uses STIX even for ordinary subscript digits.
+        families = matplotlib.rcParams["font.family"]
+        matplotlib.rcParams.update({
+            "mathtext.fontset": "custom",
+            "mathtext.rm": font_manager.FontProperties(family=families).get_fontconfig_pattern(),
+            "mathtext.sf": font_manager.FontProperties(family=families).get_fontconfig_pattern(),
+            "mathtext.it": font_manager.FontProperties(family=families, style="italic").get_fontconfig_pattern(),
+            "mathtext.bf": font_manager.FontProperties(family=families, weight="bold").get_fontconfig_pattern(),
+            "mathtext.bfit": font_manager.FontProperties(family=families, style="italic", weight="bold").get_fontconfig_pattern(),
+            "mathtext.fallback": "stixsans",
+        })
     plot_utils.configure_plot_fonts = browser_fonts
     try:
         browser_fonts()

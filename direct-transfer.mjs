@@ -189,6 +189,12 @@ export function createDirectSender({app,captureResult,captureBatchResult,onAccep
     const m=event.data;if(disposed||m?.protocol!==TRANSFER_PROTOCOL)return;
     if(m.type==='presence'&&identifier(m.receiverId)&&Number.isFinite(m.lastActive)){
       peers.set(m.receiverId,{receiverId:m.receiverId,lastActive:m.lastActive,seen:Date.now(),batch:hasBatch(m),add:hasAdd(m)});
+      // A newly opened Studio workspace receives inside its iframe. Use only
+      // the receiver belonging to that exact same-origin popup, not another tab.
+      if(busy&&pending?.popup&&!pending.delivered&&target.origin===windowRef.location.origin){
+        let receiverId;try{receiverId=pending.popup.FigureStudioWorkspace?.studioReceiverId;}catch{}
+        if(receiverId===m.receiverId){pending.peer=peers.get(receiverId);pending.popup=null;deliver(pending);}
+      }
       if(busy&&pending?.workspace&&!pending.delivered){pending.peer=findPeer(true);deliver(pending);}
     }
     else if(m.type==='gone')peers.delete(m.receiverId);
@@ -274,11 +280,11 @@ export function createStudioSendActions({documentRef=document,batch=false}={}){
   return {scope,select,button,addButton,setDisabled(value){button.disabled=value;addButton.disabled=value;select.disabled=value;},get batch(){return select.value==='all';}};
 }
 
-/** Workspace visits get send actions; standalone editors retain their full editor UI. */
-export function setupDirectSendButton({app,captureResult,captureBatchResult,onAccepted,container,studioUrl,isReady=()=>true,documentRef=document,windowRef=window}={}) {
+/** Workspaces and opted-in standalone editors get Studio send actions. */
+export function setupDirectSendButton({app,captureResult,captureBatchResult,onAccepted,container,studioUrl,standalone=false,isReady=()=>true,documentRef=document,windowRef=window}={}) {
   const params=new URLSearchParams(windowRef.location.hash.slice(1));
   const bridgeVisit=/^[a-zA-Z0-9-]{16,100}$/.test(params.get('figureBridge')||'')&&params.get('figureOrigin')===windowRef.location.origin;
-  if(new URLSearchParams(windowRef.location.search||'').get('figureWorkspace')!=='1'&&!figureWorkspaceAPI(windowRef)&&!bridgeVisit)return null;
+  if(!standalone&&new URLSearchParams(windowRef.location.search||'').get('figureWorkspace')!=='1'&&!figureWorkspaceAPI(windowRef)&&!bridgeVisit)return null;
   const host=typeof container==='string'?documentRef.querySelector(container):container;
   if(!host)return null;
   const group=documentRef.createElement('div');group.style.cssText='display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;position:relative';

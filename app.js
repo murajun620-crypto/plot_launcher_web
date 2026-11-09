@@ -1,12 +1,12 @@
 import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=source-save-v0717-1';
-import {setupDirectSendButton,getFigureWorkspace} from './direct-transfer.mjs?v=workspace-update-v0715-2';
+import {setupDirectSendButton,getFigureWorkspace} from './direct-transfer.mjs?v=c4de8a0b1952';
 import {identifyPlotProject,plotSheetIndex,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=27ae7675c457';
 import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=9127ec4c4f31";
 import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=9127ec4c4f31";
 import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9127ec4c4f31";
 import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=27ae7675c457";
 import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=27ae7675c457";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=9b3fe6f4c127";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=c4de8a0b1952";
 
 import {alignmentOffsets} from './object-layout.mjs?v=27ae7675c457';
 import {createDataEditor} from './data-editor.mjs?v=27ae7675c457';
@@ -16,7 +16,7 @@ import {createShortcutHandler} from './shortcuts.mjs?v=61d158587773';
 import {formatText,TEXT_FORMAT_ACTIONS} from './text-format.mjs?v=61d158587773';
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
-const APP_BUILD = '9b3fe6f4c127';
+const APP_BUILD = 'c4de8a0b1952';
 function makeProject(settings,data,fonts,workspace={}){
   const live=sourceData&&data.filename===sourceData.filename&&(data.bytes===sourceData.bytes||data.files&&data.files===sourceData.files);
   const projectId=workspace.figureStudioProjectId||data.figureStudioProjectId||(live?(sourceData.figureStudioProjectId||=crypto.randomUUID()):crypto.randomUUID());
@@ -404,7 +404,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=27ae7675c457", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=c4de8a0b1952", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -3403,7 +3403,7 @@ figureStudioBridge=setupFigureBridge({
   onProjectLoaded:figureStudioProjectLoaded,
   onAccepted:acceptFigureStudioResult
 });
-figureStudioDirectSender = setupDirectSendButton({app:'plot',captureResult:captureFigureStudioResult,captureBatchResult:captureFigureStudioBatch,container:'.header-actions',
+figureStudioDirectSender = setupDirectSendButton({app:'plot',standalone:true,captureResult:captureFigureStudioResult,captureBatchResult:captureFigureStudioBatch,container:'.header-actions',
   onAccepted:acceptDirectFigureStudioResult,
   isReady:()=>engineReady&&!loading&&!exporting&&!renderRunning&&!!metadata&&!!sourceData&&!!config.series.length&&renderedRevision===revision});
 figureStudioDirectSender?.setBridgeConnected(figureStudioBridge?.isConnected===true);
