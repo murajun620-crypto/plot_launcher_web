@@ -6,7 +6,7 @@ import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "
 import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9127ec4c4f31";
 import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=27ae7675c457";
 import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=27ae7675c457";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=f6b87457cb2d";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=90065d0c3278";
 
 import {alignmentOffsets} from './object-layout.mjs?v=27ae7675c457';
 import {createDataEditor} from './data-editor.mjs?v=27ae7675c457';
@@ -16,7 +16,7 @@ import {createShortcutHandler} from './shortcuts.mjs?v=61d158587773';
 import {formatText,TEXT_FORMAT_ACTIONS} from './text-format.mjs?v=61d158587773';
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
-const APP_BUILD = 'f6b87457cb2d';
+const APP_BUILD = '90065d0c3278';
 function makeProject(settings,data,fonts,workspace={}){
   const live=sourceData&&data.filename===sourceData.filename&&(data.bytes===sourceData.bytes||data.files&&data.files===sourceData.files);
   const projectId=workspace.figureStudioProjectId||data.figureStudioProjectId||(live?(sourceData.figureStudioProjectId||=crypto.randomUUID()):crypto.randomUUID());
@@ -87,11 +87,13 @@ const MICRO_HINT = 'μは \\micro と入力できます（例：\\microm、\\mic
 const LABEL_PADDING_BASE = defaultAxes().xLabelPad;
 const LABEL_PADDING_HINT = `0は標準の余白（${LABEL_PADDING_BASE} pt）。正の値で広く、負の値で狭くします。`;
 const isLabelPadding = key => /^(x|y|y2)LabelPad$/.test(key);
+const isAxisSize = key => key === 'width' || key === 'height';
+const scaleAxisSize = (value, factor) => value === '' || value == null || !Number.isFinite(Number(value)) ? value : Number((Number(value) * factor).toPrecision(12));
 const axisSetting = key => config.axes[key] ?? (['xGrid','yGrid'].includes(key) ? Boolean(config.axes.grid) : /^(?:grid|minorGrid)(?:Style|Width|Color|Alpha)$/.test(key) ? defaultAxes()[key] : undefined);
-// Keep saved settings compatible; controls show padding offsets and line widths in pt.
+// Preserve legacy cm in configuration/files; size controls display mm.
 const fontPointBase = key => ({fontScale:8,tickFontScale:7,labelFontScale:8,legendFontScale:7})[key] * (key === 'fontScale' ? 1 : Number(config.axes.fontScale));
-const axisControlValue = (key, value) => isLabelPadding(key) ? Number((Number(value) - LABEL_PADDING_BASE).toPrecision(12)) : key === 'spineScale' ? Number((Number(value) * .8).toPrecision(12)) : /^(fontScale|tickFontScale|labelFontScale|legendFontScale)$/.test(key) ? Number((Number(value)*fontPointBase(key)).toPrecision(12)) : value;
-const axisConfigValue = (key, value) => isLabelPadding(key) ? Number((Number(value) + LABEL_PADDING_BASE).toPrecision(12)) : key === 'spineScale' ? Number((Number(value) / .8).toPrecision(12)) : /^(fontScale|tickFontScale|labelFontScale|legendFontScale)$/.test(key) ? Number((Number(value)/fontPointBase(key)).toPrecision(12)) : value;
+const axisControlValue = (key, value) => isAxisSize(key) ? scaleAxisSize(value, 10) : isLabelPadding(key) ? Number((Number(value) - LABEL_PADDING_BASE).toPrecision(12)) : key === 'spineScale' ? Number((Number(value) * .8).toPrecision(12)) : /^(fontScale|tickFontScale|labelFontScale|legendFontScale)$/.test(key) ? Number((Number(value)*fontPointBase(key)).toPrecision(12)) : value;
+const axisConfigValue = (key, value) => isAxisSize(key) ? scaleAxisSize(value, .1) : isLabelPadding(key) ? Number((Number(value) + LABEL_PADDING_BASE).toPrecision(12)) : key === 'spineScale' ? Number((Number(value) / .8).toPrecision(12)) : /^(fontScale|tickFontScale|labelFontScale|legendFontScale)$/.test(key) ? Number((Number(value)/fontPointBase(key)).toPrecision(12)) : value;
 const editableXY = type => !['XPS Fit','Particle Histogram','bar_graph_general','Raman 3D'].includes(type);
 const seriesControlValue = (key,value) => key==='trendFontSize' ? Number((Number(value || 6)*Number(config.axes.fontScale)).toPrecision(12)) : value;
 const SERIES_APPEARANCE_FIELDS = ['mode','lineWidth','markerSize','lineStyle','marker','lineAlpha','scatterColor','markerEdgeColor','markerFaceColor','markerEdgeAlpha','markerFaceAlpha'];
@@ -1478,7 +1480,7 @@ function changed(delay = 400) {
   ++revision;
   $("#figure-stage").classList.add("pending");
   previewUpdating();
-  $("#figure-size").textContent = `軸領域 ${config.axes.width || "—"} × ${config.axes.height || "—"} cm`;
+  $("#figure-size").textContent = `軸領域 ${axisControlValue('width', config.axes.width) || "—"} × ${axisControlValue('height', config.axes.height) || "—"} mm`;
   updateButtons();
   clearTimeout(renderTimer);
   renderTimer = setTimeout(() => { renderWanted = true; renderPreview(); }, delay);
@@ -1622,7 +1624,7 @@ async function renderPreview() {
     $("#preview-state").className = "preview-state ready";
     $("#preview-state").textContent = "更新済み";
     $('#preview-state').title='';$('#preview-state').removeAttribute('aria-label');
-    $("#figure-size").textContent = `軸領域 ${snapshot.axes.width} × ${snapshot.axes.height} cm`;
+    $("#figure-size").textContent = `軸領域 ${axisControlValue('width', snapshot.axes.width)} × ${axisControlValue('height', snapshot.axes.height)} mm`;
     const checks=[...result.warnings,...result.series.filter(item=>item.processing && Object.keys(item.processing).length).map(item=>`${item.name}: ${Object.entries(item.processing).map(([key,value])=>`${({slope:'補正した傾き',fittedSlope:'自動計算の傾き',reference:'基準値Y₀（表示単位変換前）',areaCm2:'試料面積（cm²）',factor:'Y係数'})[key] || key} = ${Number(value.toPrecision(8))}`).join('、')}`)];
     $("#warning-list").replaceChildren(...checks.map(text => { const item = document.createElement("li"); item.textContent = text; return item; }));
     $("#plot-warnings").hidden = !checks.length;
@@ -2805,7 +2807,7 @@ function openElementEditor(part,index=0,{allowUnrendered=false}={}) {
     const shared=`<label><input data-axis="legend" type="checkbox" ${config.axes.legend?'checked':''}>凡例を表示</label>${legendModeControls()}<label title="全凡例に共通です。">フォントサイズ (pt)<input data-axis="legendFontScale" type="number" min="${axisControlValue('legendFontScale',.2)}" max="${axisControlValue('legendFontScale',3)}" step="0.1" value="${axisControlValue('legendFontScale',config.axes.legendFontScale)}"></label><details class="settings-panel"><summary>線・点の大きさ</summary><label>大きさ（標準比）<input data-axis="legendScale" type="number" min=".2" max="3" step="0.1" value="${config.axes.legendScale}"></label></details>`;
     fields.innerHTML=local+(entry?`<details class="settings-panel"><summary>全凡例の設定</summary>${shared}</details>`:shared)+`<button type="button" class="button quiet" data-reset-legend>${entry?'この凡例を':'凡例を'}標準位置に戻す</button><button type="button" class="button quiet" data-restore-legend-items ${hasHiddenLegendItems()?'':'hidden'}>凡例項目をすべて再表示</button>`;
   }
-  if(part==='figureBackground')fields.innerHTML+=`<details class="settings-panel"><summary>グラフの種類・サイズ</summary><label>グラフのプリセット<select data-preview-preset>${choiceOptions(presets.map(item=>[item.id,item.label]),config.plotType)}</select></label><div class="field-grid">${['width','height'].map((key,i)=>`<label>${['軸領域の幅 (cm)','軸領域の高さ (cm)'][i]}<input data-axis="${key}" type="number" min=".5" max="24" step="0.1" value="${config.axes[key]}"></label>`).join('')}</div></details>`+$('#font-settings').outerHTML;
+  if(part==='figureBackground')fields.innerHTML+=`<details class="settings-panel"><summary>グラフの種類・サイズ</summary><label>グラフのプリセット<select data-preview-preset>${choiceOptions(presets.map(item=>[item.id,item.label]),config.plotType)}</select></label><div class="field-grid">${['width','height'].map((key,i)=>`<label>${['軸領域の幅 (mm)','軸領域の高さ (mm)'][i]}<input data-axis="${key}" type="number" min="5" max="240" step="0.1" value="${axisControlValue(key,config.axes[key])}"></label>`).join('')}</div></details>`+$('#font-settings').outerHTML;
   if(part==='plotBackground')fields.innerHTML+=`<details class="settings-panel"><summary>グリッド線</summary>${gridControls()}</details>`;
   if(part==='grid')fields.innerHTML=gridControls();
   if(part==='trend')fields.innerHTML=`<div data-series-index="${index}">${fields.innerHTML}</div>`;
@@ -3454,9 +3456,12 @@ function figureWorkspaceLocator(input){
 }
 function figureWorkspaceMatches(input,locator){return (input.closest('dialog')?.id||'')===locator.scope&&input.id===locator.id&&input.tagName===locator.tag&&(input.type||'')===locator.type&&locator.attributes.every(([name,value])=>input.getAttribute(name)===value);}
 function figureWorkspaceField(locator){const root=locator.scope?document.getElementById(locator.scope):document;return root?figureWorkspaceFields(root).filter(input=>figureWorkspaceMatches(input,locator))[locator.ordinal]:null;}
+// Workspace fields keep the old cm representation too, so older Studio
+// snapshots and app-update sessions restore without resizing the figure.
+function figureWorkspaceFieldValue(input){return isAxisSize(input.dataset.axis)?String(axisConfigValue(input.dataset.axis,input.value)):input.value;}
 function figureWorkspaceUI({rejectInvalid=false}={}){
  const locators=new Map(),ordinals=new Map();
- const fields=figureWorkspaceFields().map(input=>{if(rejectInvalid&&input.validity?.badInput)throw Error(`「${input.getAttribute('aria-label')||input.closest('label')?.textContent?.trim().slice(0,60)||input.dataset.axis||input.id||'数値欄'}」の入力を確定してから保存してください。`);const locator=figureWorkspaceBaseLocator(input),key=figureWorkspaceLocatorKey(locator);locator.ordinal=ordinals.get(key)||0;ordinals.set(key,locator.ordinal+1);locators.set(input,locator);return {locator,value:input.value,checked:!!input.checked,indeterminate:!!input.indeterminate,badInput:!!input.validity?.badInput};});
+ const fields=figureWorkspaceFields().map(input=>{if(rejectInvalid&&input.validity?.badInput)throw Error(`「${input.getAttribute('aria-label')||input.closest('label')?.textContent?.trim().slice(0,60)||input.dataset.axis||input.id||'数値欄'}」の入力を確定してから保存してください。`);const locator=figureWorkspaceBaseLocator(input),key=figureWorkspaceLocatorKey(locator);locator.ordinal=ordinals.get(key)||0;ordinals.set(key,locator.ordinal+1);locators.set(input,locator);return {locator,value:figureWorkspaceFieldValue(input),checked:!!input.checked,indeterminate:!!input.indeterminate,badInput:!!input.validity?.badInput};});
  const dialogs=$$('dialog[open]').filter(dialog=>!['data-editor','reload-edited-confirm'].includes(dialog.id)).map(dialog=>({id:dialog.id,left:dialog.style.left||'',top:dialog.style.top||''}));
  return {fields,dialogs,details:$$('details').filter(node=>!node.closest('dialog')||node.closest('dialog').open).map(node=>{const scope=node.closest('dialog')?.id||'',root=scope?document.getElementById(scope):document;return {scope,index:[...root.querySelectorAll('details')].filter(item=>(item.closest('dialog')?.id||'')===scope).indexOf(node),open:node.open};}),
   axis:$('#axis-editor').open?{axis:$('#axis-editor-fields').dataset.axisName,kind:$('#axis-editor-fields').dataset.workspaceKind||($('#axis-editor-fields').querySelector('[data-axis$="Label"]')?'label':'ticks')}:null,
@@ -3520,7 +3525,7 @@ async function restoreFigureWorkspace(snapshot){
   if(record.ui.element&&metadata){const {part,index,origin}=record.ui.element;if(['series','seriesAll'].includes(part)&&/^\d+$/.test(origin||'')&&config.series[Number(origin)]&&origin!==index)openElementEditor('series',Number(origin));openElementEditor(part,part==='legend'?index:Number(index));$('#element-editor-fields').dataset.seriesEditorOrigin=origin||'';}
   for(const saved of record.ui.dialogs){if(!figureWorkspaceDialogIds.has(saved.id))continue;const dialog=document.getElementById(saved.id);if(saved.id==='object-layout-dialog'){openObjectLayout();}else if(saved.id==='color-panel'&&record.ui.colorTarget){const target=figureWorkspaceField(record.ui.colorTarget);if(target)openColorPanel(target,'色');}else if(!dialog.open)dialog.showModal();if(saved.left&&saved.top)positionDialog(dialog,parseFloat(saved.left),parseFloat(saved.top));}
   const fieldIndex=new Map();for(const input of figureWorkspaceFields()){const key=figureWorkspaceLocatorKey(figureWorkspaceBaseLocator(input));if(!fieldIndex.has(key))fieldIndex.set(key,[]);fieldIndex.get(key).push(input);}
-  for(const field of record.ui.fields){const input=fieldIndex.get(figureWorkspaceLocatorKey(field.locator))?.[field.locator.ordinal];if(!input)continue;input.value=field.value;if(input.type==='checkbox'||input.type==='radio'){input.checked=field.checked;input.indeterminate=field.indeterminate;}}
+  for(const field of record.ui.fields){const input=fieldIndex.get(figureWorkspaceLocatorKey(field.locator))?.[field.locator.ordinal];if(!input)continue;input.value=isAxisSize(input.dataset.axis)?axisControlValue(input.dataset.axis,field.value):field.value;if(input.type==='checkbox'||input.type==='radio'){input.checked=field.checked;input.indeterminate=field.indeterminate;}}
   for(const detail of record.ui.details){const root=detail.scope?document.getElementById(detail.scope):document;if(!root)continue;const node=[...root.querySelectorAll('details')].filter(item=>(item.closest('dialog')?.id||'')===detail.scope)[detail.index];if(node)node.open=detail.open;}
   selected=new Set(record.selected);syncInteractionSelection();$('#controls-panel').scrollTop=record.workspace.controlScroll;window.scrollTo?.(0,record.workspace.pageScroll);
   if($('#paste-dialog').open){const automatic=pasteHeaderAutomatic;pasteHeaderAutomatic=false;updatePastePreview();pasteHeaderAutomatic=automatic;}
