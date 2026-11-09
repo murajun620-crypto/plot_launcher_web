@@ -12,7 +12,10 @@ export async function identifyPlotProject(saved){
  const source=await hash({data:{filename:saved.data.filename,base64:saved.data.base64,files:saved.data.files,...(saved.data.tableEdits?.length?{tableEdits:saved.data.tableEdits}:{})},fonts:saved.fonts});
  const settings=new Map();for(const entry of workspace.sheetSettings||[]){if(!Number.isInteger(entry?.sheetIndex)||entry.sheetIndex<0||entry.sheetIndex>1000||!entry.settings||settings.has(entry.sheetIndex))fail();settings.set(entry.sheetIndex,entry.settings);}
  settings.set(saved.data.sheetIndex,saved.settings);if(settings.size>1001)fail();
+ const selected=saved.data.selectedSheets;
+ if(selected!==undefined&&(!Array.isArray(selected)||!selected.length||selected.length>1001||new Set(selected).size!==selected.length||selected.some(index=>!Number.isInteger(index)||index<0||index>1000)||!selected.includes(saved.data.sheetIndex)))fail();
  const images=[];for(const [index,setting]of [...settings].sort(([a],[b])=>a-b)){
+  if(selected&&!selected.includes(index))continue;
   if(setting.format!=='plotlauncher-web'||setting.version!==1||!setting.axes||!Array.isArray(setting.series)||!setting.series.length||typeof setting.data?.sheet!=='string')fail();
   const {inheritFirstSheet,inheritSharedSettings,...rendering}=setting;
   images.push({imageId:plotSheetId(index),sheetIndex:index,name:(setting.data.sheet||`Sheet ${index+1}`).slice(0,255),fingerprint:await hash({source,settings:rendering})});

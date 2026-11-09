@@ -1,12 +1,12 @@
 import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=source-save-v0717-1';
-import {setupDirectSendButton,getFigureWorkspace} from './direct-transfer.mjs?v=c4de8a0b1952';
-import {identifyPlotProject,plotSheetIndex,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=27ae7675c457';
+import {setupDirectSendButton,getFigureWorkspace} from './direct-transfer.mjs?v=6be2f301a94d';
+import {identifyPlotProject,plotSheetIndex,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=6be2f301a94d';
 import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=9127ec4c4f31";
 import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=9127ec4c4f31";
 import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9127ec4c4f31";
 import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=27ae7675c457";
 import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=27ae7675c457";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=c4de8a0b1952";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=6be2f301a94d";
 
 import {alignmentOffsets} from './object-layout.mjs?v=27ae7675c457';
 import {createDataEditor} from './data-editor.mjs?v=27ae7675c457';
@@ -16,7 +16,7 @@ import {createShortcutHandler} from './shortcuts.mjs?v=61d158587773';
 import {formatText,TEXT_FORMAT_ACTIONS} from './text-format.mjs?v=61d158587773';
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
-const APP_BUILD = 'c4de8a0b1952';
+const APP_BUILD = '6be2f301a94d';
 function makeProject(settings,data,fonts,workspace={}){
   const live=sourceData&&data.filename===sourceData.filename&&(data.bytes===sourceData.bytes||data.files&&data.files===sourceData.files);
   const projectId=workspace.figureStudioProjectId||data.figureStudioProjectId||(live?(sourceData.figureStudioProjectId||=crypto.randomUUID()):crypto.randomUUID());
@@ -143,6 +143,46 @@ function projectSheetSettings() {
   }
   return [...sheets].sort(([a],[b])=>a-b).map(([sheetIndex,settings])=>({sheetIndex,settings}));
 }
+
+function selectedSheetIndices(data=sourceData,info=metadata){
+  if(!info)return [];
+  return data?.selectedSheets?[...data.selectedSheets].filter(index=>index<info.sheets.length).sort((a,b)=>a-b):info.sheets.map((_,index)=>index);
+}
+function sourceWithSheetSelection(data,indices,count){
+  const {selectedSheets,...rest}=data;
+  return indices.length===count?rest:{...rest,selectedSheets:[...indices]};
+}
+function updateSheetPickerCount(){
+  const count=$$('#sheet-picker-list input:checked').length,total=$$('#sheet-picker-list input').length;
+  $('#sheet-picker-count').textContent=`${count} / ${total} シートを選択`;
+  $('#sheet-picker-apply').disabled=count===0;
+}
+async function chooseWorkbookSheets(names,filename,initial=null){
+  const dialog=$('#sheet-picker'),selected=initial?new Set(initial):null;
+  $('#sheet-picker-file').textContent=filename;
+  $('#sheet-picker-list').replaceChildren(...names.map((name,index)=>{
+    const label=document.createElement('label'),input=document.createElement('input');
+    input.type='checkbox';input.value=String(index);input.checked=!selected||selected.has(index);
+    label.append(input,document.createTextNode(name));return label;
+  }));
+  updateSheetPickerCount();dialog.returnValue='';
+  const answer=new Promise(resolve=>dialog.addEventListener('close',()=>resolve(dialog.returnValue==='apply'?$$('#sheet-picker-list input:checked').map(input=>Number(input.value)):null),{once:true}));
+  showDialog('#sheet-picker');return answer;
+}
+$('#sheet-picker-list').addEventListener('change',updateSheetPickerCount);
+for(const [id,checked]of [['#sheet-picker-all',true],['#sheet-picker-none',false]])$(id).addEventListener('click',()=>{$$('#sheet-picker-list input').forEach(input=>input.checked=checked);updateSheetPickerCount();});
+$('#choose-sheets').addEventListener('click',async()=>{
+  if(loading||exporting||!metadata||sourceData?.files)return;
+  let indices;loading=true;updateButtons();
+  try{indices=await chooseWorkbookSheets(metadata.sheets,metadata.filename,selectedSheetIndices());}
+  finally{loading=false;updateButtons();}
+  if(!indices?.length)return;
+  if(JSON.stringify(indices)===JSON.stringify(selectedSheetIndices()))return;
+  const previous=sourceData;
+  sourceData=sourceWithSheetSelection(sourceData,indices,metadata.sheets.length);drawMetadata();
+  if(!indices.includes(metadata.sheetIndex)&&!await changeSheet(indices[0])){sourceData=previous;drawMetadata();updateButtons();return;}
+  updateButtons();status(`${indices.length}シートを読み込み対象にしました。`,'ready');
+});
 
 function currentSharedSettings() {
   if (!metadata || !config.series.length) return sharedSettings;
@@ -328,21 +368,27 @@ function updateButtons() {
   $('#preset-fields').disabled = !engineReady || !metadata || busy;
   $("#header-row").disabled = !engineReady || !metadata || busy;
   $('#data-options').hidden = !metadata;
-  $("#sheet-select").disabled = !engineReady || !metadata || busy || metadata.sheets.length < 2;
-  const multipleSheets = (metadata?.sheets.length ?? 0) > 1;
-  $('#sheet-select-field').hidden = !multipleSheets;
+  const sheetIndices=selectedSheetIndices(),sheetPosition=sheetIndices.indexOf(metadata?.sheetIndex);
+  const multipleSheets = sheetIndices.length > 1;
+  $("#sheet-select").disabled = !engineReady || !metadata || busy || !multipleSheets;
+  $('#sheet-select-field').hidden = (metadata?.sheets.length ?? 0) < 2;
+  $('#choose-sheets').hidden=!!sourceData?.files||(metadata?.sheets.length ?? 0)<2;
+  $('#choose-sheets').disabled=!engineReady||busy||!metadata;
+  $('#choose-sheets').textContent=`読み込むシートを選択（${sheetIndices.length} / ${metadata?.sheets.length ?? 0}）`;
   for (const mode of ['shared','individual']) {
     $(`#sheet-mode-${mode}`).checked = sheetMode === mode;
     $(`#sheet-mode-${mode}`).disabled = !engineReady || busy || !multipleSheets;
   }
   $('#sheet-navigation').hidden = $('#open-save-all').hidden = $('#save-all-sheets-field').hidden = !multipleSheets;
-  $('#previous-sheet').disabled = !engineReady || busy || !multipleSheets || metadata.sheetIndex <= 0;
-  $('#next-sheet').disabled = !engineReady || busy || !multipleSheets || metadata.sheetIndex >= metadata.sheets.length - 1;
+  const batchLabel=sheetIndices.length<(metadata?.sheets.length??0)?'選択したシートを一括保存':'全シートを一括保存';
+  $('#open-save-all').textContent=$('#save-all-sheets-label').textContent=batchLabel;
+  $('#previous-sheet').disabled = !engineReady || busy || !multipleSheets || sheetPosition <= 0;
+  $('#next-sheet').disabled = !engineReady || busy || !multipleSheets || sheetPosition >= sheetIndices.length - 1;
   $('#open-save-all').disabled = !engineReady || busy || !multipleSheets || renderRunning;
   $('#save-all-sheets').disabled = busy || !multipleSheets;
   if (!multipleSheets) $('#save-all-sheets').checked = false;
   if (metadata) {
-    $('#preview-sheet-name').textContent = `${metadata.sheetIndex + 1} / ${metadata.sheets.length} · ${metadata.sheets[metadata.sheetIndex]}`;
+    $('#preview-sheet-name').textContent = `${sheetPosition + 1} / ${sheetIndices.length} · ${metadata.sheets[metadata.sheetIndex]}`;
     $('#preview-sheet-name').title = metadata.sheets[metadata.sheetIndex];
   }
   $("#open-settings").disabled = !metadata || busy;
@@ -404,7 +450,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=c4de8a0b1952", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=6be2f301a94d", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -1030,7 +1076,7 @@ function drawMetadata() {
   $("#file-name").textContent = metadata.filename;
   $("#file-stats").textContent = `${metadata.rowCount.toLocaleString()} 行 · ${metadata.columns.length} 列`;
   $("#sample-badge").hidden = !sample;
-  $("#sheet-select").replaceChildren(...metadata.sheets.map((name, index) => new Option(name, String(index))));
+  $("#sheet-select").replaceChildren(...selectedSheetIndices().map(index => new Option(metadata.sheets[index], String(index))));
   $("#sheet-select").value = String(metadata.sheetIndex);
   $("#header-row").value = loadedHeader;
   $("#data-preview").hidden = false;
@@ -1247,6 +1293,7 @@ async function reloadSourceData(chosenFiles=null,{fromFolder=false,discardEdits=
     const selectedFiles=ordered.map(index=>files[index]);
     if(selectedFiles.some(file=>!/\.(xlsx|xlsm|xls|csv|txt)$/i.test(file.name)) || selectedFiles.reduce((sum,file)=>sum+file.size,0)>30*1024*1024)throw new Error('Excel / CSV / TXTは合計30 MB以内で選んでください。');
     const refreshed=await Promise.all(selectedFiles.map(async(file,index)=>({...originals[index],bytes:await file.arrayBuffer()})));
+    const selectionNames=sourceData.selectedSheets?.map(index=>metadata.sheets[index]);
     const settings=makeSettings(config,metadata,loadedHeader);
     // The project loader validates settings and rolls back the worker if a
     // used column/sheet disappeared. No original file or font is overwritten.
@@ -1254,6 +1301,7 @@ async function reloadSourceData(chosenFiles=null,{fromFolder=false,discardEdits=
     ++revision;metadata=result.metadata;config=result.config;
     const currentSettings=makeSettings(config,metadata,loadedHeader);sheetSettings.set(metadata.sheetIndex,currentSettings);if(sheetMode==='shared')sharedSettings=currentSettings;
     sourceData=sourceData.files?{filename:sourceData.filename,files:refreshed,figureStudioProjectId:sourceData.figureStudioProjectId}:{filename:sourceData.filename,bytes:refreshed[0].bytes,figureStudioProjectId:sourceData.figureStudioProjectId};
+    if(selectionNames)sourceData=sourceWithSheetSelection(sourceData,[...new Set([...selectionNames.map(name=>metadata.sheets.indexOf(name)).filter(index=>index>=0),metadata.sheetIndex])].sort((a,b)=>a-b),metadata.sheets.length);
     dataFileHandles=ordered.map(index=>handles[index]);
     if(dataFileHandles[0] && sourceHandle!==dataFileHandles[0]){sourceHandle=dataFileHandles[0];sourceDirectory=null;refreshSaveDestination();}
     if(directory){sourceDirectory=directory;refreshSaveDestination();}
@@ -1287,7 +1335,8 @@ async function loadFile(file, isSample = false, reload = false, fromClipboard = 
     status("30 MB以内のExcel（.xlsx / .xlsm / .xls）、CSVまたはTXTを選んでください。", "error");
     return;
   }
-  const sheetIndex = reload ? Number($('#sheet-select').value) : 0;
+  let sheetIndex = reload ? Number($('#sheet-select').value) : 0;
+  if(reload&&!selectedSheetIndices().includes(sheetIndex))return false;
   const switchingSheet = reload && sheetIndex !== metadata.sheetIndex;
   const nextSheets = reload ? new Map(projectSheetSettings().map(item=>[item.sheetIndex,item.settings])) : new Map();
   const nextShared = reload && sheetMode === 'shared' ? currentSharedSettings() : sharedSettings;
@@ -1298,18 +1347,29 @@ async function loadFile(file, isSample = false, reload = false, fromClipboard = 
     return;
   }
   loading = true;
-  clearTimeout(renderTimer);
-  ++revision;
   updateButtons();
   status("データを読み込んでいます…");
   try {
     const filename = reload ? metadata.filename : file.name;
+    let bytes,chosenSheets;
+    if(!reload){
+      bytes=await file.arrayBuffer();
+      if(/\.(xlsx|xlsm|xls)$/i.test(filename)){
+        const info=await request('sheet-list',{filename,bytes:bytes.slice(0)});
+        if(info.sheets.length>1){
+          chosenSheets=await chooseWorkbookSheets(info.sheets,filename);
+          if(!chosenSheets?.length){status('読み込みをキャンセルしました。','ready');return false;}
+          sheetIndex=chosenSheets[0];
+        }
+      }
+    }
     const args = { filename, headerRow, sheetIndex, tableEdits:reload?sourceData?.tableEdits:undefined };
-    if (!reload) args.bytes = await file.arrayBuffer();
+    if (!reload) args.bytes = bytes;
     const originalBytes = args.bytes?.slice(0);
     const previous = metadata;
     const previousSettings = previous && config.series.length ? makeSettings(config, previous, loadedHeader) : null;
     if(!reload)await checkFigureStudioProjectReplacement();
+    clearTimeout(renderTimer);++revision;
     const nextMetadata = await request("load", args);
     if(!reload)prepareFigureStudioProjectReplacement();
     metadata = nextMetadata;
@@ -1319,7 +1379,7 @@ async function loadFile(file, isSample = false, reload = false, fromClipboard = 
       projectHandle=null;projectFilename='';
       sheetSettings.clear();
       sheetMode = 'shared'; sharedSettings = null;
-      sourceData = {filename, bytes:originalBytes};
+      sourceData = sourceWithSheetSelection({filename, bytes:originalBytes},chosenSheets||metadata.sheets.map((_,index)=>index),metadata.sheets.length);
       dataFileHandles = [sourceHandles.get(file) || null];
       sourceHandle = sourceHandles.get(file) || null; sourceDirectory = null;
       $('#save-destination').value = folderSupported ? (isSample || fromClipboard ? 'folder' : 'source') : 'download';
@@ -1805,7 +1865,7 @@ async function exportFigure(formats, allSheets = false) {
   if (exporting || loading || renderRunning || !engineReady || !metadata || (!allSheets && renderedRevision !== revision)) return;
   formats = typeof formats === 'string' ? [formats] : formats;
   if (!formats.length) {status('保存形式を1つ以上選択してください。', 'error'); return;}
-  if (allSheets && metadata.sheets.length > 1) return exportSheets(formats);
+  if (allSheets && selectedSheetIndices().length > 1) return exportSheets(formats);
   exporting = true; updateButtons();
   const stem = safeStem($('#save-name').value), snapshot = structuredClone(config), dpi = Number($('#png-dpi').value);
   const saved = [];
@@ -1827,7 +1887,7 @@ async function exportFigure(formats, allSheets = false) {
 async function exportSheets(formats) {
   exporting = true; cancelBatch = false;
   $('#cancel-batch').hidden = false; $('#cancel-batch').disabled = false; updateButtons();
-  const filename = metadata.filename, names = [...metadata.sheets];
+  const filename = metadata.filename, names = [...metadata.sheets],sheetIndices=selectedSheetIndices();
   const snapshots = new Map(projectSheetSettings().map(item=>[item.sheetIndex,item.settings]));
   const template = sheetMode === 'shared' ? currentSharedSettings() : sharedSettings || snapshots.get(0) || (config.series.length ? makeSettings(config, metadata, loadedHeader) : null);
   const stem = safeStem($('#save-name').value), dpi = Number($('#png-dpi').value);
@@ -1839,9 +1899,10 @@ async function exportSheets(formats) {
     const saveFile = await prepareSaver();
     sheetSettings = new Map(snapshots);
     if (sheetMode === 'shared') sharedSettings = template;
-    for (let index=0;index<names.length && !cancelBatch;index++) {
+    for (const [position,index]of sheetIndices.entries()) {
+      if(cancelBatch)break;
       const setting = snapshots.get(index), headerRow = setting?.data.headerRow ?? loadedHeader;
-      const prefix = `${index + 1} / ${names.length} · ${names[index]}`;
+      const prefix = `${position + 1} / ${sheetIndices.length} · ${names[index]}`;
       let sheetConfig;
       status(`${prefix} を準備しています…`);
       try {
@@ -1927,12 +1988,12 @@ $('#sample-list').addEventListener('click',event=>{
 });
 $("#sheet-select").addEventListener("change", () => loadFile(null, false, true));
 async function changeSheet(index) {
-  if (!engineReady || loading || exporting || !metadata || index < 0 || index >= metadata.sheets.length || index === metadata.sheetIndex) return;
+  if (!engineReady || loading || exporting || !metadata || !selectedSheetIndices().includes(index) || index === metadata.sheetIndex) return false;
   $('#sheet-select').value = String(index);
   return loadFile(null, false, true);
 }
-$('#previous-sheet').addEventListener('click', () => changeSheet(metadata?.sheetIndex - 1));
-$('#next-sheet').addEventListener('click', () => changeSheet(metadata?.sheetIndex + 1));
+$('#previous-sheet').addEventListener('click', () => {const indices=selectedSheetIndices();return changeSheet(indices[indices.indexOf(metadata?.sheetIndex)-1]);});
+$('#next-sheet').addEventListener('click', () => {const indices=selectedSheetIndices();return changeSheet(indices[indices.indexOf(metadata?.sheetIndex)+1]);});
 for (const mode of ['shared','individual']) $(`#sheet-mode-${mode}`).addEventListener('change', () => setSheetMode(mode));
 $("#header-row").addEventListener("change", () => loadFile(null, false, true));
 $("#plot-form").addEventListener("submit", event => event.preventDefault());
@@ -2292,10 +2353,10 @@ async function readProject(file, saved, options={}) {
   try {
     if(file.size>PROJECT_MAX_SIZE)throw new Error('プロジェクトは130 MB以内のファイルを選んでください。');
     const raw=saved || JSON.parse(await file.text()),project=parseProject(raw),identity=await identifyPlotProject(raw);
-    const retainedData={filename:project.data.filename,figureStudioProjectId:identity.projectId,...(project.data.tableEdits?{tableEdits:project.data.tableEdits}:{}),...(project.data.files?{files:project.data.files.map(file=>({...file,bytes:file.bytes.slice(0)}))}:{bytes:project.data.bytes.slice(0)})};
+    const retainedData={filename:project.data.filename,figureStudioProjectId:identity.projectId,...(project.data.selectedSheets?{selectedSheets:[...project.data.selectedSheets]}:{}),...(project.data.tableEdits?{tableEdits:project.data.tableEdits}:{}),...(project.data.files?{files:project.data.files.map(file=>({...file,bytes:file.bytes.slice(0)}))}:{bytes:project.data.bytes.slice(0)})};
     const retainedFonts=project.fonts.map(font=>({...font,bytes:font.bytes.slice(0)}));
     await checkFigureStudioProjectReplacement(options);
-    const result=await request('project',{filename:project.data.filename,tableEdits:project.data.tableEdits,bytes:project.data.bytes,...(project.data.files?{files:project.data.files}:{}),sheetIndex:project.data.sheetIndex,headerRow:project.data.headerRow,settings:project.settings,fonts:project.fonts,sheetSettings:project.workspace.sheetSettings || [],sharedSettings:project.workspace.sharedSettings});
+    const result=await request('project',{filename:project.data.filename,selectedSheets:project.data.selectedSheets,tableEdits:project.data.tableEdits,bytes:project.data.bytes,...(project.data.files?{files:project.data.files}:{}),sheetIndex:project.data.sheetIndex,headerRow:project.data.headerRow,settings:project.settings,fonts:project.fonts,sheetSettings:project.workspace.sheetSettings || [],sharedSettings:project.workspace.sharedSettings});
     prepareFigureStudioProjectReplacement(options);
     metadata=result.metadata; config=result.config; sourceData=retainedData; sample=project.data.sample; dataFileHandles=[];
     sheetSettings=new Map((project.workspace.sheetSettings || []).map(item=>[item.sheetIndex,item.settings]));
@@ -3299,9 +3360,10 @@ async function collectPlotGraphs({currentOnly=false}={}){
   if(cache&&cache.currentOnly===currentOnly&&cache.source===before.source&&cache.content===before.content&&cache.fonts.length===before.fonts.length&&cache.fonts.every((font,i)=>font===before.fonts[i]))return cache.value;
   if(plotMetadataSource!==sourceData){plotMetadataSource=sourceData;plotSheetMetadata=new Map();plotPreviewCache.clear();}
   const names=[...metadata.sheets],filename=metadata.filename,snapshots=new Map(projectSheetSettings().map(item=>[item.sheetIndex,item.settings]));
-  if(!currentOnly&&names.length>100)throw Error('Studioへの一括送信は100シート以内にしてください。');
+  const sheetIndices=selectedSheetIndices();
+  if(!currentOnly&&sheetIndices.length>100)throw Error('Studioへの一括送信は100シート以内にしてください。');
   const template=sheetMode==='shared'?currentSharedSettings():sharedSettings||snapshots.get(0)||makeSettings(config,metadata,loadedHeader),graphs=[],failures=[];
-  for(const index of currentOnly?[selectedIndex]:names.map((_,index)=>index)){
+  for(const index of currentOnly?[selectedIndex]:sheetIndices){
    try{
     const setting=snapshots.get(index),headerRow=setting?.data.headerRow??loadedHeader,key=index+':'+headerRow;
     let data=index===selectedIndex?metadata:plotSheetMetadata.get(key);
@@ -3342,11 +3404,21 @@ async function captureFigureStudioImages(batch=false){
     const captured=await collectPlotGraphs({currentOnly:!batch}),project=new Blob([JSON.stringify(captured.project)],{type:'application/json'});
     if(project.size>PROJECT_MAX_SIZE)throw Error('プロジェクトは130 MB以内にしてください。');
     if(batch&&captured.failures.length)await confirmCurrentPlotSend(captured.failures);
-    const images=[],wanted=batch&&!captured.failures.length?captured.identity.images:captured.identity.images.filter(image=>image.imageId===captured.identity.activeImageId);
+    const images=[],renderFailures=[],wanted=batch&&!captured.failures.length?captured.identity.images:captured.identity.images.filter(image=>image.imageId===captured.identity.activeImageId);
     for(const descriptor of wanted){
+     try{
       const cached=plotPreviewCache.get(descriptor.imageId),graph=captured.graphs.find(graph=>graph.index===descriptor.sheetIndex);let preview=cached?.fingerprint===descriptor.fingerprint?cached.preview:null;
       if(!preview){const rendered=await request('sheet-export',{filename:metadata.filename,sheetIndex:graph.index,headerRow:graph.headerRow,config:graph.config,format:'svg',dpi:Number($('#png-dpi').value)});const bytes=Uint8Array.from(atob(rendered.base64),c=>c.charCodeAt(0));preview=new Blob([bytes],{type:'image/svg+xml'});plotPreviewCache.set(descriptor.imageId,{fingerprint:descriptor.fingerprint,preview});}
       images.push({...descriptor,preview,...(batch&&plotAcknowledgements.isUnchanged(captured.identity.projectId,descriptor)?{unchanged:true}:{})});
+     }catch(error){
+      if(!batch||descriptor.imageId===captured.identity.activeImageId)throw Error(`シート「${descriptor.name}」：${error.message}`);
+      renderFailures.push({index:descriptor.sheetIndex,name:descriptor.name,message:error.message});
+     }
+    }
+    if(renderFailures.length){
+      await confirmCurrentPlotSend(renderFailures);
+      const current=images.find(image=>image.imageId===captured.identity.activeImageId);
+      images.splice(0,images.length,current);
     }
     const result={project,sourceName:projectFilename||`${safeStem($('#save-name').value)}.plotproject`,bridgeState:captured.checkpoint};
     if(batch)return {...result,batch:{projectId:captured.identity.projectId,images}};
@@ -3356,7 +3428,7 @@ async function captureFigureStudioImages(batch=false){
 const captureFigureStudioResult=()=>captureFigureStudioImages(false);
 const captureFigureStudioBatch=()=>captureFigureStudioImages(true);
 async function chooseFigureStudioSheet(imageId){
-  const index=plotSheetIndex(imageId);if(index===null||!metadata?.sheets[index])throw Error('対象のシートが見つかりません。');
+  const index=plotSheetIndex(imageId);if(index===null||!metadata?.sheets[index]||!selectedSheetIndices().includes(index))throw Error('対象のシートは読み込み対象に選択されていません。「読み込むシートを選択」から追加してください。');
   if(index===metadata.sheetIndex)return;
   $('#sheet-select').value=String(index);await loadFile(null,false,true);
   if(metadata?.sheetIndex!==index)throw Error('対象のシートへ切り替えられませんでした。');
@@ -3382,7 +3454,7 @@ figureStudioBridge=setupFigureBridge({
   async canReuseProject({project,imageId}){
     if(!sourceData||!metadata||loading||exporting||dragging||colormapApplying||pendingDataFiles||figureBridgePendingInput())return false;
     const identity=await identifyPlotProject(JSON.parse(await project.text())),index=plotSheetIndex(imageId);
-    return identity.projectId===sourceData.figureStudioProjectId&&(!imageId||index!==null&&!!metadata.sheets[index]&&identity.images.some(image=>image.imageId===imageId));
+    return identity.projectId===sourceData.figureStudioProjectId&&(!imageId||index!==null&&selectedSheetIndices().includes(index)&&identity.images.some(image=>image.imageId===imageId));
   },
   canAdoptAccepted:result=>!!sourceData&&!loading&&!exporting&&!dragging&&!colormapApplying&&!pendingDataFiles&&!figureBridgePendingInput()&&sourceData===result?.bridgeState?.source,
   onConnectionChange(connected){figureStudioDirectSender?.setBridgeConnected(connected);},
@@ -3448,6 +3520,7 @@ function validateFigureWorkspaceState(snapshot){
  let fontBytes=0;for(const font of state.fonts){if(!string(font?.name,255)||!string(font?.family,200)||!(font.bytes instanceof ArrayBuffer)||!font.bytes.byteLength||font.bytes.byteLength>20*1024*1024)fail();fontBytes+=font.bytes.byteLength;}if(fontBytes>60*1024*1024)fail();
  if(state.sourceData){const data=state.sourceData,meta=state.metadata;if(!string(data.filename,255)||!/\.(xlsx|xlsm|xls|csv|txt)$/i.test(data.filename)||!meta||meta.filename!==data.filename||!list(meta.columns,20000)||!list(meta.sheets,1001)||!Number.isInteger(meta.sheetIndex)||meta.sheetIndex<0||meta.sheetIndex>=meta.sheets.length)fail();
   if(data.figureStudioProjectId!==undefined&&(typeof data.figureStudioProjectId!=='string'||!/^[a-zA-Z0-9-]{16,100}$/.test(data.figureStudioProjectId)))fail();
+  if(data.selectedSheets!==undefined&&(!list(data.selectedSheets,1001)||!data.selectedSheets.length||new Set(data.selectedSheets).size!==data.selectedSheets.length||data.selectedSheets.some(index=>!Number.isInteger(index)||index<0||index>=meta.sheets.length)||!data.selectedSheets.includes(meta.sheetIndex)))fail();
   validateTableEdits(data.tableEdits);
   const files=data.files??[data];if(!list(files,16)||!files.length)fail();let total=0;for(const file of files){if(!string(file?.filename,255)||!/\.(xlsx|xlsm|xls|csv|txt)$/i.test(file.filename)||!(file.bytes instanceof ArrayBuffer)||!file.bytes.byteLength)fail();total+=file.bytes.byteLength;if(data.files&&(!Number.isInteger(file.sheetIndex)||file.sheetIndex<0||file.sheetIndex>1000||!Number.isInteger(file.headerRow)||file.headerRow<1||file.headerRow>1000))fail();}if(total>30*1024*1024)fail();
   if(state.config.series.length)restoreSettings(makeSettings(state.config,meta,state.loadedHeader),meta);

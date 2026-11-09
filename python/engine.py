@@ -2042,7 +2042,14 @@ class PlotEngine:
 
     def dispatch(self, operation, payload):
         args = json.loads(payload)
-        if operation == "load-many":
+        if operation == "sheet-list":
+            suffix = Path(args["filename"]).suffix.lower()
+            with pd.ExcelFile(args["path"], engine="xlrd" if suffix == ".xls" else "openpyxl") as book:
+                names = book.sheet_names
+            if not 1 <= len(names) <= 1001:
+                raise ValueError("Excelは1〜1001シート以内にしてください。")
+            result = {"sheets": names}
+        elif operation == "load-many":
             result = self.load_many(**args)
         elif operation == "load":
             result = self.load(**args)

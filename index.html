@@ -6,8 +6,8 @@
   <meta name="description" content="Excel・CSV・TXTの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=27ae7675c457">
-  <script type="module" src="./app.js?v=c4de8a0b1952"></script>
+  <link rel="stylesheet" href="./style.css?v=6be2f301a94d">
+  <script type="module" src="./app.js?v=6be2f301a94d"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -60,6 +60,7 @@
         <div id="data-options" class="data-options" hidden>
           <details id="source-files" class="settings-panel" hidden><summary>ファイル別のシート・読み込み設定</summary><div id="source-list"></div></details>
           <label id="sheet-select-field">シート<select id="sheet-select" disabled><option>未読み込み</option></select></label>
+          <button id="choose-sheets" type="button" class="button quiet" hidden disabled>読み込むシートを選択</button>
           <details class="settings-panel"><summary>読み込み設定</summary><label title="列名の行を指定します。TXTは1で自動判定し、列名のない表も読み込めます。">ヘッダー行<input id="header-row" type="number" min="1" max="1000" step="1" value="1" disabled></label></details>
         </div>
         <p class="field-hint">列名が並ぶ行を指定してください。</p>
@@ -157,7 +158,7 @@
         <div><span class="eyebrow">FIGURE</span><h1>グラフプレビュー</h1></div>
                 <div class="export-buttons preview-file-actions">
           <button id="open-save" class="button primary" disabled title="形式と保存先を選んでグラフを保存します">グラフを保存</button>
-          <button id="open-save-all" class="button" disabled hidden title="選択中の一括／個別設定で全シートを保存します。">全シートを一括保存</button>
+          <button id="open-save-all" class="button" disabled hidden title="読み込み対象に選んだシートを、選択中の一括／個別設定で保存します。">全シートを一括保存</button>
           <button id="copy-image" class="button" disabled title="選択した解像度でPNGをクリップボードにコピーします">画像をコピー</button>
         </div>
       </div>
@@ -249,11 +250,19 @@
     <p>アプリ内で修正したデータがあります。再読み込みすると、その修正を取り消して元ファイルの保存済みの値に置き換えます。必要な編集内容は先にCSVまたはプロジェクトに保存してください。</p>
     <div class="update-actions"><button id="reload-edited-cancel" type="button" class="button">キャンセル</button><button id="reload-edited-continue" type="button" class="button primary">修正を取り消して再読み込み</button></div>
   </dialog>
+  <dialog id="sheet-picker" class="plot-dialog sheet-picker" aria-labelledby="sheet-picker-title">
+    <div class="dialog-heading"><strong id="sheet-picker-title">読み込むシートを選択</strong></div>
+    <p id="sheet-picker-file"></p>
+    <div class="sheet-picker-toolbar"><button id="sheet-picker-all" type="button" class="button quiet">すべてON</button><button id="sheet-picker-none" type="button" class="button quiet">すべてOFF</button><output id="sheet-picker-count" aria-live="polite"></output></div>
+    <div id="sheet-picker-list" class="sheet-picker-list"></div>
+    <p class="field-hint">選択したシートを表示・一括保存・Studio送信の対象にします。あとから変更できます。</p>
+    <form method="dialog" class="update-actions"><button type="submit" value="cancel" class="button">キャンセル</button><button id="sheet-picker-apply" type="submit" value="apply" class="button primary">読み込む</button></form>
+  </dialog>
   <dialog id="studio-send-confirm" class="plot-dialog" aria-labelledby="studio-send-title">
     <div class="dialog-heading"><strong id="studio-send-title">表示中の図だけをStudioへ送りますか？</strong></div>
     <p>次のシートは、現在の系列設定では送信できません。</p>
     <ul id="studio-send-failures"></ul>
-    <p>表示中の図は送信できます。ほかのシートも送る場合は、シート設定を「個別」にして、それぞれのX列・Y列を設定してください。元データと保存済みのシート設定は保持します。</p>
+    <p>表示中の図は送信できます。不要なシートは「読み込むシートを選択」でOFFにできます。ほかのシートも送る場合は、シート設定を「個別」にして、それぞれのX列・Y列や軸範囲を確認してください。元データと保存済みのシート設定は保持します。</p>
     <form method="dialog" class="update-actions"><button type="submit" value="cancel" class="button" autofocus>戻る</button><button type="submit" value="current" class="button primary">表示中の図を送る</button></form>
   </dialog>
   <dialog id="paste-dialog" class="plot-dialog paste-dialog" aria-labelledby="paste-dialog-title">
@@ -268,7 +277,7 @@
   <dialog id="save-dialog" class="save-dialog" aria-labelledby="save-dialog-title">
     <div class="dialog-heading"><h2 id="save-dialog-title">グラフを保存</h2><button id="close-save" class="button quiet" aria-label="保存画面を閉じる">閉じる</button></div>
     <section class="save-panel" aria-label="グラフの保存">
-      <label id="save-all-sheets-field" class="check" hidden title="プレビュー上の一括／個別設定に従って保存します。ヘッダー行はシート別に保持し、列名が異なる場合は同じ位置の列を使用します。ダウンロードはZIPにまとめます。"><input type="checkbox" id="save-all-sheets">全シートを一括保存</label>
+      <label id="save-all-sheets-field" class="check" hidden title="プレビュー上の一括／個別設定に従って保存します。ヘッダー行はシート別に保持し、列名が異なる場合は同じ位置の列を使用します。ダウンロードはZIPにまとめます。"><input type="checkbox" id="save-all-sheets"><span id="save-all-sheets-label">全シートを一括保存</span></label>
       <label>ファイル名<input id="save-name" value="graph" maxlength="120" aria-label="保存するファイルの名前" title="拡張子は選択した形式に合わせて自動で付けます。同名ファイルは採番します。"></label>
       <fieldset class="save-formats"><legend title="複数の形式を同時に保存できます">保存形式</legend><div class="save-format-grid">
         <label class="check" title="画像として保存します"><input type="checkbox" data-export="png" checked>PNG</label>

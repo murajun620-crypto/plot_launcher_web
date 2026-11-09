@@ -318,6 +318,12 @@ button:focus-visible,summary:focus-visible,a:focus-visible{outline:2px solid #ab
 }
 .plot-dialog{width:min(360px,calc(100vw - 24px));max-height:85dvh;border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:0 12px 48px #202d3e40;color:var(--ink);overflow:auto}
 .plot-dialog::backdrop{background:#202d3e66}
+.sheet-picker{width:min(480px,calc(100vw - 24px))}
+.sheet-picker-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:12px 0}
+.sheet-picker-toolbar output{margin-left:auto;color:var(--muted);font-size:12px}
+.sheet-picker-list{max-height:300px;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:4px 12px}
+.sheet-picker .sheet-picker-list label{display:flex;flex-direction:row;align-items:center;gap:8px;padding:8px 0;margin:0;overflow-wrap:anywhere}
+.sheet-picker-list input[type=checkbox]{flex:none}
 .series-table-panel{min-width:0;margin:8px 0 12px;border:1px solid var(--border);border-radius:7px;background:var(--surface)}
 .series-table-heading{display:flex;align-items:center;gap:12px;padding:10px 14px}
 .series-table-heading h2{margin:0;font-size:13px;font-weight:600}

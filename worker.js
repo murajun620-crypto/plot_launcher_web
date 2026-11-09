@@ -1,4 +1,4 @@
-import { restoreSettings } from "./state.js?v=27ae7675c457";
+import { restoreSettings } from "./state.js?v=6be2f301a94d";
 import { validateTableEdits } from './table-edits.mjs?v=27ae7675c457';
 // All user data stays in this worker's in-memory filesystem.
 const PYODIDE_VERSION = "0.29.3";
@@ -70,7 +70,12 @@ self.onmessage = ({ data }) => {
         pyodide.runPython("from matplotlib import font_manager\n_project_previous = dict(_engine.__dict__)\n_project_previous['font_families'] = set(_engine.font_families)\n_project_fonts = list(font_manager.fontManager.ttflist)");
         projectSnapshot = true;
       }
-      if (operation === 'load-many' || operation === 'project' && args.files) {
+      if (operation === 'sheet-list') {
+        if(!/\.(xlsx|xlsm|xls)$/i.test(args.filename)||!(args.bytes instanceof ArrayBuffer)||args.bytes.byteLength>30*1024*1024)throw new Error('30 MB以内のExcelファイルを選んでください。');
+        uploadPath=`/data/inspect-${++uploadNumber}.${args.filename.split('.').pop().toLowerCase()}`;
+        pyodide.FS.writeFile(uploadPath,new Uint8Array(args.bytes));
+        payload={path:uploadPath,filename:args.filename};
+      } else if (operation === 'load-many' || operation === 'project' && args.files) {
         if(args.files){
           if(!Array.isArray(args.files) || !args.files.length || args.files.length>16 || args.files.reduce((sum,file)=>sum+(file.bytes?.byteLength || 0),0)>30*1024*1024)throw new Error('複数ファイルは16個・合計30 MB以内にしてください。');
           nextSources=args.files.map(file=>{
@@ -105,6 +110,7 @@ self.onmessage = ({ data }) => {
       let result = JSON.parse(dispatch(dispatchOperation, JSON.stringify(payload)));
       if (operation === "project") {
         if (result.sheets[result.sheetIndex] !== args.settings.data.sheet) throw new Error("プロジェクトのシートが設定と一致しません。");
+        if(args.selectedSheets && args.selectedSheets.some(index=>index>=result.sheets.length))throw new Error('選択したシートが元データにありません。');
         if (args.sharedSettings && !result.sheets.includes(args.sharedSettings.data.sheet)) throw new Error('プロジェクトの共通設定がデータと一致しません。');
         for (const item of args.sheetSettings || []) if (result.sheets[item.sheetIndex] !== item.settings.data.sheet) throw new Error('プロジェクトのシート設定がデータと一致しません。');
         const settings = structuredClone(args.settings);
@@ -125,7 +131,7 @@ self.onmessage = ({ data }) => {
         }
         result = {metadata:result, config, families};
       }
-      if (nextSources || uploadPath) {
+      if (operation !== 'sheet-list' && (nextSources || uploadPath)) {
         const oldPaths=new Set([currentPath,...currentSources.map(source=>source.path)].filter(Boolean));
         const keep=new Set(nextSources?nextSources.map(source=>source.path):[uploadPath]);
         for(const path of oldPaths)if(!keep.has(path))try{pyodide.FS.unlink(path);}catch{}
@@ -142,6 +148,7 @@ self.onmessage = ({ data }) => {
       const message = text.split("\n").filter(Boolean).pop().replace(/^(ValueError|RuntimeError|IndexError|EmptyDataError|ParserError):\s*/, "");
       self.postMessage({ type: "error", id, error: message, detail: text });
     } finally {
+      if(operation==='sheet-list'&&uploadPath)try{pyodide.FS.unlink(uploadPath);}catch{}
       if (loadSnapshot) pyodide.runPython('del _load_previous');
       if (projectSnapshot) pyodide.runPython("del _project_previous, _project_fonts");
     }
