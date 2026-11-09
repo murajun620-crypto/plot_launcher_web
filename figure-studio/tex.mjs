@@ -120,8 +120,8 @@ const normalStyle=o=>({'font-family':o.fontFamily||'Arial','font-size':o.fontSiz
 
 /** Build wrapped text/math rows without raster images or foreignObject. */
 export async function makeTexLayout(object,{measure,convert}){
- const o={...object},fontSize=Number(o.fontSize),width=Math.max(1,Number(o.w)-2);
- if(!Number.isFinite(fontSize)||fontSize<=0||!Number.isFinite(width))throw new Error('数式の文字サイズが不正です。');
+ const o={...object},fontSize=Number(o.fontSize),width=o.textAutoSize?Infinity:Math.max(1,Number(o.w)-2);
+ if(!Number.isFinite(fontSize)||fontSize<=0||!o.textAutoSize&&!Number.isFinite(width))throw new Error('数式の文字サイズが不正です。');
  const source=String(o.text??'');if(source.length>MAX_SOURCE)throw new Error('数式のテキストが長すぎます。');
  const pieces=splitTex(source,o.textMode),segments=await Promise.all(pieces.map(async piece=>piece.type==='math'?{...piece,geometry:await convert(piece.text,piece.display,o)}:piece));
  const rows=[];let row={runs:[],width:0,ascent:fontSize*.95,descent:fontSize*.3};
@@ -146,13 +146,14 @@ export async function makeTexLayout(object,{measure,convert}){
  }
  // A block's trailing line break is not an additional empty line.
  if(row.runs.length||!rows.length||segments.at(-1)?.type==='text')rows.push(row);
+ const contentWidth=o.textAutoSize?Math.max(0,...rows.map(row=>row.width))+2:Number(o.w);
  let height=0,maxWidth=0;
  for(const [index,row] of rows.entries()){
-  row.y=height+row.ascent;height+=Math.max(fontSize*1.25,row.ascent+row.descent);maxWidth=Math.max(maxWidth,row.width);row.x=o.textAlign==='center'?(o.w-row.width)/2:o.textAlign==='right'?o.w-row.width:0;
+  row.y=height+row.ascent;height+=Math.max(fontSize*1.25,row.ascent+row.descent);maxWidth=Math.max(maxWidth,row.width);row.x=o.textAlign==='center'?(contentWidth-row.width)/2:o.textAlign==='right'?contentWidth-row.width:0;
   const units=row.runs.reduce((sum,run)=>sum+(run.type==='text'?[...run.text].length:1),0);
-  row.spacing=o.textAlign==='justify'&&index<rows.length-1&&units>1?Math.max(0,(Number(o.w)-row.width)/(units-1)):0;
+  row.spacing=o.textAlign==='justify'&&index<rows.length-1&&units>1?Math.max(0,(contentWidth-row.width)/(units-1)):0;
  }
- return {width:Math.max(Number(o.w),maxWidth),height,rows,
+ return {width:o.textAutoSize?maxWidth:Math.max(Number(o.w),maxWidth),height,rows,
   createNodes(el,paint={}){
    return rows.flatMap(row=>{let precedingUnits=0;return row.runs.map(run=>{
     const x=row.x+run.x+precedingUnits*row.spacing,units=run.type==='text'?[...run.text].length:1;precedingUnits+=units;
@@ -167,7 +168,7 @@ export async function makeTexLayout(object,{measure,convert}){
 
 export function createTexRenderer({measure=(text,o)=>[...text].length*o.fontSize*.6,onReady=()=>{},onError=()=>{},documentRef=globalThis.document,convert}={}){
  const cache=new Map(),mathCache=new Map();let queue=Promise.resolve();
- const key=o=>JSON.stringify([o.textMode||'auto',String(o.text??''),o.fontSize,o.fontFamily||'Arial',!!o.bold,!!o.italic,!!o.underline,o.w,o.textAlign||'left']);
+ const key=o=>JSON.stringify([o.textMode||'auto',String(o.text??''),o.fontSize,o.fontFamily||'Arial',!!o.bold,!!o.italic,!!o.underline,o.textAutoSize?'natural':o.w,o.textAlign||'left']);
  const hasMath=o=>o?.type==='text'&&o.textMode!=='plain'&&(o.textMode==='tex'||splitTex(o.text,o.textMode).some(piece=>piece.type==='math'));
  async function convertMath(source,display,object){
   const mathKey=JSON.stringify([source,display,object.fontFamily||'Arial',!!object.bold,!!object.italic]);if(mathCache.has(mathKey))return mathCache.get(mathKey);

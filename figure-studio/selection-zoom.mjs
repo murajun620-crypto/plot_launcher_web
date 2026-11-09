@@ -1,4 +1,4 @@
-import {bounds} from './model.mjs?v=rotation-v079-1';
+import {bounds} from './model.mjs?v=text-fit-v0710-1';
 
 /** Leave enough scrollable space to center even a panel at a page edge. */
 export function centerSelectionInViewport(viewport,paper,point,scale){

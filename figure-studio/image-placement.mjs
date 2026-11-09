@@ -1,4 +1,4 @@
-import {mm} from './model.mjs?v=rotation-v079-1';
+import {mm} from './model.mjs?v=text-fit-v0710-1';
 import {validatedMiFiToBodySize} from './physical-size.mjs?v=0.3.5-1';
 import {IMPORT_DPI} from './image-resolution.mjs?v=image-quality-v066-1';
 
@@ -22,11 +22,15 @@ export function replacedImageSize(app,panel,previous,next){
 
 export function replacedMiFiToImageSize(panel,previousPhysical,nextPhysical,previousBody,nextBody){
  if(!validatedMiFiToBodySize(nextBody,nextPhysical))return {w:panel.w,h:panel.h};
- // The first explicit body-size setting replaces a legacy fitted placement.
- if(!validatedMiFiToBodySize(previousBody,previousPhysical))return {w:nextPhysical.width,h:nextPhysical.height};
- // Outer annotation bands may grow while the image body keeps its physical
- // scale. Preserve any deliberate (including nonuniform) Studio resizing.
- return {w:panel.w*nextPhysical.width/previousPhysical.width,h:panel.h*nextPhysical.height/previousPhysical.height};
+ // An explicit size in MiFiTo is authoritative on every send. Multiplying it
+ // by an old Studio scale would turn a requested 70 mm into (for example) 122 mm.
+ return {w:nextPhysical.width,h:nextPhysical.height};
+}
+
+export function miFiToSizeCorrection(panel,physical,body){
+ if(!validatedMiFiToBodySize(body,physical))return null;
+ const size=replacedMiFiToImageSize(panel,null,physical,null,body);
+ return Math.abs(size.w-panel.w)>1e-6||Math.abs(size.h-panel.h)>1e-6?size:null;
 }
 
 export function imageInsertionPoint(page,size,offset=0){

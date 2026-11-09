@@ -1,4 +1,4 @@
-import {bounds} from './model.mjs?v=rotation-v079-1';
+import {bounds} from './model.mjs?v=text-fit-v0710-1';
 const ns='http://www.w3.org/2000/svg';
 
 export function selectionRasterSize(box,objects,assets,{dpi=600,maxSide=16384,maxPixels=64000000}={}){

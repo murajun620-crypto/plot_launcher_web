@@ -5,10 +5,12 @@ import {History,makeObject,mm,toMM} from '../model.mjs';
 import {ARROW_PROPERTIES,arrowEndpoint,arrowPropertyValue,setArrowProperty} from '../arrowheads.mjs';
 import {selectionDescription} from '../selection.mjs';
 import {imageArrayUnits} from '../image-array.mjs';
+import {fitTextBox,naturalTextLines} from '../text-fit.mjs';
 
 const source=fs.readFileSync(new URL('../app.js',import.meta.url),'utf8');
 function section(start,end){const first=source.indexOf(start),last=source.indexOf(end,first+start.length);assert.ok(first>=0&&last>first,`${start} exists`);return source.slice(first,last);}
 const functions=[
+ section('function font(','function drawContent('),
  section('function selected(){','function setSelection('),
  section('function change(fn){','function scheduleSave('),
  section('function updateToolbar(){','function renderFast('),
@@ -35,7 +37,7 @@ function fixture(objects,{fields=[],buttons=[],tools=[]}={}){
  const events=[],document={activeElement:null},elements=new Map(['selectionInfo','selectWholeGroupButton','arrowProperties','sourceSummary','sourceApp'].map(id=>[`#${id}`,node()]));
  const queryAll=selector=>selector==='[data-prop]'?fields:selector==='#arrowProperties [data-prop]'?fields.filter(field=>Object.hasOwn(ARROW_PROPERTIES,field.dataset.prop)):selector==='[data-action]'?buttons:selector==='[data-tool]'?tools:buttons.filter(button=>selector===`[data-action="${button.dataset.action}"]`);
  const editor={value:'',hidden:true,style:{},selectionStart:0,selectionEnd:0,selectionDirection:'none',focus(){document.activeElement=editor;events.push('focus-editor');},setSelectionRange(start,end,direction){Object.assign(editor,{selectionStart:start,selectionEnd:end,selectionDirection:direction});}};
- const env={document,editor,nodes:new Map(),selectionDescription,imageArrayUnits,renderImageResolution(){},editingTexSession:false,editorComposing:false,livePreview:{source:'canvas',hide(){},show(){}},svg:{dataset:{}},texRenderer:{hasMath:()=>false,getLayout:()=>null},drawContent(){},mm,toMM,History,ARROW_PROPERTIES,arrowEndpoint,arrowPropertyValue,setArrowProperty,
+ const env={document,editor,nodes:new Map(),selectionDescription,imageArrayUnits,fitTextBox,naturalTextLines,measure:{font:'',measureText(text){return {width:text.length*(parseFloat(this.font.match(/([\d.]+)px/)?.[1])||9)*.6};}},renderOverlay(){},renderImageResolution(){},editingTexSession:false,editorComposing:false,livePreview:{source:'canvas',hide(){},show(){}},svg:{dataset:{}},texRenderer:{hasMath:()=>false,getLayout:()=>null},drawContent(){},mm,toMM,History,ARROW_PROPERTIES,arrowEndpoint,arrowPropertyValue,setArrowProperty,
   $:selector=>elements.get(selector)??queryAll(selector)[0]??null,$$:queryAll,arrowPicker:{update(){}},lineStylePicker:{update(){}},colorPickers:{update(){}},ribbon:{updateSelection(){}},toast:message=>events.push(message),updateProjectFileUI:()=>events.push('file-ui'),events};
  const keys=Object.keys(env),api=new Function(...keys,`let doc={objects:arguments[arguments.length-1]},selection=doc.objects.map(o=>o.id),groupScope=null,editingId=null,textBefore=null,textCaret=null,lastPendingPropertyInput=null,scale=1,tool='select';const history=new History(),pendingPropertyInputs=new WeakSet();
  function snapshot(){return structuredClone(doc);}function restoreBook(state){doc=structuredClone(state);}function record(before){history.push(before,snapshot());renderInspector();}function render(){renderInspector();}function textLines(object){return object.text.split('\\n');}

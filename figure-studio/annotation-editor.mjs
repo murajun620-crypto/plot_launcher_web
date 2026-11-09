@@ -1,4 +1,4 @@
-import {createShortcutHandler} from './shortcuts.mjs?v=rotation-v079-1';
+import {createShortcutHandler} from './shortcuts.mjs?v=text-fit-v0710-1';
 import {formatText,TEXT_FORMAT_ACTIONS} from './text-format.mjs?v=annotation-input-v071-1';
 
 // Both standalone editors use this same input surface and Studio's key mapping.

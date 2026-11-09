@@ -1,4 +1,4 @@
-import {blobToDataURL,dataURLToBlob} from './assets.mjs?v=rotation-v079-1';
+import {blobToDataURL,dataURLToBlob} from './assets.mjs?v=text-fit-v0710-1';
 import {automaticPreviewQuality} from './image-resolution.mjs?v=image-quality-v066-1';
 
 export const PREVIEW_QUALITIES=Object.freeze([1,.5,.25]);

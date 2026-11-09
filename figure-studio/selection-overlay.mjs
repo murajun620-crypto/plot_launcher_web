@@ -1,5 +1,5 @@
-import {bounds,objectBounds} from './model.mjs?v=rotation-v079-1';
-import {selectionDescription} from './selection.mjs?v=rotation-v079-1';
+import {bounds,objectBounds} from './model.mjs?v=text-fit-v0710-1';
+import {selectionDescription} from './selection.mjs?v=text-fit-v0710-1';
 
 export function drawSelectionFrames({root,doc,ids,groupId=null,scale,editableIds,el}){
  const set=new Set(ids),all=doc.objects.filter(object=>set.has(object.id)),box=bounds(all),u=1/scale;

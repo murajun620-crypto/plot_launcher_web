@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mm,newDocument} from '../model.mjs';
-import {importedImageSize,replacedImageSize,replacedMiFiToImageSize,imageInsertionPoint} from '../image-placement.mjs';
+import {importedImageSize,replacedImageSize,replacedMiFiToImageSize,miFiToSizeCorrection,imageInsertionPoint} from '../image-placement.mjs';
 const page=newDocument(),physical={width:139.878952,height:110.316519},image={width:186,height:147,physicalSize:physical};
 const near=(a,b)=>assert.ok(Math.abs(a-b)<1e-6,`${a} != ${b}`);
 
@@ -56,17 +56,24 @@ test('legacy and invalid MiFiTo body intent retain existing fit behavior',()=>{
  for(const mifitoBodySize of [undefined,{width:0,height:1},{width:Infinity,height:1},{width:physical.width+1,height:10},{width:10,height:physical.height+1},{width:'72',height:10}])near(importedImageSize({...image,mifitoBodySize},page,'mifito').w,mm(85));
 });
 
-test('MiFiTo updates grow outer bands while preserving body scale and deliberate manual resizing',()=>{
+test('MiFiTo updates use the explicit source size including outer bands regardless of previous Studio scaling',()=>{
  const previous={width:mm(80),height:mm(60)},next={width:mm(92),height:mm(68)},body={width:mm(80),height:mm(60)};
  for(const [scaleX,scaleY]of [[1,1],[.5,.5],[1.5,2]]){
   const panel={w:previous.width*scaleX,h:previous.height*scaleY};
   const size=replacedMiFiToImageSize(panel,previous,next,body,body);
-  near(size.w*body.width/next.width,body.width*scaleX);near(size.h*body.height/next.height,body.height*scaleY);
-  const back=replacedMiFiToImageSize(size,next,previous,body,body);near(back.w,panel.w);near(back.h,panel.h);
+  near(size.w*body.width/next.width,body.width);near(size.h*body.height/next.height,body.height);
+  const back=replacedMiFiToImageSize(size,next,previous,body,body);near(back.w,previous.width);near(back.h,previous.height);
  }
  const largerBody={width:mm(160),height:mm(120)},largerOuter={width:mm(172),height:mm(128)};
  const resized=replacedMiFiToImageSize({w:previous.width,h:previous.height},previous,largerOuter,body,largerBody);
  near(resized.w*largerBody.width/largerOuter.width,mm(160));near(resized.h*largerBody.height/largerOuter.height,mm(120));
+});
+
+test('resending an unchanged 70 mm image corrects an old 122 mm placement without changing position or orientation',()=>{
+ const physical={width:mm(70),height:mm(70*36/399)},body={...physical},panel={x:25,y:30,w:mm(122),h:mm(122*36/399),rotation:90,flipX:true};
+ const before=structuredClone(panel),correction=miFiToSizeCorrection(panel,physical,body);assert.deepEqual(panel,before);
+ near(correction.w,mm(70));near(correction.h,physical.height);assert.equal(miFiToSizeCorrection({...panel,...correction},physical,body),null);
+ assert.equal(miFiToSizeCorrection(panel,physical,null),null);
 });
 
 test('first explicit MiFiTo size replaces legacy fit; missing or invalid next intent preserves placement',()=>{
