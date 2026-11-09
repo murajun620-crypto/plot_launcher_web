@@ -43,7 +43,7 @@ import {deleteFigures,duplicateFigures} from './figure-commands.mjs?v=nested-gro
 import {ProjectFileSession,projectFilePickerOptions} from './project-file.mjs?v=project-switch-v051-1';
 import {installWorkspacePersistence} from './workspace-session.mjs?v=workspace-update-v0715-2';
 import {decodeWorkspaceState} from './workspace-state.mjs?v=project-switch-v051-1';
-import {validateWorkspaceBinding} from './integration/bridge-host.mjs?v=force-switch-v072-1';
+import {validateWorkspaceBinding} from './integration/bridge-host.mjs?v=source-save-v0717-1';
 
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 setupSourceDiscovery();

@@ -53,6 +53,10 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
   message.style.cssText='flex-basis:100%;max-width:420px;white-space:normal;overflow-wrap:anywhere;';
   function setMessage(text){message.textContent=text;message.hidden=!text;}
   const actions=createStudioSendActions({documentRef,batch:typeof captureBatchResult==='function'}),{button,addButton}=actions;
+  // The detached sender remains mounted (hidden) while this bridge is active.
+  // Keep both sets addressable for workspace capture and deferred restoration.
+  actions.select.id='figure-studio-bridge-send-scope';
+  button.id='figure-studio-bridge-send';addButton.id='figure-studio-bridge-add';
   const setDisabled=value=>actions.setDisabled(value);setDisabled(true);
   const discard=documentRef.createElement('button');discard.type='button';discard.textContent='未反映の編集を取り消す';discard.hidden=true;
   discard.style.cssText='white-space:nowrap;border:1px solid #c6d3cf;border-radius:7px;padding:8px 12px;background:#fff;color:#526661;font:12px system-ui;cursor:pointer;';
