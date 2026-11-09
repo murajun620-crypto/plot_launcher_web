@@ -1,5 +1,5 @@
-import { restoreSettings } from "./state.js?v=c520375efe6d";
-import { validateTableEdits } from './table-edits.mjs?v=c520375efe6d';
+import { restoreSettings } from "./state.js?v=ec0a315f3448";
+import { validateTableEdits } from './table-edits.mjs?v=ec0a315f3448';
 // All user data stays in this worker's in-memory filesystem.
 const PYODIDE_VERSION = "0.29.3";
 const INDEX_URL = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
@@ -23,7 +23,7 @@ async function initialize() {
   await pyodide.runPythonAsync("import micropip\nawait micropip.install(['openpyxl==3.1.5', 'xlrd==2.0.2'])");
   progress("日本語フォントと描画設定を読み込んでいます…");
   const files = await Promise.all([
-    fetchAsset("./python/engine.py?v=c520375efe6d"), fetchAsset("./python/plot_utils.py"),
+    fetchAsset("./python/engine.py?v=ec0a315f3448"), fetchAsset("./python/plot_utils.py"),
     fetchAsset("./python/generic_xy_base.py"), fetchAsset("./assets/fonts/NotoSansJP.ttf", true),
     ...["Regular", "Bold", "Italic", "BoldItalic"].map(style => fetchAsset(`./assets/fonts/LiberationSans-${style}.ttf`, true)),
     fetchAsset("./python/annotation_model.py?v=61d158587773"), fetchAsset("./python/annotation_manager.py?v=61d158587773"),

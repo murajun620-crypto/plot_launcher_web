@@ -1433,16 +1433,18 @@ class PlotEngine:
             font_size = number(item.get("legendFontSize" if mapped else "fontSize", ""), "凡例項目のフォントサイズ", minimum=2, maximum=72, optional=True)
             entry_color_mode = item.get("legendTextColorMode" if mapped else "textColorMode", "inherit")
             entry_color = item.get("legendTextColor" if mapped else "textColor", "#000000")
+            zorder = number(item.get('legendZOrder' if mapped else 'zorder', 5), '凡例の重なり順', minimum=-1000000, maximum=1000000)
             validate_color(entry_color_mode, entry_color, True)
             effective_style = style if mode == "together" or entry_style == "auto" else entry_style
             if visible:
                 rows.append({"id": f"legend-item-{series_index if mapped else index}", "seriesIndex": series_index, "key": key,
                              "label": text.get_text(), "handle": handle, "text": text, "style": effective_style, "fontSize": font_size, "position": None if x is None else (x, y),
-                             "textColor": text_color(handle, effective_style, entry_color_mode if mode=="individual" else "inherit", entry_color)})
+                             "zorder": zorder, "textColor": text_color(handle, effective_style, entry_color_mode if mode=="individual" else "inherit", entry_color)})
         if not rows:
             legend.remove()
             return None, []
         if style == "symbols" and mode == "together" and len(rows) == len(texts):
+            legend.set_zorder(number(settings.get('legendZOrder', 5), '凡例の重なり順', minimum=-1000000, maximum=1000000))
             for row in rows:
                 row["text"].set_color(row["textColor"])
             return legend, [{"artist": legend}]
@@ -1462,6 +1464,7 @@ class PlotEngine:
             for handle in grouped.legend_handles:
                 handle.set_visible(False)
         if mode == "together":
+            grouped.set_zorder(number(settings.get('legendZOrder', 5), '凡例の重なり順', minimum=-1000000, maximum=1000000))
             return grouped, [{"artist": grouped}]
         # Start separate entries at the grouped layout, then retain each
         # manually positioned center in axes coordinates on later renders.
@@ -1483,6 +1486,7 @@ class PlotEngine:
             single = Legend(parent, [row["handle"]], [row["label"]], **entry_kwargs,
                             loc="center", bbox_to_anchor=row["anchor"], bbox_transform=parent.transAxes)
             single.get_texts()[0].set_color(row["textColor"])
+            single.set_zorder(row['zorder'])
             if row["style"] == "text":
                 for handle in single.legend_handles:
                     handle.set_visible(False)
@@ -1728,6 +1732,13 @@ class PlotEngine:
                         else:
                             axis.set_label_coords(*position)
                 legend, legend_records = self._web_legends(figure, legend, config, diagnostics, preset)
+                # Share the annotation drawing layer so ordering also works with
+                # two Y axes and the 2D annotation overlay of Raman 3D.
+                for record in legend_records:
+                    artist = record['artist']
+                    if artist.axes is not annotation_axes:
+                        artist.remove()
+                        annotation_axes.add_artist(artist)
                 annotations = config.get("annotations", [])
                 if not isinstance(annotations, list) or len(annotations) > 200:
                     raise ValueError("注釈は200個以内にしてください。")

@@ -1,21 +1,22 @@
-import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=c520375efe6d';
-import {setupDirectSendButton} from './direct-transfer.mjs?v=c520375efe6d';
-import {identifyPlotProject,plotSheetIndex,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=c520375efe6d';
+import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=ec0a315f3448';
+import {setupDirectSendButton} from './direct-transfer.mjs?v=ec0a315f3448';
+import {identifyPlotProject,plotSheetIndex,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=ec0a315f3448';
 import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=9127ec4c4f31";
 import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=9127ec4c4f31";
 import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9127ec4c4f31";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=c520375efe6d";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=c520375efe6d";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=c520375efe6d";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=ec0a315f3448";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=ec0a315f3448";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=ec0a315f3448";
 
-import {createDataEditor} from './data-editor.mjs?v=c520375efe6d';
-import {validateTableEdits} from './table-edits.mjs?v=c520375efe6d';
+import {alignmentOffsets} from './object-layout.mjs?v=ec0a315f3448';
+import {createDataEditor} from './data-editor.mjs?v=ec0a315f3448';
+import {validateTableEdits} from './table-edits.mjs?v=ec0a315f3448';
 import {createAnnotationTextEditor} from './annotation-editor.mjs?v=61d158587773';
 import {createShortcutHandler} from './shortcuts.mjs?v=61d158587773';
 import {formatText,TEXT_FORMAT_ACTIONS} from './text-format.mjs?v=61d158587773';
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
-const APP_BUILD = 'c520375efe6d';
+const APP_BUILD = 'ec0a315f3448';
 function makeProject(settings,data,fonts,workspace={}){
   const live=sourceData&&data.filename===sourceData.filename&&(data.bytes===sourceData.bytes||data.files&&data.files===sourceData.files);
   const projectId=workspace.figureStudioProjectId||data.figureStudioProjectId||(live?(sourceData.figureStudioProjectId||=crypto.randomUUID()):crypto.randomUUID());
@@ -364,6 +365,9 @@ function updateButtons() {
   $$('#element-editor-fields [data-restore-legend-items]').forEach(button=>button.hidden=!hasHiddenLegendItems());
   $('#restore-legend-items').disabled=busy || !metadata;
   $('#edit-all-series').disabled = !engineReady || busy || !config.series.length || renderedRevision !== revision || renderRunning;
+  $('#normalize-all-series').hidden=$('#edit-all-series').hidden;
+  $('#normalize-all-series').disabled=!engineReady||busy||!metadata||!config.series.length;
+  syncObjectLayout();
   $('#series-table-panel').hidden = !metadata || !config.series.length;
   for(const id of ['color-map','colormap-target','colormap-start','colormap-end','apply-colormap','reset-colormap-range'])$('#'+id).disabled=!engineReady || busy || !metadata || !config.series.length || colormapApplying;
   $$('#series-table-body input,#series-table-body select').forEach(input=>input.disabled=!engineReady || busy);
@@ -398,7 +402,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=c520375efe6d", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=ec0a315f3448", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -1015,6 +1019,7 @@ function drawAnnotations() {
   });
   syncOpacityControls();
   enhanceColorInputs();
+  syncObjectLayout();
 }
 
 function drawMetadata() {
@@ -1503,6 +1508,76 @@ function legendEntryState(entry) {
   config.options ||= {};config.options.legendEntries ||= {};
   return config.options.legendEntries[entry.key] ||= {};
 }
+function plotObjects() {
+  const geometry=figureResult?.geometry;
+  if(!geometry)return [];
+  const annotations=(geometry.annotations||[]).flatMap(entry=>{
+    const item=config.annotations?.find(item=>item.id===entry.id);
+    return item&&item.visible!==false?[{...entry,kind:'annotation',item,label:item.text || ({arrow:'矢印',segment:'線'})[item.type] || '注釈',locked:!!item.locked}]:[];
+  });
+  const legends=!config.axes.legend?[]:geometry.legend?[{id:'legend',kind:'legend',label:'凡例（一括）',box:geometry.legend,svgIds:geometry.legendSvgIds}]:
+    (geometry.legendItems||[]).map(entry=>({...entry,kind:'legend'}));
+  return [...legends,...annotations];
+}
+function objectZOrder(entry) {
+  if(entry.kind==='annotation')return Number(entry.item.zorder??20);
+  if(entry.id==='legend')return Number(config.axes.legendZOrder??5);
+  return Number(entry.seriesIndex!=null?config.series[entry.seriesIndex]?.legendZOrder??5:config.options?.legendEntries?.[entry.key]?.zorder??5);
+}
+function objectState(entry) {return entry.kind==='annotation'?entry.item:entry.id==='legend'?config.axes:legendEntryState(entry);}
+function movePlotObjects(offsets,objects=plotObjects()) {
+  const [ax,ay,aw,ah]=figureResult.geometry.axes;
+  const changes=offsets.map(({id,dx,dy})=>{
+    const entry=objects.find(item=>item.id===id);if(!entry||entry.locked)return null;
+    const values={};
+    if(entry.kind==='legend'){
+      const [x,y,w,h]=entry.box,series=entry.id==='legend'||entry.seriesIndex!=null;
+      values[series?'legendX':'x']=Math.max(-10,Math.min(10,(x+w/2+dx-ax)/aw));
+      values[series?'legendY':'y']=Math.max(-10,Math.min(10,1-(y+h/2+dy-ay)/ah));
+    }else{
+      const item=entry.item;
+      for(const key of item.type==='text'?['x','y']:['x1','y1','x2','y2']){
+        const axis=key[0],delta=axis==='x'?dx/aw:-dy/ah;
+        values[key]=shiftCoordinate(item[key],delta,figureResult[axis+'Range'],axis==='y'?figureResult.yDataScale||config.axes.yScale:config.axes.xScale,item.coordinate_system);
+      }
+    }
+    if(!Object.values(values).every(Number.isFinite))throw Error('移動後の座標を計算できません。軸の範囲を確認してください。');
+    return {entry,values};
+  }).filter(Boolean);
+  for(const {entry,values}of changes)Object.assign(objectState(entry),values);
+}
+function syncObjectLayout() {
+  const objects=plotObjects(),items=objects.filter(item=>selected.has(item.id)&&!item.locked);
+  const busy=!engineReady||loading||exporting||renderRunning||renderedRevision!==revision||!!dragging;
+  $$('[data-layout-count]').forEach(node=>node.textContent=`選択中：凡例 ${items.filter(item=>item.kind==='legend').length} 個・注釈 ${items.filter(item=>item.kind==='annotation').length} 個`);
+  $$('[data-align]').forEach(button=>button.disabled=busy||items.length<(button.dataset.align.startsWith('distribute_')?3:2));
+  $$('[data-layer]').forEach(button=>button.disabled=busy||!items.length);
+  $$('[data-open-layout]').forEach(button=>button.disabled=busy||!objects.length);
+  if($('#object-layout-dialog').open){
+    const targetList=$('#object-layout-targets'),signature=JSON.stringify(objects.map(item=>[item.id,item.label,item.locked]));
+    if(targetList.dataset.signature!==signature){targetList.innerHTML=objects.map(item=>`<label><input type="checkbox" data-layout-select="${escapeHTML(item.id)}"><span>${item.kind==='legend'?'凡例':'注釈'}：${escapeHTML(item.label)}${item.locked?'（位置固定）':''}</span></label>`).join('');targetList.dataset.signature=signature;}
+    for(const input of targetList.querySelectorAll('[data-layout-select]')){input.checked=selected.has(input.dataset.layoutSelect);input.disabled=busy||!!objects.find(item=>item.id===input.dataset.layoutSelect)?.locked;}
+    $$('[data-select-legends],[data-clear-layout-selection]').forEach(button=>button.disabled=busy);
+  }
+}
+function openObjectLayout() {
+  if(loading||exporting||renderRunning||renderedRevision!==revision||!plotObjects().length)return;
+  if($('#element-editor').open)$('#element-editor').close();
+  if(!selected.size)$('#object-layout-selection').open=true;
+  showDialog('#object-layout-dialog');syncObjectLayout();
+}
+$('#object-layout-buttons').innerHTML='<div class="object-align-actions">'+$$('#annotation-layout-buttons [data-align]').map(node=>node.outerHTML).join('')+'</div><div class="object-layer-actions">'+$$('#annotation-layout-buttons [data-layer]').map(node=>node.outerHTML).join('')+'</div>';
+$('#close-object-layout').addEventListener('click',()=>$('#object-layout-dialog').close());
+$('#object-layout-targets').addEventListener('change',event=>{
+  const input=event.target.closest('[data-layout-select]');if(!input)return;
+  if(input.checked)selected.add(input.dataset.layoutSelect);else selected.delete(input.dataset.layoutSelect);
+  drawAnnotations();syncInteractionSelection();syncObjectLayout();
+});
+document.addEventListener('click',event=>{
+  if(event.target.closest('[data-open-layout]'))openObjectLayout();
+  if(event.target.closest('[data-select-legends]')){selected=new Set(plotObjects().filter(item=>item.kind==='legend').map(item=>item.id));drawAnnotations();syncInteractionSelection();syncObjectLayout();}
+  if(event.target.closest('[data-clear-layout-selection]')){selected.clear();drawAnnotations();syncInteractionSelection();syncObjectLayout();}
+});
 function hasHiddenLegendItems() {
   return config.series.some(item=>item.legendVisible===false) || Object.values(config.options?.legendEntries || {}).some(item=>item.visible===false);
 }
@@ -2646,7 +2721,7 @@ function annotationCommand(action,payload){
  if(action==='front'||action==='back')return $(`[data-layer="${action}"]`).click();
  if(action.startsWith('align-')||action.startsWith('distribute-')){const key=action.startsWith('align-')?({center:'center_h',middle:'center_v'})[action.slice(6)]||action.slice(6):action.endsWith('h')?'distribute_h':'distribute_v';return $(`[data-align="${key}"]`).click();}
  if(action==='cycle-selection'){const list=(config.annotations||[]).filter(a=>a.visible),index=list.findIndex(a=>selected.has(a.id));if(list.length)selectAnnotation(list[(index+payload.direction+list.length)%list.length].id);return;}
- if(action==='nudge'){if(!figureResult||![config.axes.width,config.axes.height].every(value=>Number.isFinite(Number(value))&&Number(value)>0))return;for(const item of config.annotations||[])if(selected.has(item.id)&&!item.locked)for(const key of item.type==='text'?['x','y']:['x1','y1','x2','y2']){const axis=key[0],delta=(axis==='x'?payload.dx:-payload.dy)/(Number(config.axes[axis==='x'?'width':'height'])/2.54*72);item[key]=shiftCoordinate(item[key],delta,figureResult?.[`${axis}Range`]||[0,1],axis==='y'?figureResult?.yDataScale||config.axes.yScale:config.axes.xScale,item.coordinate_system);}drawAnnotations();changed(0);return;}
+ if(action==='nudge'){if(!figureResult||renderRunning||renderedRevision!==revision||![config.axes.width,config.axes.height].every(value=>Number.isFinite(Number(value))&&Number(value)>0))return;const objects=plotObjects().filter(item=>selected.has(item.id)&&!item.locked),[,,aw,ah]=figureResult.geometry.axes;movePlotObjects(objects.map(item=>({id:item.id,dx:payload.dx/(Number(config.axes.width)/2.54*72)*aw,dy:payload.dy/(Number(config.axes.height)/2.54*72)*ah})),objects);drawAnnotations();changed(0);return;}
  if(action==='copy-format'){const item=config.annotations?.find(a=>selected.has(a.id)&&a.type==='text');if(item)plotFormatClipboard=plotTextValue(item);return;}
  if(action==='paste-format'&&plotFormatClipboard){for(const item of config.annotations||[])if(selected.has(item.id)&&item.type==='text'&&!item.locked)plotTextPatch(item,{...plotFormatClipboard,text:item.text});drawAnnotations();changed();}
 }
@@ -2673,9 +2748,9 @@ $("#annotation-list").addEventListener("click", event => {
 });
 
 
-function openElementEditor(part,index=0) {
+function openElementEditor(part,index=0,{allowUnrendered=false}={}) {
   const switchingSeries=$('#element-editor').open && ['series','seriesAll'].includes(part);
-  if(!metadata || loading || exporting || (renderRunning || renderedRevision!==revision) && !switchingSeries&&!figureWorkspaceRestoring&&part!=='annotation')return;
+  if(!metadata || loading || exporting || (renderRunning || renderedRevision!==revision) && !allowUnrendered&&!switchingSeries&&!figureWorkspaceRestoring&&part!=='annotation')return;
   const fields=$('#element-editor-fields');fields.dataset.workspacePart=part;fields.dataset.workspaceIndex=String(index);let sources=[],title='';
   if(part==='seriesAll') {
     if(!editableXY(config.plotType) || !config.series[index])return;
@@ -2691,10 +2766,10 @@ function openElementEditor(part,index=0) {
     if(['XPS Fit','Particle Histogram'].includes(config.plotType))sources.push($('#preset-options'));
   } else if(part==='annotation') {
     const item=config.annotations?.[index];if(!item)return;
-    selected=new Set([item.id]);drawAnnotations();syncInteractionSelection();
+    if(!selected.has(item.id))selected=new Set([item.id]);drawAnnotations();syncInteractionSelection();
     title=({text:'テキスト',arrow:'矢印',segment:'線'})[item.type]+'の設定';
     sources=[$(`#annotation-list [data-annotation-index="${index}"]`)];
-  } else if(part==='legend'){const entry=legendEntry(index);title=entry?`「${entry.label}」の凡例の設定`:'凡例の設定';sources=[];}
+  } else if(part==='legend'){const entry=legendEntry(index),id=entry?.id||'legend';if(!selected.has(id))selected=new Set([id]);drawAnnotations();syncInteractionSelection();title=entry?`「${entry.label}」の凡例の設定`:'凡例の設定';sources=[];}
   else if(part==='preset'){title='グラフの設定';sources=[$('#preset-options')];}
   else if(part==='frame'){title='枠線・軸の位置';sources=[$('#frame-settings-content')];}
   else {
@@ -2734,10 +2809,11 @@ function openElementEditor(part,index=0) {
   if(part==='plotBackground')fields.innerHTML+=`<details class="settings-panel"><summary>グリッド線</summary>${gridControls()}</details>`;
   if(part==='grid')fields.innerHTML=gridControls();
   if(part==='trend')fields.innerHTML=`<div data-series-index="${index}">${fields.innerHTML}</div>`;
+  if(['legend','annotation'].includes(part))fields.innerHTML+='<details class="settings-panel"><summary>整列・重なり</summary><button type="button" class="button quiet" data-open-layout>整列・重なりを設定</button></details>';
   // Reuse the sidebar controls, restoring live values and color-picker handlers.
   fields.querySelectorAll('.color-control').forEach(wrapper=>{const input=wrapper.querySelector('input');if(input){input.hidden=false;delete input.dataset.paletteEnhanced;wrapper.replaceWith(input);}});
   fields.querySelectorAll('[id]').forEach(element=>element.removeAttribute('id'));
-  fields.querySelectorAll('button').forEach(element=>{if(element.dataset.resetTrend===undefined&&element.dataset.resetLegend===undefined&&element.dataset.resetSlope===undefined&&element.dataset.restoreLegendItems===undefined)element.remove();});
+  fields.querySelectorAll('button').forEach(element=>{if(element.dataset.resetTrend===undefined&&element.dataset.resetLegend===undefined&&element.dataset.resetSlope===undefined&&element.dataset.restoreLegendItems===undefined&&element.dataset.openLayout===undefined)element.remove();});
   // Position is edited by dragging; retain numeric coordinates in the sidebar only.
   fields.querySelectorAll('[data-axis="legendX"],[data-axis="legendY"],[data-series-field="trendX"],[data-series-field="trendY"],[data-annotation-field="x"],[data-annotation-field="y"],[data-annotation-field="x1"],[data-annotation-field="y1"],[data-annotation-field="x2"],[data-annotation-field="y2"],[data-annotation-field="coordinate_system"]').forEach(input=>input.closest('label')?.remove());
   fields.querySelectorAll('.annotation-card > summary').forEach(element=>element.remove());
@@ -2759,12 +2835,15 @@ function openElementEditor(part,index=0) {
     else if(input.tagName==='SELECT'){const option=new Option('混在','');option.disabled=true;input.add(option,0);input.value='';}
     else if(input.type!=='range'){input.value='';input.placeholder='混在';}
   });
+  if(part==='seriesAll')fields.querySelector('.series-processing summary')?.insertAdjacentHTML('afterend','<p class="processing-scope-note">変更した補正・規格化を全系列へ適用します。最大値・ピーク高さは、各系列から別々に計算します。</p>');
   showDialog('#element-editor');enhanceColorInputs();syncAxisAutomaticControls();syncUnitControls();syncOpacityControls();syncProcessingControls();syncLegendColorControls();
+  syncObjectLayout();
 }
 $('#element-editor-fields').addEventListener('focusin',event=>{if(event.target.matches('[data-annotation-field="text"]'))beginPlotAnnotationText(config.annotations?.[Number(event.target.closest('[data-annotation-index]')?.dataset.annotationIndex)]?.id);});
 $('#element-editor-fields').addEventListener('input',applyControlInput);
 for(const root of [$('#plot-form'),$('#element-editor-fields')])root.addEventListener('focusout',event=>{if(event.target.dataset.seriesField==='detrendSlope')syncProcessingControls();});
 $('#edit-all-series').addEventListener('click',()=>openElementEditor('seriesAll'));
+$('#normalize-all-series').addEventListener('click',()=>{openElementEditor('seriesAll',0,{allowUnrendered:true});const processing=$('#element-editor-fields .series-processing');if(processing){processing.open=true;processing.querySelector('[data-series-field="normalization"]')?.focus();}});
 $('#element-editor-fields').addEventListener('click',event=>{
   if(resetProcessingSlope(event))return;
   if(event.target.closest('[data-restore-legend-items]')){restoreLegendItems();return;}
@@ -2776,6 +2855,7 @@ $('#close-element-editor').addEventListener('click',()=>$('#element-editor').clo
 $('#element-editor').addEventListener('close',()=>{drawControls();positionInteractions();});
 
 function syncInteractionSelection(){
+  syncObjectLayout();
   // A stationary click must preserve its DOM target for the next dblclick.
   $$('#figure-interactions .figure-drag-target').forEach(target=>{
     const active=selected.has(target.dataset.dragId);
@@ -2834,9 +2914,9 @@ function positionInteractions() {
   const hitSize = 24;
   Object.assign(overlay.style, {left:'0',top:'0',width:'100%',height:'100%'});
   if(figureResult.geometry.series) dataInteractions(overlay,imageBox);
-  const targets = [...(figureResult.geometry.axisLabels || []), ...(figureResult.geometry.tickLabels || []), ...[...figureResult.geometry.annotations,...(figureResult.geometry.trendEquations || [])].sort((a,b)=>(a.seriesIndex!==undefined?30:config.annotations?.find(item=>item.id===a.id)?.zorder??20)-(b.seriesIndex!==undefined?30:config.annotations?.find(item=>item.id===b.id)?.zorder??20))];
-  if (config.axes.legend && figureResult.geometry.legend) targets.unshift({id:"legend",box:figureResult.geometry.legend});
-  if(config.axes.legend)targets.unshift(...(figureResult.geometry.legendItems || []).map(entry=>({id:entry.id,box:entry.box,legendItem:entry})));
+  const targets = [...(figureResult.geometry.axisLabels || []), ...(figureResult.geometry.tickLabels || []),
+    ...[...plotObjects().map(entry=>({...entry,...(entry.kind==='legend'&&entry.id!=='legend'?{legendItem:entry}:{}),objectZOrder:objectZOrder(entry)})),
+      ...(figureResult.geometry.trendEquations || []).map(entry=>({...entry,objectZOrder:30}))].sort((a,b)=>a.objectZOrder-b.objectZOrder)];
   for (const target of targets) {
     const item = config.annotations?.find(item => item.id === target.id);
     const [x,y,w,h]=target.box;
@@ -2857,7 +2937,7 @@ function positionInteractions() {
     button.classList.add("figure-drag-target");if(selected.has(target.id))button.classList.add('selected');
     if(target.kind !== 'ticks')button.dataset.dragId=target.id;
     if(target.axis) {button.dataset.editAxis = target.axis; button.dataset.axisKind = target.kind; if(target.kind === 'ticks')button.classList.add('axis-tick-target');}
-    if(target.seriesIndex!==undefined)button.dataset.trendIndex=String(target.seriesIndex);
+    if(target.seriesIndex!==undefined&&target.kind!=='legend')button.dataset.trendIndex=String(target.seriesIndex);
     button.title=target.legendItem?`凡例「${target.legendItem.label}」：ドラッグで移動・ダブルクリックで設定`:target.seriesIndex!==undefined ? `系列${target.seriesIndex+1}の近似式：ドラッグで移動・ダブルクリックで設定` : target.axis ? `${axisName(target.axis)}軸${target.kind === 'label' ? 'ラベル：ドラッグで移動・ダブルクリックで設定' : '目盛り：ダブルクリックで設定'}` : target.id==="legend"?"凡例：ドラッグで移動・ダブルクリックで設定":"注釈：ドラッグで移動・ダブルクリックで設定";
     button.setAttribute('aria-label',button.title);
     if(item || isLegendId(target.id))button.setAttribute('aria-pressed',String(selected.has(target.id)));
@@ -2901,8 +2981,7 @@ function prepareLivePreview(d) {
   }
   const g=figureResult.geometry;
   const entries=d.axis || d.trendIndex!==undefined ? [...(g.axisLabels || []),...(g.trendEquations || [])].filter(entry=>entry.id===d.id) :
-    d.id==='legend' ? [{id:'legend',svgIds:g.legendSvgIds}] : isLegendId(d.id) ? d.legendItems :
-    g.annotations.filter(entry=>(d.handle?[d.item]:d.items.map(row=>row.item)).some(item=>item.id===entry.id));
+    d.handle?g.annotations.filter(entry=>entry.id===d.item.id):d.objects;
   d.liveEntries=entries.map(entry=>({...entry,nodes:(entry.svgIds || []).map(id=>livePreview.svg.querySelector(`[id="${id}"]`)).filter(Boolean).map(node=>({node,original:node.getAttribute('transform') || ''}))}));
 }
 function annotationDragUpdates(d,event) {
@@ -2975,7 +3054,8 @@ $("#figure-interactions").addEventListener("pointerdown", event => {
   const imageBox=$("#figure-image").getBoundingClientRect();
   dragging={pointerId:event.pointerId,id,item,axis:target.dataset.editAxis,trendIndex:target.dataset.trendIndex,anchor:[...(figureResult.geometry.axisLabels || []),...(figureResult.geometry.trendEquations || [])].find(label=>label.id===id)?.anchor,start:item?structuredClone(item):null,items:(config.annotations||[]).filter(item=>selected.has(item.id)&&!item.locked).map(item=>({item,start:structuredClone(item)})),handle:target.dataset.handle,x:event.clientX,y:event.clientY,box:imageBox,axes:figureResult.geometry.axes,legend:figureResult.geometry.legend};
   dragging.legendItems=(figureResult.geometry.legendItems || []).filter(entry=>selected.has(entry.id));
-  const ids=dragging.axis || dragging.trendIndex!==undefined || id==='legend' ? [id] : isLegendId(id) ? dragging.legendItems.map(entry=>entry.id) : dragging.handle ? [id] : dragging.items.map(row=>row.item.id);
+  dragging.objects=plotObjects().filter(entry=>selected.has(entry.id)&&!entry.locked);
+  const ids=dragging.axis || dragging.trendIndex!==undefined || dragging.handle ? [id] : dragging.objects.map(entry=>entry.id);
   dragging.targets=$$('#figure-interactions [data-drag-id]').filter(node=>ids.includes(node.dataset.dragId) && (!dragging.handle || node===target));
   prepareLivePreview(dragging);
   target.setPointerCapture(event.pointerId); event.preventDefault();
@@ -3006,21 +3086,12 @@ function finishDrag(event) {
     config.axes[`${d.axis}LabelX`] = Math.max(-10,Math.min(10,d.anchor[0]+dx)).toFixed(4);
     config.axes[`${d.axis}LabelY`] = Math.max(-10,Math.min(10,d.anchor[1]+dy)).toFixed(4);
     for(const key of ['LabelX','LabelY'])$$(`[data-axis="${d.axis}${key}"]`).forEach(input=>input.value=config.axes[`${d.axis}${key}`]);
-  } else if(d.id==="legend") {
-    const [x,y,w,h]=d.legend;
-    config.axes.legendX=((x+w/2-ax)/aw+dx).toFixed(4);
-    config.axes.legendY=(1-(y+h/2-ay)/ah+dy).toFixed(4);
-    $$('[data-axis="legendX"],[data-axis="legendY"]').forEach(input=>input.value=config.axes[input.dataset.axis]);
-  } else if(isLegendId(d.id)) {
-    for(const entry of d.legendItems){
-      const [x,y,w,h]=entry.box,state=legendEntryState(entry),series=entry.seriesIndex!==null && entry.seriesIndex!==undefined;
-      state[series?'legendX':'x']=Math.max(-10,Math.min(10,(x+w/2-ax)/aw+dx)).toFixed(4);
-      state[series?'legendY':'y']=Math.max(-10,Math.min(10,1-(y+h/2-ay)/ah+dy)).toFixed(4);
-    }
-  } else {
+  } else if(d.handle) {
     for(const {item,value} of annotationDragUpdates(d,event))Object.assign(item,value);
-    drawAnnotations();
+  } else {
+    movePlotObjects(d.objects.map(entry=>({id:entry.id,dx:dx*aw,dy:-dy*ah})),d.objects);
   }
+  drawAnnotations();
   changed(0);
 }
 $("#figure-interactions").addEventListener("pointerup",finishDrag);
@@ -3061,14 +3132,22 @@ function setPanelLabelVisible(visible){
   drawAnnotations();changed(0);
 }
 for(const id of ['#panel-label','#preview-panel-label'])$(id).addEventListener('change',event=>setPanelLabelVisible(event.target.checked));
-$$('[data-align]').forEach(button=>button.addEventListener('click',async()=>{
-  if(selected.size<2 || loading || exporting)return;
-  loading=true;updateButtons();
-  try{const result=await request('align',{config:structuredClone(config),ids:[...selected],operation:button.dataset.align});config.annotations=result.annotations;drawAnnotations();changed();}
-  catch(error){status(error.message,'error');}
-  finally{loading=false;updateButtons();if(renderWanted)renderPreview();}
-}));
-$$('[data-layer]').forEach(button=>button.addEventListener('click',()=>{const items=config.annotations||[],top=Math.max(20,...items.map(item=>item.zorder||20)),bottom=Math.min(20,...items.map(item=>item.zorder||20));items.filter(item=>selected.has(item.id)&&!item.locked).forEach((item,i)=>item.zorder=button.dataset.layer==='front'?top+1+i:bottom-1-i);changed();}));
+document.addEventListener('click',event=>{
+  const button=event.target.closest('[data-align],[data-layer]');
+  if(!button||button.disabled||loading||exporting||renderRunning||renderedRevision!==revision)return;
+  const objects=plotObjects(),items=objects.filter(item=>selected.has(item.id)&&!item.locked);
+  if(!items.length)return;
+  try{
+    if(button.dataset.align){const offsets=alignmentOffsets(items,button.dataset.align);if(!offsets.length)return;movePlotObjects(offsets,objects);}
+    else{
+      const front=button.dataset.layer==='front',edge=front?Math.max(5,...objects.map(objectZOrder)):Math.min(5,...objects.map(objectZOrder));
+      const ordered=[...items].sort((a,b)=>objectZOrder(a)-objectZOrder(b));
+      if(Math.abs(edge)+ordered.length>1000000)throw Error('重なり順が設定範囲を超えています。');
+      ordered.forEach((item,index)=>{const state=objectState(item),key=item.kind==='annotation'||item.id!=='legend'&&item.seriesIndex==null?'zorder':'legendZOrder';state[key]=front?edge+index+1:edge-ordered.length+index;});
+    }
+    drawAnnotations();changed(0);
+  }catch(error){status(error.message,'error');}
+});
 function restoreHistory(redo=false){
   const source=redo?future:history,destination=redo?history:future;if(!source.length)return;
   destination.push(structuredClone(config));config=source.pop();restoring=true;selected.clear();drawControls();changed();restoring=false;
@@ -3105,7 +3184,7 @@ $("#figure-paper").addEventListener('pointermove',event=>{
 });
 $("#figure-paper").addEventListener('pointerup',event=>{
   if((panning && panning.pointerId !== event.pointerId))return;
-  if(panning?.select && figureResult){const box=$('#figure-image').getBoundingClientRect(),left=Math.min(event.clientX,panning.x),right=Math.max(event.clientX,panning.x),top=Math.min(event.clientY,panning.y),bottom=Math.max(event.clientY,panning.y);for(const item of figureResult.geometry.annotations){const [x,y,w,h]=item.box;if(box.left+x*box.width>=left && box.left+(x+w)*box.width<=right && box.top+y*box.height>=top && box.top+(y+h)*box.height<=bottom)selected.add(item.id);}drawAnnotations();positionInteractions();}
+  if(panning?.select && figureResult){const box=$('#figure-image').getBoundingClientRect(),left=Math.min(event.clientX,panning.x),right=Math.max(event.clientX,panning.x),top=Math.min(event.clientY,panning.y),bottom=Math.max(event.clientY,panning.y);for(const item of plotObjects()){const [x,y,w,h]=item.box;if(box.left+x*box.width>=left && box.left+(x+w)*box.width<=right && box.top+y*box.height>=top && box.top+(y+h)*box.height<=bottom)selected.add(item.id);}drawAnnotations();positionInteractions();}
   $('#selection-marquee')?.remove();panning=null;
 });
 $("#figure-paper").addEventListener('pointercancel',()=>{$('#selection-marquee')?.remove();panning=null;});
@@ -3170,7 +3249,7 @@ for(const name of ['pointerout','focusout'])$('#figure-interactions').addEventLi
 window.addEventListener('keydown',event=>{
   if(event.defaultPrevented||event.isComposing||event.keyCode===229||event.getModifierState?.('AltGraph'))return;
   if($('#figure-studio-switch-confirm')?.open)return;
-  if($('#color-panel').open || $('#axis-editor').open || $('#element-editor').open || $('#save-dialog').open || $('#paste-dialog').open || $('#data-import-dialog').open)return;
+  if($('#object-layout-dialog').open || $('#color-panel').open || $('#axis-editor').open || $('#element-editor').open || $('#save-dialog').open || $('#paste-dialog').open || $('#data-import-dialog').open)return;
   if(event.target.matches('input,textarea,select') || event.target.isContentEditable)return;
   if(!loading&&!exporting&&metadata&&(event.target===document.body||event.target.closest('#figure-paper,#annotation-list,[data-add-annotation]'))&&annotationShortcut(event))return;
   const control=event.ctrlKey||event.metaKey,key=event.key.toLowerCase();
@@ -3178,7 +3257,7 @@ window.addEventListener('keydown',event=>{
   else if(key==='escape'){selected.clear();drawAnnotations();positionInteractions();}
   else if(control&&key==='c'){if(selected.size){event.preventDefault();copyAnnotations();}}
   else if(control&&key==='x'){if(selected.size){event.preventDefault();copyAnnotations();deleteAnnotations();}}
-  else if(control&&key==='a'){event.preventDefault();selected=new Set((config.annotations||[]).filter(item=>item.visible).map(item=>item.id));drawAnnotations();positionInteractions();}
+  else if(control&&key==='a'){event.preventDefault();selected=new Set(plotObjects().map(item=>item.id));drawAnnotations();positionInteractions();}
   else if(control&&key==='v'){if(event.altKey){event.preventDefault();openPasteDialog();}else if(clipboard.length){event.preventDefault();pasteAnnotations();}}
   else if(control&&key==='z'){event.preventDefault();restoreHistory(event.shiftKey);}
   else if(control&&key==='y'){event.preventDefault();restoreHistory(true);}
@@ -3439,7 +3518,7 @@ async function restoreFigureWorkspace(snapshot){
   await figureBridgeWait(()=>!renderRunning&&!renderWanted);
   if(record.ui.axis&&metadata)openAxisEditor(record.ui.axis.axis,record.ui.axis.kind);
   if(record.ui.element&&metadata){const {part,index,origin}=record.ui.element;if(['series','seriesAll'].includes(part)&&/^\d+$/.test(origin||'')&&config.series[Number(origin)]&&origin!==index)openElementEditor('series',Number(origin));openElementEditor(part,part==='legend'?index:Number(index));$('#element-editor-fields').dataset.seriesEditorOrigin=origin||'';}
-  for(const saved of record.ui.dialogs){if(!figureWorkspaceDialogIds.has(saved.id))continue;const dialog=document.getElementById(saved.id);if(saved.id==='color-panel'&&record.ui.colorTarget){const target=figureWorkspaceField(record.ui.colorTarget);if(target)openColorPanel(target,'色');}else if(!dialog.open)dialog.showModal();if(saved.left&&saved.top)positionDialog(dialog,parseFloat(saved.left),parseFloat(saved.top));}
+  for(const saved of record.ui.dialogs){if(!figureWorkspaceDialogIds.has(saved.id))continue;const dialog=document.getElementById(saved.id);if(saved.id==='object-layout-dialog'){openObjectLayout();}else if(saved.id==='color-panel'&&record.ui.colorTarget){const target=figureWorkspaceField(record.ui.colorTarget);if(target)openColorPanel(target,'色');}else if(!dialog.open)dialog.showModal();if(saved.left&&saved.top)positionDialog(dialog,parseFloat(saved.left),parseFloat(saved.top));}
   const fieldIndex=new Map();for(const input of figureWorkspaceFields()){const key=figureWorkspaceLocatorKey(figureWorkspaceBaseLocator(input));if(!fieldIndex.has(key))fieldIndex.set(key,[]);fieldIndex.get(key).push(input);}
   for(const field of record.ui.fields){const input=fieldIndex.get(figureWorkspaceLocatorKey(field.locator))?.[field.locator.ordinal];if(!input)continue;input.value=field.value;if(input.type==='checkbox'||input.type==='radio'){input.checked=field.checked;input.indeterminate=field.indeterminate;}}
   for(const detail of record.ui.details){const root=detail.scope?document.getElementById(detail.scope):document;if(!root)continue;const node=[...root.querySelectorAll('details')].filter(item=>(item.closest('dialog')?.id||'')===detail.scope)[detail.index];if(node)node.open=detail.open;}

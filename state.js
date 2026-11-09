@@ -1,6 +1,6 @@
 import { resetPresetUnitScales, unitConversion, configureAFMUnits } from "./units.js?v=9127ec4c4f31";
-import { validateTableEdits } from './table-edits.mjs?v=c520375efe6d';
-export const APP_VERSION = '2.4.29';
+import { validateTableEdits } from './table-edits.mjs?v=ec0a315f3448';
+export const APP_VERSION = '2.4.30';
 
 // Accept one numeric value or fraction without evaluating JavaScript expressions.
 export function parseCoefficient(value) {
@@ -98,7 +98,7 @@ export function defaultAxes() {
     hideMinorTicks: false, hideXMinorTicks: false, hideYMinorTicks: false, hideY2MinorTicks: false,
     spineLeft: true, spineRight: true, spineTop: true, spineBottom: true,
     yAxisRight: false, xAxisTop: false, spineColor: "#000000",
-    legend: true, legendPosition: "best", legendX: "", legendY: "", legendScale: 1, legendFontScale: 1, legendStyle: "symbols", legendMode: "together", legendTextColorMode:'auto',legendTextColor:'#000000',
+    legend: true, legendPosition: "best", legendX: "", legendY: "", legendZOrder:5, legendScale: 1, legendFontScale: 1, legendStyle: "symbols", legendMode: "together", legendTextColorMode:'auto',legendTextColor:'#000000',
     transparent: true, backgroundColor: "#ffffff", backgroundAlpha: 1, grid: false,
     xGrid: false, yGrid: false, xMinorGrid: false, yMinorGrid: false,
     gridStyle: "-", gridWidth: .5, gridColor: "#808080", gridAlpha: .2,
@@ -109,7 +109,7 @@ export function defaultAxes() {
 }
 
 export function createSeries(x, y, name, index = 0, plotType = "General") {
-  return { x, y, name, yAxis: "left", visible: true, legendVisible:true, legendX:'', legendY:'', legendStyle:'auto',legendFontSize:'',legendTextColorMode:'inherit',legendTextColor:'#000000', color: plotType === "Polishing Rate" && index === 2 ? "#000000" : COLORS[index % COLORS.length], scatterColor: "auto", mode: ['Polishing Rate','Waviness'].includes(plotType) ? "line+scatter" : "line", lineWidth: 1, lineStyle: "-", lineAlpha: 1, marker: "o", markerSize: 18, markerEdgeColor: "auto", markerFaceColor: "auto", markerEdgeAlpha: 0.8, markerFaceAlpha: 0.8, xOffset: 0, yOffset: 0, error: "", errorMode: "auto", errorMin: "", errorMax: "", errorPlus: "", errorMinus: "", trendType: "none", trendOrigin: false, trendDegree: 2, trendEquation: true, trendColor: "auto", trendStyle: "--", trendWidth: 1, trendFontSize: 6, trendDigits: 4, trendX: "", trendY: "", xFactor:1, yFactor:1, detrend:false, detrendMin:'', detrendMax:'', detrendSlope:'', density:false, currentUnit:'A', area:1, areaUnit:'cm2', normalization:'none', referenceMode:'max', referencePoint:1, referenceMin:'', referenceMax:'', referenceValue:1 };
+  return { x, y, name, yAxis: "left", visible: true, legendVisible:true, legendX:'', legendY:'', legendZOrder:5, legendStyle:'auto',legendFontSize:'',legendTextColorMode:'inherit',legendTextColor:'#000000', color: plotType === "Polishing Rate" && index === 2 ? "#000000" : COLORS[index % COLORS.length], scatterColor: "auto", mode: ['Polishing Rate','Waviness'].includes(plotType) ? "line+scatter" : "line", lineWidth: 1, lineStyle: "-", lineAlpha: 1, marker: "o", markerSize: 18, markerEdgeColor: "auto", markerFaceColor: "auto", markerEdgeAlpha: 0.8, markerFaceAlpha: 0.8, xOffset: 0, yOffset: 0, error: "", errorMode: "auto", errorMin: "", errorMax: "", errorPlus: "", errorMinus: "", trendType: "none", trendOrigin: false, trendDegree: 2, trendEquation: true, trendColor: "auto", trendStyle: "--", trendWidth: 1, trendFontSize: 6, trendDigits: 4, trendX: "", trendY: "", xFactor:1, yFactor:1, detrend:false, detrendMin:'', detrendMax:'', detrendSlope:'', density:false, currentUnit:'A', area:1, areaUnit:'cm2', normalization:'none', referenceMode:'max', referencePoint:1, referenceMin:'', referenceMax:'', referenceValue:1 };
 }
 
 export function initialSeries(columns, plotType = 'General') {
@@ -238,6 +238,7 @@ export function restoreSettings(document, metadata) {
     }
   }
   if(!['symbols','text'].includes(axes.legendStyle) || !['together','individual'].includes(axes.legendMode))throw new Error('凡例の表示方法を確認してください。');
+  if(!Number.isFinite(Number(axes.legendZOrder)) || Math.abs(Number(axes.legendZOrder))>1000000)throw Error('凡例の重なり順を確認してください。');
   const validLegendColor=(mode,color,individual=false)=>[...(individual?['inherit']:[]),'auto','black','series','custom'].includes(mode) && typeof color==='string' && /^#[\da-f]{6}$/i.test(color);
   if(!validLegendColor(axes.legendTextColorMode,axes.legendTextColor))throw new Error('凡例の文字色を確認してください。');
   for(const prefix of ['grid','minorGrid']){
@@ -283,6 +284,7 @@ export function restoreSettings(document, metadata) {
     if((result.legendX==='')!==(result.legendY==='') || [result.legendX,result.legendY].some(value=>value!=='' && (!Number.isFinite(Number(value)) || Math.abs(Number(value))>10)))throw new Error('系列ごとの凡例位置を確認してください。');
     if(!['auto','symbols','text'].includes(result.legendStyle) || result.legendFontSize!=='' && (!Number.isFinite(Number(result.legendFontSize)) || Number(result.legendFontSize)<2 || Number(result.legendFontSize)>72))throw new Error('系列ごとの凡例表示を確認してください。');
     if(!validLegendColor(result.legendTextColorMode,result.legendTextColor,true))throw new Error('系列ごとの凡例文字色を確認してください。');
+    if(!Number.isFinite(Number(result.legendZOrder)) || Math.abs(Number(result.legendZOrder))>1000000)throw Error('系列ごとの凡例の重なり順を確認してください。');
     return result;
   });
   const plotType = document.plotType || "General";
@@ -296,8 +298,9 @@ export function restoreSettings(document, metadata) {
     const entries=restored.options.legendEntries;
     if(!entries || Array.isArray(entries) || typeof entries!=='object' || Object.keys(entries).length>200)throw new Error('凡例項目の設定を確認してください。');
     for(const [key,item] of Object.entries(entries)){
-      if(key.length>200 || !item || Array.isArray(item) || typeof item!=='object' || Object.keys(item).some(key=>!['x','y','visible','style','fontSize','textColorMode','textColor'].includes(key)) || item.visible!==undefined && typeof item.visible!=='boolean' || item.style!==undefined && !['auto','symbols','text'].includes(item.style) || item.fontSize!==undefined && item.fontSize!=='' && (!['string','number'].includes(typeof item.fontSize) || !Number.isFinite(Number(item.fontSize)) || Number(item.fontSize)<2 || Number(item.fontSize)>72) || !validLegendColor(item.textColorMode ?? 'inherit',item.textColor ?? '#000000',true))throw new Error('凡例項目の設定を確認してください。');
+      if(key.length>200 || !item || Array.isArray(item) || typeof item!=='object' || Object.keys(item).some(key=>!['x','y','visible','style','fontSize','textColorMode','textColor','zorder'].includes(key)) || item.visible!==undefined && typeof item.visible!=='boolean' || item.style!==undefined && !['auto','symbols','text'].includes(item.style) || item.fontSize!==undefined && item.fontSize!=='' && (!['string','number'].includes(typeof item.fontSize) || !Number.isFinite(Number(item.fontSize)) || Number(item.fontSize)<2 || Number(item.fontSize)>72) || !validLegendColor(item.textColorMode ?? 'inherit',item.textColor ?? '#000000',true))throw new Error('凡例項目の設定を確認してください。');
       const coords=[item.x ?? '',item.y ?? ''];if((coords[0]==='')!==(coords[1]==='') || coords.some(value=>value!=='' && (!['string','number'].includes(typeof value) || !Number.isFinite(Number(value)) || Math.abs(Number(value))>10)))throw new Error('凡例項目の位置を確認してください。');
+      if(item.zorder!==undefined && (!['string','number'].includes(typeof item.zorder) || !Number.isFinite(Number(item.zorder)) || Math.abs(Number(item.zorder))>1000000))throw Error('凡例項目の重なり順を確認してください。');
     }
   }
   if(restored.options.processingAxes!==undefined){

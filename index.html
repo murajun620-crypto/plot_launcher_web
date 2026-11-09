@@ -6,8 +6,8 @@
   <meta name="description" content="Excel・CSV・TXTの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=c520375efe6d">
-  <script type="module" src="./app.js?v=c520375efe6d"></script>
+  <link rel="stylesheet" href="./style.css?v=ec0a315f3448">
+  <script type="module" src="./app.js?v=ec0a315f3448"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -76,7 +76,7 @@
         <fieldset id="plot-fields" disabled>
           <details class="control-section" open>
             <summary class="section-heading"><h2><span class="step">02</span>系列</h2><span id="series-count" class="section-note">0 系列</span></summary>
-            <div class="series-manager-actions"><button id="edit-all-series" class="button quiet" type="button" disabled title="線・点の見た目やデータ補正を全系列へまとめて設定します。データ列・名前・系列色は保持します。">全系列の設定</button></div>
+            <div class="series-manager-actions"><button id="edit-all-series" class="button quiet" type="button" disabled title="線・点の見た目やデータ補正を全系列へまとめて設定します。データ列・名前・系列色は保持します。">全系列の設定</button><button id="normalize-all-series" class="button quiet" type="button" disabled title="規格化の方法を全系列へまとめて適用します。最大値・ピーク高さは系列ごとに計算します。">全系列を規格化</button></div>
             <div id="series-list" class="series-list"><p class="empty-series">ファイルを読み込むと、X列・Y列を選べます。</p></div>
             <button id="add-series" class="button add-series" type="button"><svg><use href="#i-plus"/></svg>系列を追加</button>
             <details id="series-colormap" class="settings-panel"><summary>まとめて配色</summary><div class="field-grid"><label>連続配色<select id="color-map"><option value="viridis">Viridis</option><option value="plasma">Plasma</option><option value="spectrum">Spectrum</option></select></label><label>適用先<select id="colormap-target"><option value="both">線とマーカー</option><option value="line">線</option><option value="scatter">マーカー</option></select></label></div><div class="colormap-range-settings"><span id="colormap-range-title">使用する色の範囲</span><div class="colormap-range" role="group" aria-labelledby="colormap-range-title" title="2つのつまみを動かして範囲を指定します。矢印キーで1％ずつ調整できます。">
@@ -145,7 +145,7 @@
             </div>
             <div class="annotation-buttons"><button type="button" class="button add-annotation" data-add-annotation="text"><svg><use href="#i-plus"/></svg>テキストを追加</button><button type="button" class="button add-annotation" data-add-annotation="segment"><svg><use href="#i-plus"/></svg>線を追加</button><button type="button" class="button add-annotation" data-add-annotation="arrow"><svg><use href="#i-plus"/></svg>矢印を追加</button></div>
             <div id="annotation-list"></div>
-            <div class="annotation-buttons"><label class="panel-label-toggle" title="オフにしても文字・位置・サイズを保持します。"><input type="checkbox" id="panel-label">パネルラベルを表示</label><button type="button" class="button quiet" id="copy-annotation">複製</button><button type="button" class="button quiet" id="delete-annotation">選択を削除</button></div><details><summary>注釈の整列・重なり</summary><div class="annotation-buttons"><button type="button" class="button quiet" data-align="left">左揃え</button><button type="button" class="button quiet" data-align="center_h">左右中央</button><button type="button" class="button quiet" data-align="right">右揃え</button><button type="button" class="button quiet" data-align="top">上揃え</button><button type="button" class="button quiet" data-align="center_v">上下中央</button><button type="button" class="button quiet" data-align="bottom">下揃え</button><button type="button" class="button quiet" data-align="distribute_h">左右均等</button><button type="button" class="button quiet" data-align="distribute_v">上下均等</button><button type="button" class="button quiet" data-layer="front">最前面</button><button type="button" class="button quiet" data-layer="back">最背面</button></div></details><p class="field-hint">図または一覧で選択。Shiftで複数選択。Deleteで削除、Ctrl+C / Vでコピー。線の端点は丸いハンドルで移動できます。</p>
+            <div class="annotation-buttons"><label class="panel-label-toggle" title="オフにしても文字・位置・サイズを保持します。"><input type="checkbox" id="panel-label">パネルラベルを表示</label><button type="button" class="button quiet" id="copy-annotation">複製</button><button type="button" class="button quiet" id="delete-annotation">選択を削除</button></div><details><summary>凡例・注釈の整列・重なり</summary><p data-layout-count class="object-layout-count"></p><div id="annotation-layout-buttons" class="annotation-buttons"><button type="button" class="button quiet" data-align="left">左揃え</button><button type="button" class="button quiet" data-align="center_h">左右中央</button><button type="button" class="button quiet" data-align="right">右揃え</button><button type="button" class="button quiet" data-align="top">上揃え</button><button type="button" class="button quiet" data-align="center_v">上下中央</button><button type="button" class="button quiet" data-align="bottom">下揃え</button><button type="button" class="button quiet" data-align="distribute_h">左右均等</button><button type="button" class="button quiet" data-align="distribute_v">上下均等</button><button type="button" class="button quiet" data-layer="front">最前面</button><button type="button" class="button quiet" data-layer="back">最背面</button></div></details><p class="field-hint">図または一覧で選択。Shiftで複数選択。Deleteで削除、Ctrl+C / Vでコピー。線の端点は丸いハンドルで移動できます。</p>
           </details>
         </fieldset>
       </form>
@@ -173,7 +173,7 @@
       <div class="figure-options"><span id="preview-state" class="preview-state">準備中</span><span class="toolbar-divider"></span><span id="figure-size">軸領域 4 × 3 cm</span><div class="save-options"><label title="PNG保存と画像コピーに共通で使用します">解像度<select id="png-dpi" aria-label="保存とコピーの解像度"><option value="150">150 dpi</option><option value="300">300 dpi</option><option value="600">600 dpi</option><option value="1200" selected>1200 dpi</option></select></label></div></div>
       <section id="unit-suggestion" class="unit-suggestion" role="status" aria-live="polite" hidden><span id="unit-suggestion-text"></span><div><button id="apply-unit-suggestion" type="button" class="button primary">はい</button><button id="dismiss-unit-suggestion" type="button" class="button">いいえ</button></div></section>
       <div id="figure-stage" class="figure-stage" aria-busy="true">
-        <div class="preview-tools" title="Ctrl/Cmd＋ホイールで拡大・縮小。余白をドラッグで移動します。"><button type="button" class="button quiet" id="undo">元に戻す</button><button type="button" class="button quiet" id="redo">やり直す</button><button type="button" class="button quiet" id="zoom-out" aria-label="プレビューを縮小">−</button><output id="zoom-level">100%</output><button type="button" class="button quiet" id="zoom-in" aria-label="プレビューを拡大">＋</button><button type="button" class="button quiet" id="zoom-reset">画面に合わせる</button><label class="panel-label-toggle" title="パネルラベルの表示を切り替えます。文字や位置はラベルをダブルクリックして設定できます。"><input type="checkbox" disabled id="preview-panel-label">パネルラベルを表示</label></div>
+        <div class="preview-tools" title="Ctrl/Cmd＋ホイールで拡大・縮小。余白をドラッグで移動します。"><button type="button" class="button quiet" id="undo">元に戻す</button><button type="button" class="button quiet" id="redo">やり直す</button><button type="button" class="button quiet" id="zoom-out" aria-label="プレビューを縮小">−</button><output id="zoom-level">100%</output><button type="button" class="button quiet" id="zoom-in" aria-label="プレビューを拡大">＋</button><button type="button" class="button quiet" id="zoom-reset">画面に合わせる</button><button type="button" class="button quiet" id="open-object-layout" data-open-layout disabled title="凡例・注釈の整列、均等配置、重なり順を設定します。">整列・重なり</button><label class="panel-label-toggle" title="パネルラベルの表示を切り替えます。文字や位置はラベルをダブルクリックして設定できます。"><input type="checkbox" disabled id="preview-panel-label">パネルラベルを表示</label></div>
         <div class="paper" id="figure-paper" title="枠外をダブルクリックすると図全体の背景色を設定できます。Ctrl／⌘＋ホイールで拡大・縮小。">
           <div id="figure-content">
           <img id="figure-image" alt="作成したグラフのプレビュー" hidden>
@@ -223,6 +223,13 @@
       <button id="data-import-add" type="button" class="button"><strong>現在のプロジェクトに追加</strong><span>現在のグラフ設定を保ち、系列を追加します。</span></button>
       <p id="data-import-unavailable" class="data-import-warning" hidden>追加するには、先に「一般」などのXYグラフに切り替えてください。</p>
     </div>
+  </dialog>
+  <dialog id="object-layout-dialog" class="plot-dialog object-layout-dialog" aria-labelledby="object-layout-title">
+    <div class="dialog-heading"><strong id="object-layout-title">凡例・注釈の整列・重なり</strong><button id="close-object-layout" type="button" class="button quiet">閉じる</button></div>
+    <p data-layout-count class="object-layout-count"></p>
+    <p class="object-layout-help">プレビューでShift＋クリックすると複数選択できます。整列は2個以上、均等配置は3個以上を選択してください。</p>
+    <div id="object-layout-buttons" class="annotation-buttons"></div>
+    <details id="object-layout-selection"><summary>対象を選ぶ</summary><div class="annotation-buttons"><button type="button" class="button quiet" data-select-legends>凡例をすべて選択</button><button type="button" class="button quiet" data-clear-layout-selection>選択を解除</button></div><div id="object-layout-targets" class="object-layout-targets"></div></details>
   </dialog>
   <dialog id="data-editor" class="plot-dialog data-editor" aria-labelledby="data-editor-title">
     <div class="dialog-heading"><strong id="data-editor-title">データの編集</strong><button id="close-data-editor" type="button" class="button quiet">閉じる</button></div>
