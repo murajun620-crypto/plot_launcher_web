@@ -1,4 +1,4 @@
-import { APP_VERSION, restoreSettings } from "./state.js?v=a63d4e0f29b7";
+import { APP_VERSION, restoreSettings } from "./state.js?v=a63d4e0f29b8";
 import { validateTableEdits } from './table-edits.mjs?v=27ae7675c457';
 // All user data stays in this worker's in-memory filesystem.
 const PYODIDE_VERSION = "0.29.3";
@@ -9,7 +9,7 @@ let currentSources = [];
 function progress(text) { self.postMessage({ type: "progress", text }); }
 async function fetchAsset(relative, binary = false) {
   const url=new URL(relative,import.meta.url);url.searchParams.set('release',new URL(import.meta.url).searchParams.get('v')||'current');
-  const response = await fetch(url,{cache:'no-store'});
+  const response = await fetch(url,{cache:binary?'default':'no-store'});
   if (!response.ok) throw new Error(`必要なファイルを読み込めませんでした (${response.status}): ${relative}`);
   return binary ? new Uint8Array(await response.arrayBuffer()) : response.text();
 }
