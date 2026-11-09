@@ -1,7 +1,8 @@
-import { APP_VERSION, restoreSettings } from "./state.js?v=a63d4e0f29b8";
+import { APP_VERSION, restoreSettings } from "./state.js?v=a63d4e0f29b9";
 import { validateTableEdits } from './table-edits.mjs?v=27ae7675c457';
 // All user data stays in this worker's in-memory filesystem.
 const PYODIDE_VERSION = "0.29.3";
+const WORKER_BUILD = 'a63d4e0f29b9';
 const INDEX_URL = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
 let pyodide, dispatch, currentPath = "", uploadNumber = 0;
 let currentSources = [];
@@ -44,7 +45,7 @@ async function initialize() {
   }));
   await pyodide.runPythonAsync("import sys\nsys.path.insert(0, '/app/python')\nfrom engine import PlotEngine\n_engine = PlotEngine('/app/python', '/app/NotoSansJP.ttf')\n_dispatch = _engine.dispatch");
   dispatch = pyodide.globals.get("_dispatch");
-  self.postMessage({ type: "ready",version:APP_VERSION,build:new URL(import.meta.url).searchParams.get('v') });
+  self.postMessage({ type: "ready",version:APP_VERSION,build:WORKER_BUILD,releaseProtocol:1 });
 }
 
 const ready = initialize().catch(error => {
