@@ -1,5 +1,5 @@
 /** Source-editor bridge. The engine and tab stay alive when a different panel opens. */
-import {transferResult,transferReceipt,isTransferImageId,figureWorkspaceAPI,showFigureWorkspaceStudio} from './direct-transfer.mjs?v=source-batch-v070-1';
+import {createStudioSendActions,transferResult,transferReceipt,isTransferImageId,figureWorkspaceAPI,showFigureWorkspaceStudio} from './direct-transfer.mjs?v=studio-send-v0714-1';
 import {registerEditor} from './editor-discovery.mjs?v=editor-reuse-v036-1';
 const PROTOCOL = 'figure-studio-bridge-v1';
 const MAX_PROJECT = 320 * 1024 * 1024;
@@ -44,7 +44,7 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
   let normalVisit=!context;
   const hostId=crypto.randomUUID();
   let dismissConfirmation=null;
-  let active={panelId:'',requestId:'',editKey:'',sourceName:''},revision=0,initialized=false,loaded=false,busy=false,awaiting=0,awaitTimer=0,captured=null,baseline=null,disposed=false,clientBatch=false,acceptedCheckpoint=null,loadingRequest=null;
+  let active={panelId:'',requestId:'',editKey:'',sourceName:''},revision=0,initialized=false,loaded=false,busy=false,awaiting=0,awaitTimer=0,captured=null,baseline=null,disposed=false,clientBatch=false,clientAdd=false,acceptedCheckpoint=null,loadingRequest=null;
   const send=(type,extra={})=>{if(!disposed&&context&&parent&&!parent.closed)parent.postMessage({protocol:PROTOCOL,nonce:context.nonce,hostId,app,type,panelId:active.panelId,requestId:active.requestId,editKey:active.editKey,...extra},context.origin);};
   const ready=()=>send('ready',{capabilities:['reuse-v1',...(captureBatchResult?['batch-v1']:[])],loaded,busy:busy||!!awaiting});
   const panel=documentRef.createElement('div');panel.id='figure-studio-bridge';
@@ -52,15 +52,13 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
   const message=documentRef.createElement('span');message.hidden=true;message.setAttribute('role','status');message.setAttribute('aria-live','polite');
   message.style.cssText='flex-basis:100%;max-width:420px;white-space:normal;overflow-wrap:anywhere;';
   function setMessage(text){message.textContent=text;message.hidden=!text;}
-  const button=documentRef.createElement('button');button.id='send-to-figure-studio';button.type='button';button.className='button primary';button.textContent='Figure Studioへ送る';button.title='編集した図と元プロジェクトを、元のFigure Studioの図へ反映します。';button.disabled=true;
-  const batchButton=typeof captureBatchResult==='function'?documentRef.createElement('button'):null;
-  if(batchButton){batchButton.id='send-all-to-figure-studio';batchButton.type='button';batchButton.className='button primary';batchButton.textContent='まとめてStudioへ送る';batchButton.title='変更した画像を元のFigure Studioへまとめて反映し、未追加の画像を追加します。変更のない画像はそのまま残します。';batchButton.disabled=true;}
-  function setDisabled(value){button.disabled=value;if(batchButton)batchButton.disabled=value;}
+  const actions=createStudioSendActions({documentRef,batch:typeof captureBatchResult==='function'}),{button,addButton}=actions;
+  const setDisabled=value=>actions.setDisabled(value);setDisabled(true);
   const discard=documentRef.createElement('button');discard.type='button';discard.textContent='未反映の編集を取り消す';discard.hidden=true;
   discard.style.cssText='white-space:nowrap;border:1px solid #c6d3cf;border-radius:7px;padding:8px 12px;background:#fff;color:#526661;font:12px system-ui;cursor:pointer;';
   // Bridge actions update the original Studio panel and stay in normal layout.
   // Editors without the shared header still get an in-flow fallback.
-  panel.append(button);if(batchButton)panel.append(batchButton);panel.append(discard,message);
+  panel.append(actions.scope,button,addButton,discard,message);
   function mount(){if(mounted)return;mounted=true;onConnectionChange(true);(documentRef.querySelector?.('.header-actions')||documentRef.body).append(panel);}
   function unmount(){if(!mounted)return;mounted=false;panel.remove();onConnectionChange(false);}
   const readyTimer=setInterval(()=>{if(parent?.closed){parent=null;context=null;unmount();}ready();registry?.update();},1500);
@@ -83,7 +81,7 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
       if(disposed)return;
       active.requestId=data.requestId||'';
       if(data.imageId)active.imageId=data.imageId;
-      clientBatch=Array.isArray(data.capabilities)&&data.capabilities.includes('batch-v1');
+      clientBatch=Array.isArray(data.capabilities)&&data.capabilities.includes('batch-v1');clientAdd=Array.isArray(data.capabilities)&&data.capabilities.includes('add-v1');
       setMessage('');send('loaded',{reused:true});
     }catch(error){
       if(disposed)return;
@@ -181,7 +179,7 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
           }
         }
         active={panelId:data.panelId,requestId:data.requestId||'',editKey:data.editKey||'',sourceName:String(data.sourceName||(app==='plot'?'figure.plotproject':'figure.mifito')).replace(/[\\/]/g,'_'),...(data.imageId?{imageId:data.imageId}:{})};
-        clientBatch=Array.isArray(data.capabilities)&&data.capabilities.includes('batch-v1');
+        clientBatch=Array.isArray(data.capabilities)&&data.capabilities.includes('batch-v1');clientAdd=Array.isArray(data.capabilities)&&data.capabilities.includes('add-v1');
         // Transport reconnection does not prove that this editor contains the
         // requested project. Exact bound snapshots were handled above; only a
         // byte-checked adoption may preserve content in a newly bound route.
@@ -223,11 +221,11 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
       clearTimeout(awaitTimer);awaitTimer=0;awaiting=0;
       if(typeof data.editKey==='string'&&data.editKey.length<=2048)active.editKey=data.editKey;
       if(isTransferImageId(data.imageId))active.imageId=data.imageId;
-      if(captured){baseline={project:captured.project,sourceName:captured.sourceName||active.sourceName};active.sourceName=baseline.sourceName;}
+      if(captured&&captured.intent!=='add'){baseline={project:captured.project,sourceName:captured.sourceName||active.sourceName};active.sourceName=baseline.sourceName;}
       discard.hidden=true;
       busy=true;
       try{
-        await onAccepted?.(captured,{...active,revision:data.revision,...transferReceipt(data)});
+        if(captured?.intent!=='add')await onAccepted?.(captured,{...active,revision:data.revision,...transferReceipt(data)});
         if(!disposed)setMessage(transferReceipt(data).message||'Figureに反映しました。');
       }catch{if(!disposed)setMessage('Figureに反映しました。編集状態を確認してから次のグラフを開いてください。');}
       finally{captured=null;busy=false;if(!disposed){setDisabled(false);discard.disabled=false;showFigureWorkspaceStudio(windowRef);}}
@@ -269,17 +267,18 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
     }catch(error){loaded=false;setMessage(error.message||'元のプロジェクトへ戻せませんでした。');send('error',{code:'load-failed',loaded:false,message:message.textContent});}
     finally{busy=false;if(!disposed){setDisabled(!loaded);discard.disabled=!loaded;}}
   });
-  async function apply(batch=false){
+  async function apply(batch=false,intent='sync'){
     if(disposed||!loaded||busy||awaiting)return;
+    if(intent==='add'&&!clientAdd){setMessage('Figure Studioを最新版へ更新してから、新規追加をお試しください。');return;}
     if(batch&&!clientBatch){setMessage('Figure Studioを最新版へ更新してから、一括反映をお試しください。');return;}
     if(!parent||parent.closed){setMessage('Figure Studioが閉じています。編集内容をプロジェクトとして保存してください。');return;}
     busy=true;setDisabled(true);discard.disabled=true;send('applying');setMessage('編集結果を作成しています…');
     try{
       const result=batch?await captureBatchResult():captureResult?await captureResult():{project:await buildProject(),preview:await renderPreview()};
       if(disposed)return;
-      const wire=transferResult(app,result,result.sourceName||active.sourceName);
+      const wire=transferResult(app,{...result,intent},result.sourceName||active.sourceName);
       if(!!wire.batch!==batch)throw Error('編集結果の一括反映形式を確認してください。');
-      captured=result;awaiting=++revision;const sentRevision=revision,sentRequest=active.requestId;
+      captured={...result,intent};awaiting=++revision;const sentRevision=revision,sentRequest=active.requestId;
       send('result',{revision,...wire});
       setMessage('Figureへの反映を確認しています…');
       awaitTimer=setTimeout(()=>{if(!disposed&&awaiting===sentRevision&&active.requestId===sentRequest){awaiting=0;captured=null;setDisabled(false);discard.disabled=false;setMessage('Figureからの確認が届きません。Figure Studioの画面を確認してください。');}},30000);
@@ -287,14 +286,14 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
       if(disposed)return;captured=null;setMessage(error.message||'編集結果の作成に失敗しました。');send('error',{code:'capture-failed',message:message.textContent});setDisabled(false);
     }finally{busy=false;if(!disposed)discard.disabled=!loaded||!!awaiting;}
   }
-  button.addEventListener('click',()=>apply(false));
-  batchButton?.addEventListener('click',()=>apply(true));
+  button.addEventListener('click',()=>apply(actions.batch));
+  addButton.addEventListener('click',()=>apply(actions.batch,'add'));
   function resetWorkspaceBinding(){
     if(disposed)throw Error('編集画面との接続は終了しています。');
     if(busy||awaiting||loadingRequest)throw Error('読み込み・反映処理が終わってから、作業内容を復元してください。');
     if(loaded&&active.panelId&&active.requestId)send('detached',{message:'編集画面の元プロジェクトが切り替わりました。対象の図を開くと再接続します。'});
     const previous=connection;removeConnectionListener?.();removeConnectionListener=null;connection=null;parent=null;context=null;previous?.close();unmount();
-    clearTimeout(awaitTimer);awaitTimer=0;active={panelId:'',requestId:'',editKey:'',sourceName:''};revision=0;initialized=false;loaded=false;captured=null;baseline=null;clientBatch=false;acceptedCheckpoint=null;
+    clearTimeout(awaitTimer);awaitTimer=0;active={panelId:'',requestId:'',editKey:'',sourceName:''};revision=0;initialized=false;loaded=false;captured=null;baseline=null;clientBatch=false;clientAdd=false;acceptedCheckpoint=null;
     // Detaching can follow a manual project replacement even in a tab originally
     // opened by Studio. Its new local content now needs the normal adoption guard.
     normalVisit=true;

@@ -1,22 +1,22 @@
-import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=ec0a315f3448';
-import {setupDirectSendButton} from './direct-transfer.mjs?v=ec0a315f3448';
-import {identifyPlotProject,plotSheetIndex,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=ec0a315f3448';
+import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=studio-send-v0714-1';
+import {setupDirectSendButton} from './direct-transfer.mjs?v=studio-send-v0714-1';
+import {identifyPlotProject,plotSheetIndex,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=27ae7675c457';
 import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=9127ec4c4f31";
 import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=9127ec4c4f31";
 import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9127ec4c4f31";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=ec0a315f3448";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=ec0a315f3448";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=ec0a315f3448";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=27ae7675c457";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=27ae7675c457";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=27ae7675c457";
 
-import {alignmentOffsets} from './object-layout.mjs?v=ec0a315f3448';
-import {createDataEditor} from './data-editor.mjs?v=ec0a315f3448';
-import {validateTableEdits} from './table-edits.mjs?v=ec0a315f3448';
+import {alignmentOffsets} from './object-layout.mjs?v=27ae7675c457';
+import {createDataEditor} from './data-editor.mjs?v=27ae7675c457';
+import {validateTableEdits} from './table-edits.mjs?v=27ae7675c457';
 import {createAnnotationTextEditor} from './annotation-editor.mjs?v=61d158587773';
 import {createShortcutHandler} from './shortcuts.mjs?v=61d158587773';
 import {formatText,TEXT_FORMAT_ACTIONS} from './text-format.mjs?v=61d158587773';
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
-const APP_BUILD = 'ec0a315f3448';
+const APP_BUILD = '27ae7675c457';
 function makeProject(settings,data,fonts,workspace={}){
   const live=sourceData&&data.filename===sourceData.filename&&(data.bytes===sourceData.bytes||data.files&&data.files===sourceData.files);
   const projectId=workspace.figureStudioProjectId||data.figureStudioProjectId||(live?(sourceData.figureStudioProjectId||=crypto.randomUUID()):crypto.randomUUID());
@@ -402,7 +402,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=ec0a315f3448", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=27ae7675c457", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {

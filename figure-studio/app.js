@@ -17,16 +17,16 @@ import {createColorPickers} from './colors.mjs?v=ribbon-v060-1';
 import {renderTextPaint} from './text-paint.mjs?v=tex-v061-1';
 import {createTexRenderer} from './tex.mjs?v=micro-v0711-2';
 import {createLiveTexPreview} from './live-tex-preview.mjs?v=live-v062-1';
-import {openSource,SOURCE_APPS,setupSourceDiscovery,closeSourceSessions} from './integration/bridge-client.mjs?v=force-switch-v072-1';
+import {openSource,SOURCE_APPS,setupSourceDiscovery,closeSourceSessions} from './integration/bridge-client.mjs?v=studio-send-v0714-1';
 import {createFigureSidebar} from './thumbnails.mjs?v=live-v062-1';
-import {setupTransferReceiver,getFigureWorkspace} from './integration/direct-transfer.mjs?v=source-batch-v070-1';
+import {setupTransferReceiver,getFigureWorkspace} from './integration/direct-transfer.mjs?v=studio-send-v0714-1';
 import {readMifitoIdentity} from './integration/mifito-sync.mjs?v=0.3.5-1';
 import {readPlotIdentity} from './integration/plot-sync.mjs?v=c520375efe6d';
-import {planMiFiToSync} from './mifito-batch.mjs?v=source-batch-v070-1';
+import {planMiFiToSync} from './mifito-batch.mjs?v=studio-send-v0714-1';
 import {setupUpdateCheck} from './update-check.mjs';
 import {marqueeSelection,resolveObjectSelection,clickObjectSelection,selectionDescription} from './selection.mjs?v=nested-groups-v0712-1';
 import {renderGroupLayers} from './group-layers.mjs?v=nested-groups-v0712-1';
-import {drawSelectionFrames} from './selection-overlay.mjs?v=nested-groups-v0712-1';
+import {drawSelectionFrames} from './selection-overlay.mjs?v=studio-send-v0714-1';
 import {ARROW_PROPERTIES,arrowEndpoint,arrowPropertyValue,setArrowProperty,arrowGeometry} from './arrowheads.mjs?v=0.3.0-1';
 
 import {createArrowPicker} from './arrow-picker.mjs?v=0.3.0-1';
@@ -141,7 +141,7 @@ function renderFast(){
  }
  for(const o of editable()){const g=nodes.get(o.id);if(!g)continue;if(gesture?.kind==='resize'||gesture?.kind==='endpoint'||gesture?.kind==='arc-angle')drawContent(o,g);else g.setAttribute('transform',transform(o));}renderOverlay();}
 function queueFast(){if(!frame)frame=requestAnimationFrame(()=>{frame=0;renderFast();});}
-function renderOverlay(){overlays.replaceChildren();drawPathDraft();const all=selected(),{box:b,ink,u}=drawSelectionFrames({root:overlays,doc,ids:selection,groupId:groupScope,scale,editableIds:editable().map(object=>object.id),el});if(!b||!editable().length)return;
+function renderOverlay(){overlays.replaceChildren();drawPathDraft();const all=selected(),{box:b,ink,u}=drawSelectionFrames({root:overlays,doc,ids:selection,groupId:groupScope,scale,editableIds:editable().map(object=>object.id),draggable:tool==='select',el});if(!b||!editable().length)return;
  if(all.length===1&&(all[0].type==='line'||all[0].type==='arrow')){const o=all[0];for(const [name,point]of [['start',{x:0,y:0}],['end',{x:1,y:1}]]){const p=pathWorldPoint(o,point);overlays.append(el('circle',{cx:p.x,cy:p.y,r:4*u,fill:'white',stroke:ink,'stroke-width':1.4*u,'data-handle':name}));}}
  else for(const [name,x,y]of [['nw',b.x,b.y],['ne',b.x+b.w,b.y],['se',b.x+b.w,b.y+b.h],['sw',b.x,b.y+b.h]])overlays.append(el('rect',{x:x-4.5*u,y:y-4.5*u,width:9*u,height:9*u,fill:ink,stroke:'#fff','stroke-width':1.5*u,'data-handle':name,cursor:`${name}-resize`}));
  if(all.length===1&&pathEditId===all[0].id&&['curve','freeform'].includes(all[0].type)){
@@ -276,7 +276,9 @@ svg.addEventListener('pointerdown',e=>{
  if(spaceDown){gesture={kind:'pan',clientX:e.clientX,clientY:e.clientY,left:viewport.scrollLeft,top:viewport.scrollTop};captureGesture(e,svg);return;}
  if(pathDrawing.pointerDown(e,p))return;
  if(handle&&tool==='select'){gesture={kind:handle==='point'?'path-point':handle.startsWith('arc-')?'arc-angle':handle==='rotate'?'rotate':['start','end'].includes(handle)?'endpoint':'resize',handle,pointIndex:Number(e.target.closest('[data-point-index]')?.dataset.pointIndex),start:p,before:snapshot(),initial:clone(editable()),box:bounds(editable())};}
- else if(tool!=='select'){
+ else if(tool==='select'&&e.target.closest('[data-selection-drag]')&&editable().length){
+ gesture={kind:'move',start:p,before:snapshot(),initial:clone(editable()),box:bounds(editable()),moved:false,selectionState:{ids:[...selection],groupId:groupScope}};
+ } else if(tool!=='select'){
  const o=makeObject(tool,{x:p.x,y:p.y,w:0,h:0,...(tool==='text'?{w:mm(35),h:mm(12),text:'Text'}:{})});const before=snapshot();doc.objects.push(o);selection=[o.id];render();gesture={kind:'create',start:p,before,id:o.id};
  }else if(id){const o=doc.objects.find(object=>object.id===id);let drillId=null;
  if((e.ctrlKey||e.metaKey)&&o.groupId)selectObject(id,{individual:true,additive:e.shiftKey});
@@ -655,17 +657,19 @@ async function syncMiFiToFigures(result,{app='mifito',guard,anchorPanelId,target
  if(incoming.projectId!==identity.projectId)throw Error('画像と元プロジェクトの対応情報が一致しません。');
  const definitions=new Map(identity.images.map(image=>[image.imageId,image]));
  for(const image of incoming.images){const defined=definitions.get(image.imageId);if(!defined||defined.fingerprint!==image.fingerprint)throw Error('画像と元アプリの編集設定が一致しません。もう一度反映してください。');}
+ // Retrying an addition after a lost receipt must not place another copy.
+ if(result.intent==='add'&&transferId){syncFigure();const existing=figures.flatMap(f=>f.objects).filter(o=>o.source?.app===app&&o.source.transferId===transferId);if(existing.length){const summary={updated:0,added:0,unchanged:new Set(existing.map(o=>o.source.imageId)).size};return {summary,message:'この図はすでにStudioへ追加されています。'};}}
  if(anchor){const origin=await sourceIdentity(assets.get(anchor.source.assetId),app);if(origin.projectId!==identity.projectId)throw Error('別の元プロジェクトが開いています。元のプロジェクトを開き直してください。');}
  check();syncFigure();const identityByAsset=new Map();
  const legacyIds=new Set(figures.flatMap(f=>f.objects.filter(o=>o.source?.app===app&&(!o.source.projectId||!o.source.imageId)).map(o=>o.source.assetId)));
  for(const id of legacyIds){try{identityByAsset.set(id,await sourceIdentity(assets.get(id),app));}catch{/* Unrelated old attachments remain untouched. */}}
- check();let plan=planMiFiToSync(figures,incoming,identityByAsset,{anchorPanelId,app});
+ check();let plan=planMiFiToSync(figures,incoming,identityByAsset,{anchorPanelId,app,addOnly:result.intent==='add'});
  const prepared=new Map(),needed=new Set([...plan.matches.filter(m=>m.changed).map(m=>m.imageId),...plan.additions.map(m=>m.imageId)]);
  for(const image of incoming.images)if(needed.has(image.imageId))prepared.set(image.imageId,await imageAsset(image.preview,image.name));
  check();if(gesture)endGesture(null,true);finishText();syncFigure();
  // Re-plan after decoding so deleted/relinked images are never overwritten and
  // changes made to placement during decoding are kept.
- plan=planMiFiToSync(figures,incoming,identityByAsset,{anchorPanelId,app});
+ plan=planMiFiToSync(figures,incoming,identityByAsset,{anchorPanelId,app,addOnly:result.intent==='add'});
  for(const id of [...plan.matches.filter(m=>m.changed).map(m=>m.imageId),...plan.additions.map(m=>m.imageId)])if(!prepared.has(id))throw Error('反映中に画像の対応が変わりました。もう一度反映してください。');
  const previousSizes=new Map(),sizeCorrections=new Map();
  for(const match of plan.matches.filter(m=>m.changed||app==='mifito'&&m.image.fingerprint===m.fingerprint)){
@@ -690,7 +694,7 @@ async function syncMiFiToFigures(result,{app='mifito',guard,anchorPanelId,target
  check();syncFigure();
  // Source associations must still be the ones used to prepare this atomic edit.
  for(const link of plan.linked){const panel=figures.find(f=>f.id===link.figureId)?.objects.find(o=>o.id===link.panelId);if(panel?.source?.assetId!==link.sourceAssetId)throw Error('反映中に元プロジェクトの関連付けが変わりました。もう一度反映してください。');}
- plan=planMiFiToSync(figures,incoming,identityByAsset,{anchorPanelId,app});
+ plan=planMiFiToSync(figures,incoming,identityByAsset,{anchorPanelId,app,addOnly:result.intent==='add'});
  for(const id of [...plan.matches.filter(m=>m.changed).map(m=>m.imageId),...plan.additions.map(m=>m.imageId)])if(!prepared.has(id))throw Error('反映中に画像の対応が変わりました。もう一度反映してください。');
  const incomingById=new Map(incoming.images.map(image=>[image.imageId,image]));
  const linked=new Map(plan.linked.filter(link=>{const image=incomingById.get(link.imageId);return definitions.has(link.imageId)&&!(image?.unchanged===true&&image.fingerprint!==link.fingerprint);}).map(link=>[link.panelId,link]));
@@ -774,7 +778,7 @@ window.addEventListener('resize',()=>{if(!gesture)renderOverlay();});
 try{const restored=await loadDraft();if(restored){if(restored.doc.format==='figure-studio-book')restoreBook(validateBook(restored.doc));else{doc=validateDocument(restored.doc);figures=[doc];}assets=restored.assets;$('#saveStatus').textContent='ブラウザから復元';}else{const demo=createDemo();doc=demo.doc;figures=[doc];assets=demo.assets;initialDemo=true;$('#saveStatus').textContent='デモ · 模擬データ';}}catch{const demo=createDemo();doc=demo.doc;figures=[doc];assets=demo.assets;initialDemo=true;$('#saveStatus').textContent='自動保存を利用できません';}
 try{const target=await loadProjectFileTarget(bookId);if(target)projectFiles.opened(bookId,target);}catch{}
 renumberFigureNames(figures);render();fit();setTool('select');
-const workspaceReceiver=setupTransferReceiver({onImport:receiveDirectFigure,onStatus:({state,message})=>{if(state==='error')toast(message);}});
+const workspaceReceiver=setupTransferReceiver({onImport:receiveDirectFigure,allowAdd:true,onStatus:({state,message})=>{if(state==='error')toast(message);}});
 window.FigureStudioWorkspaceReceiverId=workspaceReceiver.receiverId;
 setupUpdateCheck({onStatus:toast,beforeReload:async()=>{
  if(pathDrawing?.drawing&&!pathDrawing.finish())throw Error('作図中の線を確定するか、Escで取り消してから更新してください。');

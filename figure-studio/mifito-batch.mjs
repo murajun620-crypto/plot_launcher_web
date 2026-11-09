@@ -5,13 +5,14 @@ const validFingerprint=value=>typeof value==='string'&&/^[a-f0-9]{64}$/.test(val
  * `fingerprint` in linked/matched entries describes the existing Studio preview.
  * No document, panel, source reference, or descriptor is changed here.
  */
-export function planMiFiToSync(figures,batch,identityByAsset=new Map(),{anchorPanelId,app='mifito'}={}){
+export function planMiFiToSync(figures,batch,identityByAsset=new Map(),{anchorPanelId,app='mifito',addOnly=false}={}){
  if(!nonempty(batch?.projectId)||!Array.isArray(batch.images))throw Error('MiFiToの同期情報が正しくありません。');
  const incoming=new Map();
  for(const image of batch.images){
   if(!nonempty(image?.imageId)||!validFingerprint(image.fingerprint)||incoming.has(image.imageId))throw Error('MiFiToの画像識別情報が正しくありません。');
   incoming.set(image.imageId,image);
  }
+ if(addOnly)return {matches:[],linked:[],additions:[...batch.images],summary:{updated:0,added:batch.images.length,unchanged:0}};
  const matches=[],linked=[],matchedIds=new Set(),changedIds=new Set();
  for(const figure of figures)for(const panel of figure.objects){
   const source=panel.source;

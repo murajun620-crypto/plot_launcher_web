@@ -1,6 +1,6 @@
 import { resetPresetUnitScales, unitConversion, configureAFMUnits } from "./units.js?v=9127ec4c4f31";
-import { validateTableEdits } from './table-edits.mjs?v=ec0a315f3448';
-export const APP_VERSION = '2.4.30';
+import { validateTableEdits } from './table-edits.mjs?v=27ae7675c457';
+export const APP_VERSION = '2.4.31';
 
 // Accept one numeric value or fraction without evaluating JavaScript expressions.
 export function parseCoefficient(value) {

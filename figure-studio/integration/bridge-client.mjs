@@ -1,5 +1,5 @@
 /** Browser-only editing bridge. No project data is sent to a server. */
-import {transferResult,transferReceipt,isTransferImageId,getFigureWorkspace} from './direct-transfer.mjs?v=source-batch-v070-1';
+import {transferResult,transferReceipt,isTransferImageId,getFigureWorkspace} from './direct-transfer.mjs?v=studio-send-v0714-1';
 import {createEditorDirectory,studioOwnerId} from './editor-discovery.mjs?v=editor-reuse-v036-1';
 export const BRIDGE_PROTOCOL = 'figure-studio-bridge-v1';
 export const SOURCE_APPS = Object.freeze({
@@ -129,7 +129,7 @@ function openSourceSession({app, project, sourceName, panelId, editKey, imageId,
   }
   function sendLoad(r){
     r.lastLoadAt=Date.now();
-    send('load',r,{project:r.project,sourceName:r.sourceName,editKey:r.editKey,reconnect:!!r.reconnect,capabilities:['batch-v1'],...(r.imageId?{imageId:r.imageId}:{})});
+    send('load',r,{project:r.project,sourceName:r.sourceName,editKey:r.editKey,reconnect:!!r.reconnect,capabilities:['batch-v1','add-v1'],...(r.imageId?{imageId:r.imageId}:{})});
   }
   function facade(r){return {window:popup,close,ready:r.ready,downloadProject:downloadFor(r)};}
   function focus(){try{workspace?.show(app);popup.focus?.();}catch{}}
@@ -230,7 +230,7 @@ function openSourceSession({app, project, sourceName, panelId, editKey, imageId,
       try {
         const applied=await r.onResult({...result,panelId:r.panelId,app,revision:message.revision});
         if(disposed||activeHost!==host)return;
-        r.latestRevision = message.revision;r.project = message.project;r.sourceName=safeName(message.sourceName||r.sourceName);
+        r.latestRevision = message.revision;if(result.intent!=='add'){r.project = message.project;r.sourceName=safeName(message.sourceName||r.sourceName);}
         if(typeof applied?.editKey==='string')r.editKey=applied.editKey;
         if(isTransferImageId(applied?.imageId))r.imageId=applied.imageId;
         const receipt=transferReceipt(applied);
