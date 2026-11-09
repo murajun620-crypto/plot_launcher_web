@@ -1,4 +1,5 @@
-import { restoreSettings } from "./state.js?v=8cb497d103c4";
+import { restoreSettings } from "./state.js?v=c520375efe6d";
+import { validateTableEdits } from './table-edits.mjs?v=c520375efe6d';
 // All user data stays in this worker's in-memory filesystem.
 const PYODIDE_VERSION = "0.29.3";
 const INDEX_URL = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
@@ -22,7 +23,7 @@ async function initialize() {
   await pyodide.runPythonAsync("import micropip\nawait micropip.install(['openpyxl==3.1.5', 'xlrd==2.0.2'])");
   progress("日本語フォントと描画設定を読み込んでいます…");
   const files = await Promise.all([
-    fetchAsset("./python/engine.py?v=61d158587773"), fetchAsset("./python/plot_utils.py"),
+    fetchAsset("./python/engine.py?v=c520375efe6d"), fetchAsset("./python/plot_utils.py"),
     fetchAsset("./python/generic_xy_base.py"), fetchAsset("./assets/fonts/NotoSansJP.ttf", true),
     ...["Regular", "Bold", "Italic", "BoldItalic"].map(style => fetchAsset(`./assets/fonts/LiberationSans-${style}.ttf`, true)),
     fetchAsset("./python/annotation_model.py?v=61d158587773"), fetchAsset("./python/annotation_manager.py?v=61d158587773"),
@@ -55,13 +56,16 @@ let queue = Promise.resolve();
 self.onmessage = ({ data }) => {
   queue = queue.catch(() => {}).then(async () => {
     const { id, operation, args } = data;
-    let uploadPath, projectSnapshot = false, nextSources;
+    let uploadPath, projectSnapshot = false, loadSnapshot = false, nextSources;
     const uploadedPaths=[];
     const projectFonts = [];
     try {
       await ready;
       let payload = args;
       let dispatchOperation=operation==='project'?'load':operation;
+      if(operation==='load'||operation==='load-many'){
+        pyodide.runPython('_load_previous = dict(_engine.__dict__)');loadSnapshot=true;
+      }
       if (operation === "project") {
         pyodide.runPython("from matplotlib import font_manager\n_project_previous = dict(_engine.__dict__)\n_project_previous['font_families'] = set(_engine.font_families)\n_project_fonts = list(font_manager.fontManager.ttflist)");
         projectSnapshot = true;
@@ -77,7 +81,7 @@ self.onmessage = ({ data }) => {
             return {path,filename:file.filename,sheetIndex:file.sheetIndex ?? 0,headerRow:file.headerRow ?? 1};
           });
         }else nextSources=args.sources.map(item=>{if(!Number.isInteger(item.index)||!currentSources[item.index])throw new Error('元ファイルが見つかりません。');return {...currentSources[item.index],sheetIndex:item.sheetIndex,headerRow:item.headerRow};});
-        payload={sources:nextSources,filename:args.filename};dispatchOperation='load-many';
+        payload={sources:nextSources,filename:args.filename,table_edits:validateTableEdits(args.tableEdits)};dispatchOperation='load-many';
       } else if (operation === "load" || operation === "project") {
         const extension = args.filename.split(".").pop().toLowerCase();
         if (!["xlsx", "xlsm", "xls", "csv", "txt"].includes(extension)) throw new Error("Excel、CSVまたはTXTファイルを選んでください。");
@@ -85,7 +89,7 @@ self.onmessage = ({ data }) => {
           uploadPath = `/data/upload-${++uploadNumber}.${extension}`;
           pyodide.FS.writeFile(uploadPath, new Uint8Array(args.bytes));
         }
-        payload = { path: uploadPath || currentPath, filename: args.filename, sheet_index: args.sheetIndex ?? 0, header_row: args.headerRow ?? 1 };
+        payload = { path: uploadPath || currentPath, filename: args.filename, sheet_index: args.sheetIndex ?? 0, header_row: args.headerRow ?? 1, table_edits:validateTableEdits(args.tableEdits) };
       }
       if (operation === "font") {
         const path = `/app/user-font-${++uploadNumber}.ttf`;
@@ -93,14 +97,25 @@ self.onmessage = ({ data }) => {
         payload = { path };
       }
       if (operation === 'sheet-info' || operation === 'sheet-export') {
-        payload = {path:currentPath,...(currentSources.length?{sources:currentSources}:{}),filename:args.filename, sheet_index:args.sheetIndex, header_row:args.headerRow, config:args.config, format:args.format, dpi:args.dpi};
+        payload = {path:currentPath,...(currentSources.length?{sources:currentSources}:{}),filename:args.filename, sheet_index:args.sheetIndex, header_row:args.headerRow, config:args.config, format:args.format, dpi:args.dpi,table_edits:validateTableEdits(args.tableEdits)};
+      }
+      if (operation === 'table-apply') {
+        payload = {columns:args.columns,cells:args.cells,path:currentPath,filename:args.filename,...(currentSources.length?{sources:currentSources}:{})};
       }
       let result = JSON.parse(dispatch(dispatchOperation, JSON.stringify(payload)));
       if (operation === "project") {
         if (result.sheets[result.sheetIndex] !== args.settings.data.sheet) throw new Error("プロジェクトのシートが設定と一致しません。");
         if (args.sharedSettings && !result.sheets.includes(args.sharedSettings.data.sheet)) throw new Error('プロジェクトの共通設定がデータと一致しません。');
         for (const item of args.sheetSettings || []) if (result.sheets[item.sheetIndex] !== item.settings.data.sheet) throw new Error('プロジェクトのシート設定がデータと一致しません。');
-        const config = restoreSettings(args.settings, result), families = [];
+        const settings = structuredClone(args.settings);
+        if(args.remapColumns){
+          for(const item of settings.series)for(const key of ['x','y','error','errorMin','errorMax','errorPlus','errorMinus']){
+            if(Number.isInteger(item[key])&&result.columns[item[key]])item[key+'Column']=result.columns[item[key]].name;
+          }
+          if(settings.options){const options=settings.options;if(Number.isInteger(options.diameterColumn)&&result.columns[options.diameterColumn])options.diameterColumnName=result.columns[options.diameterColumn].name;
+            for(const fill of options.fills||[])for(const key of ['x','upper','lower'])if(Number.isInteger(fill[key])&&result.columns[fill[key]])fill[key+'Name']=result.columns[fill[key]].name;}
+        }
+        const config = restoreSettings(settings, result), families = [];
         for (const font of args.fonts) {
           const path = `/app/user-font-${++uploadNumber}.ttf`;
           projectFonts.push(path); pyodide.FS.writeFile(path, new Uint8Array(font.bytes));
@@ -118,6 +133,7 @@ self.onmessage = ({ data }) => {
       }
       self.postMessage({ type: "result", id, result });
     } catch (error) {
+      if (loadSnapshot) pyodide.runPython('_engine.__dict__.clear()\n_engine.__dict__.update(_load_previous)');
       if (projectSnapshot) pyodide.runPython("_engine.__dict__.clear()\n_engine.__dict__.update(_project_previous)\nfont_manager.fontManager.ttflist = _project_fonts\nfont_manager.fontManager._findfont_cached.cache_clear()");
       for (const path of projectFonts) { try { pyodide.FS.unlink(path); } catch {} }
       if (uploadPath) { try { pyodide.FS.unlink(uploadPath); } catch {} }
@@ -126,6 +142,7 @@ self.onmessage = ({ data }) => {
       const message = text.split("\n").filter(Boolean).pop().replace(/^(ValueError|RuntimeError|IndexError|EmptyDataError|ParserError):\s*/, "");
       self.postMessage({ type: "error", id, error: message, detail: text });
     } finally {
+      if (loadSnapshot) pyodide.runPython('del _load_previous');
       if (projectSnapshot) pyodide.runPython("del _project_previous, _project_fonts");
     }
   });

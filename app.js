@@ -1,19 +1,21 @@
-import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=8cb497d103c4';
-import {setupDirectSendButton} from './direct-transfer.mjs?v=8cb497d103c4';
-import {identifyPlotProject,plotSheetIndex,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=dd5569f5b97e';
+import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=c520375efe6d';
+import {setupDirectSendButton} from './direct-transfer.mjs?v=c520375efe6d';
+import {identifyPlotProject,plotSheetIndex,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=c520375efe6d';
 import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=9127ec4c4f31";
 import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=9127ec4c4f31";
 import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9127ec4c4f31";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=8cb497d103c4";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=8cb497d103c4";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=8cb497d103c4";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=c520375efe6d";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=c520375efe6d";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=c520375efe6d";
 
+import {createDataEditor} from './data-editor.mjs?v=c520375efe6d';
+import {validateTableEdits} from './table-edits.mjs?v=c520375efe6d';
 import {createAnnotationTextEditor} from './annotation-editor.mjs?v=61d158587773';
 import {createShortcutHandler} from './shortcuts.mjs?v=61d158587773';
 import {formatText,TEXT_FORMAT_ACTIONS} from './text-format.mjs?v=61d158587773';
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
-const APP_BUILD = '8cb497d103c4';
+const APP_BUILD = 'c520375efe6d';
 function makeProject(settings,data,fonts,workspace={}){
   const live=sourceData&&data.filename===sourceData.filename&&(data.bytes===sourceData.bytes||data.files&&data.files===sourceData.files);
   const projectId=workspace.figureStudioProjectId||data.figureStudioProjectId||(live?(sourceData.figureStudioProjectId||=crypto.randomUUID()):crypto.randomUUID());
@@ -111,6 +113,7 @@ const recentColors = [];
 let colormapControlConfig=null,colormapPreviewToken=0,colormapPreviewTimer,colormapApplying=false;
 const colormapRamps=new Map();
 let sourceData = null;
+let dataEditor = null;
 var figureStudioBridge,figureStudioDirectSender;
 let sourceHandle = null, sourceDirectory = null, saveDirectory = null;
 const sourceHandles = new WeakMap();
@@ -178,6 +181,7 @@ function projectEditState() {
 }
 
 function hasUnsavedChanges() {
+  if (dataEditor?.hasDraft()) return true;
   if (!sourceData && ![...importedFonts.values()].some(font=>!font.automatic)) return false;
   const current = projectEditState(), saved = savedProjectState;
   return !saved || current.source !== saved.source || current.content !== saved.content ||
@@ -308,6 +312,7 @@ function updateButtons() {
   $("#data-drop-area").setAttribute("aria-disabled", String(!engineReady || busy));
   $("#sample-data").disabled = !engineReady || busy;
   $$('#sample-list button,#sample-groups button').forEach(button=>button.disabled=busy||pendingSampleId!==null);
+  $('#file-name').disabled=!engineReady || busy || !metadata;
   $('#add-data').hidden=!sourceData;
   $('#add-data').disabled=!engineReady || busy;
   $('#reload-data').hidden=!sourceData || sample;
@@ -371,6 +376,7 @@ function updateButtons() {
 }
 
 function request(operation, args) {
+  if (operation === 'sheet-info' || operation === 'sheet-export') args = {...args, tableEdits:sourceData?.tableEdits};
   return new Promise((resolve, reject) => {
     const id = ++requestID;
     requests.set(id, { resolve, reject });
@@ -392,7 +398,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=8cb497d103c4", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=c520375efe6d", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -885,14 +891,14 @@ function processingControls(item) {
   const num=(key,label,extra='')=>`<label>${label}<input data-series-field="${key}" type="number" ${key==='referencePoint'?'step="1"':'step="any"'} value="${escapeHTML(item[key] ?? '')}" ${extra}></label>`;
   const factor=(key,label)=>`<label title="数値または分数を入力できます（例：0.5、1/2、1/0.25）。">${label}<input data-series-field="${key}" type="text" spellcheck="false" placeholder="例：1/2" value="${escapeHTML(item[key] ?? 1)}"></label>`;
   const referenceMode=item.referenceMode || 'max';
-  const legacyReference=!['max','manual'].includes(referenceMode)?`<option value="${escapeHTML(referenceMode)}" selected hidden>保存時の基準</option>`:'';
+  const legacyReference=!['max','peakHeight','manual'].includes(referenceMode)?`<option value="${escapeHTML(referenceMode)}" selected hidden>保存時の基準</option>`:'';
   return `<details class="series-processing settings-panel"><summary>データ補正</summary>
     <div class="field-grid" title="元データを保持し、Yは傾き補正→係数→規格化→単位表示・Yオフセットの順に適用します。誤差棒も同じ倍率で変換します。面積で割る場合は、面積の逆数をY係数に入力します。">${factor('xFactor','Xに掛ける係数')}${factor('yFactor','Yに掛ける係数')}</div>
     <label><input data-series-field="detrend" type="checkbox" ${item.detrend?'checked':''}>傾きを補正</label>
     <div data-processing-for="detrend"><div class="field-grid" title="空欄は全範囲。指定範囲で直線を当てはめ、先頭の有効点の高さを保って傾きだけを除きます。範囲は表示中のX値です。">${num('detrendMin','補正範囲 X最小','placeholder="全範囲"')}${num('detrendMax','X最大','placeholder="全範囲"')}</div>
     <div class="slope-control"><label title="自動計算した直線の傾きを表示します。手入力や▲▼で微調整できます。Y係数・規格化・表示単位の変換前のY値を、表示中のX値で割った傾きです。">補正する傾き<input data-series-field="detrendSlope" type="number" step="0.001" value="${escapeHTML(item.detrendSlope ?? '')}" placeholder="自動計算中"></label><button type="button" class="button quiet" data-reset-slope title="指定範囲の近似直線から求めた傾きに戻します。">自動に戻す</button></div></div>
     <label>規格化<select data-series-field="normalization">${choiceOptions([['none','なし'],['ratio','基準値で割る（Y/Y₀）'],['relative','相対変化（(Y−Y₀)/Y₀）']],item.normalization || 'none')}</select></label>
-    <div data-processing-for="normalization"><label title="最大値は、傾き補正・Y係数を適用した後の各系列から別々に求めます。">規格化の基準<select data-series-field="referenceMode">${legacyReference}${choiceOptions([['max','各系列の最大値'],['manual','値を入力']],referenceMode)}</select></label>
+    <div data-processing-for="normalization"><label title="最大値・ピーク高さは、傾き補正・Y係数を適用した後の各系列から別々に求めます。ピーク高さは最大値−最小値です。Yの最小値を引かず、その高さで割ります。">規格化の基準<select data-series-field="referenceMode">${legacyReference}${choiceOptions([['max','各系列の最大値'],['peakHeight','各系列のピーク高さ（最大値 − 最小値）'],['manual','値を入力']],referenceMode)}</select></label>
     <div data-processing-for="manual" title="傾き補正・Y係数を掛けた後、表示単位とYオフセットを適用する前の基準値です。系列ごとに指定できます。">${num('referenceValue','基準値 Y₀')}</div></div>
     <div class="field-grid" title="表示中の単位で位置をずらします。XはX係数・単位換算の後、Yは傾き補正・Y係数・規格化・単位換算の後に加算します。">${num('xOffset','Xオフセット')}${num('yOffset','Yオフセット')}</div>
   </details>`;
@@ -1026,6 +1032,46 @@ function drawMetadata() {
   $("#data-table tbody").innerHTML = metadata.rows.map((row, index) => `<tr><td>${index + 1}</td>${row.map(value => `<td>${escapeHTML(value ?? "")}</td>`).join("")}</tr>`).join("");
 }
 
+async function applyDataTableEdits(edits) {
+  if (!engineReady || loading || exporting || !metadata || !sourceData) throw Error('グラフの処理が完了してから反映してください。');
+  const previous = metadata;
+  loading = true; clearTimeout(renderTimer); ++revision; updateButtons();
+  try {
+    const result = await request('table-apply', {...edits, filename:metadata.filename});
+    validateTableEdits(result.tableEdits);
+    metadata = result.metadata;
+    sourceData = {...sourceData, tableEdits:result.tableEdits};
+    config.series.forEach(item => {
+      const old = previous.columns[item.y], current = metadata.columns[item.y];
+      if (current && old && [old.name, old.originalName].includes(item.name)) item.name = current.originalName ?? current.name;
+    });
+    const current = makeSettings(config, metadata, loadedHeader);
+    sheetSettings.set(metadata.sheetIndex, current);
+    if (sheetMode === 'shared') sharedSettings = current;
+    // Annotation undo is configuration-only; it must not refer to old column names.
+    history = []; future = []; lastState = structuredClone(config);
+    drawMetadata(); drawControls(); renderWanted = !!config.series.length;
+    status('データ表の編集を反映しました。', 'ready');
+  } finally {loading = false; updateButtons(); if (renderWanted) renderPreview();}
+}
+dataEditor = createDataEditor({dialog:$('#data-editor'), request,
+  getSource:()=>sourceData, getMetadata:()=>metadata, apply:applyDataTableEdits,
+  show:()=>showDialog('#data-editor'),
+  saveCSV:{
+    prepare:filename=>{
+      const name=`${safeStem(filename)}.csv`;
+      return async blob=>{download(blob,name);return name;};
+    },
+    write:async save=>{
+      exporting=true;updateButtons();
+      try {const result=await request('table-csv',{}),blob=new Blob([Uint8Array.from(atob(result.base64),c=>c.charCodeAt(0))],{type:'text/csv;charset=utf-8'});const name=await save(blob);return {blob,name};}
+      finally {exporting=false;updateButtons();if(renderWanted)renderPreview();}
+    }
+  }
+});
+$('#file-name').addEventListener('click',()=>{if(engineReady && !loading && !exporting)void dataEditor.open();});
+$('#edit-data-preview').addEventListener('click',()=>{if(engineReady && !loading && !exporting)void dataEditor.open();});
+
 function resetPreview() {
   clearLivePreview();
   figureResult = null;
@@ -1132,12 +1178,12 @@ async function loadDataFiles(files, append=false, selection=null) {
   const filename=selection?sourceData.filename:`${safeStem(originals[0].filename).slice(0,80)}_combined.csv`;
   loading=true;clearTimeout(renderTimer);++revision;updateButtons();status('複数ファイルを読み込んでいます…');
   try{
-    const args={filename,...(selection?{sources:selection}:{files:originals.map(file=>({...file,bytes:file.bytes.slice(0)}))})};
+    const args={filename,tableEdits:(append||selection)?sourceData?.tableEdits:undefined,...(selection?{sources:selection}:{files:originals.map(file=>({...file,bytes:file.bytes.slice(0)}))})};
     if(!append&&!selection)await checkFigureStudioProjectReplacement();
     const data=await request('load-many',args);
     if(!append&&!selection)prepareFigureStudioProjectReplacement();
     config=combinedConfig(data,append || selection?oldMetadata:null,oldConfig);metadata=data;loadedHeader=1;
-    sourceData={filename,files:originals.map((file,index)=>({...file,sheetIndex:data.sources[index].sheetIndex,headerRow:data.sources[index].headerRow})),...((append||selection)&&sourceData?.figureStudioProjectId?{figureStudioProjectId:sourceData.figureStudioProjectId}:{})};
+    sourceData={filename,...((append||selection)&&sourceData?.tableEdits?{tableEdits:sourceData.tableEdits}:{}),files:originals.map((file,index)=>({...file,sheetIndex:data.sources[index].sheetIndex,headerRow:data.sources[index].headerRow})),...((append||selection)&&sourceData?.figureStudioProjectId?{figureStudioProjectId:sourceData.figureStudioProjectId}:{})};
     dataFileHandles=nextHandles;
     if(!append && !selection){projectHandle=null;projectFilename='';sourceHandle=sourceHandles.get(files[0]) || null;sourceDirectory=null;$('#save-destination').value=folderSupported?'source':'download';}
     sample=false;sheetMode='shared';sharedSettings=null;sheetSettings.clear();
@@ -1150,8 +1196,13 @@ async function loadDataFiles(files, append=false, selection=null) {
   finally{loading=false;updateButtons();if(renderWanted)renderPreview();}
 }
 
-async function reloadSourceData(chosenFiles=null,{fromFolder=false}={}) {
+let pendingEditedReload = null;
+$('#reload-edited-cancel').addEventListener('click',()=>{pendingEditedReload=null;$('#reload-edited-confirm').close();});
+$('#reload-edited-confirm').addEventListener('cancel',()=>{pendingEditedReload=null;});
+$('#reload-edited-continue').addEventListener('click',()=>{const pending=pendingEditedReload;pendingEditedReload=null;$('#reload-edited-confirm').close();if(pending&&pending.source===sourceData)void reloadSourceData(pending.files,{fromFolder:pending.fromFolder,discardEdits:true});});
+async function reloadSourceData(chosenFiles=null,{fromFolder=false,discardEdits=false}={}) {
   if(!engineReady || loading || exporting || !sourceData || !metadata)return false;
+  if(sourceData.tableEdits?.length&&!discardEdits){pendingEditedReload={files:chosenFiles,fromFolder,source:sourceData};showDialog('#reload-edited-confirm');return false;}
   const originals=sourceData.files || [{filename:sourceData.filename,sheetIndex:metadata.sheetIndex,headerRow:loadedHeader}];
   loading=true;clearTimeout(renderTimer);updateButtons();status('データを再読み込みしています…');
   try {
@@ -1192,8 +1243,9 @@ async function reloadSourceData(chosenFiles=null,{fromFolder=false}={}) {
     const settings=makeSettings(config,metadata,loadedHeader);
     // The project loader validates settings and rolls back the worker if a
     // used column/sheet disappeared. No original file or font is overwritten.
-    const result=await request('project',{filename:sourceData.filename,...(sourceData.files?{files:refreshed.map(file=>({...file,bytes:file.bytes.slice(0)}))}:{bytes:refreshed[0].bytes.slice(0)}),sheetIndex:metadata.sheetIndex,headerRow:loadedHeader,settings,fonts:[],sheetSettings:projectSheetSettings(),sharedSettings});
+    const result=await request('project',{filename:sourceData.filename,remapColumns:!!sourceData.tableEdits?.length,...(sourceData.files?{files:refreshed.map(file=>({...file,bytes:file.bytes.slice(0)}))}:{bytes:refreshed[0].bytes.slice(0)}),sheetIndex:metadata.sheetIndex,headerRow:loadedHeader,settings,fonts:[],sheetSettings:projectSheetSettings(),sharedSettings});
     ++revision;metadata=result.metadata;config=result.config;
+    const currentSettings=makeSettings(config,metadata,loadedHeader);sheetSettings.set(metadata.sheetIndex,currentSettings);if(sheetMode==='shared')sharedSettings=currentSettings;
     sourceData=sourceData.files?{filename:sourceData.filename,files:refreshed,figureStudioProjectId:sourceData.figureStudioProjectId}:{filename:sourceData.filename,bytes:refreshed[0].bytes,figureStudioProjectId:sourceData.figureStudioProjectId};
     dataFileHandles=ordered.map(index=>handles[index]);
     if(dataFileHandles[0] && sourceHandle!==dataFileHandles[0]){sourceHandle=dataFileHandles[0];sourceDirectory=null;refreshSaveDestination();}
@@ -1245,7 +1297,7 @@ async function loadFile(file, isSample = false, reload = false, fromClipboard = 
   status("データを読み込んでいます…");
   try {
     const filename = reload ? metadata.filename : file.name;
-    const args = { filename, headerRow, sheetIndex };
+    const args = { filename, headerRow, sheetIndex, tableEdits:reload?sourceData?.tableEdits:undefined };
     if (!reload) args.bytes = await file.arrayBuffer();
     const originalBytes = args.bytes?.slice(0);
     const previous = metadata;
@@ -2080,8 +2132,8 @@ async function restoreUpdateSession() {
     let restoredMetadata=null;
     if(record.sourceData){
       const data=record.sourceData;
-      restoredMetadata=data.files?await request('load-many',{filename:data.filename,files:data.files.map(file=>({...file,bytes:file.bytes.slice(0)}))}):
-        await request('load',{filename:data.filename,bytes:data.bytes.slice(0),sheetIndex:record.metadata.sheetIndex,headerRow:record.loadedHeader});
+      restoredMetadata=data.files?await request('load-many',{filename:data.filename,tableEdits:data.tableEdits,files:data.files.map(file=>({...file,bytes:file.bytes.slice(0)}))}):
+        await request('load',{filename:data.filename,tableEdits:data.tableEdits,bytes:data.bytes.slice(0),sheetIndex:record.metadata.sheetIndex,headerRow:record.loadedHeader});
       if(restoredMetadata.filename!==record.metadata.filename || restoredMetadata.sheetIndex!==record.metadata.sheetIndex)throw new Error('データのシートを復元できませんでした。');
     }
     for(const font of record.fonts)await request('font',{filename:font.name,bytes:font.bytes.slice(0)});
@@ -2143,6 +2195,7 @@ async function checkFigureStudioProjectReplacement({fromBridge=false}={}){
   await figureStudioBridge?.captureWorkspaceBinding?.();
 }
 function prepareFigureStudioProjectReplacement({fromBridge=false,force=false}={}){
+  dataEditor?.reset();
   if(fromBridge){
     if(force){plotTextEditor.finish(true,{focus:false});dragging=null;panning=null;pendingDataFiles=null;$$('dialog[open]').forEach(dialog=>dialog.close());}
     return;
@@ -2160,10 +2213,10 @@ async function readProject(file, saved, options={}) {
   try {
     if(file.size>PROJECT_MAX_SIZE)throw new Error('プロジェクトは130 MB以内のファイルを選んでください。');
     const raw=saved || JSON.parse(await file.text()),project=parseProject(raw),identity=await identifyPlotProject(raw);
-    const retainedData={filename:project.data.filename,figureStudioProjectId:identity.projectId,...(project.data.files?{files:project.data.files.map(file=>({...file,bytes:file.bytes.slice(0)}))}:{bytes:project.data.bytes.slice(0)})};
+    const retainedData={filename:project.data.filename,figureStudioProjectId:identity.projectId,...(project.data.tableEdits?{tableEdits:project.data.tableEdits}:{}),...(project.data.files?{files:project.data.files.map(file=>({...file,bytes:file.bytes.slice(0)}))}:{bytes:project.data.bytes.slice(0)})};
     const retainedFonts=project.fonts.map(font=>({...font,bytes:font.bytes.slice(0)}));
     await checkFigureStudioProjectReplacement(options);
-    const result=await request('project',{filename:project.data.filename,bytes:project.data.bytes,...(project.data.files?{files:project.data.files}:{}),sheetIndex:project.data.sheetIndex,headerRow:project.data.headerRow,settings:project.settings,fonts:project.fonts,sheetSettings:project.workspace.sheetSettings || [],sharedSettings:project.workspace.sharedSettings});
+    const result=await request('project',{filename:project.data.filename,tableEdits:project.data.tableEdits,bytes:project.data.bytes,...(project.data.files?{files:project.data.files}:{}),sheetIndex:project.data.sheetIndex,headerRow:project.data.headerRow,settings:project.settings,fonts:project.fonts,sheetSettings:project.workspace.sheetSettings || [],sharedSettings:project.workspace.sharedSettings});
     prepareFigureStudioProjectReplacement(options);
     metadata=result.metadata; config=result.config; sourceData=retainedData; sample=project.data.sample; dataFileHandles=[];
     sheetSettings=new Map((project.workspace.sheetSettings || []).map(item=>[item.sheetIndex,item.settings]));
@@ -3140,7 +3193,7 @@ catch (error) { fatal(`描画機能を開始できませんでした。ブラウ
 
 // Figure Studio bridge: included in the source application's module scope.
 let figureBridgeBaseline=null,figureBridgePreservedOnReconnect=false;
-const figureBridgePendingInput=()=>plotTextEditor.active||$$('[data-axis],[data-option],[data-series-field],[data-annotation-field],[data-legend-field],[data-fill]').some(input=>!input.disabled&&input.getClientRects().length>0&&incompleteNumberInput(input));
+const figureBridgePendingInput=()=>dataEditor?.hasDraft()||dataEditor?.busy||plotTextEditor.active||$$('[data-axis],[data-option],[data-series-field],[data-annotation-field],[data-legend-field],[data-fill]').some(input=>!input.disabled&&input.getClientRects().length>0&&incompleteNumberInput(input));
 async function figureBridgeIsDirty(){
   if(loading||exporting||renderRunning||renderedRevision!==revision||dragging||colormapApplying||pendingDataFiles||figureBridgePendingInput())return true;
   try{return !samePlotCheckpoint(figureBridgeBaseline,(await collectPlotGraphs()).checkpoint);}catch{return true;}
@@ -3294,6 +3347,7 @@ function validateFigureWorkspaceState(snapshot){
  let fontBytes=0;for(const font of state.fonts){if(!string(font?.name,255)||!string(font?.family,200)||!(font.bytes instanceof ArrayBuffer)||!font.bytes.byteLength||font.bytes.byteLength>20*1024*1024)fail();fontBytes+=font.bytes.byteLength;}if(fontBytes>60*1024*1024)fail();
  if(state.sourceData){const data=state.sourceData,meta=state.metadata;if(!string(data.filename,255)||!/\.(xlsx|xlsm|xls|csv|txt)$/i.test(data.filename)||!meta||meta.filename!==data.filename||!list(meta.columns,20000)||!list(meta.sheets,1001)||!Number.isInteger(meta.sheetIndex)||meta.sheetIndex<0||meta.sheetIndex>=meta.sheets.length)fail();
   if(data.figureStudioProjectId!==undefined&&(typeof data.figureStudioProjectId!=='string'||!/^[a-zA-Z0-9-]{16,100}$/.test(data.figureStudioProjectId)))fail();
+  validateTableEdits(data.tableEdits);
   const files=data.files??[data];if(!list(files,16)||!files.length)fail();let total=0;for(const file of files){if(!string(file?.filename,255)||!/\.(xlsx|xlsm|xls|csv|txt)$/i.test(file.filename)||!(file.bytes instanceof ArrayBuffer)||!file.bytes.byteLength)fail();total+=file.bytes.byteLength;if(data.files&&(!Number.isInteger(file.sheetIndex)||file.sheetIndex<0||file.sheetIndex>1000||!Number.isInteger(file.headerRow)||file.headerRow<1||file.headerRow>1000))fail();}if(total>30*1024*1024)fail();
   if(state.config.series.length)restoreSettings(makeSettings(state.config,meta,state.loadedHeader),meta);
  }else if(state.metadata!==null)fail();
@@ -3312,7 +3366,7 @@ function validateFigureWorkspaceState(snapshot){
 }
 // End pure workspace validation helpers.
 
-function figureWorkspaceFields(root=document){return [...root.querySelectorAll('input,select,textarea')].filter(input=>!['file','password','hidden'].includes(input.type)&&input.id!=='save-destination'&&(!input.closest('dialog')||input.closest('dialog').open));}
+function figureWorkspaceFields(root=document){return [...root.querySelectorAll('input,select,textarea')].filter(input=>!['file','password','hidden'].includes(input.type)&&input.id!=='save-destination'&&!input.closest('#data-editor')&&(!input.closest('dialog')||input.closest('dialog').open));}
 function figureWorkspaceBaseLocator(input){return {scope:input.closest('dialog')?.id||'',id:input.id||'',tag:input.tagName,type:input.type||'',attributes:figureWorkspaceAttributes.filter(name=>input.hasAttribute(name)).map(name=>[name,input.getAttribute(name)]),ordinal:0};}
 const figureWorkspaceLocatorKey=locator=>JSON.stringify([locator.scope,locator.id,locator.tag,locator.type,locator.attributes]);
 function figureWorkspaceLocator(input){
@@ -3324,7 +3378,7 @@ function figureWorkspaceField(locator){const root=locator.scope?document.getElem
 function figureWorkspaceUI({rejectInvalid=false}={}){
  const locators=new Map(),ordinals=new Map();
  const fields=figureWorkspaceFields().map(input=>{if(rejectInvalid&&input.validity?.badInput)throw Error(`「${input.getAttribute('aria-label')||input.closest('label')?.textContent?.trim().slice(0,60)||input.dataset.axis||input.id||'数値欄'}」の入力を確定してから保存してください。`);const locator=figureWorkspaceBaseLocator(input),key=figureWorkspaceLocatorKey(locator);locator.ordinal=ordinals.get(key)||0;ordinals.set(key,locator.ordinal+1);locators.set(input,locator);return {locator,value:input.value,checked:!!input.checked,indeterminate:!!input.indeterminate,badInput:!!input.validity?.badInput};});
- const dialogs=$$('dialog[open]').map(dialog=>({id:dialog.id,left:dialog.style.left||'',top:dialog.style.top||''}));
+ const dialogs=$$('dialog[open]').filter(dialog=>!['data-editor','reload-edited-confirm'].includes(dialog.id)).map(dialog=>({id:dialog.id,left:dialog.style.left||'',top:dialog.style.top||''}));
  return {fields,dialogs,details:$$('details').filter(node=>!node.closest('dialog')||node.closest('dialog').open).map(node=>{const scope=node.closest('dialog')?.id||'',root=scope?document.getElementById(scope):document;return {scope,index:[...root.querySelectorAll('details')].filter(item=>(item.closest('dialog')?.id||'')===scope).indexOf(node),open:node.open};}),
   axis:$('#axis-editor').open?{axis:$('#axis-editor-fields').dataset.axisName,kind:$('#axis-editor-fields').dataset.workspaceKind||($('#axis-editor-fields').querySelector('[data-axis$="Label"]')?'label':'ticks')}:null,
   element:$('#element-editor').open?{part:$('#element-editor-fields').dataset.workspacePart,index:$('#element-editor-fields').dataset.workspaceIndex||'0',origin:$('#element-editor-fields').dataset.seriesEditorOrigin||''}:null,
@@ -3332,15 +3386,16 @@ function figureWorkspaceUI({rejectInvalid=false}={}){
   focus:locators.get(document.activeElement)||null};
 }
 function figureWorkspaceHasWork(){return !!sourceData||[...importedFonts.values()].some(font=>!font.automatic)||!!pendingDataFiles||!!$('#paste-text').value||JSON.stringify(config)!==JSON.stringify({axes:defaultAxes(),series:[]});}
-function figureWorkspaceBusy(){return figureWorkspaceCapturing||figureWorkspaceRestoring||loading||exporting||!!dragging||!!panning||colormapApplying||updateReloading||updateChecking||!!figureStudioDirectSender?.busy;}
+function figureWorkspaceBusy(){return dataEditor?.busy||figureWorkspaceCapturing||figureWorkspaceRestoring||loading||exporting||!!dragging||!!panning||colormapApplying||updateReloading||updateChecking||!!figureStudioDirectSender?.busy;}
 function figureWorkspaceSignature(){
  if(!figureWorkspaceHasWork())return 'plot-empty';
  const ui=figureWorkspaceUI();ui.focus=null;
- const value=JSON.stringify({source:figureWorkspaceToken(sourceData),fonts:[...importedFonts.values()].map(figureWorkspaceToken),config,loadedHeader,sample,sheets:[...sheetSettings],sheetMode,sharedSettings,history,future,lastState,selected:[...selected],clipboard,view,ui,pending:pendingDataFiles?.map(file=>[file.name,file.size,file.lastModified]),pasteHeaderAutomatic});
+ const value=JSON.stringify({source:figureWorkspaceToken(sourceData),fonts:[...importedFonts.values()].map(figureWorkspaceToken),config,loadedHeader,sample,sheets:[...sheetSettings],sheetMode,sharedSettings,history,future,lastState,selected:[...selected],clipboard,view,ui,pending:pendingDataFiles?.map(file=>[file.name,file.size,file.lastModified]),pasteHeaderAutomatic,dataDraft:!!dataEditor?.hasDraft()});
  let a=2166136261,b=2246822507;for(let i=0;i<value.length;i++){const code=value.charCodeAt(i);a=Math.imul(a^code,16777619);b=Math.imul(b^code,3266489909);}return `plot-${value.length}-${(a>>>0).toString(16)}-${(b>>>0).toString(16)}`;
 }
 function figureWorkspaceEmpty(){return {format:'plotlauncher-workspace',version:1,config:{axes:defaultAxes(),series:[]},sourceData:null,metadata:null,fonts:[],fontFamilies:['Liberation Sans','Noto Sans JP','DejaVu Sans'],fontAliases:[],savedProjectState:null,loadedHeader:1,sample:false,sheetSettings:[],sheetMode:'shared',sharedSettings:null,history:[],future:[],lastState:undefined,selected:[],clipboard:[],projectFilename:'',sourceToken:null,fontTokens:[],bridgeBaseline:null,pendingDataFiles:null,pastedTable:null,pasteHeaderAutomatic:true,recentColors:[],workspace:{saveName:$('#save-name').defaultValue||'graph',pngDpi:'1200',saveDestination:'download',view:{zoom:1,x:0,y:0},tableHidden:false,tableDetails:false,details:[],controlScroll:0,pageScroll:0},ui:{fields:[],dialogs:[],details:[],axis:null,element:null,colorTarget:null,focus:null}};}
 async function captureFigureWorkspace(){
+ if(dataEditor?.hasDraft())throw Error('データ表の編集を「グラフに反映」するか、未反映の編集を取り消してから保存してください。');
  if(figureWorkspaceBusy())throw Error('PlotLauncherの処理が終わってから保存してください。');
  if(!figureWorkspaceHasWork())return {version:1,app:'plot',state:null,binding:null};
  figureWorkspaceUI({rejectInvalid:true});
@@ -3363,10 +3418,11 @@ async function restoreFigureWorkspace(snapshot){
  figureWorkspaceRestoring=true;loading=true;updateButtons();
  try{
   let restoredMetadata=null;
-  if(record.sourceData){const data=record.sourceData;restoredMetadata=data.files?await request('load-many',{filename:data.filename,files:data.files.map(file=>({...file,bytes:file.bytes.slice(0)}))}):await request('load',{filename:data.filename,bytes:data.bytes.slice(0),sheetIndex:record.metadata.sheetIndex,headerRow:record.loadedHeader});if(restoredMetadata.filename!==record.metadata.filename||restoredMetadata.sheetIndex!==record.metadata.sheetIndex)throw Error('元データのシートを復元できませんでした。');}
+  if(record.sourceData){const data=record.sourceData;restoredMetadata=data.files?await request('load-many',{filename:data.filename,tableEdits:data.tableEdits,files:data.files.map(file=>({...file,bytes:file.bytes.slice(0)}))}):await request('load',{filename:data.filename,tableEdits:data.tableEdits,bytes:data.bytes.slice(0),sheetIndex:record.metadata.sheetIndex,headerRow:record.loadedHeader});if(restoredMetadata.filename!==record.metadata.filename||restoredMetadata.sheetIndex!==record.metadata.sheetIndex)throw Error('元データのシートを復元できませんでした。');}
   for(const font of record.fonts)await request('font',{filename:font.name,bytes:font.bytes.slice(0)});
   $$('dialog[open]').forEach(dialog=>dialog.close());
   config=record.config;sourceData=record.sourceData;metadata=restoredMetadata;importedFonts.clear();record.fonts.forEach(font=>importedFonts.set(font.name,font));
+  dataEditor?.reset();
   loadedFonts.clear();record.fontFamilies.forEach(family=>loadedFonts.add(family));localFontAliases.clear();record.fontAliases.forEach(([family,alias])=>localFontAliases.set(family,alias));failedLocalFonts.clear();
   if(sourceData)figureWorkspaceTokens.set(sourceData,record.sourceToken);record.fonts.forEach((font,index)=>figureWorkspaceTokens.set(font,record.fontTokens[index]));
   savedProjectState=record.savedProjectState;figureBridgeBaseline=record.bridgeBaseline;figureBridgePreservedOnReconnect=false;loadedHeader=record.loadedHeader;sample=record.sample;

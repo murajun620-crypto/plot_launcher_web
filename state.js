@@ -1,5 +1,6 @@
 import { resetPresetUnitScales, unitConversion, configureAFMUnits } from "./units.js?v=9127ec4c4f31";
-export const APP_VERSION = '2.4.28';
+import { validateTableEdits } from './table-edits.mjs?v=c520375efe6d';
+export const APP_VERSION = '2.4.29';
 
 // Accept one numeric value or fraction without evaluating JavaScript expressions.
 export function parseCoefficient(value) {
@@ -163,7 +164,7 @@ function projectBase64(bytes) {
 
 export function makeProject(settings, data, fonts = [], workspace = {}) {
   const saved = {format:'plotlauncher-project', version:1, settings:structuredClone(settings),
-    data:{filename:data.filename, base64:data.files?'':projectBase64(data.bytes), ...(data.files?{files:data.files.map(file=>({filename:file.filename,base64:projectBase64(file.bytes),sheetIndex:file.sheetIndex,headerRow:file.headerRow}))}:{}), sheetIndex:data.sheetIndex, headerRow:data.headerRow, sample:!!data.sample},
+    data:{filename:data.filename, base64:data.files?'':projectBase64(data.bytes), ...(data.files?{files:data.files.map(file=>({filename:file.filename,base64:projectBase64(file.bytes),sheetIndex:file.sheetIndex,headerRow:file.headerRow}))}:{}), ...(data.tableEdits?.length?{tableEdits:structuredClone(validateTableEdits(data.tableEdits))}:{}), sheetIndex:data.sheetIndex, headerRow:data.headerRow, sample:!!data.sample},
     fonts:fonts.map(font => ({name:font.name, family:font.family, base64:projectBase64(font.bytes)})), workspace:structuredClone(workspace)};
   parseProject(saved);
   return saved;
@@ -172,6 +173,7 @@ export function makeProject(settings, data, fonts = [], workspace = {}) {
 export function parseProject(saved) {
   if (saved?.format !== 'plotlauncher-project' || saved.version !== 1) throw new Error('PlotLauncher Webのプロジェクトファイルを選んでください。');
   const data = saved.data, settings = saved.settings, workspace = saved.workspace || {};
+  validateTableEdits(data?.tableEdits);
   if(workspace.figureStudioProjectId!==undefined&&!/^[a-zA-Z0-9-]{16,100}$/.test(workspace.figureStudioProjectId))throw Error('プロジェクトの識別情報を確認してください。');
   if (!data || typeof data.filename !== 'string' || data.filename.length > 255 || !/\.(xlsx|xlsm|xls|csv|txt)$/i.test(data.filename) || !Number.isInteger(data.sheetIndex) || data.sheetIndex < 0 || data.sheetIndex > 1000 || !Number.isInteger(data.headerRow) || data.headerRow < 1 || data.headerRow > 1000 || typeof data.sample !== 'boolean') throw new Error('プロジェクトのデータ・シート・ヘッダー行を確認してください。');
   if (settings?.format !== 'plotlauncher-web' || settings.version !== 1 || settings.data?.filename !== data.filename || settings.data?.headerRow !== data.headerRow || !Array.isArray(settings.series) || !settings.series.length || !settings.axes) throw new Error('プロジェクトのグラフ設定を確認してください。');
@@ -267,7 +269,7 @@ export function restoreSettings(document, metadata) {
         }
         if (key === 'yAxis' && !['left','right'].includes(item[key])) throw new Error("設定JSONのY軸を確認してください。");
         if (key === 'trendType' && !['none','linear','polynomial','exponential','logarithmic','power'].includes(item[key])) throw new Error("設定JSONの近似線を確認してください。");
-        if (key === 'normalization' && !['none','ratio','relative'].includes(item[key]) || key === 'referenceMode' && !['max','manual','first','point','range'].includes(item[key]) || key === 'currentUnit' && !['A','mA','μA','nA','pA'].includes(item[key]) || key === 'areaUnit' && !['cm2','mm2','m2'].includes(item[key])) throw new Error('設定JSONのデータ補正を確認してください。');
+        if (key === 'normalization' && !['none','ratio','relative'].includes(item[key]) || key === 'referenceMode' && !['max','peakHeight','manual','first','point','range'].includes(item[key]) || key === 'currentUnit' && !['A','mA','μA','nA','pA'].includes(item[key]) || key === 'areaUnit' && !['cm2','mm2','m2'].includes(item[key])) throw new Error('設定JSONのデータ補正を確認してください。');
         if (!["string", "number"].includes(typeof item[key])) throw new Error("設定JSONの系列設定を確認してください。");
         result[key] = item[key];
       }

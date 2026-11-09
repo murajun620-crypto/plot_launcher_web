@@ -432,7 +432,7 @@ class PlotEngine:
         self.font_families.add(family)
         return {"family": family}
 
-    def load(self, path, filename, sheet_index=0, header_row=1):
+    def load(self, path, filename, sheet_index=0, header_row=1, table_edits=None, source_index=0):
         """Read saved files; Office and Tkinter are never imported."""
         header = number(header_row, "ヘッダー行", minimum=1, maximum=1000)
         if not header.is_integer():
@@ -492,18 +492,34 @@ class PlotEngine:
         self.column_labels = dict(zip(names, names))
         self.multi_source = False
         self.xps_csv = suffix == ".csv" and bool(xps_header)
-        return {"filename": filename, "sheets": sheets, "sheetIndex": sheets.index(sheet_name), "columns": columns, "rowCount": len(frame), "rows": rows, "headerRow": int(header), "xpsCSV": self.xps_csv, "plotType": "XPS Fit" if self.xps_csv else self.infer_plot_type(filename)}
+        info = {"filename": filename, "sheets": sheets, "sheetIndex": sheets.index(sheet_name), "columns": columns, "rowCount": len(frame), "rows": rows, "headerRow": int(header), "xpsCSV": self.xps_csv, "plotType": "XPS Fit" if self.xps_csv else self.infer_plot_type(filename)}
+        self.table_edits = table_edits or []
+        edit = next((entry for entry in self.table_edits if (entry['sourceIndex'], entry['sheetIndex'], entry['headerRow']) == (source_index, info['sheetIndex'], info['headerRow'])), None)
+        if edit:
+            if edit['rowCount'] != len(frame) or edit['columnCount'] != len(frame.columns):
+                raise ValueError('保存されたデータ表の編集と元データの行・列数が一致しません。')
+            frame = frame.astype(object)
+            frame.columns = edit['columns']
+            for row, column, value in edit['cells']:
+                frame.iat[row, column] = self._edited_cell(value)
+            self.frame = frame
+            self.column_labels = dict(zip(frame.columns, frame.columns))
+            info = self._refresh_table_info(info)
+        self.table_info = info
+        self.table_parts = [{'sourceIndex': source_index, 'sheetIndex': info['sheetIndex'], 'headerRow': info['headerRow'], 'rowCount': len(frame), 'columnCount': len(frame.columns), 'columns': list(frame.columns), 'offset': 0, 'filename': filename}]
+        return info
 
-    def load_many(self, sources, filename="combined.csv", **unused):
+    def load_many(self, sources, filename="combined.csv", table_edits=None, **unused):
         if not isinstance(sources, list) or not 1 <= len(sources) <= 16:
             raise ValueError("同時に読み込めるファイルは16個までです。")
         previous = dict(self.__dict__)
-        frames, groups, columns, source_info = [], [], [], []
+        frames, groups, columns, source_info, parts = [], [], [], [], []
         try:
             for source_index, source in enumerate(sources):
-                info = self.load(source["path"], source["filename"], source.get("sheetIndex", 0), source.get("headerRow", 1))
+                info = self.load(source["path"], source["filename"], source.get("sheetIndex", 0), source.get("headerRow", 1), table_edits, source_index)
                 frame = self.frame.copy()
                 start = len(columns)
+                parts.append({**self.table_parts[0], 'offset': start})
                 group = []
                 for local, column in enumerate(info["columns"]):
                     name = f"{source_index+1}:{Path(source['filename']).stem[:40]}:{column['name'][:140]} [{local+1}]"
@@ -519,13 +535,15 @@ class PlotEngine:
             self.multi_source = True
             self.column_labels = {column['name']:column['originalName'] for column in columns}
             rows = [[None if pd.isna(value) else str(value)[:140] for value in row] for row in frame.head(8).itertuples(index=False, name=None)]
-            return {"filename":filename, "sheets":["重ね描き"], "sheetIndex":0, "headerRow":1, "columns":columns, "rowCount":len(frame), "rows":rows, "plotType":"General", "groups":groups, "sources":source_info}
+            info = {"filename":filename, "sheets":["重ね描き"], "sheetIndex":0, "headerRow":1, "columns":columns, "rowCount":len(frame), "rows":rows, "plotType":"General", "groups":groups, "sources":source_info}
+            self.table_info, self.table_parts, self.table_edits = info, parts, table_edits or []
+            return info
         except Exception:
             self.__dict__.clear(); self.__dict__.update(previous)
             raise
 
     @contextmanager
-    def sheet_data(self, path, filename, sheet_index, header_row, sources=None):
+    def sheet_data(self, path, filename, sheet_index, header_row, sources=None, table_edits=None):
         """Read/export another sheet without replacing the editable preview."""
         previous = dict(self.__dict__)
         self.figure = None
@@ -533,14 +551,99 @@ class PlotEngine:
             if sources:
                 if sheet_index != 0:
                     raise ValueError("重ね描きのシートは先頭を選んでください。")
-                yield self.load_many(sources, filename)
+                yield self.load_many(sources, filename, table_edits)
             else:
-                yield self.load(path, filename, sheet_index, header_row)
+                yield self.load(path, filename, sheet_index, header_row, table_edits)
         finally:
             if self.figure is not None and self.figure is not previous.get("figure"):
                 plt.close(self.figure)
             self.__dict__.clear()
             self.__dict__.update(previous)
+
+    @staticmethod
+    def _edited_cell(value):
+        # Text is never evaluated as a formula. Empty cells stay missing.
+        if value == '':
+            return np.nan
+        if re.fullmatch(r'[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?', value.strip()):
+            result = float(value)
+            if not math.isfinite(result):
+                raise ValueError('セルの数値が大きすぎます。')
+            return result
+        return value
+
+    def _refresh_table_info(self, info):
+        columns = []
+        for index, name in enumerate(self.frame.columns):
+            numeric = pd.to_numeric(self.frame.iloc[:, index], errors='coerce').replace([np.inf, -np.inf], np.nan)
+            column = {'index': index, 'name': name, 'numeric': int(numeric.iloc[:2000].notna().sum())}
+            unit = column_length_unit(name)
+            if unit:
+                finite = numeric.dropna()
+                column.update(lengthUnit=unit, numericRange=[float(finite.min()), float(finite.max())] if len(finite) else None)
+            columns.append(column)
+        rows = [[None if pd.isna(value) else str(value)[:140] for value in row] for row in self.frame.head(8).itertuples(index=False, name=None)]
+        return {**info, 'columns': columns, 'rows': rows}
+
+    def table_page(self, start=0, column_start=0):
+        if self.frame is None:
+            raise ValueError('先にデータを読み込んでください。')
+        start = int(number(start, '開始行', minimum=0, maximum=max(0, len(self.frame)-1)))
+        column_start = int(number(column_start, '開始列', minimum=0, maximum=max(0, len(self.frame.columns)-1)))
+        end, column_end = min(start+50, len(self.frame)), min(column_start+12, len(self.frame.columns))
+        rows = [[None if pd.isna(value) else str(value) for value in row] for row in self.frame.iloc[start:end, column_start:column_end].itertuples(index=False, name=None)]
+        columns = []
+        for index in range(column_start, column_end):
+            part = next(part for part in self.table_parts if part['offset'] <= index < part['offset']+part['columnCount'])
+            columns.append({'index': index, 'name': part['columns'][index-part['offset']], 'filename': part['filename'], 'rowCount': part['rowCount']})
+        return {'start': start, 'columnStart': column_start, 'rowCount': len(self.frame), 'columnCount': len(self.frame.columns), 'rows': rows, 'columns': columns}
+
+    def edit_table(self, columns, cells, path, filename, sources=None):
+        import copy
+        if not isinstance(columns, list) or len(columns) != len(self.frame.columns) or not isinstance(cells, list) or len(cells) > 50000:
+            raise ValueError('データ表の編集内容を確認してください。')
+        if any(not isinstance(name, str) for name in columns) or any(not isinstance(cell, list) or len(cell) != 3 or not isinstance(cell[0], int) or not isinstance(cell[1], int) or not 0 <= cell[0] < len(self.frame) or not 0 <= cell[1] < len(self.frame.columns) or not isinstance(cell[2], str) for cell in cells):
+            raise ValueError('データ表の編集内容を確認してください。')
+        edits = copy.deepcopy(self.table_edits)
+        for part in self.table_parts:
+            offset, count = part['offset'], part['columnCount']
+            names = [str(name).strip() for name in columns[offset:offset+count]]
+            if any(not name or len(name) > 200 for name in names) or len(set(names)) != len(names):
+                raise ValueError('列名は同じファイル内で重複しない、1〜200文字の名前にしてください。')
+            changes = [cell for cell in cells if isinstance(cell, list) and len(cell) == 3 and isinstance(cell[1], int) and offset <= cell[1] < offset+count]
+            key = (part['sourceIndex'], part['sheetIndex'], part['headerRow'])
+            entry = next((edit for edit in edits if (edit['sourceIndex'], edit['sheetIndex'], edit['headerRow']) == key), None)
+            if not changes and names == part['columns']:
+                continue
+            if entry is None:
+                entry = {key: part[key] for key in ('sourceIndex', 'sheetIndex', 'headerRow', 'rowCount', 'columnCount')}
+                entry.update(columns=names, cells=[])
+                edits.append(entry)
+            merged = {(row, column): value for row, column, value in entry['cells']}
+            for row, column, value in changes:
+                if not isinstance(row, int) or row < 0 or row >= part['rowCount'] or not isinstance(value, str) or len(value) > 10000:
+                    raise ValueError('セルは元データの範囲内・1万文字以内で編集してください。')
+                self._edited_cell(value)
+                merged[row, column-offset] = value
+            entry.update(columns=names, cells=[[row, column, value] for (row, column), value in merged.items()])
+        if sum(len(edit['cells']) for edit in edits) > 50000 or len(json.dumps(edits, ensure_ascii=False).encode('utf-16-le'))//2 > 8*1024*1024:
+            raise ValueError('データ表の編集は合計5万セル・8 MB以内にしてください。')
+        previous = dict(self.__dict__)
+        try:
+            info = self.load_many(sources, filename, edits) if sources else self.load(path, filename, self.table_info['sheetIndex'], self.table_info['headerRow'], edits)
+            return {'metadata': info, 'tableEdits': edits}
+        except Exception:
+            self.__dict__.clear(); self.__dict__.update(previous)
+            raise
+
+    def table_csv(self):
+        if self.frame is None:
+            raise ValueError('先にデータを読み込んでください。')
+        # One row per input row; independent X columns are retained. No interpolation.
+        content = self.frame.to_csv(index=False, lineterminator='\r\n').encode('utf-8-sig')
+        if len(content) > 100*1024*1024:
+            raise ValueError('CSVは100 MB以内にしてください。')
+        return {'base64': base64.b64encode(content).decode('ascii')}
 
     def process_series(self, x, raw_y, item):
         """Affine corrections; raw data and reference estimates stay unchanged."""
@@ -589,6 +692,11 @@ class PlotEngine:
             if reference_mode == "max":
                 if not valid.any(): raise ValueError("規格化の基準となる有効な点がありません。")
                 reference = float(np.max(y[valid]))
+            elif reference_mode == "peakHeight":
+                if not valid.any(): raise ValueError("規格化の基準となる有効な点がありません。")
+                reference = float(np.max(y[valid]) - np.min(y[valid]))
+                if reference == 0:
+                    raise ValueError("最大値と最小値が同じため、ピーク高さで規格化できません。")
             elif reference_mode == "first":
                 if not valid.any(): raise ValueError("規格化の基準となる有効な点がありません。")
                 reference = y[np.flatnonzero(valid)[0]]
@@ -1917,8 +2025,14 @@ class PlotEngine:
         elif operation == "load":
             result = self.load(**args)
         elif operation in {"sheet-info", "sheet-export"}:
-            with self.sheet_data(args["path"], args["filename"], args["sheet_index"], args["header_row"], args.get("sources")) as metadata:
+            with self.sheet_data(args["path"], args["filename"], args["sheet_index"], args["header_row"], args.get("sources"), args.get('table_edits')) as metadata:
                 result = metadata if operation == "sheet-info" else self.export(args["config"], args["format"], args.get("dpi", 1200))
+        elif operation == 'table-page':
+            result = self.table_page(**args)
+        elif operation == 'table-apply':
+            result = self.edit_table(**args)
+        elif operation == 'table-csv':
+            result = self.table_csv()
         elif operation == "render":
             result = self.render(args["config"])
         elif operation == "export":

@@ -21,7 +21,7 @@ import {openSource,SOURCE_APPS,setupSourceDiscovery,closeSourceSessions} from '.
 import {createFigureSidebar} from './thumbnails.mjs?v=live-v062-1';
 import {setupTransferReceiver,getFigureWorkspace} from './integration/direct-transfer.mjs?v=source-batch-v070-1';
 import {readMifitoIdentity} from './integration/mifito-sync.mjs?v=0.3.5-1';
-import {readPlotIdentity} from './integration/plot-sync.mjs?v=source-batch-v070-1';
+import {readPlotIdentity} from './integration/plot-sync.mjs?v=c520375efe6d';
 import {planMiFiToSync} from './mifito-batch.mjs?v=source-batch-v070-1';
 import {setupUpdateCheck} from './update-check.mjs';
 import {marqueeSelection,resolveObjectSelection,clickObjectSelection,selectionDescription} from './selection.mjs?v=nested-groups-v0712-1';

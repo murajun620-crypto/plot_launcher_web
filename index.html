@@ -6,8 +6,8 @@
   <meta name="description" content="Excel・CSV・TXTの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=8035a7177f74">
-  <script type="module" src="./app.js?v=8cb497d103c4"></script>
+  <link rel="stylesheet" href="./style.css?v=c520375efe6d">
+  <script type="module" src="./app.js?v=c520375efe6d"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -53,7 +53,7 @@
         <div id="data-drop-area" class="data-drop-area" role="region" aria-label="データファイルのドロップ先" aria-disabled="true">ここにデータをドロップ</div>
         <button id="sample-data" class="sample-button" disabled>サンプルを使う</button>
         <div id="file-summary" class="file-summary" hidden>
-          <svg><use href="#i-file"/></svg><div><strong id="file-name"></strong><span id="file-stats"></span></div><span id="sample-badge" class="badge" hidden>サンプル</span>
+          <svg><use href="#i-file"/></svg><div><button id="file-name" type="button" class="data-filename" title="データ表を開いて編集・CSV保存"></button><span id="file-stats"></span></div><span id="sample-badge" class="badge" hidden>サンプル</span>
         </div>
         <div id="data-reload-actions" class="data-reload-actions" hidden><button id="reload-data" class="button quiet" hidden disabled title="元ファイルの保存済みの内容を、グラフの設定を保って読み込みます。使用中で選択できない場合は右の▽からフォルダーを選んでください。"><svg><use href="#i-refresh"/></svg>再読み込み</button><details id="reload-data-menu"><summary class="button quiet" aria-label="データの再読み込み方法" title="使用中のExcelファイルを読み込む">▾</summary><div class="reload-data-options"><button id="reload-data-folder" type="button" class="button quiet" disabled title="元ファイルのあるフォルダーを選びます。Excelのファイル選択で「使用中」と表示される場合に使用します。保存済みのデータだけを読み込みます。">フォルダーから再読み込み</button></div></details></div>
         <input id="reload-data-files" type="file" accept=".xlsx,.xlsm,.xls,.csv,.txt" multiple hidden>
@@ -193,7 +193,7 @@
           <div class="table-scroll series-table-scroll" tabindex="0" role="region" aria-label="系列の表（横・縦にスクロールできます）"><table id="series-table" data-details="false" aria-label="系列の設定一覧"><thead id="series-table-head"></thead><tbody id="series-table-body"></tbody></table></div>
         </div>
       </section>
-      <details id="data-preview" class="data-preview" title="先頭8行を表示します。グラフには全行を使用します。Excelなどで元ファイルを編集した場合は「再読み込み」を押してください。貼り付けたデータはセル範囲を貼り付け直してください。" hidden><summary><span>読み込んだデータ</span><span id="table-caption"></span></summary><div class="table-scroll"><table id="data-table"><thead></thead><tbody></tbody></table></div></details>
+      <details id="data-preview" class="data-preview" title="先頭8行を表示します。ファイル名のクリック、または「編集・CSV保存」で全行を表示・編集できます。グラフには全行を使用します。" hidden><summary><span>読み込んだデータ</span><span id="table-caption"></span></summary><div class="data-preview-actions"><button id="edit-data-preview" type="button" class="button quiet">編集・CSV保存</button></div><div class="table-scroll"><table id="data-table"><thead></thead><tbody></tbody></table></div></details>
       <footer class="preview-footer"><span>PlotLauncher Web · 一般グラフ</span></footer>
     </main>
   </div>
@@ -223,6 +223,24 @@
       <button id="data-import-add" type="button" class="button"><strong>現在のプロジェクトに追加</strong><span>現在のグラフ設定を保ち、系列を追加します。</span></button>
       <p id="data-import-unavailable" class="data-import-warning" hidden>追加するには、先に「一般」などのXYグラフに切り替えてください。</p>
     </div>
+  </dialog>
+  <dialog id="data-editor" class="plot-dialog data-editor" aria-labelledby="data-editor-title">
+    <div class="dialog-heading"><strong id="data-editor-title">データの編集</strong><button id="close-data-editor" type="button" class="button quiet">閉じる</button></div>
+    <p id="data-editor-filename" class="data-editor-filename"></p>
+    <p class="data-editor-help">編集内容はプロジェクトに保存します。元ファイルは変更しません。CSVは現在のシートのデータを、補正・規格化する前の値で保存します。</p>
+    <div class="data-editor-toolbar"><div><button id="apply-data-edits" type="button" class="button primary" disabled>グラフに反映</button><button id="discard-data-edits" type="button" class="button" disabled>未反映の編集を取り消す</button></div><button id="save-data-csv" type="button" class="button">CSVに保存</button></div>
+    <p id="data-editor-count" class="data-editor-count"></p>
+    <div id="data-editor-discard-confirm" class="data-editor-confirm" hidden><span>未反映の編集を取り消しますか？</span><button id="data-editor-keep" type="button" class="button">編集を続ける</button><button id="data-editor-discard" type="button" class="button">取り消す</button></div>
+    <div class="data-editor-navigation"><div><button id="data-row-previous" type="button" class="button quiet" aria-label="前の50行">◀</button><span id="data-editor-range"></span><button id="data-row-next" type="button" class="button quiet" aria-label="次の50行">▶</button><label>行へ移動<input id="data-row-jump" type="number" min="1" step="1" value="1" aria-label="表示する行番号"></label></div><div><button id="data-column-previous" type="button" class="button quiet" aria-label="前の12列">◀</button><span id="data-editor-columns"></span><button id="data-column-next" type="button" class="button quiet" aria-label="次の12列">▶</button></div></div>
+    <div class="data-editor-scroll" tabindex="0" role="region" aria-label="編集するデータ表"><table id="editable-data-table"><thead></thead><tbody></tbody></table></div>
+    <p id="data-editor-message" class="preset-message" role="status" aria-live="polite"></p>
+    <a id="data-csv-download" class="data-csv-download" hidden>保存したCSVをもう一度ダウンロード</a>
+    <details class="data-editor-help"><summary>複数ファイルのCSV保存について</summary><p>各ファイルのX・Y列を横に並べた1つのCSVに保存します。行数が異なる部分は空欄になります。X値の異なるデータも、それぞれのX列を保持します。行・列の追加やExcelの数式計算には対応していません。</p></details>
+  </dialog>
+  <dialog id="reload-edited-confirm" class="plot-dialog" aria-labelledby="reload-edited-title">
+    <div class="dialog-heading"><strong id="reload-edited-title">元ファイルから再読み込み</strong></div>
+    <p>アプリ内で修正したデータがあります。再読み込みすると、その修正を取り消して元ファイルの保存済みの値に置き換えます。必要な編集内容は先にCSVまたはプロジェクトに保存してください。</p>
+    <div class="update-actions"><button id="reload-edited-cancel" type="button" class="button">キャンセル</button><button id="reload-edited-continue" type="button" class="button primary">修正を取り消して再読み込み</button></div>
   </dialog>
   <dialog id="paste-dialog" class="plot-dialog paste-dialog" aria-labelledby="paste-dialog-title">
     <div class="dialog-heading"><strong id="paste-dialog-title">データを貼り付け</strong><button type="button" id="close-paste" class="button quiet">閉じる</button></div>

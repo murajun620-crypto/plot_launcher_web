@@ -9,7 +9,7 @@ export async function identifyPlotProject(saved){
  if(saved?.format!=='plotlauncher-project'||saved.version!==1||!saved.data||!Number.isInteger(saved.data.sheetIndex)||saved.data.sheetIndex<0||saved.data.sheetIndex>1000||!saved.settings||!Array.isArray(saved.fonts)||saved.fonts.length>32)fail();
  const workspace=saved.workspace||{};if(workspace.figureStudioProjectId!==undefined&&!id(workspace.figureStudioProjectId))fail();
  const projectId=workspace.figureStudioProjectId||`legacy-plot-${await hash(saved)}`;
- const source=await hash({data:{filename:saved.data.filename,base64:saved.data.base64,files:saved.data.files},fonts:saved.fonts});
+ const source=await hash({data:{filename:saved.data.filename,base64:saved.data.base64,files:saved.data.files,...(saved.data.tableEdits?.length?{tableEdits:saved.data.tableEdits}:{})},fonts:saved.fonts});
  const settings=new Map();for(const entry of workspace.sheetSettings||[]){if(!Number.isInteger(entry?.sheetIndex)||entry.sheetIndex<0||entry.sheetIndex>1000||!entry.settings||settings.has(entry.sheetIndex))fail();settings.set(entry.sheetIndex,entry.settings);}
  settings.set(saved.data.sheetIndex,saved.settings);if(settings.size>1001)fail();
  const images=[];for(const [index,setting]of [...settings].sort(([a],[b])=>a-b)){

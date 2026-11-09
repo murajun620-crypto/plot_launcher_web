@@ -71,6 +71,35 @@ fieldset{margin:0;padding:0;border:0;min-width:0}
 .file-summary>svg{color:var(--blue);width:18px;height:20px}
 .file-summary>div{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}
 .file-summary strong{font-size:11px;font-weight:550;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.data-filename{border:0;padding:0;background:transparent;color:var(--blue);font:inherit;font-size:11px;font-weight:550;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.data-filename:hover{color:#123f7a}
+.data-filename:focus-visible{outline:2px solid var(--blue);outline-offset:3px;border-radius:2px}
+.plot-dialog.data-editor{width:min(1120px,94vw);max-width:94vw}
+.data-editor-filename{font-size:13px;font-weight:600;overflow-wrap:anywhere;margin:0 0 8px}
+.data-editor-help{color:var(--muted);font-size:11px;line-height:1.6;margin:8px 0 12px}
+.data-editor-toolbar,.data-editor-toolbar>div,.data-editor-navigation,.data-editor-navigation>div{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.data-editor-toolbar,.data-editor-navigation{justify-content:space-between}
+.data-editor-count{font-size:11px;color:var(--muted);margin:8px 0}
+.data-editor-navigation{font-size:11px;margin-bottom:8px}
+.data-editor-navigation label{display:flex;align-items:center;gap:6px;margin:0}
+.data-editor-navigation input{width:85px;padding:7px}
+.data-editor-navigation .button{padding:6px 9px}
+.data-editor-scroll{overflow:auto;max-height:min(52vh,510px);border:1px solid var(--border);border-radius:6px;overscroll-behavior:contain}
+#editable-data-table{border-collapse:separate;border-spacing:0;width:max-content;min-width:100%;font-size:12px}
+#editable-data-table td,#editable-data-table th{padding:0;border-right:1px solid #e6eaf0;border-bottom:1px solid #e6eaf0;text-align:left;min-width:140px}
+#editable-data-table thead th{position:sticky;top:0;z-index:2;background:#edf2fa;padding:5px}
+#editable-data-table thead span{display:block;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;color:var(--muted);font-weight:400;margin-bottom:4px}
+#editable-data-table tr>th:first-child{position:sticky;left:0;z-index:1;background:#f3f5f9;min-width:45px;padding:6px;text-align:right;font-size:11px;font-weight:400}
+#editable-data-table thead tr>th:first-child{z-index:3}
+#editable-data-table input{display:block;width:170px;min-width:140px;border:1px solid transparent;border-radius:0;background:transparent;padding:7px;font-size:12px;color:var(--ink);margin:0}
+#editable-data-table thead input{font-weight:600;background:#fff;border-color:var(--border);border-radius:4px}
+#editable-data-table input:focus{outline:2px solid var(--blue);outline-offset:-2px}
+#editable-data-table input.data-cell-changed{background:#fff2c9}
+#editable-data-table input:disabled{background:#f3f4f6}
+.data-editor-confirm{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#fff5da;border:1px solid #ead79d;padding:10px;border-radius:5px;margin-bottom:10px;font-size:12px}
+.data-editor-confirm[hidden]{display:none}
+.data-csv-download{display:block;color:var(--blue);font-size:11px;text-decoration:underline;text-underline-offset:3px;margin:4px 0 12px}
+.data-csv-download[hidden]{display:none}
 .file-summary span:not(.badge){color:var(--muted);font-size:10px}
 .badge{font-size:9px;white-space:nowrap;color:var(--blue);background:#e7eefb;padding:3px 5px;border-radius:3px}
 .badge[hidden]{display:none}
@@ -209,6 +238,7 @@ input[type=color]::-webkit-color-swatch{border:0;border-radius:5px}
 .data-preview summary{padding:14px 16px;cursor:pointer;font-size:11px;color:#64738a}
 .data-preview summary>span:last-child{float:right;font-size:10px;color:#9aa7b7}
 .data-preview p{font-size:10px;color:#9aa7b7;padding:0 16px 10px}
+.data-preview-actions{display:flex;justify-content:flex-end;padding:0 12px 8px}
 .table-scroll{overflow:auto;max-height:265px}
 table{border-collapse:collapse;width:100%;font-size:10px;color:#64738a;text-align:right;white-space:nowrap}
 th{font-weight:550;background:#f7f9fc;position:sticky;top:0}
