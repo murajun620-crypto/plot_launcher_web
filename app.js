@@ -1,12 +1,12 @@
 import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=source-save-v0717-1';
-import {setupDirectSendButton} from './direct-transfer.mjs?v=workspace-update-v0715-2';
+import {setupDirectSendButton,getFigureWorkspace} from './direct-transfer.mjs?v=workspace-update-v0715-2';
 import {identifyPlotProject,plotSheetIndex,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=27ae7675c457';
 import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=9127ec4c4f31";
 import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=9127ec4c4f31";
 import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9127ec4c4f31";
 import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=27ae7675c457";
 import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=27ae7675c457";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=90065d0c3278";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=9b3fe6f4c127";
 
 import {alignmentOffsets} from './object-layout.mjs?v=27ae7675c457';
 import {createDataEditor} from './data-editor.mjs?v=27ae7675c457';
@@ -16,7 +16,7 @@ import {createShortcutHandler} from './shortcuts.mjs?v=61d158587773';
 import {formatText,TEXT_FORMAT_ACTIONS} from './text-format.mjs?v=61d158587773';
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
-const APP_BUILD = '90065d0c3278';
+const APP_BUILD = '9b3fe6f4c127';
 function makeProject(settings,data,fonts,workspace={}){
   const live=sourceData&&data.filename===sourceData.filename&&(data.bytes===sourceData.bytes||data.files&&data.files===sourceData.files);
   const projectId=workspace.figureStudioProjectId||data.figureStudioProjectId||(live?(sourceData.figureStudioProjectId||=crypto.randomUUID()):crypto.randomUUID());
@@ -2120,7 +2120,9 @@ $('#new-project').addEventListener('click', () => {
   if (loading || exporting) return;
   // A fresh page clears data, settings, undo history and the worker together.
   // The existing beforeunload handler protects unsaved work on cancellation.
-  window.location.assign(new URL('./', window.location.href).href);
+  const target=new URL('./',window.location.href),workspace=getFigureWorkspace();
+  if(workspace){target.searchParams.set('figureWorkspace','1');target.searchParams.set('figureWorkspaceOwner',workspace.ownerId);}
+  window.location.assign(target.href);
 });
 
 function updateSessionStore(operation,key,value) {
@@ -3290,16 +3292,17 @@ const figureBridgeWait = (predicate,checkError=()=>null) => new Promise((resolve
 });
 const plotPreviewCache=new Map(),plotAcknowledgements=createPlotAcknowledgements();
 let plotCollectionCache=null,plotMetadataSource=null,plotSheetMetadata=new Map();
-async function collectPlotGraphs(){
+async function collectPlotGraphs({currentOnly=false}={}){
   if(!metadata||!sourceData||!config.series.length)throw Error('先にグラフを作成してください。');
   const before=projectEditState(),selectedIndex=metadata.sheetIndex;
   const cache=plotCollectionCache;
-  if(cache&&cache.source===before.source&&cache.content===before.content&&cache.fonts.length===before.fonts.length&&cache.fonts.every((font,i)=>font===before.fonts[i]))return cache.value;
+  if(cache&&cache.currentOnly===currentOnly&&cache.source===before.source&&cache.content===before.content&&cache.fonts.length===before.fonts.length&&cache.fonts.every((font,i)=>font===before.fonts[i]))return cache.value;
   if(plotMetadataSource!==sourceData){plotMetadataSource=sourceData;plotSheetMetadata=new Map();plotPreviewCache.clear();}
   const names=[...metadata.sheets],filename=metadata.filename,snapshots=new Map(projectSheetSettings().map(item=>[item.sheetIndex,item.settings]));
-  if(names.length>100)throw Error('Studioへの一括送信は100シート以内にしてください。');
-  const template=sheetMode==='shared'?currentSharedSettings():sharedSettings||snapshots.get(0)||makeSettings(config,metadata,loadedHeader),graphs=[];
-  for(let index=0;index<names.length;index++){
+  if(!currentOnly&&names.length>100)throw Error('Studioへの一括送信は100シート以内にしてください。');
+  const template=sheetMode==='shared'?currentSharedSettings():sharedSettings||snapshots.get(0)||makeSettings(config,metadata,loadedHeader),graphs=[],failures=[];
+  for(const index of currentOnly?[selectedIndex]:names.map((_,index)=>index)){
+   try{
     const setting=snapshots.get(index),headerRow=setting?.data.headerRow??loadedHeader,key=index+':'+headerRow;
     let data=index===selectedIndex?metadata:plotSheetMetadata.get(key);
     if(!data){data=await request('sheet-info',{filename,sheetIndex:index,headerRow});plotSheetMetadata.set(key,data);}
@@ -3307,13 +3310,28 @@ async function collectPlotGraphs(){
     const graphConfig=index===selectedIndex?structuredClone(config):configurationForSheet(data,setting,template);
     if(!graphConfig.series.length)throw Error(`シート「${names[index]}」のX列とY列を設定してください。`);
     graphs.push({index,headerRow,config:graphConfig,settings:makeSettings(graphConfig,data,headerRow)});
+   }catch(error){
+    if(index===selectedIndex)throw error;
+    failures.push({index,name:names[index],message:error.message});
+   }
   }
+  // Keep every saved sheet setting in the source project, including sheets
+  // that cannot inherit the current graph's column layout.
+  const savedSheets=new Map(snapshots);for(const graph of graphs)savedSheets.set(graph.index,graph.settings);
   const current=graphs.find(graph=>graph.index===selectedIndex),project=makeProject(current.settings,{...sourceData,sheetIndex:selectedIndex,headerRow:loadedHeader,sample},[...importedFonts.values()],{
-    saveName:$('#save-name').value,pngDpi:Number($('#png-dpi').value),view:{...view},sections:$$('#controls-panel .control-section').map(section=>section.open),sheetSettings:graphs.map(graph=>({sheetIndex:graph.index,settings:graph.settings})),sheetMode,sharedSettings:sheetMode==='shared'?currentSharedSettings():sharedSettings
+    saveName:$('#save-name').value,pngDpi:Number($('#png-dpi').value),view:{...view},sections:$$('#controls-panel .control-section').map(section=>section.open),sheetSettings:[...savedSheets].sort(([a],[b])=>a-b).map(([sheetIndex,settings])=>({sheetIndex,settings})),sheetMode,sharedSettings:sheetMode==='shared'?currentSharedSettings():sharedSettings
   });
   const identity=await identifyPlotProject(project),after=projectEditState();
   if(after.source!==before.source||after.content!==before.content||after.fonts.length!==before.fonts.length||after.fonts.some((font,i)=>font!==before.fonts[i]))throw Error('準備中にグラフが変更されました。もう一度お試しください。');
-  const checkpoint={...after,identity},value={project,identity,graphs,checkpoint};plotCollectionCache={...after,value};return value;
+  const checkpoint={...after,identity},value={project,identity,graphs,failures,checkpoint};plotCollectionCache={...after,currentOnly,value};return value;
+}
+async function confirmCurrentPlotSend(failures){
+  const dialog=$('#studio-send-confirm'),list=$('#studio-send-failures');
+  list.replaceChildren(...failures.map(failure=>{const item=document.createElement('li');item.textContent=`${failure.name}：${failure.message}`;return item;}));
+  dialog.returnValue='';
+  const accepted=new Promise(resolve=>dialog.addEventListener('close',()=>resolve(dialog.returnValue==='current'),{once:true}));
+  showDialog('#studio-send-confirm');
+  if(!await accepted)throw new DOMException('Studioへの送信をキャンセルしました。','AbortError');
 }
 async function captureFigureStudioImages(batch=false){
   if(!engineReady||loading||exporting||!metadata||!sourceData||!config.series.length)throw Error('グラフの処理が完了してから反映してください。');
@@ -3321,9 +3339,10 @@ async function captureFigureStudioImages(batch=false){
   await figureBridgeWait(()=>!renderRunning&&renderedRevision===revision,()=>!renderRunning&&$('#preview-state').classList.contains('error')?'グラフの設定を確認してください。':null);
   exporting=true;updateButtons();
   try{
-    const captured=await collectPlotGraphs(),project=new Blob([JSON.stringify(captured.project)],{type:'application/json'});
+    const captured=await collectPlotGraphs({currentOnly:!batch}),project=new Blob([JSON.stringify(captured.project)],{type:'application/json'});
     if(project.size>PROJECT_MAX_SIZE)throw Error('プロジェクトは130 MB以内にしてください。');
-    const images=[],wanted=batch?captured.identity.images:captured.identity.images.filter(image=>image.imageId===captured.identity.activeImageId);
+    if(batch&&captured.failures.length)await confirmCurrentPlotSend(captured.failures);
+    const images=[],wanted=batch&&!captured.failures.length?captured.identity.images:captured.identity.images.filter(image=>image.imageId===captured.identity.activeImageId);
     for(const descriptor of wanted){
       const cached=plotPreviewCache.get(descriptor.imageId),graph=captured.graphs.find(graph=>graph.index===descriptor.sheetIndex);let preview=cached?.fingerprint===descriptor.fingerprint?cached.preview:null;
       if(!preview){const rendered=await request('sheet-export',{filename:metadata.filename,sheetIndex:graph.index,headerRow:graph.headerRow,config:graph.config,format:'svg',dpi:Number($('#png-dpi').value)});const bytes=Uint8Array.from(atob(rendered.base64),c=>c.charCodeAt(0));preview=new Blob([bytes],{type:'image/svg+xml'});plotPreviewCache.set(descriptor.imageId,{fingerprint:descriptor.fingerprint,preview});}
@@ -3347,7 +3366,8 @@ async function chooseFigureStudioSheet(imageId){
 function figureStudioResultMatchesCurrentProject(result){return !!sourceData&&result?.bridgeState?.source===sourceData;}
 function acceptFigureStudioResult(result){
   if(!figureStudioResultMatchesCurrentProject(result))return false;
-  plotAcknowledgements.accept(result);figureBridgeBaseline=result.bridgeState?.identity?mergePlotCheckpoint(figureBridgeBaseline,result.bridgeState,!!result.batch):result.bridgeState;return true;
+  const completeBatch=!!result.batch&&result.batch.images.length===result.bridgeState?.identity?.images.length;
+  plotAcknowledgements.accept(result);figureBridgeBaseline=result.bridgeState?.identity?mergePlotCheckpoint(figureBridgeBaseline,result.bridgeState,completeBatch):result.bridgeState;return true;
 }
 async function acceptDirectFigureStudioResult(result){
   if(!figureStudioResultMatchesCurrentProject(result))return;

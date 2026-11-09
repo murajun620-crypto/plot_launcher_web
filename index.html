@@ -7,7 +7,7 @@
   <title>PlotLauncher Web</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
   <link rel="stylesheet" href="./style.css?v=27ae7675c457">
-  <script type="module" src="./app.js?v=90065d0c3278"></script>
+  <script type="module" src="./app.js?v=9b3fe6f4c127"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -248,6 +248,13 @@
     <div class="dialog-heading"><strong id="reload-edited-title">元ファイルから再読み込み</strong></div>
     <p>アプリ内で修正したデータがあります。再読み込みすると、その修正を取り消して元ファイルの保存済みの値に置き換えます。必要な編集内容は先にCSVまたはプロジェクトに保存してください。</p>
     <div class="update-actions"><button id="reload-edited-cancel" type="button" class="button">キャンセル</button><button id="reload-edited-continue" type="button" class="button primary">修正を取り消して再読み込み</button></div>
+  </dialog>
+  <dialog id="studio-send-confirm" class="plot-dialog" aria-labelledby="studio-send-title">
+    <div class="dialog-heading"><strong id="studio-send-title">表示中の図だけをStudioへ送りますか？</strong></div>
+    <p>次のシートは、現在の系列設定では送信できません。</p>
+    <ul id="studio-send-failures"></ul>
+    <p>表示中の図は送信できます。ほかのシートも送る場合は、シート設定を「個別」にして、それぞれのX列・Y列を設定してください。元データと保存済みのシート設定は保持します。</p>
+    <form method="dialog" class="update-actions"><button type="submit" value="cancel" class="button" autofocus>戻る</button><button type="submit" value="current" class="button primary">表示中の図を送る</button></form>
   </dialog>
   <dialog id="paste-dialog" class="plot-dialog paste-dialog" aria-labelledby="paste-dialog-title">
     <div class="dialog-heading"><strong id="paste-dialog-title">データを貼り付け</strong><button type="button" id="close-paste" class="button quiet">閉じる</button></div>
