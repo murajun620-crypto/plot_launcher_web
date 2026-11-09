@@ -1,6 +1,7 @@
 import {ARROW_PROPERTIES} from './arrowheads.mjs';
 import {isPathObject,validatePathObject} from './paths.mjs';
 import {isLineStyle} from './line-styles.mjs';
+import {validateGroupHierarchy} from './groups.mjs?v=nested-groups-v0712-1';
 export const STROKE_ALIGNMENTS=Object.freeze(['outside','inside','center']);
 export const TEXT_MODES=Object.freeze(['auto','tex','plain']);
 export const PT_PER_MM=72/25.4;
@@ -87,6 +88,7 @@ export function validateDocument(input){
   for(const p of ['locked','bold','italic','underline','arrowEnd','arrowStart','flipX','flipY','textAutoSize'])if(o[p]!==undefined&&typeof o[p]!=='boolean')throw Error('書式が不正です。');
   for(const [p,values]of Object.entries(ARROW_PROPERTIES))if(o[p]!==undefined&&!values.includes(o[p]))throw Error('矢印の書式が不正です。');
  }
+ validateGroupHierarchy(input.objects);
  const result=clone(input);
  // Older files keep their overall opacity; new independent channels start opaque.
  for(const object of result.objects){object.fillTransparency??=0;object.strokeTransparency??=0;if(object.type==='text'){object.strokeAlignment??='center';object.textMode??='auto';}}

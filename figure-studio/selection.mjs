@@ -1,4 +1,4 @@
-import {bounds,expandSelection} from './model.mjs?v=text-fit-v0710-1';
+import {bounds,expandSelection} from './model.mjs?v=nested-groups-v0712-1';
 
 export function resolveObjectSelection(doc,ids,{groupId=null}={}){
  const valid=new Set(ids),objects=doc.objects.filter(object=>valid.has(object.id));

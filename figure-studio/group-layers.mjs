@@ -1,4 +1,4 @@
-import {objectSelectionLabel} from './selection.mjs?v=text-fit-v0710-1';
+import {objectSelectionLabel} from './selection.mjs?v=nested-groups-v0712-1';
 
 const icons={image:'▧',text:'T',line:'╱',arrow:'↗',rect:'□',ellipse:'○',curve:'∿',freeform:'⌁',arc:'⌒'};
 export function renderGroupLayers({root,doc,ids,groupId=null,onSelect}){
@@ -18,7 +18,7 @@ export function renderGroupLayers({root,doc,ids,groupId=null,onSelect}){
   const members=doc.objects.filter(member=>member.groupId===object.groupId),all=members.every(member=>selected.has(member.id))&&!groupId;
   const block=document.createElement('div');block.className='layer-group'+(all?' group-selected':groupId===object.groupId?' group-editing':'');
   const header=document.createElement('button');header.type='button';header.className='layer-group-header';header.dataset.groupId=object.groupId;header.setAttribute('aria-pressed',String(all));header.title='クリックでグループ全体を選択';
-  const name=document.createElement('span'),count=document.createElement('span');name.textContent='▣ '+groupNames.get(object.groupId);count.textContent=members.length+'個';count.className='layer-meta';header.append(name,count);
+  const name=document.createElement('span'),count=document.createElement('span'),depth=Math.max(...members.map(member=>(member.groupStack?.length??0)+1));name.textContent='▣ '+groupNames.get(object.groupId);count.textContent=members.length+'個'+(depth>1?' · '+depth+'階層':'');count.className='layer-meta';header.append(name,count);
   header.onclick=event=>onSelect({groupId:object.groupId,additive:event.shiftKey});
   const children=document.createElement('div');children.className='layer-group-children';children.setAttribute('role','group');children.setAttribute('aria-label',groupNames.get(object.groupId)+'の内容');
   for(const member of [...members].reverse())row(member,children);block.append(header,children);root.append(block);

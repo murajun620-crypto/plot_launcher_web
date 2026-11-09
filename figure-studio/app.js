@@ -1,17 +1,18 @@
-import {fitTextBox,naturalTextLines} from './text-fit.mjs?v=text-fit-v0710-1';
-import {PT_PER_MM,mm,toMM,uid,clone,newDocument,makeObject,bounds,objectBounds,expandSelection,align,distribute,reorder,autoLayout,History,validateDocument,rotateOrFlip} from './model.mjs?v=text-fit-v0710-1';
+import {fitTextBox,naturalTextLines} from './text-fit.mjs?v=nested-groups-v0712-1';
+import {regroupObjects,ungroupObjects,remapGroupIds} from './groups.mjs?v=nested-groups-v0712-1';
+import {PT_PER_MM,mm,toMM,uid,clone,newDocument,makeObject,bounds,objectBounds,expandSelection,align,distribute,reorder,autoLayout,History,validateDocument,rotateOrFlip} from './model.mjs?v=nested-groups-v0712-1';
 import {isPathObject,pathData,objectFromPoints} from './paths.mjs?v=ribbon-v060-1';
 import {createPathDrawing} from './path-drawing.mjs?v=ribbon-v060-1';
-import {imageAsset,imagePhysicalSize,imageMiFiToBodySize,blobToDataURL,dataURLToBlob,download,sanitizeSVG} from './assets.mjs?v=text-fit-v0710-1';
-import {importedImageSize,replacedImageSize,replacedMiFiToImageSize,miFiToSizeCorrection,imageInsertionPoint} from './image-placement.mjs?v=text-fit-v0710-1';
+import {imageAsset,imagePhysicalSize,imageMiFiToBodySize,blobToDataURL,dataURLToBlob,download,sanitizeSVG} from './assets.mjs?v=nested-groups-v0712-1';
+import {importedImageSize,replacedImageSize,replacedMiFiToImageSize,miFiToSizeCorrection,imageInsertionPoint} from './image-placement.mjs?v=nested-groups-v0712-1';
 import {rasterResolution} from './image-resolution.mjs?v=image-quality-v066-1';
 import {saveDraft,loadDraft,saveProjectFileTarget,loadProjectFileTarget} from './storage.mjs?v=0.3.6-1';
-import {createDemo} from './demo.mjs?v=text-fit-v0710-1';
-import {createShortcutHandler,shortcutLabel} from './shortcuts.mjs?v=text-fit-v0710-1';
-import {installShortcutUI} from './shortcut-ui.mjs?v=text-fit-v0710-1';
+import {createDemo} from './demo.mjs?v=nested-groups-v0712-1';
+import {createShortcutHandler,shortcutLabel} from './shortcuts.mjs?v=nested-groups-v0712-1';
+import {installShortcutUI} from './shortcut-ui.mjs?v=nested-groups-v0712-1';
 import {createRibbon} from './ribbon.mjs?v=source-batch-v070-1';
-import {imageArrayUnits,arrangeImageArray} from './image-array.mjs?v=text-fit-v0710-1';
-import {createImageArrayDialog} from './image-array-dialog.mjs?v=text-fit-v0710-1';
+import {imageArrayUnits,arrangeImageArray} from './image-array.mjs?v=nested-groups-v0712-1';
+import {createImageArrayDialog} from './image-array-dialog.mjs?v=nested-groups-v0712-1';
 import {createColorPickers} from './colors.mjs?v=ribbon-v060-1';
 import {renderTextPaint} from './text-paint.mjs?v=tex-v061-1';
 import {createTexRenderer} from './tex.mjs?v=micro-v0711-2';
@@ -23,21 +24,21 @@ import {readMifitoIdentity} from './integration/mifito-sync.mjs?v=0.3.5-1';
 import {readPlotIdentity} from './integration/plot-sync.mjs?v=source-batch-v070-1';
 import {planMiFiToSync} from './mifito-batch.mjs?v=source-batch-v070-1';
 import {setupUpdateCheck} from './update-check.mjs';
-import {marqueeSelection,resolveObjectSelection,clickObjectSelection,selectionDescription} from './selection.mjs?v=text-fit-v0710-1';
-import {renderGroupLayers} from './group-layers.mjs?v=text-fit-v0710-1';
-import {drawSelectionFrames} from './selection-overlay.mjs?v=text-fit-v0710-1';
+import {marqueeSelection,resolveObjectSelection,clickObjectSelection,selectionDescription} from './selection.mjs?v=nested-groups-v0712-1';
+import {renderGroupLayers} from './group-layers.mjs?v=nested-groups-v0712-1';
+import {drawSelectionFrames} from './selection-overlay.mjs?v=nested-groups-v0712-1';
 import {ARROW_PROPERTIES,arrowEndpoint,arrowPropertyValue,setArrowProperty,arrowGeometry} from './arrowheads.mjs?v=0.3.0-1';
 
 import {createArrowPicker} from './arrow-picker.mjs?v=0.3.0-1';
 import {lineStrokeAttributes,lineStyleValue,setLineStyle,supportsLineStyle} from './line-styles.mjs?v=lines-v064-1';
 import {createLineStylePicker} from './line-style-picker.mjs?v=lines-v064-1';
-import {createPreviewQuality} from './preview-quality.mjs?v=text-fit-v0710-1';
-import {createSelectionWheelZoom,resetSelectionZoom} from './selection-zoom.mjs?v=text-fit-v0710-1';
+import {createPreviewQuality} from './preview-quality.mjs?v=nested-groups-v0712-1';
+import {createSelectionWheelZoom,resetSelectionZoom} from './selection-zoom.mjs?v=nested-groups-v0712-1';
 import {fontSizeForAction} from './text-format.mjs?v=annotation-input-v071-1';
-import {selectionPNG,writeSelectionImage,studioPasteObjects,matchesSelectionPNG} from './image-clipboard.mjs?v=text-fit-v0710-1';
+import {selectionPNG,writeSelectionImage,studioPasteObjects,matchesSelectionPNG} from './image-clipboard.mjs?v=nested-groups-v0712-1';
 import {reorderFigures} from './figure-order.mjs';
 import {renumberFigureNames} from './figure-names.mjs?v=0.3.3-1';
-import {deleteFigures,duplicateFigures} from './figure-commands.mjs?v=text-fit-v0710-1';
+import {deleteFigures,duplicateFigures} from './figure-commands.mjs?v=nested-groups-v0712-1';
 import {ProjectFileSession,projectFilePickerOptions} from './project-file.mjs?v=project-switch-v051-1';
 import {installWorkspacePersistence} from './workspace-session.mjs?v=project-switch-v051-1';
 import {decodeWorkspaceState} from './workspace-state.mjs?v=project-switch-v051-1';
@@ -193,9 +194,9 @@ function renderInspector(){
   if(action==='edit-points'||action==='close-path'){button.disabled=arr.length!==1||!edits.length||!['curve','freeform'].includes(o.type);if(action==='close-path'&&!o?.closed&&(o?.points?.length??0)<3)button.disabled=true;button.setAttribute('aria-pressed',String(action==='edit-points'?pathEditId===o?.id:!!o?.closed));}
   if(['front','back','forward','backward','lock','duplicate','delete'].includes(action))button.disabled=!arr.length;
   if(['rotate-right','rotate-left','flip-v','flip-h'].includes(action))button.disabled=!edits.length;
-  if(action==='group')button.disabled=!!groupScope||edits.length<2;
+  if(action==='group')button.disabled=!!groupScope||new Set(edits.map(object=>object.groupId||object.id)).size<2;
   if(action==='image-array')button.disabled=imageArrayUnits(doc,selection,selectionOptions()).length<2;
-  if(action==='ungroup')button.disabled=!edits.some(object=>object.groupId);
+  if(action==='ungroup'||action==='ungroup-all')button.disabled=!edits.some(object=>object.groupId);
   if(action==='attach-source')button.disabled=arr.length!==1||o.type!=='image';
   if(action==='edit-source')button.disabled=arr.length!==1||!o.source;
  }
@@ -334,7 +335,7 @@ svg.addEventListener('dblclick',e=>{if(pathDrawing.doubleClick(e,svgPoint(e)))re
 viewport.addEventListener('wheel',createSelectionWheelZoom({viewport,paper,getSelection:selected,getScale:()=>scale,setScale,afterCenter:positionEditor}),{passive:false});
 window.addEventListener('keydown',e=>{if(!e.defaultPrevented&&e.code==='Space'&&!editingId&&(e.target===svg||e.target===viewport||e.target===document.body)){spaceDown=true;e.preventDefault();}});window.addEventListener('keyup',e=>{if(e.code==='Space')spaceDown=false;});window.addEventListener('blur',()=>{spaceDown=false;shortcut.reset();if(gesture)endGesture(null,true);});
 
-function duplicate(){const old=selected();if(!old.length)return;change(()=>{const groups=new Map();const added=old.map(o=>{const n=clone(o);n.id=uid();n.x+=mm(3);n.y+=mm(3);n.locked=false;if(n.groupId&&!groupScope){if(!groups.has(n.groupId))groups.set(n.groupId,uid());n.groupId=groups.get(n.groupId);}return n;});doc.objects.push(...added);selection=added.map(o=>o.id);});}
+function duplicate(){const old=selected();if(!old.length)return;change(()=>{const added=old.map(o=>{const n=clone(o);n.id=uid();n.x+=mm(3);n.y+=mm(3);n.locked=false;return n;});if(!groupScope)remapGroupIds(added,uid);doc.objects.push(...added);selection=added.map(o=>o.id);});}
 function applyTextStyle(property,value){if(editingId){const o=doc.objects.find(o=>o.id===editingId);o[property]=typeof value==='function'?value(o[property],o):value;if(property==='text')editor.value=o.text;positionEditor();renderInspector();return;}change(()=>editable().filter(o=>o.type==='text').forEach(o=>{o[property]=typeof value==='function'?value(o[property],o):value;if(o.textAutoSize||['text','textMode','fontSize','fontFamily','bold','italic','underline'].includes(property))fitText(o);}));}
 function changeFont(action){applyTextStyle('fontSize',v=>fontSizeForAction(v,action));}
 function addLabels(){change(()=>{const targets=editable().filter(o=>o.type==='image');const list=targets.length?targets:doc.objects.filter(o=>o.type==='image'&&!o.locked);list.forEach((o,i)=>{const label=makeObject('text',{x:o.x,y:o.y-mm(6),w:mm(9),h:mm(6),fontSize:9,bold:true,text:i<26?String.fromCharCode(65+i):String(i+1),name:'Panel label'});fitText(label);doc.objects.push(label);});});}
@@ -362,8 +363,8 @@ function execute(action,payload={}){
  if(action.startsWith('distribute-'))return change(()=>distribute(doc,selection,action.slice(-1),selectionOptions()));
  if(['front','back','forward','backward'].includes(action))return change(()=>reorder(doc,editable().map(o=>o.id),action,selectionOptions()));
  if(action==='group'&&groupScope)return;
- if(action==='group')return change(()=>{if(editable().length<2)return;const id=uid();editable().forEach(o=>o.groupId=id);});
- if(action==='ungroup')return change(()=>{const targets=groupScope?doc.objects.filter(object=>object.groupId===groupScope):editable();if(targets.some(object=>object.locked))return;targets.forEach(object=>object.groupId=null);groupScope=null;});
+ if(action==='group')return change(()=>{const targets=editable();if(new Set(targets.map(object=>object.groupId||object.id)).size<2)return;try{regroupObjects(targets,uid());}catch(error){toast(error.message);}});
+ if(action==='ungroup'||action==='ungroup-all')return change(()=>{const targets=groupScope?doc.objects.filter(object=>object.groupId===groupScope):editable();if(targets.some(object=>object.locked))return;ungroupObjects(targets,{all:action==='ungroup-all'});groupScope=null;});
  if(action==='lock')return change(()=>{const value=!selected().every(o=>o.locked);selected().forEach(o=>o.locked=value);});
  if(action==='copy-format'){const o=selected()[0];if(o){formatClipboard={...Object.fromEntries(['fill','stroke','fillTransparency','strokeTransparency','strokeWidth','strokeAlignment','textMode','fontSize','fontFamily','bold','italic','underline','textAlign','opacity'].filter(p=>o[p]!==undefined).map(p=>[p,o[p]])),...(supportsLineStyle(o)?{dashStyle:lineStyleValue(o),dashed:lineStyleValue(o)!=='solid'}:{})};toast('書式をコピーしました');}return;}
  if(action==='paste-format'){if(formatClipboard)change(()=>editable().forEach(o=>{Object.assign(o,formatClipboard);if(o.type==='text')fitText(o);}));return;}
@@ -506,7 +507,7 @@ document.addEventListener('paste',async e=>{
   if(doc.id!==figure||bookId!==book){toast('Figureが切り替わりました。もう一度貼り付けてください。');return;}
   if(!copied?.length){await importImages(files);return;}
  }
- if(copied?.length){e.preventDefault();const temp={...doc,objects:copied};try{validateDocument(temp);}catch{return;}change(()=>{const groups=new Map();const added=copied.map(o=>{const n=clone(o);n.id=uid();n.x+=mm(3);n.y+=mm(3);if(n.groupId){if(!groups.has(n.groupId))groups.set(n.groupId,uid());n.groupId=groups.get(n.groupId);}return n;});doc.objects.push(...added);selection=added.map(o=>o.id);});return;}
+ if(copied?.length){e.preventDefault();const temp={...doc,objects:copied};try{validateDocument(temp);}catch{return;}change(()=>{const added=copied.map(o=>{const n=clone(o);n.id=uid();n.x+=mm(3);n.y+=mm(3);return n;});remapGroupIds(added,uid);doc.objects.push(...added);selection=added.map(o=>o.id);});return;}
  if(text&&text.length<100000){e.preventDefault();change(()=>{const o=makeObject('text',{text});fitText(o);doc.objects.push(o);selection=[o.id];});}
 });
 
@@ -766,7 +767,7 @@ function withPNGResolution(blob,dpi){return blob.arrayBuffer().then(buffer=>{con
 async function exportPNG(){try{await prepareFigureExport();const dpi=Number($('#exportDpi').value),w=Math.round(doc.width/72*dpi),h=Math.round(doc.height/72*dpi);if(w*h>100000000||w>16384||h>16384)throw Error('出力が大きすぎます。DPIまたは用紙サイズを下げてください。');toast('PNGを書き出しています…');const s=buildExport(),url=URL.createObjectURL(new Blob([s],{type:'image/svg+xml'}));try{const img=new Image();img.src=url;await img.decode();const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);const blob=await new Promise(resolve=>c.toBlob(resolve,'image/png'));if(!blob)throw Error('PNGの生成に失敗しました');download(await withPNGResolution(blob,dpi),`${safeName(doc.name)}_${dpi}dpi.png`);c.width=c.height=1;toast(`${w} × ${h} px・${dpi} dpiで保存しました`);}finally{URL.revokeObjectURL(url);}}catch(e){toast(e.message);}}
 async function exportPDF(){const win=window.open('','figure-studio-print');if(!win){toast('PDF保存用の別タブを許可してください');return;}try{await prepareFigureExport();const s=buildExport();win.document.open();win.document.write(`<!doctype html><html><head><title>Figure PDF</title><style>@page{size:${toMM(doc.width)}mm ${toMM(doc.height)}mm;margin:0}html,body{margin:0;padding:0}svg{display:block;width:${toMM(doc.width)}mm;height:${toMM(doc.height)}mm}@media screen{body{background:#ddd;padding:20px}svg{background:white}}</style></head><body>${s}</body></html>`);win.document.close();Promise.all([win.document.fonts.ready,...[...win.document.querySelectorAll('svg image')].map(i=>{const image=new win.Image();image.src=i.getAttribute('href');return image.decode();})]).then(()=>win.print()).catch(()=>toast('画像の読み込みが完了しませんでした。SVG保存をお使いください'));toast('印刷画面で「PDFに保存」、倍率100%、余白なしを選んでください');}catch(error){win.close();toast(error.message);}}
 
-svg.addEventListener('contextmenu',e=>{e.preventDefault();finishText();const id=e.target.closest('[data-id]')?.dataset.id;if(id&&!selection.includes(id)){const target=doc.objects.find(object=>object.id===id);setSelection([id],{scope:target?.groupId===groupScope?groupScope:null});}const menu=$('#contextMenu');menu.replaceChildren();for(const[label,action,key]of [...(doc.objects.find(object=>object.id===id)?.groupId?[['グループ内を個別選択','select-member','Ctrl / ⌘＋クリック']]:[]),...(groupScope?[['グループ全体へ戻る','select-group','Esc']]:[]),['複製','duplicate','Ctrl+D'],['最前面へ','front','Alt → 3'],['最背面へ','back','Alt → 4'],['一段前へ','forward',''],['一段後ろへ','backward',''],['左揃え','align-left','Alt → 5 → L'],['グループ化','group','Ctrl+G'],['グループ解除','ungroup','Ctrl+Shift+G'],['固定 / 解除','lock',''],['元アプリで編集','edit-source',''],['削除','delete','Delete']]){const b=document.createElement('button');b.type='button';b.textContent=label;const k=document.createElement('kbd');k.textContent=shortcutLabel(key);b.append(k);b.onclick=()=>{menu.hidden=true;execute(action,{id});svg.focus();};menu.append(b);}menu.hidden=false;menu.style.left=`${Math.min(e.clientX,innerWidth-250)}px`;menu.style.top=`${Math.min(e.clientY,innerHeight-450)}px`;});
+svg.addEventListener('contextmenu',e=>{e.preventDefault();finishText();const id=e.target.closest('[data-id]')?.dataset.id;if(id&&!selection.includes(id)){const target=doc.objects.find(object=>object.id===id);setSelection([id],{scope:target?.groupId===groupScope?groupScope:null});}const menu=$('#contextMenu');menu.replaceChildren();for(const[label,action,key]of [...(doc.objects.find(object=>object.id===id)?.groupId?[['グループ内を個別選択','select-member','Ctrl / ⌘＋クリック']]:[]),...(groupScope?[['グループ全体へ戻る','select-group','Esc']]:[]),['複製','duplicate','Ctrl+D'],['最前面へ','front','Alt → 3'],['最背面へ','back','Alt → 4'],['一段前へ','forward',''],['一段後ろへ','backward',''],['左揃え','align-left','Alt → 5 → L'],['グループ化','group','Ctrl+G'],['グループ解除（1階層）','ungroup','Ctrl+Shift+G'],['全グループ解除','ungroup-all','Ctrl+Shift+A → G'],['固定 / 解除','lock',''],['元アプリで編集','edit-source',''],['削除','delete','Delete']]){const b=document.createElement('button');b.type='button';b.textContent=label;const k=document.createElement('kbd');k.textContent=shortcutLabel(key);b.append(k);b.onclick=()=>{menu.hidden=true;execute(action,{id});svg.focus();};menu.append(b);}menu.hidden=false;menu.style.left=`${Math.min(e.clientX,innerWidth-250)}px`;menu.style.top=`${Math.min(e.clientY,innerHeight-450)}px`;});
 document.addEventListener('pointerdown',e=>{if(!e.target.closest('#contextMenu'))$('#contextMenu').hidden=true;for(const d of $$('details:not(.sidebar-text-panel)[open]'))if(!d.contains(e.target))d.open=false;});
 window.addEventListener('beforeunload',e=>{if(projectSaving||dirty||pathDrawing?.drawing||(editingId&&textBefore&&JSON.stringify(snapshot())!==JSON.stringify(textBefore))){e.preventDefault();e.returnValue='';}});
 window.addEventListener('resize',()=>{if(!gesture)renderOverlay();});

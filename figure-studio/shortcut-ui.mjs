@@ -1,4 +1,4 @@
-import {isMacPlatform,keyboardPlatform,shortcutLabel,shortcutRows} from './shortcuts.mjs?v=text-fit-v0710-1';
+import {isMacPlatform,keyboardPlatform,shortcutLabel,shortcutRows} from './shortcuts.mjs?v=nested-groups-v0712-1';
 
 /** Localize command labels only; figure names and user text are untouched. */
 export function installShortcutUI({documentRef=globalThis.document,platform=keyboardPlatform()}={}){

@@ -22,7 +22,8 @@ export const SHORTCUTS = Object.freeze([
   ['元に戻す／やり直す', 'Ctrl + Z / Y'],
   ['コピー／切り取り／貼り付け', 'Ctrl + C / X / V'],
   ['複製', 'Ctrl + D'],
-  ['グループ化／解除', 'Ctrl + G / Ctrl + Shift + G'],
+  ['グループ化／1階層解除', 'Ctrl + G / Ctrl + Shift + G'],
+  ['選択したグループの全階層解除', 'Ctrl + Shift + A → G'],
   ['グループ内を個別選択', 'Ctrl + クリック（またはグループ選択後にもう一度クリック）'],
   ['グループ全体へ戻る', 'Esc'],
   ['文字を拡大／縮小', 'Ctrl + Shift + > / <'],
@@ -155,6 +156,19 @@ export function createShortcutHandler({
     if (key === 'escape') {
       if (sequence) return consume(event);
       return consume(event, ribbon ? 'focus-canvas' : 'escape');
+    }
+
+    if (editing && sequence === 'ungroup-all') reset();
+    if (!editing && sequence === 'ungroup-all') {
+      if (['control','shift','meta'].includes(key)) return false;
+      if (event.repeat && primary && event.shiftKey && key === 'a') {event.preventDefault?.();event.stopPropagation?.();return true;}
+      if (key === 'g' && !event.altKey) return consume(event,'ungroup-all');
+      return consume(event);
+    }
+    if (!editing && primary && event.shiftKey && !event.altKey && key === 'a' && supportsAction('ungroup-all')) {
+      event.preventDefault?.();event.stopPropagation?.();sequence='ungroup-all';
+      onHint('全グループ解除：Gで選択したグループの全階層を解除 · Escで取消');
+      return true;
     }
 
     if(mac&&event.altKey&&!primary&&!editing&&!['align','rotate'].includes(sequence)&&/^arrow(left|right|up|down)$/.test(key)){
