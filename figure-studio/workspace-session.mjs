@@ -82,7 +82,7 @@ export function installWorkspacePersistence(api,{windowRef=window,documentRef=wi
   const deadline=Date.now()+30000;
   while(Date.now()<deadline){
    try{const state=frame.contentWindow.FigureStudioWorkspaceState;if(state&&state.version===1&&state.app===app&&['capture','validate','restore','signature','hasWork'].every(key=>typeof state[key]==='function'))return state;
-    if(frame.contentDocument?.readyState==='complete'&&frame.contentDocument?.querySelector(app==='plot'?'#app-version':'#appVersion')?.textContent)throw Error(`${app==='plot'?'PlotLauncher':'MiFiTo'}の「更新確認」から最新版へ更新して、もう一度保存してください。`);
+    if(!frame.contentWindow.FigureAppRelease&&frame.contentDocument?.readyState==='complete'&&frame.contentDocument?.querySelector(app==='plot'?'#app-version':'#appVersion')?.textContent)throw Error(`${app==='plot'?'PlotLauncher':'MiFiTo'}の「更新確認」から最新版へ更新して、もう一度保存してください。`);
    }catch(error){if(error.message?.includes('更新確認'))throw error;}
    await pause(80);
   }

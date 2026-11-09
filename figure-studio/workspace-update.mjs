@@ -1,4 +1,4 @@
-import {parseRelease,hasNewRelease} from './update-check.mjs?v=workspace-update-v0715-2';
+import {parseRelease,hasNewRelease} from './update-check.mjs?v=latest-open-v0720-1';
 import {SOURCE_APPS} from './integration/bridge-client.mjs?v=studio-send-v0714-1';
 
 const TOKEN='_workspaceUpdate',APPS=['studio','plot','mifito'];
@@ -77,8 +77,8 @@ export function installWorkspaceUpdater(api,{windowRef=window,documentRef=window
   while(Date.now()<deadline){const value=child('studio')?.FigureStudioWorkspaceUpdate;if(value?.capture&&value?.restore)return value;await pause(80);}
   throw Error('Studioの準備が完了してから、もう一度お試しください。');
  }
- async function check(){
-  if(busy)return;busy=true;paint();notice('3アプリの更新を確認しています…',{persistent:true});
+ async function check({silent=false}={}){
+  if(busy)return {busy:true};busy=true;paint();if(!silent)notice('3アプリの更新を確認しています…',{persistent:true});
   const controller=new windowRef.AbortController(),timer=windowRef.setTimeout(()=>controller.abort(),10000);
   try{
    const entries=await Promise.all(APPS.map(async app=>{
@@ -86,12 +86,14 @@ export function installWorkspaceUpdater(api,{windowRef=window,documentRef=window
     url.searchParams.set('check',String(Date.now()));const response=await windowRef.fetch(url.href,{cache:'no-store',credentials:'same-origin',signal:controller.signal});
     if(!response.ok)throw Error(`${NAMES[app]}の更新情報を取得できませんでした。`);return [app,parseRelease(await response.json())];
    }));
-   const releases=Object.fromEntries(entries),changed=hasNewRelease(shellRelease,releases.studio)||APPS.some(app=>{const current=liveRelease(app);return current&&hasNewRelease(current,releases[app]);});
+   const releases=Object.fromEntries(entries);
+   if(hasNewRelease(releases.studio,shellRelease)&&releases.studio.version!==shellRelease.version||APPS.some(app=>{const current=liveRelease(app);return current&&current.version!==releases[app].version&&hasNewRelease(releases[app],current);}))throw Error('配信情報の反映中です。少し待って再試行してください。');
+   const changed=hasNewRelease(shellRelease,releases.studio)||APPS.some(app=>{const current=liveRelease(app);return current&&hasNewRelease(current,releases[app]);});
    available=changed?releases:null;
    const versions=APPS.map(app=>`${NAMES[app]} v${releases[app].version}`).join(' ／ ');
-   notice(changed?`${versions}。「3アプリを更新」で、開いているプロジェクトと未反映の編集を維持して更新します。`:`開いている3アプリは最新です。${versions}`);
+   if(!silent)notice(changed?`${versions}。「3アプリを更新」で、開いているプロジェクトと未反映の編集を維持して更新します。`:`開いている3アプリは最新です。${versions}`);
    return {available:changed,releases};
-  }catch(error){notice(error.name==='AbortError'?'更新確認がタイムアウトしました。再度お試しください。':`更新を確認できませんでした。${error.message}`);}
+  }catch(error){if(silent)throw error;notice(error.name==='AbortError'?'更新確認がタイムアウトしました。再度お試しください。':`更新を確認できませんでした。${error.message}`);}
   finally{windowRef.clearTimeout(timer);busy=false;paint();}
  }
  function releaseGuards(){guardCleanup?.();guardCleanup=null;windowRef.clearTimeout(guardTimer);}
@@ -106,8 +108,10 @@ export function installWorkspaceUpdater(api,{windowRef=window,documentRef=window
   }
   guardCleanup=()=>{for(const cleanup of remove)cleanup();};
  }
- async function update(){
-  if(busy||!available)return;busy=true;lock(true);paint();notice('3アプリの作業内容を一時保存しています…',{persistent:true});let studio,stored=null;
+ async function update({pendingToken=null,verified=false}={}){
+  if(busy||!available)return false;
+  if(!verified){try{const checked=await check({silent:true});if(!checked?.available)return false;}catch(error){notice(`更新を確認できませんでした。${error.message}`,{persistent:true});return false;}}
+  busy=true;lock(true);paint();notice('3アプリの作業内容を一時保存しています…',{persistent:true});let studio,stored=null;
   try{
    studio=await studioAPI();const saved=await studio.capture();lock(true);
    const handles={};for(const app of ['plot','mifito'])handles[app]=await child(app)?.FigureStudioWorkspaceState?.captureReloadHandles?.()??null;
@@ -115,28 +119,37 @@ export function installWorkspaceUpdater(api,{windowRef=window,documentRef=window
    const record={format:'figure-studio-update',version:1,url:url.href,createdAt:Date.now(),targets:available,studio:saved,handles};
    await sessionStore(windowRef,'put',token,record);
    stored={token,record};
-   prepareNavigation();url.searchParams.set(TOKEN,token);notice('一時保存しました。3アプリを更新して再開します。',{persistent:true});windowRef.location.replace(url.href);
+   prepareNavigation();url.searchParams.set(TOKEN,token);if(pendingToken)url.searchParams.set('_projectOpen',pendingToken);url.searchParams.set('_appBuild',available.studio.build);url.searchParams.set('_appReload',windowRef.crypto.randomUUID());notice('一時保存しました。3アプリを更新して再開します。',{persistent:true});windowRef.location.replace(url.href);
    guardTimer=windowRef.setTimeout(()=>{releaseGuards();studio.cancel?.();recovery=record;recoveryToken=token;busy=false;lock(true);paint();notice('画面の切り替えが完了しませんでした。作業は一時保存しています。「復元を再試行」で再開できます。',{persistent:true,backup:true});},8000);
-  }catch(error){releaseGuards();studio?.cancel?.();busy=false;if(stored){recovery=stored.record;recoveryToken=stored.token;}lock(!!recoveryToken);paint();notice(`更新を中止しました。${stored?'作業は一時保存しています。「復元を再試行」で再開できます。':'現在の作業はそのままです。'}${error.message}`,{persistent:true,backup:!!stored});}
+   return true;
+  }catch(error){releaseGuards();studio?.cancel?.();busy=false;if(stored){recovery=stored.record;recoveryToken=stored.token;}lock(!!recoveryToken);paint();notice(`更新を中止しました。${stored?'作業は一時保存しています。「復元を再試行」で再開できます。':'現在の作業はそのままです。'}${error.message}`,{persistent:true,backup:!!stored});return false;}
  }
  async function restore(){
   if(busy)return;const token=recoveryToken||new URL(windowRef.location.href).searchParams.get(TOKEN);if(!uuid(token))return;
-  busy=true;lock(true);paint();notice('更新前のプロジェクトと3アプリの編集状態を復元しています…',{persistent:true});
+  busy=true;lock(true);paint();notice('更新前のプロジェクトと3アプリの編集状態を復元しています…',{persistent:true});let restored=false;
   try{
    const record=await sessionStore(windowRef,'get',token),original=record&&new URL(record.url);
    if(record?.format!=='figure-studio-update'||record.version!==1||!record.studio?.project||original.origin!==windowRef.location.origin||original.pathname!==windowRef.location.pathname)throw Error('更新前の一時保存が見つかりません。');
    recovery=record;recoveryToken=token;const studio=await studioAPI();await studio.restore(record.studio);lock(true);
    for(const app of ['plot','mifito'])if(record.handles?.[app])await child(app)?.FigureStudioWorkspaceState?.restoreReloadHandles?.(record.handles[app]);
    lock(false);api.show(record.studio.project.workspace?.active||'studio');
-   windowRef.history.replaceState(null,'',original.href);
+   original.searchParams.set('_appBuild',shellRelease.build);original.searchParams.set('_appReload',windowRef.crypto.randomUUID());const pendingToken=new URL(windowRef.location.href).searchParams.get('_projectOpen');if(pendingToken)original.searchParams.set('_projectOpen',pendingToken);windowRef.history.replaceState(null,'',original.href);
    // The recovery record remains available until all three restorations succeed.
    try{await sessionStore(windowRef,'delete',token);}catch{}
-   recovery=null;recoveryToken=null;available=null;syncVersion();notice('3アプリを更新し、開いていたプロジェクトと未反映の編集を復元しました。');
+   recovery=null;recoveryToken=null;available=null;syncVersion();restored=true;notice('3アプリを更新し、開いていたプロジェクトと未反映の編集を復元しました。');
   }catch(error){notice(`作業の復元を完了できませんでした。一時保存は保持しています。「復元を再試行」を押してください。${error.message}`,{persistent:true,backup:true});}
   finally{busy=false;lock(!!recoveryToken);paint();}
+  if(restored)try{await windowRef.FigureAppRelease?.resumeWorkspace(api);}catch(error){notice(error.message,{persistent:true});}
  }
- api.workspaceUpdater={check,update,restore,bind,get busy(){return busy;}};
+ async function ensureLatest(stagePending=null){
+  const checked=await check({silent:true});if(checked?.busy)throw Error('更新・復元の完了を待ってからプロジェクトを開いてください。');
+  if(!checked.available)return true;
+  const pendingToken=stagePending?await stagePending():null;
+  if(!await update({pendingToken,verified:true}))throw Error('最新版への更新を完了できませんでした。');return false;
+ }
+ api.workspaceUpdater={check,update,restore,bind,ensureLatest,get busy(){return busy;}};
  bind();const token=new URL(windowRef.location.href).searchParams.get(TOKEN);if(uuid(token)){recoveryToken=token;void restore();}
+ else if(new URL(windowRef.location.href).searchParams.has('_projectOpen'))void studioAPI().then(()=>windowRef.FigureAppRelease?.resumeWorkspace(api)).catch(error=>notice(error.message,{persistent:true}));
  return api.workspaceUpdater;
 }
 

@@ -1,12 +1,12 @@
 import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=source-save-v0717-1';
-import {setupDirectSendButton,getFigureWorkspace} from './direct-transfer.mjs?v=6be2f301a94d';
-import {identifyPlotProject,plotSheetIndex,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=6be2f301a94d';
+import {setupDirectSendButton,getFigureWorkspace} from './direct-transfer.mjs?v=a63d4e0f29b7';
+import {identifyPlotProject,plotSheetIndex,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=a63d4e0f29b7';
 import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=9127ec4c4f31";
 import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=9127ec4c4f31";
 import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9127ec4c4f31";
 import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=27ae7675c457";
 import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=27ae7675c457";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=6be2f301a94d";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=a63d4e0f29b7";
 
 import {alignmentOffsets} from './object-layout.mjs?v=27ae7675c457';
 import {createDataEditor} from './data-editor.mjs?v=27ae7675c457';
@@ -16,7 +16,8 @@ import {createShortcutHandler} from './shortcuts.mjs?v=61d158587773';
 import {formatText,TEXT_FORMAT_ACTIONS} from './text-format.mjs?v=61d158587773';
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
-const APP_BUILD = '6be2f301a94d';
+const APP_BUILD = 'a63d4e0f29b7';
+window.FigureAppRelease?.assertRunning({version:APP_VERSION,build:APP_BUILD});
 function makeProject(settings,data,fonts,workspace={}){
   const live=sourceData&&data.filename===sourceData.filename&&(data.bytes===sourceData.bytes||data.files&&data.files===sourceData.files);
   const projectId=workspace.figureStudioProjectId||data.figureStudioProjectId||(live?(sourceData.figureStudioProjectId||=crypto.randomUUID()):crypto.randomUUID());
@@ -125,7 +126,7 @@ const folderSupported = typeof window.showDirectoryPicker === 'function';
 const importedFonts = new Map();
 let savedProjectState = null;
 let projectHandle=null, projectFilename='';
-let updateChecking=false, updateReloading=false, availableUpdate=null, updateRecovery=null;
+let updateChecking=false, updateReloading=false, availableUpdate=null, updateRecovery=null,projectVersionChecking=false;
 let pendingDataFiles = null;
 let sampleCatalog = null, sampleCatalogPromise = null, sampleGroup = 'all', pendingSampleId = null;
 let sheetSettings = new Map(), cancelBatch = false;
@@ -337,7 +338,7 @@ function status(text, kind = "working") {
 function updateButtons() {
   figureStudioDirectSender?.sync();
   compactHelp();
-  const busy = loading || exporting;
+  const busy = loading || exporting || projectVersionChecking;
   $('#check-update').disabled=busy || updateChecking;
   $('#apply-update').disabled=busy || !availableUpdate;
   $('#retry-update-restore').disabled=busy;
@@ -450,11 +451,13 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=6be2f301a94d", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=a63d4e0f29b7", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
+      if(data.version!==APP_VERSION||data.build!==APP_BUILD){fatal('描画機能の版が一致しません。更新してからプロジェクトを開いてください。');return;}
       await catalogReady;
+      try{if(window.FigureAppRelease&&!await window.FigureAppRelease.startup())return;}catch(error){fatal(error.message);return;}
       engineReady = true;
       updateButtons();
       $("#initial-message .spinner").hidden = true;
@@ -462,7 +465,11 @@ function startWorker() {
       $("#initial-message p").textContent = "Excel / CSV / TXTを読み込むか、「サンプルを使う」を押してください。";
       $("#preview-state").textContent = "データ未選択";
       status("Excel / CSV / TXTファイルを選んでください。", "ready");
-      if(!await restoreUpdateSession() && !getFigureBridgeContext())await openGalleryProject();
+      const restored=await restoreUpdateSession();
+      if(!getFigureBridgeContext()){
+        const opened=await window.FigureAppRelease?.resumePending().catch(error=>{status(error.message,'error');return true;});
+        if(!opened&&!restored)await openGalleryProject();
+      }
       // Permission waiting must never delay opening data or a gallery project.
       void browseLocalFonts({automatic:true});
     } else if (data.type === "fatal") {
@@ -2242,23 +2249,26 @@ async function checkAppUpdate() {
   }catch(error){updateMessage(`更新を確認できませんでした。接続を確認して再確認してください。${error.message}`,true);}
   finally{updateChecking=false;updateButtons();}
 }
-async function applyAppUpdate() {
+async function applyAppUpdate({pendingToken=null}={}) {
   if(!availableUpdate || loading || exporting)return;
   exporting=true;updateButtons();updateMessage('作業内容を一時保存しています…');
   const token=crypto.randomUUID();
   try{
+    if(window.FigureAppRelease){availableUpdate=await window.FigureAppRelease.latest();if(availableUpdate.version===APP_VERSION&&availableUpdate.build===APP_BUILD){exporting=false;updateButtons();return false;}}
     // IndexedDB clones one object graph, preserving the saved-state references
     // and file handles as well as binary data. No files leave this browser.
     const snapshot=updateRecovery && !sourceData?{...updateRecovery.record,target:{...availableUpdate},fromVersion:APP_VERSION,fromBuild:APP_BUILD}:captureUpdateSession({...availableUpdate});
     await updateSessionStore('put',token,snapshot);
-    const url=new URL(window.location.href);url.searchParams.set('_update',token);
+    const url=window.FigureAppRelease?window.FigureAppRelease.navigationURL(window.location.href,availableUpdate,pendingToken):new URL(window.location.href);url.searchParams.set('_update',token);
     updateReloading=true;
     window.location.replace(url.href);
     // Restore normal close protection if navigation was blocked by the browser.
     setTimeout(()=>{updateReloading=false;exporting=false;updateButtons();},5000);
+    return true;
   }catch(error){
     updateReloading=false;exporting=false;updateButtons();
     updateMessage(`更新を中止しました。現在の作業はそのままです。${error.message}`,true);
+    return false;
   }
 }
 async function restoreUpdateSession() {
@@ -2298,6 +2308,8 @@ async function restoreUpdateSession() {
     $('#undo').disabled=!history.length;$('#redo').disabled=!future.length;
     $('#controls-panel').scrollTop=workspace.controlScroll;window.scrollTo?.(0,workspace.pageScroll);
     const original=new URL(record.url);original.searchParams.delete('_update');
+    original.searchParams.set('_appBuild',APP_BUILD);original.searchParams.set('_appReload',crypto.randomUUID());
+    const pendingToken=new URL(window.location.href).searchParams.get('_projectOpen');if(pendingToken)original.searchParams.set('_projectOpen',pendingToken);
     if(original.origin===new URL(window.location.href).origin && original.pathname===new URL(window.location.href).pathname)window.history?.replaceState(null,'',original.href);
     try{await updateSessionStore('delete',token);}catch{} // The restored work remains usable if cleanup alone fails.
     updateRecovery=null;$('#update-dialog').close();
@@ -2349,6 +2361,11 @@ function prepareFigureStudioProjectReplacement({fromBridge=false,force=false}={}
 }
 async function readProject(file, saved, options={}) {
   if(!engineReady || loading || exporting)return;
+  if(projectVersionChecking)return false;
+  projectVersionChecking=true;updateButtons();
+  try{if(window.FigureAppRelease&&!await window.FigureAppRelease.ensureCurrent({file,handle:sourceHandles.get(file)||null,options}))return false;}
+  catch(error){status(`最新版を確認できないため、プロジェクトを開いていません。${error.message}`,'error');return false;}
+  finally{projectVersionChecking=false;updateButtons();}
   loading=true; updateButtons(); status('プロジェクトを開いています…');
   try {
     if(file.size>PROJECT_MAX_SIZE)throw new Error('プロジェクトは130 MB以内のファイルを選んでください。');
@@ -3639,4 +3656,11 @@ window.FigureStudioWorkspaceState={version:1,app:'plot',capture:captureFigureWor
  async restoreBinding(binding){if(binding==null)return figureStudioBridge?.resetWorkspaceBinding?.();return figureStudioBridge?.restoreWorkspaceBinding?.(structuredClone(binding));},
  markSaved(signature){if(typeof signature==='string'&&signature===figureWorkspaceSignature()){figureWorkspaceSavedSignature=signature;return true;}return false;}
 };
+
+window.FigureAppRelease?.configure({
+ ready:()=>engineReady&&!loading&&!exporting,
+ update:async(target,pendingToken)=>{availableUpdate=target;return applyAppUpdate({pendingToken});},
+ open:async record=>{if(record.handle)sourceHandles.set(record.file,record.handle);return readProject(record.file,undefined,record.options);},
+ error:error=>status(error.message,'error')
+});
 

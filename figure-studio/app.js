@@ -21,10 +21,10 @@ import {openSource,SOURCE_APPS,setupSourceDiscovery,closeSourceSessions} from '.
 import {createFigureSidebar} from './thumbnails.mjs?v=live-v062-1';
 import {setupTransferReceiver,getFigureWorkspace} from './integration/direct-transfer.mjs?v=studio-send-v0714-1';
 import {readMifitoIdentity} from './integration/mifito-sync.mjs?v=0.3.5-1';
-import {readPlotIdentity} from './integration/plot-sync.mjs?v=sheet-scope-v0719-1';
+import {readPlotIdentity} from './integration/plot-sync.mjs?v=latest-open-v0720-1';
 import {planMiFiToSync} from './mifito-batch.mjs?v=studio-send-v0714-1';
-import {setupUpdateCheck} from './update-check.mjs?v=workspace-update-v0715-2';
-import {installWorkspaceUpdater} from './workspace-update.mjs?v=workspace-update-v0715-2';
+import {setupUpdateCheck} from './update-check.mjs?v=latest-open-v0720-1';
+import {installWorkspaceUpdater} from './workspace-update.mjs?v=latest-open-v0720-1';
 import {marqueeSelection,resolveObjectSelection,clickObjectSelection,selectionDescription} from './selection.mjs?v=nested-groups-v0712-1';
 import {renderGroupLayers} from './group-layers.mjs?v=nested-groups-v0712-1';
 import {drawSelectionFrames} from './selection-overlay.mjs?v=studio-send-v0714-1';
@@ -41,10 +41,13 @@ import {reorderFigures} from './figure-order.mjs';
 import {renumberFigureNames} from './figure-names.mjs?v=0.3.3-1';
 import {deleteFigures,duplicateFigures} from './figure-commands.mjs?v=nested-groups-v0712-1';
 import {ProjectFileSession,projectFilePickerOptions} from './project-file.mjs?v=project-switch-v051-1';
-import {installWorkspacePersistence} from './workspace-session.mjs?v=workspace-update-v0715-2';
+import {installWorkspacePersistence} from './workspace-session.mjs?v=latest-open-v0720-1';
 import {decodeWorkspaceState} from './workspace-state.mjs?v=project-switch-v051-1';
 import {validateWorkspaceBinding} from './integration/bridge-host.mjs?v=source-save-v0717-1';
 
+const STUDIO_RELEASE={version:'0.7.20',build:'latest-open-v0720-1'};
+window.FigureAppRelease?.assertRunning(STUDIO_RELEASE);
+if(window.FigureAppRelease&&!await window.FigureAppRelease.startup())throw Error('最新版へ切り替えています。');
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 setupSourceDiscovery();
 installShortcutUI();
@@ -53,7 +56,7 @@ const el=(tag,attrs={},text)=>{const n=document.createElementNS(ns,tag);for(cons
 let doc=newDocument(),assets=new Map(),selection=[],tool='select',scale=1.5,history=new History(),gesture=null,textBefore=null,editingId=null,dirty=false,saveTimer,revision=0,clipboard=null,formatClipboard=null,frame=0,spaceDown=false,manualSavedRevision=-1,bridge=null;
 let groupScope=null;
 let figures=[doc],bookId=uid(),initialDemo=false,transferQueue=Promise.resolve(),updateReloading=false;
-let projectSaving=false,projectOpening=false;
+let projectSaving=false,projectOpening=false,projectVersionChecking=false;
 let preservedWorkspace=null,textCaret=null,lastPendingPropertyInput=null;
 let clipboardMarker='Figure Studio objects',clipboardGeneration=0,clipboardPNG=null;
 const pendingPropertyInputs=new WeakSet();
@@ -600,6 +603,11 @@ async function connectSavedEditors(bindings){
 async function readProject(file,handle=null,{recovery=false}={}){
  let plan=null,previous=null,previousBindings=null;
  try{
+  if(!recovery&&window.FigureAppRelease){
+   if(projectVersionChecking)return false;projectVersionChecking=true;
+   try{if(!await window.FigureAppRelease.ensureCurrent({file,handle}))return false;}
+   finally{projectVersionChecking=false;}
+  }
   if(file.size>400*1024*1024)throw Error('プロジェクトは400 MB以内で開いてください。');
   const raw=JSON.parse(await file.text()),next=raw.format==='figure-studio-book'?validateBook(raw):{format:'figure-studio-book',version:1,id:uid(),activeId:raw.id,figures:[validateDocument(raw)]};
   const loaded=new Map(),imageIds=new Set(next.figures.flatMap(f=>f.objects.filter(o=>o.type==='image').map(o=>o.assetId)));
@@ -784,10 +792,10 @@ renumberFigureNames(figures);render();fit();setTool('select');
 const workspaceReceiver=setupTransferReceiver({onImport:receiveDirectFigure,allowAdd:true,onStatus:({state,message})=>{if(state==='error')toast(message);}});
 window.FigureStudioWorkspaceReceiverId=workspaceReceiver.receiverId;
 window.FigureStudioWorkspaceUpdate={
- release:{version:document.querySelector('meta[name="figure-studio-version"]').content,build:document.querySelector('meta[name="figure-studio-build"]').content},
+ release:STUDIO_RELEASE,
  setUpdateReloading(value){updateReloading=!!value;},
  async capture(){
-  if(updateReloading||projectSaving||projectOpening)throw Error('Studioの保存・読み込みが完了してから更新してください。');
+  if(updateReloading||projectSaving||projectOpening&&!projectVersionChecking)throw Error('Studioの保存・読み込みが完了してから更新してください。');
   if(pathDrawing?.drawing&&!pathDrawing.finish())throw Error('作図中の線を確定するか、Escで取り消してください。');
   if(!commitFocusedProperty())throw Error('入力中の数値を確定してください。');
   updateReloading=true;
@@ -817,11 +825,12 @@ window.FigureStudioWorkspaceUpdate={
  cancel(){updateReloading=false;}
 };
 const integratedWorkspace=getFigureWorkspace(window);
+let standaloneUpdater=null;
 if(integratedWorkspace)installWorkspaceUpdater(integratedWorkspace,{windowRef:window.parent,documentRef:window.parent.document});
-else setupUpdateCheck({onStatus:toast,beforeReload:async()=>{
+else standaloneUpdater=setupUpdateCheck({onStatus:toast,beforeReload:async()=>{
  if(pathDrawing?.drawing&&!pathDrawing.finish())throw Error('作図中の線を確定するか、Escで取り消してから更新してください。');
  if(!commitFocusedProperty())throw Error('入力中の数値を確定してから更新してください。');
- if(projectSaving||projectOpening)throw Error('プロジェクトの保存・読み込みが完了してから更新してください。');
+ if(projectSaving||projectOpening&&!projectVersionChecking)throw Error('プロジェクトの保存・読み込みが完了してから更新してください。');
  updateReloading=true;
  try{await transferQueue;if(gesture)endGesture(null,true);finishText();const rev=revision;clearTimeout(saveTimer);await saveDraft(snapshot(),assets);if(rev!==revision)throw Error('保存中に変更がありました。もう一度「更新する」を押してください。');dirty=false;return true;}
  catch(error){updateReloading=false;throw error;}
@@ -838,3 +847,11 @@ window.FigureStudioWorkspaceSave=async()=>{
  if(bookId!==saved.bookId||revision!==saved.revision||projectSaving||projectOpening||editingId||gesture)throw Error('保存中に変更がありました。もう一度「更新する」を押してください。');
  return true;
 };
+
+window.FigureAppRelease?.configure({
+ ready:()=>!projectSaving&&!projectOpening,
+ update:(target,pendingToken)=>standaloneUpdater?.forceUpdate(target,pendingToken),
+ open:record=>readProject(record.file,record.handle,record.options),
+ error:error=>toast(error.message)
+});
+if(!integratedWorkspace)void window.FigureAppRelease?.resumePending().catch(error=>toast(error.message));

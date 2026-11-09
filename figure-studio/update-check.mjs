@@ -90,12 +90,13 @@ export function setupUpdateCheck({beforeReload, onStatus = () => {}} = {}) {
     }
   }
 
-  async function update() {
+  async function update({pendingToken=null}={}) {
     if (busy || disposed) return {status: 'busy'};
     if (!available) return check();
     busy = true;
     paint('reloading');
     try {
+      if(window.FigureAppRelease)available=await window.FigureAppRelease.latest();
       const result = await beforeReload();
       if (disposed) return {status: 'disposed'};
       if (result === false) {
@@ -103,7 +104,7 @@ export function setupUpdateCheck({beforeReload, onStatus = () => {}} = {}) {
         return {status: 'cancelled'};
       }
       notify('作業内容を保存しました。更新して再開します。', 'reloading');
-      const url=new URL(location.href);url.searchParams.set('_studioBuild',available.build);location.replace(url.href);
+      const url=window.FigureAppRelease?window.FigureAppRelease.navigationURL(location.href,available,pendingToken):new URL(location.href);url.searchParams.set('_studioBuild',available.build);location.replace(url.href);
       return {status: 'reloading', ...available};
     } catch {
       notify('作業内容を保存できなかったため、更新しませんでした。プロジェクトを保存してから再度お試しください。', 'save-error');
@@ -120,6 +121,7 @@ export function setupUpdateCheck({beforeReload, onStatus = () => {}} = {}) {
   return {
     check,
     update,
+    async forceUpdate(target,pendingToken){available=parseRelease(target);return (await update({pendingToken})).status==='reloading';},
     getState: () => ({busy, current: {...current}, available: available ? {...available} : null}),
     dispose() {
       disposed = true;
