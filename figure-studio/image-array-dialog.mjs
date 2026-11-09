@@ -1,5 +1,5 @@
-import {mm} from './model.mjs?v=group-selection-v078-1';
-import {inferImageArray} from './image-array.mjs?v=group-selection-v078-1';
+import {mm} from './model.mjs?v=rotation-v079-1';
+import {inferImageArray} from './image-array.mjs?v=rotation-v079-1';
 
 export function createImageArrayDialog({root,getDocument,getSelection,getSelectionOptions=()=>({}),onApply,onClose=()=>{}}){
  const form=root.querySelector('form'),horizontal=root.querySelector('[name="horizontalGap"]'),vertical=root.querySelector('[name="verticalGap"]'),separate=root.querySelector('[name="separateGaps"]'),verticalField=root.querySelector('[data-array-vertical-field]'),horizontalLabel=root.querySelector('[data-array-horizontal-label]'),summary=root.querySelector('[data-array-summary]'),note=root.querySelector('[data-array-note]'),error=root.querySelector('[data-array-error]'),apply=root.querySelector('[type="submit"]');

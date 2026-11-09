@@ -1,4 +1,4 @@
-import {bounds,selectionUnits,expandSelection} from './model.mjs?v=group-selection-v078-1';
+import {bounds,selectionUnits,expandSelection} from './model.mjs?v=rotation-v079-1';
 
 /** A group stays whole in mixed selections; only a group selected alone opens up. */
 export function imageArraySelection(doc,ids,{individual=false}={}){

@@ -1,7 +1,7 @@
 /**
  * Keyboard shortcuts for Figure Studio.
  *
- * Alt 3 / Alt 4 / Alt 5 are the user's Quick Access Toolbar ordering, not
+ * Alt 3 / Alt 4 / Alt 5 / Alt 7 are the user's Quick Access Toolbar ordering, not
  * universal PowerPoint defaults. Both held-Alt and sequential Key Tips work.
  *
  * Clipboard shortcuts deliberately remain native. The editor should listen
@@ -14,6 +14,8 @@ export const SHORTCUTS = Object.freeze([
   ['上／中央／下揃え', 'Alt → 5 → T / M / B'],
   ['左右／上下に等間隔', 'Alt → 5 → H / V'],
   ['間隔を指定して配列', 'Alt → 5 → G'],
+  ['右／左へ90度回転', 'Alt → 7 → R / L'],
+  ['上下／左右反転', 'Alt → 7 → V / H'],
   ['保存／開く', 'Ctrl + S / O'],
   ['Figureを追加', 'Ctrl + M'],
   ['次／前のFigure', 'Ctrl + PageDown / PageUp'],
@@ -44,14 +46,16 @@ const ALIGN_KEYS = Object.freeze({
 const TOOL_KEYS = Object.freeze({
   v: 'select', t: 'text', l: 'line', a: 'arrow', r: 'rect', e: 'ellipse',
 });
+const ROTATE_KEYS = Object.freeze({r:'rotate-right',l:'rotate-left',v:'flip-v',h:'flip-h'});
 
 const FORMAT_KEYS = Object.freeze({
   b: 'bold', i: 'italic', u: 'underline',
   l: 'text-left', e: 'text-center', r: 'text-right', j: 'text-justify',
 });
 
-const ALT_HINT = 'Alt: 3 最前面 · 4 最背面 · 5 配置 · Esc 閉じる';
+const ALT_HINT = 'Alt: 3 最前面 · 4 最背面 · 5 配置 · 7 回転 · Esc 閉じる';
 const ALIGN_HINT = '配置: L 左 · C 中央 · R 右 · T 上 · M 上下中央 · B 下 · H 左右等間隔 · V 上下等間隔 · G 間隔を指定して配列';
+const ROTATE_HINT = '回転: R 右へ90度 · L 左へ90度 · V 上下反転 · H 左右反転 · Esc 閉じる';
 
 export const keyboardPlatform=()=>globalThis.navigator?.userAgentData?.platform||globalThis.navigator?.platform||'';
 export const isMacPlatform=(platform=keyboardPlatform())=>/mac|iphone|ipad|ipod/i.test(platform);
@@ -153,7 +157,7 @@ export function createShortcutHandler({
       return consume(event, ribbon ? 'focus-canvas' : 'escape');
     }
 
-    if(mac&&event.altKey&&!primary&&!editing&&sequence!=='align'&&/^arrow(left|right|up|down)$/.test(key)){
+    if(mac&&event.altKey&&!primary&&!editing&&!['align','rotate'].includes(sequence)&&/^arrow(left|right|up|down)$/.test(key)){
       if(ribbon){reset();return false;}
       const steps={arrowleft:[-.1,0],arrowright:[.1,0],arrowup:[0,-.1],arrowdown:[0,.1]};
       const [dx,dy]=steps[key];return consume(event,'nudge',{dx,dy});
@@ -170,18 +174,19 @@ export function createShortcutHandler({
         return true;
       }
       if (sequence || event.altKey) {
-        // Alt+3, Alt+4 and Alt+5 also work without a prior Alt keydown.
+        // Held Alt also works without a prior Alt keydown.
         const phase = sequence || 'root';
         if (phase === 'root' && key === '3') return consume(event, 'front');
         if (phase === 'root' && key === '4') return consume(event, 'back');
-        if (phase === 'root' && key === '5') {
+        if (phase === 'root' && ['5','7'].includes(key)) {
           event.preventDefault?.();
           event.stopPropagation?.();
-          sequence = 'align';
-          onHint(ALIGN_HINT);
+          sequence = key==='5'?'align':'rotate';
+          onHint(sequence==='align'?ALIGN_HINT:ROTATE_HINT);
           return true;
         }
         if (phase === 'align' && ALIGN_KEYS[key]) return consume(event, ALIGN_KEYS[key]);
+        if (phase === 'rotate' && ROTATE_KEYS[key]) return consume(event, ROTATE_KEYS[key]);
         // An unknown sequence is consumed instead of unexpectedly changing tool.
         return consume(event);
       }

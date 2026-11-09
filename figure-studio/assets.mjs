@@ -1,4 +1,4 @@
-import {uid} from './model.mjs?v=group-selection-v078-1';
+import {uid} from './model.mjs?v=rotation-v079-1';
 import {svgPhysicalSize,svgMiFiToBodySize,validatedMiFiToBodySize} from './physical-size.mjs?v=0.3.5-1';
 export const blobToDataURL=blob=>new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(r.error);r.readAsDataURL(blob);});
 export function dataURLToBlob(url){const match=/^data:([^;,]+)?(;base64)?,([\s\S]*)$/.exec(url);if(!match)throw Error('ファイルデータが不正です。');const raw=match[2]?atob(match[3]):decodeURIComponent(match[3]);const bytes=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);return new Blob([bytes],{type:match[1]||'application/octet-stream'});}

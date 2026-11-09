@@ -41,6 +41,18 @@ function paintOpacity(node,channel){
 }
 const visibleChildren=group=>group.children.filter(node=>node.getAttribute('data-hit')!=='true'&&node.getAttribute('stroke')!=='transparent');
 
+test('rotated and reflected objects use identical geometry in preview, thumbnails and exported SVG',()=>{
+ const types=['image','text','rect','ellipse','line','arrow','curve','freeform','arc'];
+ const objects=types.map(type=>makeObject(type,{assetId:'raster',x:10,y:20,w:80,h:40,rotation:90,flipX:true,flipY:true})),app=harness(objects);
+ const markup=app.buildExport(),groups=app.exported.children.filter(node=>node.tag==='g');
+ assert.equal(groups.length,types.length);assert.doesNotMatch(markup,/NaN|Infinity/);
+ groups.forEach((group,i)=>{
+  const expected='translate(10 20) rotate(90 40 20) translate(40 20) scale(-1 -1) translate(-40 -20)';
+  for(const rendered of [group,app.draw(objects[i]),app.draw(objects[i],'thumbnail')])assert.equal(rendered.getAttribute('transform'),expected);
+ });
+ assert.equal(groups[0].children[0].getAttribute('href'),app.image.dataUrl);
+});
+
 test('all object groups invert independent transparency percentages while preserving whole-object opacity',()=>{
  const app=harness();
  for(const type of ['image','text','line','arrow','rect','ellipse','curve','freeform','arc']){

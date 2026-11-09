@@ -12,7 +12,7 @@ export function newDocument(){return {format:'figure-studio',version:1,id:uid(),
 export function makeObject(type,props={}){return {id:uid(),type,x:mm(10),y:mm(10),w:mm(40),h:mm(25),rotation:0,opacity:1,fillTransparency:0,strokeTransparency:0,locked:false,groupId:null,stroke:'#263b44',fill:'none',strokeWidth:1,strokeAlignment:'center',...(type==='text'?{text:'Text',textMode:'auto',fontFamily:'Arial',fontSize:9,bold:false,italic:false,underline:false,textAlign:'left',fill:'#172f36',stroke:'none',strokeAlignment:'outside'}:{}),...(type==='arrow'?{arrowEnd:true}:{}),...(type==='curve'?{points:[{x:0,y:1},{x:.5,y:0},{x:1,y:1}],closed:false}:type==='freeform'?{points:[{x:0,y:1},{x:.3,y:.2},{x:.7,y:.8},{x:1,y:0}],closed:false}:type==='arc'?{startAngle:0,endAngle:180,closed:false}:{}),...props};}
 export function objectBounds(o){
  const r=(o.rotation||0)*Math.PI/180,c=Math.cos(r),s=Math.sin(r),cx=o.x+o.w/2,cy=o.y+o.h/2;
- const p=(o.type==='line'||o.type==='arrow'?[[o.x,o.y],[o.x+o.w,o.y+o.h]]:[[o.x,o.y],[o.x+o.w,o.y],[o.x+o.w,o.y+o.h],[o.x,o.y+o.h]]).map(([x,y])=>({x:cx+(x-cx)*c-(y-cy)*s,y:cy+(x-cx)*s+(y-cy)*c}));
+ const p=(o.type==='line'||o.type==='arrow'?[[o.x,o.y],[o.x+o.w,o.y+o.h]]:[[o.x,o.y],[o.x+o.w,o.y],[o.x+o.w,o.y+o.h],[o.x,o.y+o.h]]).map(([x,y])=>{const dx=(x-cx)*(o.flipX?-1:1),dy=(y-cy)*(o.flipY?-1:1);return {x:cx+dx*c-dy*s,y:cy+dx*s+dy*c};});
  return {x:Math.min(...p.map(v=>v.x)),y:Math.min(...p.map(v=>v.y)),w:Math.max(...p.map(v=>v.x))-Math.min(...p.map(v=>v.x)),h:Math.max(...p.map(v=>v.y))-Math.min(...p.map(v=>v.y))};
 }
 export function bounds(objects){if(!objects.length)return null;const bs=objects.map(objectBounds);const x=Math.min(...bs.map(o=>o.x)),y=Math.min(...bs.map(o=>o.y));return {x,y,w:Math.max(...bs.map(o=>o.x+o.w))-x,h:Math.max(...bs.map(o=>o.y+o.h))-y};}
@@ -23,6 +23,21 @@ export function selectionUnits(doc,ids,{individual=false}={}){
  return [...units.values()].filter(unit=>!unit.some(o=>o.locked||lockedGroups.has(o.groupId)));
 }
 export function expandSelection(doc,ids){const set=new Set(ids),groups=new Set(doc.objects.filter(o=>set.has(o.id)&&o.groupId).map(o=>o.groupId));for(const o of doc.objects)if(o.groupId&&groups.has(o.groupId))set.add(o.id);return [...set];}
+export function rotateOrFlip(doc,ids,action,options={}){
+ if(!['rotate-right','rotate-left','flip-v','flip-h'].includes(action))return;
+ const angle=value=>((value%360)+360)%360;
+ for(const unit of selectionUnits(doc,ids,options)){
+  const b=bounds(unit),cx=b.x+b.w/2,cy=b.y+b.h/2;
+  for(const o of unit){
+   const dx=o.x+o.w/2-cx,dy=o.y+o.h/2-cy;let x=dx,y=dy;
+   if(action==='rotate-right'){x=-dy;y=dx;o.rotation=angle((o.rotation||0)+90);}
+   if(action==='rotate-left'){x=dy;y=-dx;o.rotation=angle((o.rotation||0)-90);}
+   if(action==='flip-h'){x=-dx;o.rotation=angle(-(o.rotation||0));o.flipX=!o.flipX;}
+   if(action==='flip-v'){y=-dy;o.rotation=angle(-(o.rotation||0));o.flipY=!o.flipY;}
+   o.x=cx+x-o.w/2;o.y=cy+y-o.h/2;
+  }
+ }
+}
 export function align(doc,ids,mode,target='selection',options={}){
  const units=selectionUnits(doc,ids,options);if(!units.length)return;
  const b=target==='page'?{x:0,y:0,w:doc.width,h:doc.height}:bounds(units.flat());
@@ -69,7 +84,7 @@ export function validateDocument(input){
   for(const p of ['fillTransparency','strokeTransparency'])if(o[p]!==undefined&&!finite(o[p],0,100))throw Error('塗りつぶしと線の透明度は0〜100%で指定してください。');
   for(const p of ['fill','stroke'])if(o[p]&&!/^(#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})|none|transparent)$/i.test(o[p]))throw Error('色が不正です。');
   if(o.groupId!=null&&(typeof o.groupId!=='string'||!o.groupId||o.groupId.length>200))throw Error('グループが不正です。');
-  for(const p of ['locked','bold','italic','underline','arrowEnd','arrowStart'])if(o[p]!==undefined&&typeof o[p]!=='boolean')throw Error('書式が不正です。');
+  for(const p of ['locked','bold','italic','underline','arrowEnd','arrowStart','flipX','flipY'])if(o[p]!==undefined&&typeof o[p]!=='boolean')throw Error('書式が不正です。');
   for(const [p,values]of Object.entries(ARROW_PROPERTIES))if(o[p]!==undefined&&!values.includes(o[p]))throw Error('矢印の書式が不正です。');
  }
  const result=clone(input);

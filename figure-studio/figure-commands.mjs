@@ -1,4 +1,4 @@
-import {clone,newDocument,uid} from './model.mjs?v=group-selection-v078-1';
+import {clone,newDocument,uid} from './model.mjs?v=rotation-v079-1';
 
 // Book operations keep shared image/source assets intact and form one undo step.
 export function deleteFigures(figures,ids,activeId){

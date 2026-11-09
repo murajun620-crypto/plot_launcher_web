@@ -1,4 +1,4 @@
-import {isMacPlatform,keyboardPlatform,shortcutLabel,shortcutRows} from './shortcuts.mjs?v=group-selection-v078-1';
+import {isMacPlatform,keyboardPlatform,shortcutLabel,shortcutRows} from './shortcuts.mjs?v=rotation-v079-1';
 
 /** Localize command labels only; figure names and user text are untouched. */
 export function installShortcutUI({documentRef=globalThis.document,platform=keyboardPlatform()}={}){

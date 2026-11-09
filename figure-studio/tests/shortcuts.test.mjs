@@ -38,6 +38,38 @@ test('sequential Alt, 5, L aligns left and clears Key Tips', () => {
   assert.equal(s.hints.at(-1), '');
 });
 
+test('Alt 7 R/L/V/H supports sequential and held keys from canvas and ribbon without changing tool',()=>{
+ for(const active of [true,'ribbon'])for(const held of [false,true]){
+  const s=setup({active});
+  for(const [key,action]of Object.entries({r:'rotate-right',l:'rotate-left',v:'flip-v',h:'flip-h'})){
+   s.press('Alt');s.press('7',{altKey:held});const event=s.press(key,{altKey:held});
+   assert.equal(event.defaultPrevented,true);assert.equal(event.stopped,true);assert.equal(s.calls.at(-1)[0],action);assert.equal(s.hints.at(-1),'');
+  }
+  assert.equal(s.calls.length,4);assert.ok(s.hints.some(hint=>hint.includes('7 回転')));assert.ok(s.hints.some(hint=>hint.includes('V 上下反転')));
+ }
+ const direct=setup();direct.press('7',{altKey:true});direct.press('R',{altKey:true});assert.deepEqual(direct.calls,[['rotate-right',undefined]]);
+});
+
+test('Mac Option 7 maps generated characters to physical R/L/V/H and localizes help',()=>{
+ const s=setup({platform:'MacIntel'});
+ for(const [code,key,action]of [['KeyR','®','rotate-right'],['KeyL','¬','rotate-left'],['KeyV','√','flip-v'],['KeyH','˙','flip-h']]){
+  s.press('¶',{altKey:true,code:'Digit7'});s.press(key,{altKey:true,code});assert.equal(s.calls.at(-1)[0],action);
+ }
+ assert.match(new Map(shortcutRows('MacIntel')).get('上下／左右反転'),/Option → 7/);
+});
+
+test('rotation sequences cancel safely and never alter text, native inputs, dialogs, IME or AltGraph',()=>{
+ const s=setup();s.press('Alt');s.press('7');s.press('Escape');assert.equal(s.calls.length,0);s.press('r');assert.equal(s.calls.at(-1)[0],'rect');
+ s.press('Alt');s.press('7');s.press('x');assert.equal(s.calls.length,1);assert.equal(s.hints.at(-1),'');
+ for(const state of [{editing:true},{editing:'canvas-text'},{active:false}]){
+  const input=setup(state);for(const key of ['Alt','7','r','l','v','h'])assert.equal(input.press(key,{altKey:true}).defaultPrevented,false);
+  assert.equal(input.calls.length,0);
+ }
+ for(const event of [{isComposing:true},{keyCode:229},{getModifierState:key=>key==='AltGraph'}]){
+  const input=setup();input.press('Alt');input.press('7');assert.equal(input.press('r',event).defaultPrevented,false);assert.equal(input.calls.length,0);
+ }
+});
+
 test('Mac Option sequences accept both released keys and characters generated while held',()=>{
  const s=setup({platform:'MacIntel'});
  s.press('Alt',{altKey:true,code:'AltLeft'});s.press('5',{code:'Digit5'});s.press('g',{code:'KeyG'});

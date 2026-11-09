@@ -1,4 +1,4 @@
-import {objectSelectionLabel} from './selection.mjs?v=group-selection-v078-1';
+import {objectSelectionLabel} from './selection.mjs?v=rotation-v079-1';
 
 const icons={image:'▧',text:'T',line:'╱',arrow:'↗',rect:'□',ellipse:'○',curve:'∿',freeform:'⌁',arc:'⌒'};
 export function renderGroupLayers({root,doc,ids,groupId=null,onSelect}){

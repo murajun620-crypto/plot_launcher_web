@@ -1,16 +1,16 @@
-import {PT_PER_MM,mm,toMM,uid,clone,newDocument,makeObject,bounds,objectBounds,expandSelection,align,distribute,reorder,autoLayout,History,validateDocument} from './model.mjs?v=group-selection-v078-1';
+import {PT_PER_MM,mm,toMM,uid,clone,newDocument,makeObject,bounds,objectBounds,expandSelection,align,distribute,reorder,autoLayout,History,validateDocument,rotateOrFlip} from './model.mjs?v=rotation-v079-1';
 import {isPathObject,pathData,objectFromPoints} from './paths.mjs?v=ribbon-v060-1';
 import {createPathDrawing} from './path-drawing.mjs?v=ribbon-v060-1';
-import {imageAsset,imagePhysicalSize,imageMiFiToBodySize,blobToDataURL,dataURLToBlob,download,sanitizeSVG} from './assets.mjs?v=group-selection-v078-1';
-import {importedImageSize,replacedImageSize,replacedMiFiToImageSize,imageInsertionPoint} from './image-placement.mjs?v=group-selection-v078-1';
+import {imageAsset,imagePhysicalSize,imageMiFiToBodySize,blobToDataURL,dataURLToBlob,download,sanitizeSVG} from './assets.mjs?v=rotation-v079-1';
+import {importedImageSize,replacedImageSize,replacedMiFiToImageSize,imageInsertionPoint} from './image-placement.mjs?v=rotation-v079-1';
 import {rasterResolution} from './image-resolution.mjs?v=image-quality-v066-1';
 import {saveDraft,loadDraft,saveProjectFileTarget,loadProjectFileTarget} from './storage.mjs?v=0.3.6-1';
-import {createDemo} from './demo.mjs?v=group-selection-v078-1';
-import {createShortcutHandler,shortcutLabel} from './shortcuts.mjs?v=group-selection-v078-1';
-import {installShortcutUI} from './shortcut-ui.mjs?v=group-selection-v078-1';
+import {createDemo} from './demo.mjs?v=rotation-v079-1';
+import {createShortcutHandler,shortcutLabel} from './shortcuts.mjs?v=rotation-v079-1';
+import {installShortcutUI} from './shortcut-ui.mjs?v=rotation-v079-1';
 import {createRibbon} from './ribbon.mjs?v=source-batch-v070-1';
-import {imageArrayUnits,arrangeImageArray} from './image-array.mjs?v=group-selection-v078-1';
-import {createImageArrayDialog} from './image-array-dialog.mjs?v=group-selection-v078-1';
+import {imageArrayUnits,arrangeImageArray} from './image-array.mjs?v=rotation-v079-1';
+import {createImageArrayDialog} from './image-array-dialog.mjs?v=rotation-v079-1';
 import {createColorPickers} from './colors.mjs?v=ribbon-v060-1';
 import {renderTextPaint} from './text-paint.mjs?v=tex-v061-1';
 import {createTexRenderer} from './tex.mjs?v=live-v062-1';
@@ -22,21 +22,21 @@ import {readMifitoIdentity} from './integration/mifito-sync.mjs?v=0.3.5-1';
 import {readPlotIdentity} from './integration/plot-sync.mjs?v=source-batch-v070-1';
 import {planMiFiToSync} from './mifito-batch.mjs?v=source-batch-v070-1';
 import {setupUpdateCheck} from './update-check.mjs';
-import {marqueeSelection,resolveObjectSelection,clickObjectSelection,selectionDescription} from './selection.mjs?v=group-selection-v078-1';
-import {renderGroupLayers} from './group-layers.mjs?v=group-selection-v078-1';
-import {drawSelectionFrames} from './selection-overlay.mjs?v=group-selection-v078-1';
+import {marqueeSelection,resolveObjectSelection,clickObjectSelection,selectionDescription} from './selection.mjs?v=rotation-v079-1';
+import {renderGroupLayers} from './group-layers.mjs?v=rotation-v079-1';
+import {drawSelectionFrames} from './selection-overlay.mjs?v=rotation-v079-1';
 import {ARROW_PROPERTIES,arrowEndpoint,arrowPropertyValue,setArrowProperty,arrowGeometry} from './arrowheads.mjs?v=0.3.0-1';
 
 import {createArrowPicker} from './arrow-picker.mjs?v=0.3.0-1';
 import {lineStrokeAttributes,lineStyleValue,setLineStyle,supportsLineStyle} from './line-styles.mjs?v=lines-v064-1';
 import {createLineStylePicker} from './line-style-picker.mjs?v=lines-v064-1';
-import {createPreviewQuality} from './preview-quality.mjs?v=group-selection-v078-1';
-import {createSelectionWheelZoom,resetSelectionZoom} from './selection-zoom.mjs?v=group-selection-v078-1';
+import {createPreviewQuality} from './preview-quality.mjs?v=rotation-v079-1';
+import {createSelectionWheelZoom,resetSelectionZoom} from './selection-zoom.mjs?v=rotation-v079-1';
 import {fontSizeForAction} from './text-format.mjs?v=annotation-input-v071-1';
-import {selectionPNG,writeSelectionImage,studioPasteObjects,matchesSelectionPNG} from './image-clipboard.mjs?v=group-selection-v078-1';
+import {selectionPNG,writeSelectionImage,studioPasteObjects,matchesSelectionPNG} from './image-clipboard.mjs?v=rotation-v079-1';
 import {reorderFigures} from './figure-order.mjs';
 import {renumberFigureNames} from './figure-names.mjs?v=0.3.3-1';
-import {deleteFigures,duplicateFigures} from './figure-commands.mjs?v=group-selection-v078-1';
+import {deleteFigures,duplicateFigures} from './figure-commands.mjs?v=rotation-v079-1';
 import {ProjectFileSession,projectFilePickerOptions} from './project-file.mjs?v=project-switch-v051-1';
 import {installWorkspacePersistence} from './workspace-session.mjs?v=project-switch-v051-1';
 import {decodeWorkspaceState} from './workspace-state.mjs?v=project-switch-v051-1';
@@ -105,7 +105,7 @@ function refreshImagePreviews(){for(const o of doc.objects)if(o.type==='image'){
 function setScale(s){scale=Math.max(.25,Math.min(5,s));$('#zoom').value=Math.round(scale*100);$('#zoomLabel').textContent=`${Math.round(scale*100)}%`;paper.style.width=`${doc.width*scale}px`;paper.style.height=`${doc.height*scale}px`;svg.style.width=`${doc.width*scale}px`;svg.style.height=`${doc.height*scale}px`;refreshImagePreviews();renderOverlay();positionEditor();}
 function fit(){resetSelectionZoom(viewport);viewport.scrollLeft=viewport.scrollTop=0;const w=viewport.clientWidth-100,h=viewport.clientHeight-85;setScale(Math.min(w/doc.width,h/doc.height));}
 function svgPoint(e){const r=svg.getBoundingClientRect();return{x:(e.clientX-r.left)/scale,y:(e.clientY-r.top)/scale};}
-function transform(o){return `translate(${o.x} ${o.y}) rotate(${o.rotation||0} ${o.w/2} ${o.h/2})`;}
+function transform(o){return `translate(${o.x} ${o.y}) rotate(${o.rotation||0} ${o.w/2} ${o.h/2})`+(o.flipX||o.flipY?` translate(${o.w/2} ${o.h/2}) scale(${o.flipX?-1:1} ${o.flipY?-1:1}) translate(${-o.w/2} ${-o.h/2})`:'');}
 function font(o){return `${o.italic?'italic ':''}${o.bold?'bold ':''}${o.fontSize}px ${o.fontFamily||'Arial'}`;}
 function textLines(o){measure.font=font(o);const out=[];for(const paragraph of o.text.split('\n')){let line='';for(const c of paragraph){if(line&&measure.measureText(line+c).width>Math.max(1,o.w-2)){out.push(line);line=c;}else line+=c;}out.push(line);}return out;}
 function drawContent(o,g,full=false,sourceAssets){
@@ -139,7 +139,7 @@ function renderFast(){
  for(const o of editable()){const g=nodes.get(o.id);if(!g)continue;if(gesture?.kind==='resize'||gesture?.kind==='endpoint'||gesture?.kind==='arc-angle')drawContent(o,g);else g.setAttribute('transform',transform(o));}renderOverlay();}
 function queueFast(){if(!frame)frame=requestAnimationFrame(()=>{frame=0;renderFast();});}
 function renderOverlay(){overlays.replaceChildren();drawPathDraft();const all=selected(),{box:b,ink,u}=drawSelectionFrames({root:overlays,doc,ids:selection,groupId:groupScope,scale,editableIds:editable().map(object=>object.id),el});if(!b||!editable().length)return;
- if(all.length===1&&(all[0].type==='line'||all[0].type==='arrow')){const o=all[0],r=(o.rotation||0)*Math.PI/180,cx=o.x+o.w/2,cy=o.y+o.h/2;for(const [name,x,y]of [['start',o.x,o.y],['end',o.x+o.w,o.y+o.h]]){const xx=cx+(x-cx)*Math.cos(r)-(y-cy)*Math.sin(r),yy=cy+(x-cx)*Math.sin(r)+(y-cy)*Math.cos(r);overlays.append(el('circle',{cx:xx,cy:yy,r:4*u,fill:'white',stroke:ink,'stroke-width':1.4*u,'data-handle':name}));}}
+ if(all.length===1&&(all[0].type==='line'||all[0].type==='arrow')){const o=all[0];for(const [name,point]of [['start',{x:0,y:0}],['end',{x:1,y:1}]]){const p=pathWorldPoint(o,point);overlays.append(el('circle',{cx:p.x,cy:p.y,r:4*u,fill:'white',stroke:ink,'stroke-width':1.4*u,'data-handle':name}));}}
  else for(const [name,x,y]of [['nw',b.x,b.y],['ne',b.x+b.w,b.y],['se',b.x+b.w,b.y+b.h],['sw',b.x,b.y+b.h]])overlays.append(el('rect',{x:x-4.5*u,y:y-4.5*u,width:9*u,height:9*u,fill:ink,stroke:'#fff','stroke-width':1.5*u,'data-handle':name,cursor:`${name}-resize`}));
  if(all.length===1&&pathEditId===all[0].id&&['curve','freeform'].includes(all[0].type)){
   all[0].points.forEach((point,index)=>{const p=pathWorldPoint(all[0],point);overlays.append(el('circle',{cx:p.x,cy:p.y,r:3.5*u,fill:'#fff',stroke:'#cc8623','stroke-width':1.3*u,'data-handle':'point','data-point-index':index,cursor:'crosshair'}));});
@@ -190,6 +190,7 @@ function renderInspector(){
   if(['toggle-arrow-start','toggle-arrow-end'].includes(action))button.disabled=!edits.some(object=>['line','arrow'].includes(object.type));
   if(action==='edit-points'||action==='close-path'){button.disabled=arr.length!==1||!edits.length||!['curve','freeform'].includes(o.type);if(action==='close-path'&&!o?.closed&&(o?.points?.length??0)<3)button.disabled=true;button.setAttribute('aria-pressed',String(action==='edit-points'?pathEditId===o?.id:!!o?.closed));}
   if(['front','back','forward','backward','lock','duplicate','delete'].includes(action))button.disabled=!arr.length;
+  if(['rotate-right','rotate-left','flip-v','flip-h'].includes(action))button.disabled=!edits.length;
   if(action==='group')button.disabled=!!groupScope||edits.length<2;
   if(action==='image-array')button.disabled=imageArrayUnits(doc,selection,selectionOptions()).length<2;
   if(action==='ungroup')button.disabled=!edits.some(object=>object.groupId);
@@ -220,8 +221,8 @@ function renderImageResolution(arr,edits){
  button.hidden=!target||!!target.source;button.disabled=!target||!edits.some(o=>o.id===target.id);
 }
 function setTool(t){finishText();pathToolTransition=true;try{pathDrawing?.setTool(t);}finally{pathToolTransition=false;}pathEditId=null;tool=t;svg.style.cursor=t==='select'?'default':'crosshair';updateToolbar();$('#statusText').textContent={select:'クリックで選択 · Shiftで複数選択 · ドラッグで移動',text:'ドラッグでテキストボックスを作成',line:'ドラッグで線を作成 · Shiftで角度固定',arrow:'ドラッグで矢印を作成 · Shiftで角度固定',rect:'ドラッグで長方形を作成',ellipse:'ドラッグで楕円を作成',curve:'クリックで点を追加 · ダブルクリック／Enterで確定 · Escで取消',freeform:'クリックで折れ線・ドラッグで手描き · Enterで確定 · 始点クリックで閉じる',arc:'ドラッグで円弧を作成 · 黄色の点またはホームで角度を変更'}[t];if(['curve','freeform'].includes(t))setSelection([],{focus:false});renderOverlay();svg.focus({preventScroll:true});}
-function pathWorldPoint(object,point){const x=object.x+point.x*object.w,y=object.y+point.y*object.h,cx=object.x+object.w/2,cy=object.y+object.h/2,r=(object.rotation||0)*Math.PI/180;return {x:cx+(x-cx)*Math.cos(r)-(y-cy)*Math.sin(r),y:cy+(x-cx)*Math.sin(r)+(y-cy)*Math.cos(r)};}
-function pathLocalPoint(object,point){const cx=object.x+object.w/2,cy=object.y+object.h/2,r=(object.rotation||0)*Math.PI/180,dx=point.x-cx,dy=point.y-cy;return {x:cx+dx*Math.cos(r)+dy*Math.sin(r)-object.x,y:cy-dx*Math.sin(r)+dy*Math.cos(r)-object.y};}
+function pathWorldPoint(object,point){const dx=(point.x-.5)*object.w*(object.flipX?-1:1),dy=(point.y-.5)*object.h*(object.flipY?-1:1),cx=object.x+object.w/2,cy=object.y+object.h/2,r=(object.rotation||0)*Math.PI/180;return {x:cx+dx*Math.cos(r)-dy*Math.sin(r),y:cy+dx*Math.sin(r)+dy*Math.cos(r)};}
+function pathLocalPoint(object,point){const cx=object.x+object.w/2,cy=object.y+object.h/2,r=(object.rotation||0)*Math.PI/180,dx=point.x-cx,dy=point.y-cy;return {x:object.w/2+(dx*Math.cos(r)+dy*Math.sin(r))*(object.flipX?-1:1),y:object.h/2+(-dx*Math.sin(r)+dy*Math.cos(r))*(object.flipY?-1:1)};}
 function drawPathDraft(){
  if(!pathDraft)return;const points=[...pathDraft.points];if(pathDraft.previewPoint&&(!points.length||Math.hypot(points.at(-1).x-pathDraft.previewPoint.x,points.at(-1).y-pathDraft.previewPoint.y)>.001))points.push(pathDraft.previewPoint);
  if(points.length>=2){try{const object=objectFromPoints(pathDraft.type,points),group=el('g',{transform:'translate('+object.x+' '+object.y+')','pointer-events':'none'});group.append(el('path',{d:pathData(object),fill:'none',stroke:'#147d73','stroke-width':1.5/scale,'stroke-linejoin':'round','stroke-linecap':'round'}));overlays.append(group);}catch{}}
@@ -244,7 +245,7 @@ function positionEditor(){
  if(editingTexSession){livePreview.show(o,{source:'canvas',composition:editorComposing});const g=nodes.get(o.id);if(g)drawContent(o,g);return;}
  if(livePreview.source==='canvas')livePreview.hide();
  const outlined=o.stroke&&o.stroke!=='none'&&o.strokeWidth>0&&(o.strokeTransparency??0)<100;
- Object.assign(editor.style,{position:'absolute',left:`${o.x*scale}px`,top:`${o.y*scale}px`,width:`${Math.max(o.w,20)*scale}px`,height:`${Math.max(o.h,o.fontSize*2)*scale}px`,fontFamily:o.fontFamily,fontSize:`${o.fontSize*scale}px`,fontWeight:o.bold?'700':'400',fontStyle:o.italic?'italic':'normal',textDecoration:o.underline?'underline':'none',lineHeight:'1.25',textAlign:o.textAlign,color:outlined||o.fill==='none'?'transparent':o.fill,opacity:outlined?1:(o.opacity??1)*(1-(o.fillTransparency??0)/100),backgroundColor:outlined?'transparent':'#ffffffed',caretColor:'#172f36',transform:`rotate(${o.rotation||0}deg)`,transformOrigin:'center',zIndex:'10'});
+ Object.assign(editor.style,{position:'absolute',left:`${o.x*scale}px`,top:`${o.y*scale}px`,width:`${Math.max(o.w,20)*scale}px`,height:`${Math.max(o.h,o.fontSize*2)*scale}px`,fontFamily:o.fontFamily,fontSize:`${o.fontSize*scale}px`,fontWeight:o.bold?'700':'400',fontStyle:o.italic?'italic':'normal',textDecoration:o.underline?'underline':'none',lineHeight:'1.25',textAlign:o.textAlign,color:outlined||o.fill==='none'?'transparent':o.fill,opacity:outlined?1:(o.opacity??1)*(1-(o.fillTransparency??0)/100),backgroundColor:outlined?'transparent':'#ffffffed',caretColor:'#172f36',transform:`rotate(${o.rotation||0}deg)`+(o.flipX||o.flipY?` scale(${o.flipX?-1:1},${o.flipY?-1:1})`:''),transformOrigin:'center',zIndex:'10'});
  const g=nodes.get(o.id);if(g)drawContent(o,g);
 }
 
@@ -314,7 +315,7 @@ viewport.addEventListener('pointermove',e=>{
  const b=g.box,left=g.handle.includes('w'),top=g.handle.includes('n'),ax=left?b.x+b.w:b.x,ay=top?b.y+b.h:b.y;let sx=Math.max(.02,((left?-1:1)*(p.x-ax))/Math.max(b.w,1)),sy=Math.max(.02,((top?-1:1)*(p.y-ay))/Math.max(b.h,1));if(e.shiftKey||g.initial.every(o=>o.type==='image'))sx=sy=Math.min(sx,sy);
  for(const old of g.initial){const o=doc.objects.find(v=>v.id===old.id);o.x=ax+(old.x-ax)*sx;o.y=ay+(old.y-ay)*sy;o.w=old.w*sx;o.h=old.h*sy;}queueFast();
  }else if(g.kind==='rotate'){const o=editable()[0],b=g.box,cx=b.x+b.w/2,cy=b.y+b.h/2;let a=Math.atan2(p.y-cy,p.x-cx)*180/Math.PI+90;if(e.shiftKey)a=Math.round(a/15)*15;o.rotation=a;queueFast();}
- else if(g.kind==='endpoint'){const o=editable()[0],old=g.initial[0],r=(old.rotation||0)*Math.PI/180,cx=old.x+old.w/2,cy=old.y+old.h/2;const turn=(x,y)=>({x:cx+(x-cx)*Math.cos(r)-(y-cy)*Math.sin(r),y:cy+(x-cx)*Math.sin(r)+(y-cy)*Math.cos(r)}),a=turn(old.x,old.y),b=turn(old.x+old.w,old.y+old.h);o.rotation=0;if(g.handle==='start'){o.x=p.x;o.y=p.y;o.w=b.x-p.x;o.h=b.y-p.y;}else{o.x=a.x;o.y=a.y;o.w=p.x-a.x;o.h=p.y-a.y;}queueFast();}
+ else if(g.kind==='endpoint'){const o=editable()[0],old=g.initial[0],a=pathWorldPoint(old,{x:0,y:0}),b=pathWorldPoint(old,{x:1,y:1});o.rotation=0;o.flipX=o.flipY=false;if(g.handle==='start'){o.x=p.x;o.y=p.y;o.w=b.x-p.x;o.h=b.y-p.y;}else{o.x=a.x;o.y=a.y;o.w=p.x-a.x;o.h=p.y-a.y;}queueFast();}
  else if(g.kind==='create'){const o=doc.objects.find(v=>v.id===g.id);if(['line','arrow'].includes(o.type)){let x=dx,y=dy;if(e.shiftKey){const len=Math.hypot(x,y),a=Math.round(Math.atan2(y,x)/(Math.PI/4))*Math.PI/4;x=len*Math.cos(a);y=len*Math.sin(a);}o.w=x;o.h=y;}else{let w=Math.abs(dx),h=Math.abs(dy);if(e.shiftKey)w=h=Math.max(w,h);o.x=Math.min(p.x,g.start.x);o.y=Math.min(p.y,g.start.y);o.w=Math.max(w,2);o.h=Math.max(h,2);}drawContent(o,nodes.get(o.id));renderOverlay();}
  else if(g.kind==='marquee'){updateMarquee(g,e);if(!frame)frame=requestAnimationFrame(()=>{frame=0;drawMarquee();});}
 });
@@ -339,7 +340,7 @@ function execute(action,payload={}){
  if(pathDrawing?.drawing){if(action==='save'||action==='save-as'){if(!pathDrawing.finish()){toast('2点以上を指定してから保存してください');return;}}else if(['undo','redo','new','sample','new-figure','open','next-figure','previous-figure'].includes(action)){pathDrawing.cancel();if(action==='undo')return;}}
  if(action==='edit-points'){const object=editable()[0];if(selection.length===1&&['curve','freeform'].includes(object?.type)){pathEditId=pathEditId===object.id?null:object.id;renderOverlay();renderInspector();svg.focus({preventScroll:true});}return;}
  if(action==='close-path')return change(()=>editable().filter(object=>['curve','freeform'].includes(object.type)&&(object.closed||object.points.length>=3)).forEach(object=>object.closed=!object.closed));
- if(gesture&&['undo','redo','new','sample','new-figure','duplicate-figure','delete-figure','open','next-figure','previous-figure'].includes(action))endGesture(null,true);
+ if(gesture&&['undo','redo','new','sample','new-figure','duplicate-figure','delete-figure','open','next-figure','previous-figure','rotate-right','rotate-left','flip-v','flip-h'].includes(action))endGesture(null,true);
  if(['select','text','line','arrow','rect','ellipse','curve','freeform','arc'].includes(action))return setTool(action);
  if(['font-grow','font-shrink','font-up','font-down'].includes(action))return changeFont(action);
  if(['bold','italic','underline'].includes(action))return applyTextStyle(action,v=>!v);
@@ -354,6 +355,7 @@ function execute(action,payload={}){
  if(action==='duplicate')return duplicate();
  if(action==='delete')return change(()=>{const ids=new Set(editable().map(o=>o.id));doc.objects=doc.objects.filter(o=>!ids.has(o.id));selection=[];});
  if(action==='nudge')return change(()=>editable().forEach(o=>{o.x+=payload.dx;o.y+=payload.dy;}));
+ if(['rotate-right','rotate-left','flip-v','flip-h'].includes(action))return change(()=>rotateOrFlip(doc,selection,action,selectionOptions()));
  if(action.startsWith('align-'))return change(()=>align(doc,selection,action.slice(6),$('#alignTarget').value,selectionOptions()));
  if(action.startsWith('distribute-'))return change(()=>distribute(doc,selection,action.slice(-1),selectionOptions()));
  if(['front','back','forward','backward'].includes(action))return change(()=>reorder(doc,editable().map(o=>o.id),action,selectionOptions()));
