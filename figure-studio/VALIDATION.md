@@ -1,4 +1,10 @@
-# Figure Studio Web v0.7.10 検証記録
+# Figure Studio Web v0.7.11 検証記録
+
+## v0.7.11の追加確認（2026-11-09）
+
+- JavaScriptの構文を確認。ローカル同梱のMathJaxにconfigmacrosを追加し、microを立体のμへ定義。MathJaxではmathrm内のmuも斜体になるため、microはtext内のUnicode μとして描画する。
+- 専用localhostの実画面で、自動モードの`$10\,\micro\mathrm{m}$`と、TeX数式モードの`$\micro$`がエラーなく表示されることを確認。表示中SVGのμがfont-style="normal"で、入力欄は元のTeX文字列を保持することを確認。
+- 更新確認による作業復元後も正しい文字が描画され、ブラウザの警告・エラーログなし。確認には組み込みデモの文字だけを使用。
 
 ## v0.7.10の追加確認（2026-11-09）
 

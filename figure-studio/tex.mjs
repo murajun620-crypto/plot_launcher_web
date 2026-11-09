@@ -9,7 +9,10 @@ const numericList=value=>String(value??'').trim().split(/[\s,]+/).filter(Boolean
 export function splitTex(text,mode='auto'){
  text=String(text??'');
  if(mode==='plain')return [{type:'text',text}];
- if(mode==='tex')return [{type:'math',text,display:true}];
+ if(mode==='tex'){
+  const enclosed=splitTex(text.trim(),'auto');
+  return [{type:'math',text:enclosed.length===1&&enclosed[0].type==='math'?enclosed[0].text:text,display:true}];
+ }
  const result=[];let start=0,index=0,pending=null;
  while(index<text.length){
   let token=null;
@@ -43,7 +46,7 @@ function loadEngine(documentRef){
   const view=documentRef.defaultView;
   view.MathJax={
    loader:{load:[]},
-   tex:{packages:['base','ams','newcommand'],maxBuffer:MAX_SOURCE,maxMacros:10000,formatError(_jax,error){throw error;}},
+   tex:{packages:['base','ams','newcommand','configmacros'],macros:{micro:'\\text{μ}'},maxBuffer:MAX_SOURCE,maxMacros:10000,formatError(_jax,error){throw error;}},
    svg:{fontCache:'none'},
    options:{enableMenu:false},
    startup:{typeset:false}
