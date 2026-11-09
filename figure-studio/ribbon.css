@@ -39,7 +39,7 @@
 .ribbon-font-group{width:300px}
 #studioRibbon .font-row{gap:5px;margin:0}
 #studioRibbon .font-row select{height:29px;flex:1;padding:4px 7px;font-size:12px;background:#fff;border-color:#cfd6db;border-radius:3px}
-#studioRibbon .font-size-field{width:69px;flex:0 0 69px;height:29px;border-radius:3px;border-color:#cfd6db;background:#fff}
+#studioRibbon .font-size-field{width:80px;flex:0 0 80px;height:29px;border-radius:3px;border-color:#cfd6db;background:#fff}
 #studioRibbon .font-size-field input{font-size:12px;min-width:0}
 .ribbon-font-format{display:flex;align-items:center;gap:3px;min-height:29px}
 #studioRibbon .ribbon-text-menu{margin-left:auto}
@@ -96,17 +96,18 @@
 #studioRibbon [data-ribbon-panel=insert] .tool-button{flex-direction:column;justify-content:center;gap:7px;min-width:65px;height:62px;padding:7px}
 #studioRibbon [data-ribbon-panel=insert] .tool-button .icon{width:23px;height:23px}
 .ribbon-insert-shapes{display:flex;gap:3px}
-.ribbon-geometry-group{width:214px}
+.ribbon-geometry-group{width:246px}
 #studioRibbon .geometry-fields{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
 #studioRibbon .inline-field{height:29px;min-width:0;padding:0 6px;gap:4px;border-radius:3px;background:#fff;border-color:#d4dade}
 #studioRibbon .inline-field>span{font-size:10px;color:#61717b}
 #studioRibbon .inline-field>input{font-size:11px;padding:4px 0}
-.ribbon-style-group{width:200px}
+.ribbon-style-group{width:246px}
 #studioRibbon .ribbon-style-group>.ribbon-group-body{display:grid;grid-template-rows:29px 29px;align-content:center;gap:5px}
 #studioRibbon .ribbon-style-group .field-grid{grid-template-columns:minmax(0,116px) minmax(0,1fr);gap:8px;align-items:center}
 #studioRibbon .color-field{gap:4px;padding:0;color:#53626b;font-size:10px}
 #studioRibbon .color-field input{width:27px;height:26px;padding:2px;border-radius:3px}
-.ribbon-style-actions{display:grid;grid-template-columns:74px 48px minmax(0,1fr);align-items:center;gap:4px}
+/* Reserve room for decimal digits and native number-input steppers. */
+.ribbon-style-actions{display:grid;grid-template-columns:120px 48px minmax(42px,1fr);align-items:center;gap:4px}
 .line-style-picker{min-width:0}
 #studioRibbon .line-style-picker>summary{gap:1px;padding-inline:2px}
 #studioRibbon .line-style-picker>summary[aria-disabled=true]{opacity:.4;cursor:default}
