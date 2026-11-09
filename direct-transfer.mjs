@@ -266,7 +266,7 @@ export function showFigureWorkspaceStudio(windowRef=window){
 
 /** Scope and intent are independent: adding never replaces a placed figure. */
 export function createStudioSendActions({documentRef=document,batch=false}={}){
-  const scope=documentRef.createElement('label');scope.style.cssText='display:inline-flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap;';scope.append('対象');
+  const scope=documentRef.createElement('label');scope.style.cssText='display:inline-flex;flex-direction:row;align-items:center;gap:6px;font-size:12px;white-space:nowrap;';scope.append('対象');
   const select=documentRef.createElement('select');select.id='figure-studio-send-scope';select.setAttribute('aria-label','Studioへ送る図の範囲');select.style.cssText='width:auto;min-width:0;max-width:160px;padding:8px;border:1px solid #b8cfcb;border-radius:7px;background:#fff;color:#173c38;font:inherit;';
   for(const [value,text] of [['current','表示中の図'],...(batch?[['all','すべての図']]:[])]){const option=documentRef.createElement('option');option.value=value;option.textContent=text;option.defaultSelected=option.selected=value===(batch?'all':'current');select.append(option);}scope.append(select);
   const button=documentRef.createElement('button');button.id='send-to-figure-studio';button.type='button';button.className='button primary';button.textContent='Studioへ変更を反映';button.title='配置済みの図を更新し、まだ配置していない図は追加します。配置や大きさは維持します。';

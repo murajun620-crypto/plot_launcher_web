@@ -103,7 +103,7 @@ export function setupUpdateCheck({beforeReload, onStatus = () => {}} = {}) {
         return {status: 'cancelled'};
       }
       notify('作業内容を保存しました。更新して再開します。', 'reloading');
-      location.reload();
+      const url=new URL(location.href);url.searchParams.set('_studioBuild',available.build);location.replace(url.href);
       return {status: 'reloading', ...available};
     } catch {
       notify('作業内容を保存できなかったため、更新しませんでした。プロジェクトを保存してから再度お試しください。', 'save-error');

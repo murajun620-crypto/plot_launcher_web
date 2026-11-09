@@ -1,5 +1,6 @@
 import {SOURCE_APPS} from './integration/bridge-client.mjs?v=force-switch-v072-1';
-import {installWorkspacePersistence} from './workspace-session.mjs?v=project-switch-v051-1';
+import {installWorkspacePersistence} from './workspace-session.mjs?v=workspace-update-v0715-2';
+import {installWorkspaceUpdater} from './workspace-update.mjs?v=workspace-update-v0715-2';
 
 const APPS=['studio','plot','mifito'];
 
@@ -7,14 +8,17 @@ const APPS=['studio','plot','mifito'];
 export function createWorkspace({windowRef=window,documentRef=windowRef.document}={}){
  const workspaceOwner=windowRef.crypto?.randomUUID?.()||crypto.randomUUID();
  const frames=new Map([['studio',documentRef.getElementById('studio-frame')]]);
+ const reloadToken=new URL(windowRef.location.href).searchParams.get('_workspaceUpdate');
+ if(reloadToken&&/^[a-f0-9-]{36}$/i.test(reloadToken)){const url=new URL(frames.get('studio').src,windowRef.location.href);url.searchParams.set('_workspaceReload',reloadToken);frames.get('studio').src=url.href;}
  const tabs=[...documentRef.querySelectorAll('[role="tab"][data-app]')];
- let active='studio',noticeTimer=null,updateObserver=null;
+ let active='studio';
  function editorUrl(app,options={}){
   const base=new URL(new URL(SOURCE_APPS[app].url).pathname,windowRef.location.origin);
   const target=new URL(options.url||base.href,windowRef.location.href);
   if(target.origin!==windowRef.location.origin||!/^https?:$/.test(target.protocol))throw Error('編集画面はFigure Studioと同じ配信元で開いてください。');
   target.searchParams.set('figureWorkspace','1');
   target.searchParams.set('figureWorkspaceOwner',workspaceOwner);
+  if(reloadToken)target.searchParams.set('_workspaceReload',reloadToken);
   if(options.nonce){const hash=new URLSearchParams(target.hash.slice(1));hash.set('figureBridge',options.nonce);hash.set('figureOrigin',options.origin||windowRef.location.origin);if(options.ownerId)hash.set('figureOwner',options.ownerId);target.hash=hash.toString();}
   return target.href;
  }
@@ -41,16 +45,8 @@ export function createWorkspace({windowRef=window,documentRef=windowRef.document
   tab.addEventListener('click',()=>show(tab.dataset.app));
   tab.addEventListener('keydown',event=>{let index=tabs.indexOf(tab);if(event.key==='ArrowRight')index=(index+1)%tabs.length;else if(event.key==='ArrowLeft')index=(index+tabs.length-1)%tabs.length;else if(event.key==='Home')index=0;else if(event.key==='End')index=tabs.length-1;else return;event.preventDefault();show(tabs[index].dataset.app);tabs[index].focus();});
  }
- function notice(message){const box=documentRef.getElementById('workspace-status');box.textContent=message;box.hidden=!message;windowRef.clearTimeout(noticeTimer);noticeTimer=windowRef.setTimeout(()=>{box.hidden=true;},6500);}
- // Only the Studio document updates here. A shell reload must first preserve
- // every live source editor; it must never be substituted for this proxy.
- const updateButton=documentRef.getElementById('checkUpdateButton'),updateLabel=updateButton.querySelector('.update-check-label');
- function innerUpdateButton(){try{return api.studioWindow.document.getElementById('checkUpdateButton');}catch{return null;}}
- function syncUpdate(){const inner=innerUpdateButton();updateButton.disabled=!inner||inner.disabled;if(!inner)return;updateLabel.textContent=inner.querySelector('.update-check-label')?.textContent||'更新確認';updateButton.title=inner.title||'新しいバージョンを確認';updateButton.setAttribute('aria-label',inner.getAttribute('aria-label')||updateButton.title);updateButton.setAttribute('aria-busy',inner.getAttribute('aria-busy')||'false');updateButton.classList.toggle('has-update',inner.classList.contains('has-update'));}
- function bindUpdate(){updateObserver?.disconnect();updateObserver=null;const inner=innerUpdateButton();syncUpdate();if(inner&&typeof windowRef.MutationObserver==='function'){updateObserver=new windowRef.MutationObserver(syncUpdate);updateObserver.observe(inner,{subtree:true,childList:true,characterData:true,attributes:true});}}
- updateButton.addEventListener('click',()=>{const inner=innerUpdateButton();if(!inner){notice('Figureの準備ができてから、もう一度お試しください。');return;}inner.click();syncUpdate();});
- frames.get('studio').addEventListener('load',()=>{bindUpdate();if(active==='studio')resize(frames.get('studio'));});
- bindUpdate();
+ installWorkspaceUpdater(api,{windowRef,documentRef});
+ frames.get('studio').addEventListener('load',()=>{if(active==='studio')resize(frames.get('studio'));});
  show('studio');return api;
 }
 

@@ -1,5 +1,5 @@
 /** Source-editor bridge. The engine and tab stay alive when a different panel opens. */
-import {createStudioSendActions,transferResult,transferReceipt,isTransferImageId,figureWorkspaceAPI,showFigureWorkspaceStudio} from './direct-transfer.mjs?v=studio-send-default-all-v1';
+import {createStudioSendActions,transferResult,transferReceipt,isTransferImageId,figureWorkspaceAPI,showFigureWorkspaceStudio} from './direct-transfer.mjs?v=workspace-update-v0715-2';
 import {registerEditor} from './editor-discovery.mjs?v=editor-reuse-v036-1';
 const PROTOCOL = 'figure-studio-bridge-v1';
 const MAX_PROJECT = 320 * 1024 * 1024;

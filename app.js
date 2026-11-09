@@ -1,12 +1,12 @@
-import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=studio-send-default-all-v1';
-import {setupDirectSendButton} from './direct-transfer.mjs?v=studio-send-default-all-v1';
+import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=workspace-update-v0715-2';
+import {setupDirectSendButton} from './direct-transfer.mjs?v=workspace-update-v0715-2';
 import {identifyPlotProject,plotSheetIndex,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=27ae7675c457';
 import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=9127ec4c4f31";
 import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=9127ec4c4f31";
 import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9127ec4c4f31";
 import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=27ae7675c457";
 import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=27ae7675c457";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=9b52edf7a7bd";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=fdb06fb0e836";
 
 import {alignmentOffsets} from './object-layout.mjs?v=27ae7675c457';
 import {createDataEditor} from './data-editor.mjs?v=27ae7675c457';
@@ -16,7 +16,7 @@ import {createShortcutHandler} from './shortcuts.mjs?v=61d158587773';
 import {formatText,TEXT_FORMAT_ACTIONS} from './text-format.mjs?v=61d158587773';
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
-const APP_BUILD = '9b52edf7a7bd';
+const APP_BUILD = 'fdb06fb0e836';
 function makeProject(settings,data,fonts,workspace={}){
   const live=sourceData&&data.filename===sourceData.filename&&(data.bytes===sourceData.bytes||data.files&&data.files===sourceData.files);
   const projectId=workspace.figureStudioProjectId||data.figureStudioProjectId||(live?(sourceData.figureStudioProjectId||=crypto.randomUUID()):crypto.randomUUID());
@@ -3529,6 +3529,15 @@ async function restoreFigureWorkspace(snapshot){
  }finally{figureWorkspaceRestoring=false;}
 }
 window.FigureStudioWorkspaceState={version:1,app:'plot',capture:captureFigureWorkspace,async validate(snapshot){return validateFigureWorkspaceState(snapshot==null?null:structuredClone(snapshot));},restore:restoreFigureWorkspace,signature:figureWorkspaceSignature,hasWork:figureWorkspaceHasWork,getBusy:figureWorkspaceBusy,
+ release:{version:APP_VERSION,build:APP_BUILD},
+ setUpdateReloading(value){updateReloading=!!value;},
+ captureReloadHandles(){return sourceData||projectHandle?structuredClone({projectId:sourceData?.figureStudioProjectId??null,handles:{projectHandle,projectFilename,sourceHandle,sourceDirectory,saveDirectory,dataFileHandles}}):null;},
+ restoreReloadHandles(saved){
+  if(saved?.projectId!==(sourceData?.figureStudioProjectId??null)||!saved.handles)throw Error('元データと保存先の対応を確認できませんでした。');
+  const value=saved.handles,handle=(entry,kind)=>entry?.kind===kind?entry:null;
+  projectHandle=handle(value.projectHandle,'file');sourceHandle=handle(value.sourceHandle,'file');sourceDirectory=handle(value.sourceDirectory,'directory');saveDirectory=handle(value.saveDirectory,'directory');
+  dataFileHandles=Array.isArray(value.dataFileHandles)?value.dataFileHandles.map(entry=>handle(entry,'file')):[];refreshSaveDestination();updateButtons();
+ },
  async restoreBinding(binding){if(binding==null)return figureStudioBridge?.resetWorkspaceBinding?.();return figureStudioBridge?.restoreWorkspaceBinding?.(structuredClone(binding));},
  markSaved(signature){if(typeof signature==='string'&&signature===figureWorkspaceSignature()){figureWorkspaceSavedSignature=signature;return true;}return false;}
 };

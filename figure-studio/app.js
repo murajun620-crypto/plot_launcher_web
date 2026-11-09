@@ -23,7 +23,8 @@ import {setupTransferReceiver,getFigureWorkspace} from './integration/direct-tra
 import {readMifitoIdentity} from './integration/mifito-sync.mjs?v=0.3.5-1';
 import {readPlotIdentity} from './integration/plot-sync.mjs?v=c520375efe6d';
 import {planMiFiToSync} from './mifito-batch.mjs?v=studio-send-v0714-1';
-import {setupUpdateCheck} from './update-check.mjs';
+import {setupUpdateCheck} from './update-check.mjs?v=workspace-update-v0715-2';
+import {installWorkspaceUpdater} from './workspace-update.mjs?v=workspace-update-v0715-2';
 import {marqueeSelection,resolveObjectSelection,clickObjectSelection,selectionDescription} from './selection.mjs?v=nested-groups-v0712-1';
 import {renderGroupLayers} from './group-layers.mjs?v=nested-groups-v0712-1';
 import {drawSelectionFrames} from './selection-overlay.mjs?v=studio-send-v0714-1';
@@ -40,7 +41,7 @@ import {reorderFigures} from './figure-order.mjs';
 import {renumberFigureNames} from './figure-names.mjs?v=0.3.3-1';
 import {deleteFigures,duplicateFigures} from './figure-commands.mjs?v=nested-groups-v0712-1';
 import {ProjectFileSession,projectFilePickerOptions} from './project-file.mjs?v=project-switch-v051-1';
-import {installWorkspacePersistence} from './workspace-session.mjs?v=project-switch-v051-1';
+import {installWorkspacePersistence} from './workspace-session.mjs?v=workspace-update-v0715-2';
 import {decodeWorkspaceState} from './workspace-state.mjs?v=project-switch-v051-1';
 import {validateWorkspaceBinding} from './integration/bridge-host.mjs?v=force-switch-v072-1';
 
@@ -596,7 +597,7 @@ async function connectSavedEditors(bindings){
   if(panel){const session=editSource(panel,{figureId:figure.id});if(!(await session.ready).connected)throw Error('復元した編集画面へ接続できませんでした。');}
  }
 }
-async function readProject(file,handle=null){
+async function readProject(file,handle=null,{recovery=false}={}){
  let plan=null,previous=null,previousBindings=null;
  try{
   if(file.size>400*1024*1024)throw Error('プロジェクトは400 MB以内で開いてください。');
@@ -609,7 +610,7 @@ async function readProject(file,handle=null){
   for(const o of next.figures.flatMap(f=>f.objects))if(o.assetId&&!loaded.has(o.assetId)||o.source?.assetId&&!loaded.has(o.source.assetId))throw Error('必要な素材がありません。');
   const workspace=workspacePersistence(),hasEditorChanges=workspace?await workspace.hasWorkspaceChanges():false;
   if(gesture)endGesture(null,true);finishText();
-  if((dirty||pathDrawing?.drawing||hasEditorChanges)&&!confirm('現在の作業内容を閉じて、選択したプロジェクトを開きますか？'))return;
+  if(!recovery&&(dirty||pathDrawing?.drawing||hasEditorChanges)&&!confirm('現在の作業内容を閉じて、選択したプロジェクトを開きますか？'))return;
   if(workspace)plan=await workspace.prepareWorkspaceRestore(raw.workspace??null);
   else if(raw.workspace)await decodeWorkspaceState(raw.workspace);
   const bindings=plan?await savedEditorBindings(plan.decoded,next,loaded):null;
@@ -625,10 +626,12 @@ async function readProject(file,handle=null){
   projectFiles.opened(bookId,{handle,name:file.name});const openedBook=bookId;
   scheduleSave();try{await saveProjectFileTarget(openedBook,{handle,name:file.name});}catch{}
   toast(raw.workspace?'3タブの最新状態と未反映の編集を復元しました':'プロジェクトを開きました');
+  return true;
  }catch(error){
   if(previous)closeSourceSessions();
   if(previous){restoreBook(previous.book);assets=previous.assets;selection=previous.selection;groupScope=previous.groupScope;dirty=previous.dirty;revision=previous.revision;manualSavedRevision=previous.manualSavedRevision;preservedWorkspace=previous.preservedWorkspace;history.past=previous.past;history.future=previous.future;render();}
   try{await plan?.cancel();if(previousBindings)await connectSavedEditors(previousBindings);}catch(rollbackError){toast(rollbackError.message);return;}
+  if(recovery)throw error;
   toast(`開けませんでした: ${error.message}`);
  }
 }
@@ -773,14 +776,49 @@ async function exportPDF(){const win=window.open('','figure-studio-print');if(!w
 
 svg.addEventListener('contextmenu',e=>{e.preventDefault();finishText();const id=e.target.closest('[data-id]')?.dataset.id;if(id&&!selection.includes(id)){const target=doc.objects.find(object=>object.id===id);setSelection([id],{scope:target?.groupId===groupScope?groupScope:null});}const menu=$('#contextMenu');menu.replaceChildren();for(const[label,action,key]of [...(doc.objects.find(object=>object.id===id)?.groupId?[['グループ内を個別選択','select-member','Ctrl / ⌘＋クリック']]:[]),...(groupScope?[['グループ全体へ戻る','select-group','Esc']]:[]),['複製','duplicate','Ctrl+D'],['最前面へ','front','Alt → 3'],['最背面へ','back','Alt → 4'],['一段前へ','forward',''],['一段後ろへ','backward',''],['左揃え','align-left','Alt → 5 → L'],['グループ化','group','Ctrl+G'],['グループ解除（1階層）','ungroup','Ctrl+Shift+G'],['全グループ解除','ungroup-all','Ctrl+Shift+A → G'],['固定 / 解除','lock',''],['元アプリで編集','edit-source',''],['削除','delete','Delete']]){const b=document.createElement('button');b.type='button';b.textContent=label;const k=document.createElement('kbd');k.textContent=shortcutLabel(key);b.append(k);b.onclick=()=>{menu.hidden=true;execute(action,{id});svg.focus();};menu.append(b);}menu.hidden=false;menu.style.left=`${Math.min(e.clientX,innerWidth-250)}px`;menu.style.top=`${Math.min(e.clientY,innerHeight-450)}px`;});
 document.addEventListener('pointerdown',e=>{if(!e.target.closest('#contextMenu'))$('#contextMenu').hidden=true;for(const d of $$('details:not(.sidebar-text-panel)[open]'))if(!d.contains(e.target))d.open=false;});
-window.addEventListener('beforeunload',e=>{if(projectSaving||dirty||pathDrawing?.drawing||(editingId&&textBefore&&JSON.stringify(snapshot())!==JSON.stringify(textBefore))){e.preventDefault();e.returnValue='';}});
+window.addEventListener('beforeunload',e=>{if(!updateReloading&&(projectSaving||dirty||pathDrawing?.drawing||(editingId&&textBefore&&JSON.stringify(snapshot())!==JSON.stringify(textBefore)))){e.preventDefault();e.returnValue='';}});
 window.addEventListener('resize',()=>{if(!gesture)renderOverlay();});
 try{const restored=await loadDraft();if(restored){if(restored.doc.format==='figure-studio-book')restoreBook(validateBook(restored.doc));else{doc=validateDocument(restored.doc);figures=[doc];}assets=restored.assets;$('#saveStatus').textContent='ブラウザから復元';}else{const demo=createDemo();doc=demo.doc;figures=[doc];assets=demo.assets;initialDemo=true;$('#saveStatus').textContent='デモ · 模擬データ';}}catch{const demo=createDemo();doc=demo.doc;figures=[doc];assets=demo.assets;initialDemo=true;$('#saveStatus').textContent='自動保存を利用できません';}
 try{const target=await loadProjectFileTarget(bookId);if(target)projectFiles.opened(bookId,target);}catch{}
 renumberFigureNames(figures);render();fit();setTool('select');
 const workspaceReceiver=setupTransferReceiver({onImport:receiveDirectFigure,allowAdd:true,onStatus:({state,message})=>{if(state==='error')toast(message);}});
 window.FigureStudioWorkspaceReceiverId=workspaceReceiver.receiverId;
-setupUpdateCheck({onStatus:toast,beforeReload:async()=>{
+window.FigureStudioWorkspaceUpdate={
+ release:{version:document.querySelector('meta[name="figure-studio-version"]').content,build:document.querySelector('meta[name="figure-studio-build"]').content},
+ setUpdateReloading(value){updateReloading=!!value;},
+ async capture(){
+  if(updateReloading||projectSaving||projectOpening)throw Error('Studioの保存・読み込みが完了してから更新してください。');
+  if(pathDrawing?.drawing&&!pathDrawing.finish())throw Error('作図中の線を確定するか、Escで取り消してください。');
+  if(!commitFocusedProperty())throw Error('入力中の数値を確定してください。');
+  updateReloading=true;
+  try{
+   await transferQueue;if(gesture)endGesture(null,false);finishText();
+   const capturedRevision=revision,capturedBook=bookId,project=packageProject(),workspace=workspacePersistence(),captured=workspace?await workspace.captureWorkspace():null;
+   if(captured)project.workspace=captured.data;
+   // Undo may refer to deleted images, so recovery also retains those assets.
+   for(const[id,asset]of assets){const {previewUrl,persisted,...saved}=asset;project.assets[id]=saved;}
+   if(bookId!==capturedBook||revision!==capturedRevision)throw Error('保存中にFigureの内容が変わりました。もう一度更新してください。');
+   if(new Blob([JSON.stringify(project)]).size>400*1024*1024)throw Error('更新前の保存サイズが400 MBを超えています。不要な素材を減らしてください。');
+   clearTimeout(saveTimer);await saveDraft(snapshot(),assets);
+   if(bookId!==capturedBook||revision!==capturedRevision)throw Error('保存中にFigureの内容が変わりました。もう一度更新してください。');
+   return {project,name:projectFiles.target(bookId)?.name||`${safeName(figures[0].name)}.figurestudio`,local:{dirty,revision,manualSavedRevision,selection:[...selection],groupScope,past:clone(history.past),future:clone(history.future),scale,scroll:{left:viewport.scrollLeft,top:viewport.scrollTop},target:projectFiles.target(bookId)||null}};
+  }catch(error){updateReloading=false;throw error;}
+ },
+ async restore(saved){
+  const local=saved?.local;if(!saved?.project||!local||typeof local.dirty!=='boolean'||!Number.isSafeInteger(local.revision)||local.revision<0||!Number.isSafeInteger(local.manualSavedRevision)||!Array.isArray(local.selection)||!Array.isArray(local.past)||!Array.isArray(local.future))throw Error('Studioの更新前の状態が正しくありません。');
+  const past=local.past.map(validateBook),future=local.future.map(validateBook);
+  const file=new File([JSON.stringify(saved.project)],saved.name||'recovered.figurestudio',{type:'application/json'});
+  if(!await readProject(file,local.target?.handle||null,{recovery:true}))throw Error('Studioのプロジェクトを復元できませんでした。');
+  history.past=past;history.future=future;dirty=local.dirty;revision=local.revision;manualSavedRevision=local.manualSavedRevision;
+  selection=local.selection.filter(id=>doc.objects.some(o=>o.id===id));groupScope=doc.objects.some(o=>o.groupId===local.groupScope)?local.groupScope:null;
+  if(Number.isFinite(local.scale)&&local.scale>0&&local.scale<=30)scale=local.scale;
+  render();viewport.scrollLeft=Number(local.scroll?.left)||0;viewport.scrollTop=Number(local.scroll?.top)||0;updateProjectFileUI();
+ },
+ cancel(){updateReloading=false;}
+};
+const integratedWorkspace=getFigureWorkspace(window);
+if(integratedWorkspace)installWorkspaceUpdater(integratedWorkspace,{windowRef:window.parent,documentRef:window.parent.document});
+else setupUpdateCheck({onStatus:toast,beforeReload:async()=>{
  if(pathDrawing?.drawing&&!pathDrawing.finish())throw Error('作図中の線を確定するか、Escで取り消してから更新してください。');
  if(!commitFocusedProperty())throw Error('入力中の数値を確定してから更新してください。');
  if(projectSaving||projectOpening)throw Error('プロジェクトの保存・読み込みが完了してから更新してください。');

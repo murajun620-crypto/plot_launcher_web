@@ -89,6 +89,7 @@ export function installWorkspacePersistence(api,{windowRef=window,documentRef=wi
   throw Error(`${app==='plot'?'PlotLauncher':'MiFiTo'}の準備が完了してから、もう一度お試しください。`);
  };
  const lock=value=>{
+  value=value||!!api.workspaceUpdateBusy;
   api.persistenceBusy=value;documentRef.documentElement.dataset.workspaceBusy=String(value);
   for(const tab of documentRef.querySelectorAll('[role="tab"][data-app]'))tab.disabled=value;
   for(const panel of documentRef.querySelectorAll('.workspace-panel'))panel.inert=value||panel.getAttribute('aria-hidden')==='true';
