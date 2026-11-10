@@ -1,6 +1,6 @@
 export const MATRIX_TYPES=['Surface Map','Surface Histogram'];
 export const isMatrixPlot=type=>MATRIX_TYPES.includes(type);
-export const MATRIX_DEFAULTS={range:'A1:S19',sheets:[],pitchX:5,pitchY:5,originX:0,originY:0,valueLabel:'Surface roughness, Sa',valueUnit:'nm',palette:'turbo',colorMin:'',colorMax:'',markerSize:18,mapStyle:'points',edgeColor:'none',edgeWidth:.25,equalAspect:true,colorbar:true,binMin:'',binMax:'',binWidth:'',binCount:'',histStyle:'overlay',histAlpha:.55,cumulative:true,cumulativeColors:{}};
+export const MATRIX_DEFAULTS={range:'A1:S19',sheets:[],pitchX:5,pitchY:5,originX:0,originY:0,valueLabel:'Surface roughness, Sa',valueUnit:'nm',palette:'turbo',colorMin:'',colorMax:'',markerSize:18,mapStyle:'points',edgeColor:'none',edgeWidth:.25,equalAspect:true,colorbar:true,frame:false,binMin:'',binMax:'',binWidth:'',binCount:'',histStyle:'overlay',histAlpha:.55,cumulative:true,cumulativeColors:{}};
 export function validateMatrixOptions(raw){
  if(!raw||typeof raw!=='object'||Array.isArray(raw))throw Error('マップ・分布の設定を確認してください。');
  const value={...structuredClone(MATRIX_DEFAULTS),...structuredClone(raw)};
@@ -13,7 +13,7 @@ export function validateMatrixOptions(raw){
  if(value.binWidth!==''&&Number(value.binWidth)<=0||value.binCount!==''&&(!Number.isInteger(Number(value.binCount))||Number(value.binCount)<1||Number(value.binCount)>500))throw Error('ビン幅は正の値、ビン数は1〜500の整数にしてください。');
  if(value.binWidth!==''&&value.binCount!=='')throw Error('ビン幅とビン数はいずれか一方を指定してください。');
  for(const [key,choices]of Object.entries({palette:['viridis','plasma','turbo','jet','cividis','gray'],mapStyle:['points','cells'],histStyle:['overlay','grouped','step']}))if(!choices.includes(value[key]))throw Error('マップ・ヒストグラムの表示方法を確認してください。');
- for(const key of ['equalAspect','colorbar','cumulative'])if(typeof value[key]!=='boolean')throw Error('マップ・分布の表示設定を確認してください。');
+ for(const key of ['equalAspect','colorbar','frame','cumulative'])if(typeof value[key]!=='boolean')throw Error('マップ・分布の表示設定を確認してください。');
  for(const key of ['valueLabel','valueUnit'])if(typeof value[key]!=='string'||value[key].length>200)throw Error('値のラベル・単位を確認してください。');
  if(typeof value.edgeColor!=='string'||!/^none$|^#[\da-f]{6}$/i.test(value.edgeColor))throw Error('点の縁色を確認してください。');
  if(!value.cumulativeColors||Array.isArray(value.cumulativeColors)||typeof value.cumulativeColors!=='object'||Object.keys(value.cumulativeColors).length>32||Object.entries(value.cumulativeColors).some(([key,color])=>!/^\d{1,4}$/.test(key)||typeof color!=='string'||!/^auto$|^#[\da-f]{6}$/i.test(color)))throw Error('累積線の色を確認してください。');

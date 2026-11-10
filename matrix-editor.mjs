@@ -1,4 +1,4 @@
-import {MATRIX_DEFAULTS,validateMatrixOptions} from './matrix-model.mjs?v=db41dbe0ccaf';
+import {MATRIX_DEFAULTS,validateMatrixOptions} from './matrix-model.mjs?v=0c9ffb5d33f2';
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function createMatrixEditor({root,request,getMetadata,getConfig,onApply,enhanceColors,showDialog}){
  let info=null,openedMetadata=null;

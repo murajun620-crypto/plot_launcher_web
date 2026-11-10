@@ -264,7 +264,7 @@ def render_matrix(engine, config):
                 axis.label.set_gid("web-axis-label-"+name)
                 if settings.get(name+"LabelX","")!="" and settings.get(name+"LabelY","")!="": axis.set_label_coords(float(settings[name+"LabelX"]),float(settings[name+"LabelY"]))
             for target in [axes]+([right] if right else []):
-                for side,spine in target.spines.items(): spine.set_visible(bool(settings.get("spine"+side.title(),True)));spine.set_linewidth(.8*float(settings.get("spineScale",1)));spine.set_color(settings.get("spineColor","#000000"))
+                for side,spine in target.spines.items(): spine.set_visible((histogram or options.get("frame",False)) and bool(settings.get("spine"+side.title(),True)));spine.set_linewidth(.8*float(settings.get("spineScale",1)));spine.set_color(settings.get("spineColor","#000000"))
             for name in ["x","y"]:
                 for minor in [False,True]:
                     enabled=settings.get(name+("MinorGrid" if minor else "Grid"),False)
