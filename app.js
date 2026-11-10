@@ -1,12 +1,12 @@
 import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=source-save-v0717-1';
-import {setupDirectSendButton,getFigureWorkspace} from './direct-transfer.mjs?v=7a1dad783ded';
-import {identifyPlotProject,plotSheetIndex,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=7a1dad783ded';
+import {setupDirectSendButton,getFigureWorkspace} from './direct-transfer.mjs?v=f9663459d218';
+import {identifyPlotProject,plotSheetIndex,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=f9663459d218';
 import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=9127ec4c4f31";
 import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=9127ec4c4f31";
 import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9127ec4c4f31";
 import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=27ae7675c457";
 import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=27ae7675c457";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=7a1dad783ded";
+import { APP_VERSION, COLORS, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=f9663459d218";
 
 import {alignmentOffsets} from './object-layout.mjs?v=27ae7675c457';
 import {createDataEditor} from './data-editor.mjs?v=27ae7675c457';
@@ -14,10 +14,11 @@ import {validateTableEdits} from './table-edits.mjs?v=27ae7675c457';
 import {createAnnotationTextEditor} from './annotation-editor.mjs?v=61d158587773';
 import {createShortcutHandler} from './shortcuts.mjs?v=61d158587773';
 import {formatText,TEXT_FORMAT_ACTIONS} from './text-format.mjs?v=61d158587773';
+import {createColorPanel} from './colors.mjs?v=unified-palette-1';
 import {createXRangePicker} from './x-range-picker.mjs?v=normalization-range-1';
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
-const APP_BUILD = '7a1dad783ded';
+const APP_BUILD = 'f9663459d218';
 window.FigureAppRelease?.assertRunning({version:APP_VERSION,build:APP_BUILD});
 function makeProject(settings,data,fonts,workspace={}){
   const live=sourceData&&data.filename===sourceData.filename&&(data.bytes===sourceData.bytes||data.files&&data.files===sourceData.files);
@@ -116,7 +117,7 @@ let previewURL, figureResult, dragging, livePreview;
 const normalizationRangeModes=['maxRange','peakHeightRange'];
 const normalizationRangePicker=createXRangePicker({paper:$('#figure-paper'),image:$('#figure-image')});
 const normalizationXState=state=>JSON.stringify([state.axes.xUnit,state.axes.xUnitScale,state.axes.xScale,state.options?.afmSourceUnits?.x,state.series.map(item=>[item.x,item.xFactor,item.xOffset])]);
-let colorTarget;
+let colorTarget, colorPanel;
 const recentColors = [];
 let colormapControlConfig=null,colormapPreviewToken=0,colormapPreviewTimer,colormapApplying=false;
 const colormapRamps=new Map();
@@ -456,7 +457,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=7a1dad783ded", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=f9663459d218", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -516,6 +517,7 @@ function enhanceColorInputs() {
   syncColorIcons();
 }
 function syncColorIcons() {
+  colorPanel?.update();
   for (const wrapper of $$('.color-control')) {
     const input=wrapper.querySelector('input'), button=wrapper.querySelector('.color-icon');
     if (!input || !button) continue;
@@ -541,37 +543,20 @@ function syncOpacityControls(activeInput = null) {
   }
 }
 
-function colorSwatch(hex, name = hex) {
-  const button = document.createElement('button'); button.type = 'button'; button.className = 'color-swatch';
-  button.style.backgroundColor = hex; button.title = name; button.setAttribute('aria-label', name);
-  button.setAttribute('aria-pressed', String(hex.toLowerCase() === colorTarget?.value.toLowerCase()));
-  button.addEventListener('click', () => chooseColor(hex)); return button;
-}
+colorPanel=createColorPanel({dialog:$('#color-panel'),onChoose:chooseColor,isDisabled:()=>loading||exporting||projectVersionChecking,onRecentChange:colors=>recentColors.splice(0,recentColors.length,...colors)});
 function openColorPanel(input, title) {
   if (loading || exporting || input.matches(':disabled')) return;
-  colorTarget = input;
-  $('#color-panel-title').textContent = `${title}を選ぶ`;
-  const names = {black:'黒',gray:'灰',blue:'青',orange:'橙',red:'赤',green:'緑',purple:'紫'};
-  $('#color-swatches').replaceChildren(...Array.from({length:10},(_,shade) => Object.keys(names).map(base => colorSwatch(COLOR_PALETTE[base][shade], `${names[base]} ${shade} ${COLOR_PALETTE[base][shade]}`))).flat());
-  $('#basic-colors').replaceChildren(...['#000000','#ffffff'].map(hex => colorSwatch(hex)));
-  $('#recent-colors').replaceChildren(...recentColors.map(hex => colorSwatch(hex)));
-  $('#custom-color').value = /^#[0-9a-f]{6}$/i.test(input.value) ? input.value : '#000000';
-  $('#color-code').value = $('#custom-color').value; $('#color-error').textContent = '';
-  showDialog('#color-panel');
+  colorTarget=input;
+  const text=input.type!=='color',key=input.dataset.seriesField||input.dataset.axis||input.dataset.option;
+  colorPanel.open(input,title,{allowNone:text,allowAuto:text&&(input.value.toLowerCase()==='auto'||['yColor','y2Color','scatterColor','markerEdgeColor','markerFaceColor','trendColor','barEdgeColor'].includes(key))});
 }
 function chooseColor(value) {
-  if (!/^#[0-9a-f]{6}$/i.test(value)) {$('#color-error').textContent = '#RRGGBB形式で入力してください。'; return;}
-  if (!colorTarget?.isConnected || colorTarget.matches(':disabled') || loading || exporting) {$('#color-panel').close(); return;}
-  colorTarget.value = value;
-  recentColors.splice(0, recentColors.length, value, ...recentColors.filter(hex => hex.toLowerCase() !== value.toLowerCase()).slice(0,7));
+  if (!colorTarget?.isConnected || colorTarget.matches(':disabled') || loading || exporting) {colorPanel.close();return;}
+  if (!/^#[0-9a-f]{6}$/i.test(value) && !(colorTarget.type!=='color'&&['none','auto'].includes(value))) return;
+  colorTarget.value=value;
   applyControlInput({target:colorTarget});
   syncColorIcons();
-  $('#color-panel').close();
 }
-$('#close-color-panel').addEventListener('click', () => $('#color-panel').close());
-$('#custom-color').addEventListener('change', event => chooseColor(event.target.value));
-$('#apply-color-code').addEventListener('click', () => chooseColor($('#color-code').value.trim()));
-$('#color-code').addEventListener('keydown', event => {if(event.key === 'Enter') {event.preventDefault(); chooseColor(event.target.value.trim());}});
 enhanceColorInputs();
 
 const axisName = axis => axis === 'y2' ? '右Y' : axis.toUpperCase();
@@ -3689,7 +3674,7 @@ async function restoreFigureWorkspace(snapshot){
   savedProjectState=record.savedProjectState;figureBridgeBaseline=record.bridgeBaseline;figureBridgePreservedOnReconnect=false;loadedHeader=record.loadedHeader;sample=record.sample;
   sheetSettings=new Map(record.sheetSettings);sheetMode=record.sheetMode;sharedSettings=record.sharedSettings;history=record.history;future=record.future;lastState=record.lastState;selected=new Set(record.selected);clipboard=record.clipboard;
   sourceHandle=sourceDirectory=saveDirectory=projectHandle=null;dataFileHandles=[];projectFilename=record.projectFilename;
-  pendingDataFiles=record.pendingDataFiles;pastedTable=record.pastedTable;pasteHeaderAutomatic=record.pasteHeaderAutomatic;recentColors.splice(0,recentColors.length,...(record.recentColors||[]));
+  pendingDataFiles=record.pendingDataFiles;pastedTable=record.pastedTable;pasteHeaderAutomatic=record.pasteHeaderAutomatic;colorPanel.replaceRecentColors(record.recentColors||[]);
   const workspace=record.workspace;view=workspace.view;$('#save-name').value=workspace.saveName;$('#png-dpi').value=workspace.pngDpi;$('#save-destination').value='download';
   clearTimeout(renderTimer);++revision;resetPreview();if(metadata)drawMetadata();else{$('#data-preview').hidden=true;$('#initial-message strong').textContent='データを選んでください';$('#preview-state').textContent='データ未選択';}
   drawControls();refreshSaveDestination();if($('#series-table-content').hidden!==workspace.tableHidden)toggleSeriesTable();$('#series-table-details').checked=workspace.tableDetails;$('#series-table').dataset.details=String(workspace.tableDetails);

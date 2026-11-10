@@ -1,4 +1,4 @@
-import {parseRelease,hasNewRelease} from './update-check.mjs?v=latest-open-v0720-1';
+import {parseRelease,hasNewRelease} from './update-check.mjs?v=unified-colors-v0721-1';
 import {SOURCE_APPS} from './integration/bridge-client.mjs?v=studio-send-v0714-1';
 
 const TOKEN='_workspaceUpdate',APPS=['studio','plot','mifito'];

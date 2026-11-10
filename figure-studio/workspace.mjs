@@ -1,6 +1,6 @@
 import {SOURCE_APPS} from './integration/bridge-client.mjs?v=force-switch-v072-1';
-import {installWorkspacePersistence} from './workspace-session.mjs?v=latest-open-v0720-1';
-import {installWorkspaceUpdater} from './workspace-update.mjs?v=latest-open-v0720-1';
+import {installWorkspacePersistence} from './workspace-session.mjs?v=unified-colors-v0721-1';
+import {installWorkspaceUpdater} from './workspace-update.mjs?v=unified-colors-v0721-1';
 
 const APPS=['studio','plot','mifito'];
 

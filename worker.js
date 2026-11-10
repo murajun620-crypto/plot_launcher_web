@@ -1,8 +1,8 @@
-import { APP_VERSION, restoreSettings } from "./state.js?v=7a1dad783ded";
+import { APP_VERSION, restoreSettings } from "./state.js?v=f9663459d218";
 import { validateTableEdits } from './table-edits.mjs?v=27ae7675c457';
 // All user data stays in this worker's in-memory filesystem.
 const PYODIDE_VERSION = "0.29.3";
-const WORKER_BUILD = '7a1dad783ded';
+const WORKER_BUILD = 'f9663459d218';
 const INDEX_URL = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
 let pyodide, dispatch, currentPath = "", uploadNumber = 0;
 let currentSources = [];

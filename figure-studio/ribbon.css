@@ -152,20 +152,6 @@
 .color-trigger-glyph .is-none{background:repeating-conic-gradient(#fff 0% 25%,#d9dfe3 0% 50%) 0 0/5px 5px!important}
 .color-trigger-glyph .is-none::after{content:"";position:absolute;left:0;right:0;top:1px;height:1px;background:#ca3434;transform:rotate(-9deg)}
 .color-trigger-glyph .is-mixed{background:linear-gradient(90deg,#fff 0 50%,#62727d 50%)!important}
-#studioRibbon .color-palette-dropdown>.color-palette-panel{width:252px;max-width:calc(100vw - 16px);padding:10px;border-radius:5px}
-.color-palette-section{margin:0 0 10px;padding:0;border:0}
-.color-palette-section h3{margin:0 0 6px;font-size:11px;line-height:16px;font-weight:500;color:#54636d}
-.color-palette-grid{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:3px}
-#studioRibbon .color-palette-grid .color-swatch-button{position:relative;display:block;width:100%;min-width:0;height:20px;min-height:20px;padding:0;border:1px solid #26363826;border-radius:1px;background:var(--swatch-color);box-shadow:none;line-height:1}
-#studioRibbon .color-palette-grid .color-swatch-button:hover:not(:disabled){z-index:1;outline:1px solid #394b55;outline-offset:1px;box-shadow:inset 0 0 0 1px #fff}
-#studioRibbon .color-palette-grid .color-swatch-button.is-selected{outline:2px solid var(--accent);outline-offset:1px;box-shadow:inset 0 0 0 1px white}
-#studioRibbon .color-palette-grid .color-swatch-button:focus-visible{z-index:2;outline:2px solid #263638;outline-offset:2px;box-shadow:inset 0 0 0 1px white}
-#studioRibbon .color-palette-panel .color-none-button{min-height:32px;border-top:1px solid #e4e8eb;border-radius:0;padding-inline:4px}
-#studioRibbon .color-palette-panel .color-none-button[aria-pressed=true]{background:var(--accent-soft);color:var(--accent)}
-.color-custom-row{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:35px;padding:3px 4px;color:#35434c;font-size:11px;cursor:pointer}
-.color-custom-row>span{display:flex;align-items:center;gap:6px}
-.color-custom-row input[type=color]{flex:none;width:32px;height:25px;padding:2px;border:1px solid #cfd6db;border-radius:3px;background:#fff;cursor:pointer}
-.color-custom-row:focus-within{outline:2px solid var(--accent);outline-offset:1px}
 .color-transparency-row{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;padding-top:9px;margin-top:4px;border-top:1px solid #e4e8eb}
 #studioRibbon .color-transparency-row .inline-field{width:127px;flex:none;height:29px}
 .color-transparency-hint{font-size:10px;line-height:15px;color:#74808a;white-space:nowrap}

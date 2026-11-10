@@ -1,0 +1,25 @@
+/* Shared with Figure Studio and MiFiTo. */
+.color-palette-panel{box-sizing:border-box;width:252px;max-width:calc(100vw - 16px);padding:10px;border-radius:5px;background:#fff;color:#35434c;font:11px/1.5 "Segoe UI","Yu Gothic UI",Meiryo,sans-serif;--color-accent:#147d73}
+.color-palette-panel .color-palette-section{margin:0 0 10px;padding:0;border:0}
+.color-palette-panel .color-palette-section h3{margin:0 0 6px;font-size:11px;line-height:16px;font-weight:500;color:#54636d}
+.color-palette-panel .color-palette-grid{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:3px}
+.color-palette-panel .color-palette-grid .color-swatch-button{box-sizing:border-box;position:relative;display:block;width:100%;min-width:0;height:20px;min-height:20px;padding:0;border:1px solid #26363826;border-radius:1px;background:var(--swatch-color);box-shadow:none;line-height:1;cursor:pointer}
+.color-palette-panel .color-palette-grid .color-swatch-button:hover:not(:disabled){z-index:1;outline:1px solid #394b55;outline-offset:1px;box-shadow:inset 0 0 0 1px #fff}
+.color-palette-panel .color-palette-grid .color-swatch-button.is-selected{outline:2px solid var(--color-accent);outline-offset:1px;box-shadow:inset 0 0 0 1px #fff}
+.color-palette-panel .color-palette-grid .color-swatch-button:focus-visible{z-index:2;outline:2px solid #263638;outline-offset:2px;box-shadow:inset 0 0 0 1px #fff}
+.color-palette-panel .color-none-button{box-sizing:border-box;display:flex;align-items:center;width:100%;min-height:32px;border:0;border-top:1px solid #e4e8eb;border-radius:0;padding:5px 4px;background:#fff;color:#35434c;text-align:left;font:inherit;cursor:pointer}
+.color-palette-panel .color-none-button[aria-pressed=true]{background:#e9f4f1;color:var(--color-accent)}
+.color-palette-panel .color-none-button:hover{background:#f0f4f2}
+.color-palette-panel .color-custom-row{display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:10px;min-height:35px;padding:3px 4px;color:#35434c;font-size:11px;cursor:pointer}
+.color-palette-panel .color-custom-row>span{display:flex;align-items:center;gap:6px}
+.color-palette-panel .color-custom-row input[type=color]{box-sizing:border-box;flex:none;width:32px;height:25px;min-height:0;padding:2px;border:1px solid #cfd6db;border-radius:3px;background:#fff;cursor:pointer}
+.color-palette-panel .color-custom-row:focus-within{outline:2px solid var(--color-accent);outline-offset:1px}
+dialog.studio-color-panel{box-sizing:border-box;position:fixed;inset:auto;margin:0;width:254px;max-width:calc(100vw - 16px);padding:0;overflow:auto;border:1px solid #d5dcdf;border-radius:5px;box-shadow:0 7px 24px #26363826;background:#fff;z-index:1000}
+dialog.studio-color-panel .color-palette-panel{width:100%}
+dialog.studio-color-panel>.studio-color-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px 0;color:#54636d;font:11px/1.5 "Segoe UI","Yu Gothic UI",Meiryo,sans-serif}
+.studio-color-heading strong{font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.studio-color-heading button{flex:none;width:22px;height:22px;min-height:0;padding:0;border:0;border-radius:3px;background:transparent;color:#64738a;font-size:17px;cursor:pointer}
+.studio-color-panel [hidden]{display:none!important}
+
+#studioRibbon .color-palette-dropdown>.color-palette-panel{width:252px;max-width:calc(100vw - 16px);padding:10px;border-radius:5px}
+#studioRibbon .color-palette-panel .color-none-button{min-height:32px;border-top:1px solid #e4e8eb;border-radius:0;padding-inline:4px}
