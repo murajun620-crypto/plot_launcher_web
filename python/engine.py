@@ -655,6 +655,9 @@ class PlotEngine:
         frames, groups, columns, source_info, parts = [], [], [], [], []
         try:
             for source_index, source in enumerate(sources):
+                notify = getattr(self, 'progress_callback', None)
+                if notify is not None:
+                    notify(f"データを解析しています：{source['filename']}", source_index, len(sources))
                 info = self.load(source["path"], source["filename"], source.get("sheetIndex", 0), source.get("headerRow", 1), table_edits, source_index)
                 frame = self.frame.copy()
                 start = len(columns)
@@ -668,6 +671,9 @@ class PlotEngine:
                 frames.append(frame.reset_index(drop=True))
                 groups.append({"columns":group, "filename":source["filename"], "plotType":info["plotType"]})
                 source_info.append({"filename":source["filename"], "sheets":info["sheets"], "sheetIndex":info["sheetIndex"], "headerRow":info["headerRow"]})
+            notify = getattr(self, 'progress_callback', None)
+            if notify is not None:
+                notify('読み込んだデータをまとめています…', len(sources), len(sources))
             if len(columns) > MAX_COLUMNS: raise ValueError(f"複数ファイルの合計は{MAX_COLUMNS}列以内にしてください。")
             frame = pd.concat(frames, axis=1)
             self.frame, self.filename, self.sheet_name, self.xps_csv = frame, filename, "重ね描き", False

@@ -1,0 +1,23 @@
+.file-open-progress{position:fixed;inset:16px 20px auto auto;box-sizing:border-box;margin:0;width:370px;max-width:calc(100vw - 32px);padding:17px 19px;border:1px solid #cfdae8;border-radius:12px;background:#fff;color:#202d3e;box-shadow:0 8px 32px #243c5e2b;z-index:10000;font:13px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP","Yu Gothic UI",sans-serif;overflow-wrap:anywhere}
+.file-open-progress[hidden]{display:none!important}
+.file-open-progress::backdrop{background:transparent;pointer-events:none}
+.file-progress-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.file-progress-heading strong{font-size:15px;font-weight:600}
+.file-progress-heading button{border:0;background:transparent;padding:0 3px;color:#788395;cursor:pointer;font:20px/1.2 sans-serif}
+.file-progress-heading button[hidden]{display:none}
+.file-progress-name{margin-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#627087;font-size:12px}
+.file-progress-stage{margin-top:13px;white-space:pre-line}
+.file-progress-rail{position:relative;height:7px;margin:11px 0 5px;border-radius:6px;overflow:hidden;background:#e9eef5}
+.file-progress-rail[hidden]{display:none}
+.file-open-progress progress{display:block;appearance:none;width:100%;height:7px;margin:0;border:0;border-radius:6px;overflow:hidden;background:#e9eef5;accent-color:#205eb0}
+.file-open-progress progress::-webkit-progress-bar{border-radius:6px;background:#e9eef5}
+.file-open-progress progress::-webkit-progress-value{border-radius:6px;background:#205eb0;transition:width .15s linear}
+.file-open-progress progress::-moz-progress-bar{border-radius:6px;background:#205eb0}
+.file-progress-runner{display:none;position:absolute;inset:0 auto 0 0;width:40%;border-radius:6px;background:#205eb0;will-change:transform;pointer-events:none}
+.file-open-progress progress:not([value])+.file-progress-runner{display:block;animation:file-progress-slide 1.25s ease-in-out infinite alternate}
+.file-progress-count{min-height:18px;color:#627087;font-size:11px}
+.file-open-progress[data-kind=complete] strong{color:#17866e}
+.file-open-progress[data-kind=error]{border-color:#d7a7a9}
+.file-open-progress[data-kind=error] strong{color:#b3393b}
+@keyframes file-progress-slide{from{transform:translateX(-65%)}to{transform:translateX(215%)}}
+@media(prefers-reduced-motion:reduce){.file-open-progress progress:not([value])+.file-progress-runner{animation:none;transform:translateX(75%)}}

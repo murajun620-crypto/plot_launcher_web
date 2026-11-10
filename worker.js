@@ -1,11 +1,13 @@
-import { APP_VERSION, restoreSettings } from "./state.js?v=0c94ffef0819";
+import { APP_VERSION, restoreSettings } from "./state.js?v=baaeeccc3ee1";
 import { validateTableEdits } from './table-edits.mjs?v=27ae7675c457';
 // All user data stays in this worker's in-memory filesystem.
 const PYODIDE_VERSION = "0.29.3";
-const WORKER_BUILD = '0c94ffef0819';
+const WORKER_BUILD = 'baaeeccc3ee1';
 const INDEX_URL = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
 let pyodide, dispatch, currentPath = "", uploadNumber = 0;
 let currentSources = [];
+let progressRequestId=null;
+function operationProgress(text,completed=null,total=null,unit=''){self.postMessage({type:'progress',id:progressRequestId,text,completed,total,unit});}
 
 function progress(text) { self.postMessage({ type: "progress", text }); }
 async function fetchAsset(relative, binary = false) {
@@ -44,6 +46,8 @@ async function initialize() {
     pyodide.FS.writeFile(`/app/python/${name}`, await fetchAsset(`./python/${name}`));
   }));
   await pyodide.runPythonAsync("import sys\nsys.path.insert(0, '/app/python')\nfrom engine import PlotEngine\n_engine = PlotEngine('/app/python', '/app/NotoSansJP.ttf')\n_dispatch = _engine.dispatch");
+  pyodide.globals.set("_report_file_progress",(text,completed,total)=>operationProgress(text,completed,total,'ファイル'));
+  pyodide.runPython("_engine.progress_callback = _report_file_progress");
   dispatch = pyodide.globals.get("_dispatch");
   self.postMessage({ type: "ready",version:APP_VERSION,build:WORKER_BUILD,releaseProtocol:1 });
 }
@@ -63,6 +67,7 @@ self.onmessage = ({ data }) => {
     const projectFonts = [];
     try {
       await ready;
+      progressRequestId=id;
       let payload = args;
       let dispatchOperation=operation==='project'?'load':operation;
       if(operation==='load'||operation==='load-many'){
@@ -109,7 +114,9 @@ self.onmessage = ({ data }) => {
       if (operation === 'table-apply') {
         payload = {columns:args.columns,cells:args.cells,path:currentPath,filename:args.filename,...(currentSources.length?{sources:currentSources}:{})};
       }
+      if(['load','load-many','project','sheet-list'].includes(operation))operationProgress(operation==='sheet-list'?'Excelのシートを確認しています…':'データを解析しています…');
       let result = JSON.parse(dispatch(dispatchOperation, JSON.stringify(payload)));
+      if(operation==='project')operationProgress('グラフ設定を確認しています…');
       if (operation === "project") {
         if (result.sheets[result.sheetIndex] !== args.settings.data.sheet) throw new Error("プロジェクトのシートが設定と一致しません。");
         if(args.selectedSheets && args.selectedSheets.some(index=>index>=result.sheets.length))throw new Error('選択したシートが元データにありません。');
@@ -124,7 +131,8 @@ self.onmessage = ({ data }) => {
             for(const fill of options.fills||[])for(const key of ['x','upper','lower'])if(Number.isInteger(fill[key])&&result.columns[fill[key]])fill[key+'Name']=result.columns[fill[key]].name;}
         }
         const config = restoreSettings(settings, result), families = [];
-        for (const font of args.fonts) {
+        for (const [fontIndex,font] of args.fonts.entries()) {
+          operationProgress(`フォントを復元しています：${font.name}`,fontIndex,args.fonts.length,'フォント');
           const path = `/app/user-font-${++uploadNumber}.ttf`;
           projectFonts.push(path); pyodide.FS.writeFile(path, new Uint8Array(font.bytes));
           const registered = JSON.parse(dispatch("font", JSON.stringify({path})));
