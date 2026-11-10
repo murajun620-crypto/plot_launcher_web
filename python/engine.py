@@ -47,6 +47,111 @@ MAX_COLUMNS = 256
 MAX_SERIES = 32
 
 
+def smooth_line_coordinates(x, y, *, xlog=False, ylog=False, xlim=None):
+    """PCHIP in displayed coordinates, without changing measured points.
+
+    Weighted harmonic derivatives and limited one-sided endpoint derivatives:
+    https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.PchipInterpolator.html
+    Split at missing values, repeated X and sweep reversals; never sort a sweep.
+    """
+    x, y = np.asarray(x, dtype=float), np.asarray(y, dtype=float)
+    if len(x) < 3:
+        return x.copy(), y.copy()
+    valid = np.isfinite(x) & np.isfinite(y)
+    if xlog:
+        valid &= x > 0
+    if ylog:
+        valid &= y > 0
+    with np.errstate(divide="ignore", invalid="ignore"):
+        tx = np.log10(x) if xlog else x.copy()
+        ty = np.log10(y) if ylog else y.copy()
+    bounds = sorted(xlim) if xlim is not None else None
+    visible = valid[:-1] & valid[1:]
+    if bounds is not None:
+        visible &= (np.minimum(x[:-1], x[1:]) <= bounds[1]) & (np.maximum(x[:-1], x[1:]) >= bounds[0])
+    samples = min(48, max(1, int(np.ceil(1200 / max(1, int(visible.sum()))))))
+    if bounds is not None and xlog:
+        bounds = np.log10(np.maximum(bounds, np.finfo(float).tiny))
+    chunks = []
+
+    def interpolate(a, b):
+        if len(a) < 3 or samples == 1:
+            return a.copy(), b.copy()
+        reverse = a[-1] < a[0]
+        u, v = (a[::-1], b[::-1]) if reverse else (a, b)
+        with np.errstate(over="ignore", divide="ignore", invalid="ignore", under="ignore"):
+            span, shift = u[-1] - u[0], v[0]
+            scale = float(np.max(np.abs(v - shift)))
+            if not np.isfinite(span) or span <= 0 or not np.isfinite(scale):
+                return a.copy(), b.copy()
+            scale = scale or 1.0
+            t, z = (u - u[0]) / span, (v - shift) / scale
+            h = np.diff(t)
+            slopes = np.diff(z) / h
+            if np.any(h <= 0) or not np.isfinite(slopes).all():
+                return a.copy(), b.copy()
+            derivatives = np.zeros(len(t))
+            same = (np.sign(slopes[:-1]) == np.sign(slopes[1:])) & (slopes[:-1] != 0) & (slopes[1:] != 0)
+            w1, w2 = 2 * h[1:] + h[:-1], h[1:] + 2 * h[:-1]
+            middle = derivatives[1:-1]
+            middle[same] = (w1[same] + w2[same]) / (w1[same] / slopes[:-1][same] + w2[same] / slopes[1:][same])
+
+            def endpoint(h0, h1, d0, d1):
+                d = ((2 * h0 + h1) * d0 - h0 * d1) / (h0 + h1)
+                if np.sign(d) != np.sign(d0):
+                    return 0.0
+                return 3 * d0 if np.sign(d0) != np.sign(d1) and abs(d) > 3 * abs(d0) else d
+
+            derivatives[0] = endpoint(h[0], h[1], slopes[0], slopes[1])
+            derivatives[-1] = endpoint(h[-1], h[-2], slopes[-1], slopes[-2])
+            divisions = np.ones(len(h), dtype=int)
+            active = np.ones(len(h), dtype=bool) if bounds is None else (u[1:] >= bounds[0]) & (u[:-1] <= bounds[1])
+            divisions[active] = samples
+            starts = np.r_[0, np.cumsum(divisions)]
+            interval = np.repeat(np.arange(len(h)), divisions)
+            q = (np.arange(starts[-1]) - np.repeat(starts[:-1], divisions)) / divisions[interval]
+            dense_x = u[interval] + (u[interval+1] - u[interval]) * q
+            dense_z = ((2*q**3 - 3*q**2 + 1) * z[interval]
+                       + (q**3 - 2*q**2 + q) * h[interval] * derivatives[interval]
+                       + (-2*q**3 + 3*q**2) * z[interval+1]
+                       + (q**3 - q**2) * h[interval] * derivatives[interval+1])
+            dense_y = dense_z * scale + shift
+            dense_y = np.clip(dense_y, np.minimum(v[interval], v[interval+1]), np.maximum(v[interval], v[interval+1]))
+            dense_x, dense_y = np.r_[dense_x, u[-1]], np.r_[dense_y, v[-1]]
+            # Keep every knot exact, including constant segments and endpoints.
+            dense_x[starts], dense_y[starts] = u, v
+            if not np.isfinite(dense_x).all() or not np.isfinite(dense_y).all():
+                return a.copy(), b.copy()
+        return (dense_x[::-1], dense_y[::-1]) if reverse else (dense_x, dense_y)
+
+    edges = np.flatnonzero(np.diff(np.r_[False, valid, False]))
+    for lo, hi in zip(edges[::2], edges[1::2]):
+        if chunks:
+            chunks.append((np.array([np.nan]), np.array([np.nan])))
+        a, b = tx[lo:hi], ty[lo:hi]
+        start, direction = 0, 0
+        for i in range(1, len(a)):
+            step = int(np.sign(a[i] - a[i-1]))
+            if step == 0:
+                chunks.append(interpolate(a[start:i], b[start:i]))
+                chunks.append((a[i:i+1], b[i:i+1]))
+                start, direction = i, 0
+            elif direction and step != direction:
+                chunks.append(interpolate(a[start:i], b[start:i]))
+                start, direction = i-1, step
+            else:
+                direction = step
+        chunks.append(interpolate(a[start:], b[start:]))
+    if not chunks:
+        return x.copy(), y.copy()
+    sx, sy = np.concatenate([c[0] for c in chunks]), np.concatenate([c[1] for c in chunks])
+    if xlog:
+        sx = 10 ** sx
+    if ylog:
+        sy = 10 ** sy
+    return sx, sy
+
+
 def fit_trendline(x, y, kind, *, origin=False, degree=2, xlog=False, ylog=False, digits=4):
     """Unweighted XY regression; log/exp/power use transformed least squares."""
     if kind not in {"linear", "polynomial", "exponential", "logarithmic", "power"}:
@@ -1001,6 +1106,8 @@ class PlotEngine:
             linestyle = item.get("lineStyle", "-")
             if linestyle not in {"-", "--", "-.", ":"}:
                 raise ValueError("線種を選び直してください。")
+            if item.get("lineInterpolation", "linear") not in {"linear", "smooth"}:
+                raise ValueError("線の結び方を選び直してください。")
             keys.setdefault("styles", []).append(linestyle)
             # Project each series separately so log filtering and different
             # offsets on a shared input column cannot affect other series.
@@ -1233,7 +1340,15 @@ class PlotEngine:
                     plot_utils.apply_preview_legend(axes, handles=handles, labels=[item.get("name", f"Series {i+1}") for i,item in enumerate(config["series"])])
         result = []
         for index, artists in enumerate(groups):
-            visible = config.get("series", [])[index].get("visible", True)
+            item = config.get("series", [])[index]
+            if preset not in {"bar_graph_general", "Particle Histogram", "XPS Fit", "Raman 3D"} and item.get("lineInterpolation", "linear") == "smooth" and item.get("mode", "line") != "scatter":
+                line = next((artist for artist in artists if isinstance(artist, Line2D) and artist.get_linestyle() not in {"None", "", " "} and artist.get_linewidth() > 0), None)
+                if line is not None:
+                    x, y = line.get_data()
+                    if frame is not None and f"_x_{index}" in frame and f"_y_{index}" in frame:
+                        x, y = frame[f"_x_{index}"].to_numpy(dtype=float), frame[f"_y_{index}"].to_numpy(dtype=float)
+                    line.set_data(*smooth_line_coordinates(x, y, xlog=axes.get_xscale() == "log", ylog=axes.get_yscale() == "log", xlim=axes.get_xlim()))
+            visible = item.get("visible", True)
             for artist in artists:
                 artist.set_visible(visible)
             result.append({"index": index, "artists": artists})

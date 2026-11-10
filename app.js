@@ -1,12 +1,12 @@
 import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=source-save-v0717-1';
-import {setupDirectSendButton,getFigureWorkspace} from './direct-transfer.mjs?v=f9663459d218';
-import {identifyPlotProject,plotSheetIndex,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=f9663459d218';
+import {setupDirectSendButton,getFigureWorkspace} from './direct-transfer.mjs?v=0c94ffef0819';
+import {identifyPlotProject,plotSheetIndex,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=0c94ffef0819';
 import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=9127ec4c4f31";
 import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=9127ec4c4f31";
 import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9127ec4c4f31";
 import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=27ae7675c457";
 import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=27ae7675c457";
-import { APP_VERSION, COLORS, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=f9663459d218";
+import { APP_VERSION, COLORS, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=0c94ffef0819";
 
 import {alignmentOffsets} from './object-layout.mjs?v=27ae7675c457';
 import {createDataEditor} from './data-editor.mjs?v=27ae7675c457';
@@ -18,7 +18,7 @@ import {createColorPanel} from './colors.mjs?v=unified-palette-1';
 import {createXRangePicker} from './x-range-picker.mjs?v=normalization-range-1';
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
-const APP_BUILD = 'f9663459d218';
+const APP_BUILD = '0c94ffef0819';
 window.FigureAppRelease?.assertRunning({version:APP_VERSION,build:APP_BUILD});
 function makeProject(settings,data,fonts,workspace={}){
   const live=sourceData&&data.filename===sourceData.filename&&(data.bytes===sourceData.bytes||data.files&&data.files===sourceData.files);
@@ -99,7 +99,7 @@ const axisControlValue = (key, value) => isAxisSize(key) ? scaleAxisSize(value, 
 const axisConfigValue = (key, value) => isAxisSize(key) ? scaleAxisSize(value, .1) : isLabelPadding(key) ? Number((Number(value) + LABEL_PADDING_BASE).toPrecision(12)) : key === 'spineScale' ? Number((Number(value) / .8).toPrecision(12)) : /^(fontScale|tickFontScale|labelFontScale|legendFontScale)$/.test(key) ? Number((Number(value)/fontPointBase(key)).toPrecision(12)) : value;
 const editableXY = type => !['XPS Fit','Particle Histogram','bar_graph_general','Raman 3D'].includes(type);
 const seriesControlValue = (key,value) => key==='trendFontSize' ? Number((Number(value || 6)*Number(config.axes.fontScale)).toPrecision(12)) : value;
-const SERIES_APPEARANCE_FIELDS = ['mode','lineWidth','markerSize','lineStyle','marker','lineAlpha','scatterColor','markerEdgeColor','markerFaceColor','markerEdgeAlpha','markerFaceAlpha'];
+const SERIES_APPEARANCE_FIELDS = ['mode','lineWidth','markerSize','lineInterpolation','lineStyle','marker','lineAlpha','scatterColor','markerEdgeColor','markerFaceColor','markerEdgeAlpha','markerFaceAlpha'];
 const PROCESSING_FIELDS = ['xFactor','yFactor','xOffset','yOffset','detrend','detrendMin','detrendMax','detrendSlope','density','currentUnit','area','areaUnit','normalization','referenceMode','referencePoint','referenceMin','referenceMax','referenceValue'];
 const opacityPercent = value => `${Number((Number(value) * 100).toFixed(2))}%`;
 const opacityControl = (attributes, label, value = 1) => `<label class="opacity-control" title="0%は透明、100%は不透明。←／→キーで1%ずつ調整できます。"><span class="opacity-caption">${escapeHTML(label)}<output aria-hidden="true">${opacityPercent(value)}</output></span><input ${attributes} data-opacity type="range" min="0" max="1" step="0.01" value="${escapeHTML(value)}" aria-label="${escapeHTML(label)}" aria-valuetext="${opacityPercent(value)}"></label>`;
@@ -457,7 +457,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=f9663459d218", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=0c94ffef0819", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -815,7 +815,7 @@ function drawSeriesTable() {
   const modes={line:'線',scatter:'点','line+scatter':'線＋点'},styles={'-':'実線','--':'破線','-.':'一点鎖線',':':'点線'};
   const markers={o:'丸',s:'四角','^':'三角 ▲',v:'三角 ▼',D:'ひし形','+':'+',x:'×','*':'星',p:'五角形',h:'六角形'};
   const errors={auto:'±列から自動',none:'なし',symmetric:'±値',asymmetric:'正・負の誤差幅',minmax:'最小・最大値'};
-  const headers=['No.','表示','系列名','X列','Y列','Y軸','描画','線・棒色','点色','線幅 (pt)','点面積 (pt²)','線種','マーカー','Xオフセット','Yオフセット','誤差','±列','正の誤差列','負の誤差列','最小値列','最大値列'];
+  const headers=['No.','表示','系列名','X列','Y列','Y軸','描画','線・棒色','点色','線幅 (pt)','点面積 (pt²)','線種','マーカー','Xオフセット','Yオフセット','誤差','±列','正の誤差列','負の誤差列','最小値列','最大値列','線の結び方'];
   $('#series-table-head').innerHTML=`<tr>${headers.map((label,index)=>`<th scope="col"${index>=11?' data-series-detail':''}>${text(label)}</th>`).join('')}<th scope="col">設定</th></tr>`;
   $('#series-table-body').innerHTML=items.map((item,index)=>{
     const histogram=config.plotType==='Particle Histogram',xps=config.plotType==='XPS Fit',bar=config.plotType==='bar_graph_general',threeD=config.plotType==='Raman 3D',options=config.options || {};
@@ -835,7 +835,8 @@ function drawSeriesTable() {
       editableXY(config.plotType)?select('lineStyle','線種',styles):'—',histogram || bar || threeD?'—':xps?'丸':select('marker','マーカー',markers),
       histogram?'—':input('xOffset','Xオフセット','number','step="any"'),histogram?'—':input('yOffset','Yオフセット','number','step="any"'),
       editableXY(config.plotType)?select('errorMode','誤差',errors):'—',
-      ...['error','errorPlus','errorMinus','errorMin','errorMax'].map((key,i)=>editableXY(config.plotType)?column(key,headers[16+i],true):'—')];
+      ...['error','errorPlus','errorMinus','errorMin','errorMax'].map((key,i)=>editableXY(config.plotType)?column(key,headers[16+i],true):'—'),
+      editableXY(config.plotType)?select('lineInterpolation','線の結び方',{linear:'直線',smooth:'滑らかな曲線'},false,item.lineInterpolation || 'linear'):'—'];
     return `<tr data-series-index="${index}">${cells.map((html,index)=>`<td${index>=11?' data-series-detail':''}>${html}</td>`).join('')}<td><button type="button" data-series-table-edit="${index}" aria-label="系列${index+1}の詳細設定を開く">詳細</button></td></tr>`;
   }).join('');
   drawSeriesTableSummary();enhanceColorInputs();updateButtons();
@@ -883,6 +884,7 @@ function drawControls() {
       <div class="field-grid"><label>グラフの種類<select data-series-field="mode">${choiceOptions([["line", "線"], ["scatter", "点"], ["line+scatter", "線＋点"]], series.mode)}</select></label><label title="右軸を選ぶと右側に独立したY軸を表示します。">使用するY軸<select data-series-field="yAxis">${choiceOptions([['left','左軸'],['right','右軸']],series.yAxis || 'left')}</select></label></div>
       <details class="series-columns settings-panel"><summary>${editableXY(config.plotType)?'データ列':'データ列・オフセット'}</summary><div class="field-grid"><label>X列<select data-series-field="x">${columnOptions(series.x)}</select></label><label>Y列<select data-series-field="y">${columnOptions(series.y)}</select></label></div>${editableXY(config.plotType)?'':`<div class="field-grid">${input("xOffset", "Xオフセット", 'step="any"')}${input("yOffset", "Yオフセット", 'step="any"')}</div>`}</details>
       <div class="annotation-buttons"><button type="button" class="button quiet" data-series-up="${index}" ${index===0?'disabled':''}>↑</button><button type="button" class="button quiet" data-series-down="${index}" ${index===config.series.length-1?'disabled':''}>↓</button><button type="button" class="button quiet" data-series-copy="${index}">複製</button></div><details class="series-advanced settings-panel"><summary>線・点の見た目</summary>
+        <label title="測定点の間を曲線で結びます。元データ・マーカー・誤差棒は変更しません。">線の結び方<select data-series-field="lineInterpolation">${choiceOptions([["linear","直線"],["smooth","滑らかな曲線"]],series.lineInterpolation || "linear")}</select></label>
         <div class="field-grid">${input("lineWidth", "線幅 (pt)", 'min="0" max="6" step="0.1"')}<label>線種<select data-series-field="lineStyle">${choiceOptions([["-", "実線"], ["--", "破線"], ["-.", "一点鎖線"], [":", "点線"]], series.lineStyle)}</select></label></div>
         <div class="field-grid"><label>マーカー<select data-series-field="marker">${choiceOptions([["o", "丸"], ["s", "四角"], ["^", "三角 ▲"], ["v", "三角 ▼"], ["D", "ひし形"], ["+", "+"], ["x", "×"], ["*", "星"], ["p", "五角形"], ["h", "六角形"]], series.marker)}</select></label>${input("markerSize", "マーカー面積 (pt²)", 'min="1" max="200" step="0.1"')}</div>
         <label title="全系列に共通です。">点の縁の太さ (pt・全系列)<input data-axis="markerEdgeWidth" type="number" min="0" max="20" step="0.1" value="${config.axes.markerEdgeWidth}"></label>
@@ -912,7 +914,7 @@ function drawControls() {
     if(['tickFontScale','labelFontScale','legendFontScale'].includes(input.dataset.axis)){input.min=axisControlValue(input.dataset.axis,.2);input.max=axisControlValue(input.dataset.axis,3);}
   });
   const generic=editableXY(config.plotType || 'General');
-  const markerFields=['mode','marker','markerSize','scatterColor','markerEdgeColor','markerFaceColor','markerEdgeAlpha','markerFaceAlpha','lineStyle','lineAlpha','error','errorMode','errorMin','errorMax','yAxis'];
+  const markerFields=['lineInterpolation','mode','marker','markerSize','scatterColor','markerEdgeColor','markerFaceColor','markerEdgeAlpha','markerFaceAlpha','lineStyle','lineAlpha','error','errorMode','errorMin','errorMax','yAxis'];
   $$('[data-series-field]').forEach(input=>{if(!input.closest('#series-table-body') && markerFields.includes(input.dataset.seriesField))input.closest('label').hidden=!generic;});
   syncSeriesErrorControls();
   syncYAxesControls();

@@ -1,6 +1,6 @@
 import { resetPresetUnitScales, unitConversion, configureAFMUnits } from "./units.js?v=9127ec4c4f31";
 import { validateTableEdits } from './table-edits.mjs?v=27ae7675c457';
-export const APP_VERSION = '2.4.44';
+export const APP_VERSION = '2.4.45';
 
 // Accept one numeric value or fraction without evaluating JavaScript expressions.
 export function parseCoefficient(value) {
@@ -109,7 +109,7 @@ export function defaultAxes() {
 }
 
 export function createSeries(x, y, name, index = 0, plotType = "General") {
-  return { x, y, name, yAxis: "left", visible: true, legendVisible:true, legendX:'', legendY:'', legendZOrder:5, legendStyle:'auto',legendFontSize:'',legendTextColorMode:'inherit',legendTextColor:'#000000', color: plotType === "Polishing Rate" && index === 2 ? "#000000" : COLORS[index % COLORS.length], scatterColor: "auto", mode: ['Polishing Rate','Waviness'].includes(plotType) ? "line+scatter" : "line", lineWidth: 1, lineStyle: "-", lineAlpha: 1, marker: "o", markerSize: 18, markerEdgeColor: "auto", markerFaceColor: "auto", markerEdgeAlpha: 0.8, markerFaceAlpha: 0.8, xOffset: 0, yOffset: 0, error: "", errorMode: "auto", errorMin: "", errorMax: "", errorPlus: "", errorMinus: "", trendType: "none", trendOrigin: false, trendDegree: 2, trendEquation: true, trendColor: "auto", trendStyle: "--", trendWidth: 1, trendFontSize: 6, trendDigits: 4, trendX: "", trendY: "", xFactor:1, yFactor:1, detrend:false, detrendMin:'', detrendMax:'', detrendSlope:'', density:false, currentUnit:'A', area:1, areaUnit:'cm2', normalization:'none', referenceMode:'max', referencePoint:1, referenceMin:'', referenceMax:'', referenceValue:1 };
+  return { x, y, name, yAxis: "left", visible: true, legendVisible:true, legendX:'', legendY:'', legendZOrder:5, legendStyle:'auto',legendFontSize:'',legendTextColorMode:'inherit',legendTextColor:'#000000', color: plotType === "Polishing Rate" && index === 2 ? "#000000" : COLORS[index % COLORS.length], scatterColor: "auto", mode: ['Polishing Rate','Waviness'].includes(plotType) ? "line+scatter" : "line", lineWidth: 1, lineStyle: "-", lineInterpolation: "linear", lineAlpha: 1, marker: "o", markerSize: 18, markerEdgeColor: "auto", markerFaceColor: "auto", markerEdgeAlpha: 0.8, markerFaceAlpha: 0.8, xOffset: 0, yOffset: 0, error: "", errorMode: "auto", errorMin: "", errorMax: "", errorPlus: "", errorMinus: "", trendType: "none", trendOrigin: false, trendDegree: 2, trendEquation: true, trendColor: "auto", trendStyle: "--", trendWidth: 1, trendFontSize: 6, trendDigits: 4, trendX: "", trendY: "", xFactor:1, yFactor:1, detrend:false, detrendMin:'', detrendMax:'', detrendSlope:'', density:false, currentUnit:'A', area:1, areaUnit:'cm2', normalization:'none', referenceMode:'max', referencePoint:1, referenceMin:'', referenceMax:'', referenceValue:1 };
 }
 
 export function initialSeries(columns, plotType = 'General') {
@@ -274,6 +274,7 @@ export function restoreSettings(document, metadata) {
           if (typeof item[key] !== 'boolean') throw new Error("設定JSONの系列表示を確認してください。");
           result[key] = item[key]; continue;
         }
+        if (key === 'lineInterpolation' && !['linear','smooth'].includes(item[key])) throw new Error('線の結び方を確認してください。');
         if (key === 'yAxis' && !['left','right'].includes(item[key])) throw new Error("設定JSONのY軸を確認してください。");
         if (key === 'trendType' && !['none','linear','polynomial','exponential','logarithmic','power'].includes(item[key])) throw new Error("設定JSONの近似線を確認してください。");
         if (key === 'normalization' && !['none','ratio','relative'].includes(item[key]) || key === 'referenceMode' && !['max','peakHeight','maxRange','peakHeightRange','manual','first','point','range'].includes(item[key]) || key === 'currentUnit' && !['A','mA','μA','nA','pA'].includes(item[key]) || key === 'areaUnit' && !['cm2','mm2','m2'].includes(item[key])) throw new Error('設定JSONのデータ補正を確認してください。');
