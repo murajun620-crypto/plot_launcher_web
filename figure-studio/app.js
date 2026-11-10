@@ -7,12 +7,14 @@ import {imageAsset,imagePhysicalSize,imageMiFiToBodySize,blobToDataURL,dataURLTo
 import {importedImageSize,replacedImageSize,replacedMiFiToImageSize,miFiToSizeCorrection,imageInsertionPoint} from './image-placement.mjs?v=nested-groups-v0712-1';
 import {rasterResolution} from './image-resolution.mjs?v=image-quality-v066-1';
 import {saveDraft,loadDraft,saveProjectFileTarget,loadProjectFileTarget} from './storage.mjs?v=0.3.6-1';
-import {createDemo} from './demo.mjs?v=nested-groups-v0712-1';
+import {createDemo} from './demo.mjs?v=panel-labels-v0722-1';
 import {createShortcutHandler,shortcutLabel} from './shortcuts.mjs?v=nested-groups-v0712-1';
 import {installShortcutUI} from './shortcut-ui.mjs?v=nested-groups-v0712-1';
 import {createRibbon} from './ribbon.mjs?v=source-batch-v070-1';
 import {imageArrayUnits,arrangeImageArray} from './image-array.mjs?v=nested-groups-v0712-1';
 import {createImageArrayDialog} from './image-array-dialog.mjs?v=nested-groups-v0712-1';
+import {applyPanelLabels} from './panel-labels.mjs?v=panel-labels-v0722-1';
+import {createPanelLabelDialog} from './panel-label-dialog.mjs?v=panel-labels-v0722-1';
 import {createColorPickers} from './colors.mjs?v=unified-palette-1';
 import {renderTextPaint} from './text-paint.mjs?v=tex-v061-1';
 import {createTexRenderer} from './tex.mjs?v=micro-v0711-2';
@@ -21,10 +23,10 @@ import {openSource,SOURCE_APPS,setupSourceDiscovery,closeSourceSessions} from '.
 import {createFigureSidebar} from './thumbnails.mjs?v=live-v062-1';
 import {setupTransferReceiver,getFigureWorkspace} from './integration/direct-transfer.mjs?v=studio-send-v0714-1';
 import {readMifitoIdentity} from './integration/mifito-sync.mjs?v=0.3.5-1';
-import {readPlotIdentity} from './integration/plot-sync.mjs?v=unified-colors-v0721-1';
+import {readPlotIdentity} from './integration/plot-sync.mjs?v=panel-labels-v0722-1';
 import {planMiFiToSync} from './mifito-batch.mjs?v=studio-send-v0714-1';
-import {setupUpdateCheck} from './update-check.mjs?v=unified-colors-v0721-1';
-import {installWorkspaceUpdater} from './workspace-update.mjs?v=unified-colors-v0721-1';
+import {setupUpdateCheck} from './update-check.mjs?v=panel-labels-v0722-1';
+import {installWorkspaceUpdater} from './workspace-update.mjs?v=panel-labels-v0722-1';
 import {marqueeSelection,resolveObjectSelection,clickObjectSelection,selectionDescription} from './selection.mjs?v=nested-groups-v0712-1';
 import {renderGroupLayers} from './group-layers.mjs?v=nested-groups-v0712-1';
 import {drawSelectionFrames} from './selection-overlay.mjs?v=studio-send-v0714-1';
@@ -41,11 +43,11 @@ import {reorderFigures} from './figure-order.mjs';
 import {renumberFigureNames} from './figure-names.mjs?v=0.3.3-1';
 import {deleteFigures,duplicateFigures} from './figure-commands.mjs?v=nested-groups-v0712-1';
 import {ProjectFileSession,projectFilePickerOptions} from './project-file.mjs?v=project-switch-v051-1';
-import {installWorkspacePersistence} from './workspace-session.mjs?v=unified-colors-v0721-1';
+import {installWorkspacePersistence} from './workspace-session.mjs?v=panel-labels-v0722-1';
 import {decodeWorkspaceState} from './workspace-state.mjs?v=project-switch-v051-1';
 import {validateWorkspaceBinding} from './integration/bridge-host.mjs?v=source-save-v0717-1';
 
-const STUDIO_RELEASE={version:'0.7.21',build:'unified-colors-v0721-1'};
+const STUDIO_RELEASE={version:'0.7.22',build:'panel-labels-v0722-1'};
 window.FigureAppRelease?.assertRunning(STUDIO_RELEASE);
 if(window.FigureAppRelease&&!await window.FigureAppRelease.startup())throw Error('最新版へ切り替えています。');
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
@@ -76,6 +78,7 @@ const nodes=new Map(),svg=$('#canvas'),objects=$('#objects'),overlays=$('#overla
 svg.setAttribute('tabindex','0');svg.setAttribute('role','application');svg.setAttribute('aria-label','Figure編集キャンバス');
 const ribbon=createRibbon({onResize:()=>{renderOverlay();positionEditor();},onFocusCanvas:()=>svg.focus({preventScroll:true})});
 const imageArrayDialog=createImageArrayDialog({root:$('#imageArrayDialog'),getDocument:()=>doc,getSelection:()=>selection,getSelectionOptions:()=>({individual:!!groupScope}),onApply:(ids,gaps)=>{let result;change(()=>{result=arrangeImageArray(doc,ids,gaps);});toast(`${result.rows}行 × ${result.columns}列に配列しました · Ctrl+Zで戻せます`);},onClose:()=>svg.focus({preventScroll:true})});
+const panelLabelDialog=createPanelLabelDialog({root:$('#panelLabelDialog'),getDocument:()=>doc,getSelection:()=>selection,onApply:(ids,options)=>{let result;change(()=>{result=applyPanelLabels(doc,ids,options,fitText);});setSelection(result.ids,{focus:false});toast(`${result.count}パネルにラベルを付けました · Ctrl+Zで戻せます`);},onClose:()=>svg.focus({preventScroll:true})});
 const colorPickers=createColorPickers();
 pathDrawing=createPathDrawing({svg,point:svgPoint,scale:()=>scale,onDraft:draft=>{pathDraft=draft;if(!pathPreviewFrame)pathPreviewFrame=requestAnimationFrame(()=>{pathPreviewFrame=0;renderOverlay();});},onCommit:commitDrawnPath,onCancel:()=>{if(!pathToolTransition)setTool('select');},onHint:message=>{if(message)$('#statusText').textContent=message;}});
 const measure=document.createElement('canvas').getContext('2d');
@@ -344,7 +347,7 @@ window.addEventListener('keydown',e=>{if(!e.defaultPrevented&&e.code==='Space'&&
 function duplicate(){const old=selected();if(!old.length)return;change(()=>{const added=old.map(o=>{const n=clone(o);n.id=uid();n.x+=mm(3);n.y+=mm(3);n.locked=false;return n;});if(!groupScope)remapGroupIds(added,uid);doc.objects.push(...added);selection=added.map(o=>o.id);});}
 function applyTextStyle(property,value){if(editingId){const o=doc.objects.find(o=>o.id===editingId);o[property]=typeof value==='function'?value(o[property],o):value;if(property==='text')editor.value=o.text;positionEditor();renderInspector();return;}change(()=>editable().filter(o=>o.type==='text').forEach(o=>{o[property]=typeof value==='function'?value(o[property],o):value;if(o.textAutoSize||['text','textMode','fontSize','fontFamily','bold','italic','underline'].includes(property))fitText(o);}));}
 function changeFont(action){applyTextStyle('fontSize',v=>fontSizeForAction(v,action));}
-function addLabels(){change(()=>{const targets=editable().filter(o=>o.type==='image');const list=targets.length?targets:doc.objects.filter(o=>o.type==='image'&&!o.locked);list.forEach((o,i)=>{const label=makeObject('text',{x:o.x,y:o.y-mm(6),w:mm(9),h:mm(6),fontSize:9,bold:true,text:i<26?String.fromCharCode(65+i):String(i+1),name:'Panel label'});fitText(label);doc.objects.push(label);});});}
+function addLabels(){finishText();panelLabelDialog.show();}
 function execute(action,payload={}){
  if(pathDrawing?.drawing){if(action==='save'||action==='save-as'){if(!pathDrawing.finish()){toast('2点以上を指定してから保存してください');return;}}else if(['undo','redo','new','sample','new-figure','open','next-figure','previous-figure'].includes(action)){pathDrawing.cancel();if(action==='undo')return;}}
  if(action==='edit-points'){const object=editable()[0];if(selection.length===1&&['curve','freeform'].includes(object?.type)){pathEditId=pathEditId===object.id?null:object.id;renderOverlay();renderInspector();svg.focus({preventScroll:true});}return;}
@@ -403,7 +406,7 @@ function execute(action,payload={}){
 }
 const shortcut=createShortcutHandler({execute,isEditing:e=>e.target===editor?'canvas-text':e.target.isContentEditable||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName),isCanvasActive:()=>document.querySelector('dialog[open]')?false:document.activeElement?.closest('#studioRibbon,#ribbonSelectionPane,.app-header')?'ribbon':(document.activeElement===svg||document.activeElement===document.body||document.activeElement===editor||!!document.activeElement?.closest('#figureTabs')),onHint:text=>{$('#keyHint').textContent=text;$('#keyHint').hidden=!text;}});
 window.addEventListener('keydown',shortcut);document.addEventListener('pointerdown',()=>shortcut.reset());
-document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b||b.disabled)return;const action=b.dataset.action;execute(action);for(const d of $$('details:not(.sidebar-text-panel)[open]'))d.open=false;if(['new-figure','duplicate-figure','delete-figure','move-figure-left','move-figure-right'].includes(action)){focusFigure();return;}if(!['image-array','help','open','import','save','save-as','attach-source','edit-source','export-pdf','toggle-selection-pane','show-text-pane'].includes(action)&&!editingId)svg.focus({preventScroll:true});});
+document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b||b.disabled)return;const action=b.dataset.action;execute(action);for(const d of $$('details:not(.sidebar-text-panel)[open]'))d.open=false;if(['new-figure','duplicate-figure','delete-figure','move-figure-left','move-figure-right'].includes(action)){focusFigure();return;}if(!['labels','image-array','help','open','import','save','save-as','attach-source','edit-source','export-pdf','toggle-selection-pane','show-text-pane'].includes(action)&&!editingId)svg.focus({preventScroll:true});});
 for(const button of $$('#studioRibbon [data-action],#ribbonSelectionPane [data-action]'))button.addEventListener('pointerdown',event=>{if(editingId&&isRibbonTextControl(button))event.preventDefault();});
 $('#docName').addEventListener('input',e=>{const name=e.target.value||'Untitled Figure';change(()=>doc.name=name);});
 for(const [id,key]of [['pageWidth','width'],['pageHeight','height']])$('#'+id).addEventListener('change',e=>{const v=Number(e.target.value);if(v>=10&&v<=2000){change(()=>doc[key]=mm(v));fit();}else{toast('用紙サイズは10〜2000 mmです');renderInspector();}});
