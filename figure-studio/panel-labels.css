@@ -4,9 +4,11 @@
 .panel-label-fields label{display:flex;flex-direction:column;gap:7px;font-size:12px;font-weight:600}
 .panel-label-fields input,.panel-label-fields select{width:100%;padding:9px;font-size:14px}
 .panel-label-wide{grid-column:1/-1}
-.panel-label-preview{font:700 22px Arial,sans-serif;letter-spacing:.02em;padding:15px 16px;background:#f3f6f5;border:1px solid var(--line);border-radius:6px;margin:0 0 18px;color:#000}
+.panel-label-preview{font:400 22px Arial,sans-serif;letter-spacing:.02em;padding:15px 16px;background:#f3f6f5;border:1px solid var(--line);border-radius:6px;margin:0 0 18px;color:#000}
 .panel-label-advanced{border-top:1px solid var(--line);padding-top:12px}
 .panel-label-advanced>summary{font-size:12px;font-weight:600;padding:4px 0;list-style:none}
 .panel-label-advanced>summary::before{content:'＋ ';color:var(--accent)}
 .panel-label-advanced[open]>summary::before{content:'− '}
 .panel-label-advanced .panel-label-fields{margin-bottom:12px}
+
+#panelLabelDialog .panel-label-fields .image-array-separate{flex-direction:row;align-items:center}#panelLabelDialog .image-array-separate input{width:auto}
