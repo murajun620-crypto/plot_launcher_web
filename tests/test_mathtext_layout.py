@@ -122,7 +122,15 @@ class MathtextLayoutTests(unittest.TestCase):
                 self.assertEqual(plot.figure.axes[0].get_xlabel(), r'Raman shift (cm$^{-1}$)')
                 for format, signature in [('svg',b'<?xml'),('png',b'\x89PNG'),('pdf',b'%PDF')]:
                     with self.subTest(format=format):
-                        self.assertTrue(base64.b64decode(plot.export(config,format,150)['base64']).startswith(signature))
+                        original = _mathtext.TruetypeFonts.get_xheight
+                        uncorrected = []
+                        def observe(fontset, *args):
+                            if type(fontset) is _mathtext.UnicodeFonts: uncorrected.append(args)
+                            return original(fontset, *args)
+                        with patch.object(_mathtext.TruetypeFonts, 'get_xheight', observe):
+                            self.assertTrue(base64.b64decode(plot.export(config,format,150)['base64']).startswith(signature))
+                        self.assertEqual(uncorrected, [], 'Export redrew selected-font math without the layout correction')
+                        self.assertIs(_mathtext.TruetypeFonts.get_xheight, original)
 
 
 if __name__ == '__main__':
