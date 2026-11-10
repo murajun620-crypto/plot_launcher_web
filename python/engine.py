@@ -240,6 +240,19 @@ def plot_environment(values, frame, sheet_name, filename):
     adapter.load_xpsfit_csv_table = lambda _path: (frame, frame.columns.tolist())
     sys.modules["df_utils"] = adapter
     original_fonts = plot_utils.configure_plot_fonts
+    from matplotlib import _mathtext
+    original_xheight = _mathtext.TruetypeFonts.get_xheight
+    def browser_math_xheight(fontset, fontname, fontsize, dpi):
+        # Arial's PCLT xHeight is in font design units. Mathtext's PCLT path
+        # interprets it as a 12 pt / 100 dpi measurement and nearly doubles
+        # the height, pushing scripts too far from the baseline. For custom
+        # fonts, measure the actual x glyph as Matplotlib does without PCLT.
+        # STIX/DejaVu font sets retain their own layout and symbol metrics.
+        if type(fontset) is _mathtext.UnicodeFonts:
+            height = fontset.get_metrics(fontname, matplotlib.rcParams['mathtext.default'], 'x', fontsize, dpi).iceberg
+            if math.isfinite(height) and height > 0:
+                return height
+        return original_xheight(fontset, fontname, fontsize, dpi)
     def browser_fonts():
         original_fonts()
         # Matplotlib expands a generic sans-serif name to just one face.
@@ -257,11 +270,13 @@ def plot_environment(values, frame, sheet_name, filename):
             "mathtext.fallback": "stixsans",
         })
     plot_utils.configure_plot_fonts = browser_fonts
+    _mathtext.TruetypeFonts.get_xheight = browser_math_xheight
     try:
         browser_fonts()
         yield
     finally:
         plot_utils.configure_plot_fonts = original_fonts
+        _mathtext.TruetypeFonts.get_xheight = original_xheight
         for key in list(os.environ):
             if key.startswith("PLOT_"):
                 del os.environ[key]
