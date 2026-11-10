@@ -1,12 +1,12 @@
 import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=source-save-v0717-1';
-import {setupDirectSendButton,getFigureWorkspace} from './direct-transfer.mjs?v=12996535565f';
-import {identifyPlotProject,plotSheetIndex,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=12996535565f';
+import {setupDirectSendButton,getFigureWorkspace} from './direct-transfer.mjs?v=7a1dad783ded';
+import {identifyPlotProject,plotSheetIndex,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=7a1dad783ded';
 import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=9127ec4c4f31";
 import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=9127ec4c4f31";
 import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9127ec4c4f31";
 import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=27ae7675c457";
 import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=27ae7675c457";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=12996535565f";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=7a1dad783ded";
 
 import {alignmentOffsets} from './object-layout.mjs?v=27ae7675c457';
 import {createDataEditor} from './data-editor.mjs?v=27ae7675c457';
@@ -17,7 +17,7 @@ import {formatText,TEXT_FORMAT_ACTIONS} from './text-format.mjs?v=61d158587773';
 import {createXRangePicker} from './x-range-picker.mjs?v=normalization-range-1';
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
-const APP_BUILD = '12996535565f';
+const APP_BUILD = '7a1dad783ded';
 window.FigureAppRelease?.assertRunning({version:APP_VERSION,build:APP_BUILD});
 function makeProject(settings,data,fonts,workspace={}){
   const live=sourceData&&data.filename===sourceData.filename&&(data.bytes===sourceData.bytes||data.files&&data.files===sourceData.files);
@@ -456,7 +456,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=12996535565f", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=7a1dad783ded", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -1657,6 +1657,7 @@ function movePlotObjects(offsets,objects=plotObjects()) {
       const [x,y,w,h]=entry.box,series=entry.id==='legend'||entry.seriesIndex!=null;
       values[series?'legendX':'x']=Math.max(-10,Math.min(10,(x+w/2+dx-ax)/aw));
       values[series?'legendY':'y']=Math.max(-10,Math.min(10,1-(y+h/2+dy-ay)/ah));
+      if(entry.id==='legend')for(const key of ['legendX','legendY'])values[key]=String(values[key]);
     }else{
       const item=entry.item;
       for(const key of item.type==='text'?['x','y']:['x1','y1','x2','y2']){
