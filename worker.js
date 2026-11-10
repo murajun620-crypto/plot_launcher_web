@@ -1,8 +1,8 @@
-import { APP_VERSION, restoreSettings } from "./state.js?v=baaeeccc3ee1";
+import { APP_VERSION, restoreSettings } from "./state.js?v=db41dbe0ccaf";
 import { validateTableEdits } from './table-edits.mjs?v=27ae7675c457';
 // All user data stays in this worker's in-memory filesystem.
 const PYODIDE_VERSION = "0.29.3";
-const WORKER_BUILD = 'baaeeccc3ee1';
+const WORKER_BUILD = 'db41dbe0ccaf';
 const INDEX_URL = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
 let pyodide, dispatch, currentPath = "", uploadNumber = 0;
 let currentSources = [];
@@ -27,7 +27,7 @@ async function initialize() {
   await pyodide.runPythonAsync("import micropip\nawait micropip.install(['openpyxl==3.1.5', 'xlrd==2.0.2'])");
   progress("日本語フォントと描画設定を読み込んでいます…");
   const files = await Promise.all([
-    fetchAsset("./python/engine.py?v=27ae7675c457"), fetchAsset("./python/plot_utils.py"),
+    fetchAsset("./python/engine.py?v=db41dbe0ccaf"), fetchAsset("./python/plot_utils.py"),
     fetchAsset("./python/generic_xy_base.py"), fetchAsset("./assets/fonts/NotoSansJP.ttf", true),
     ...["Regular", "Bold", "Italic", "BoldItalic"].map(style => fetchAsset(`./assets/fonts/LiberationSans-${style}.ttf`, true)),
     fetchAsset("./python/annotation_model.py?v=61d158587773"), fetchAsset("./python/annotation_manager.py?v=61d158587773"),
@@ -45,6 +45,7 @@ async function initialize() {
   await Promise.all([...new Set([...catalog.map(preset => preset.script), "xps_csv.py", "desktop_defaults.py"])].map(async name => {
     pyodide.FS.writeFile(`/app/python/${name}`, await fetchAsset(`./python/${name}`));
   }));
+  pyodide.FS.writeFile("/app/python/spatial.py", await fetchAsset("./python/spatial.py?v=db41dbe0ccaf"));
   await pyodide.runPythonAsync("import sys\nsys.path.insert(0, '/app/python')\nfrom engine import PlotEngine\n_engine = PlotEngine('/app/python', '/app/NotoSansJP.ttf')\n_dispatch = _engine.dispatch");
   pyodide.globals.set("_report_file_progress",(text,completed,total)=>operationProgress(text,completed,total,'ファイル'));
   pyodide.runPython("_engine.progress_callback = _report_file_progress");

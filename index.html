@@ -5,11 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Excel・CSV・TXTの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
+  <link rel="stylesheet" href="./matrix-editor.css?v=db41dbe0ccaf">
   <link rel="stylesheet" href="./file-progress.css?v=file-open-1">
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
   <link rel="stylesheet" href="./style.css?v=baaeeccc3ee1">
   <link rel="stylesheet" href="./colors.css?v=unified-palette-1">
-  <script type="module" src="./release-loader.mjs?v=release-gate-1" data-release-app="plot" data-release-version="2.4.46" data-release-build="baaeeccc3ee1" data-release-entry="./app.js?v=baaeeccc3ee1"></script>
+  <script type="module" src="./release-loader.mjs?v=release-gate-1" data-release-app="plot" data-release-version="2.5.0" data-release-build="db41dbe0ccaf" data-release-entry="./app.js?v=db41dbe0ccaf"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -53,6 +54,7 @@
         <button id="add-data" class="button quiet" disabled hidden title="別のExcel / CSV / TXTを読み込み、現在のグラフへ系列を追加します。">ファイルを追加</button><input id="add-data-files" type="file" accept=".xlsx,.xlsm,.xls,.csv,.txt" multiple hidden>
         <button id="paste-data" class="button paste-data" disabled title="Excelでセル範囲をコピーし、Ctrl/Command＋Vで貼り付けます（Ctrl/Command＋Alt＋Vでこの画面を開く）">データを貼り付け</button>
         <div id="data-drop-area" class="data-drop-area" role="region" aria-label="データファイルのドロップ先" aria-disabled="true">ここにデータをドロップ</div>
+        <button id="matrix-analysis" class="button quiet" disabled>マップ・ヒストグラムを作る</button>
         <button id="sample-data" class="sample-button" disabled>サンプルを使う</button>
         <div id="file-summary" class="file-summary" hidden>
           <svg><use href="#i-file"/></svg><div><button id="file-name" type="button" class="data-filename" title="データ表を開いて編集・CSV保存"></button><span id="file-stats"></span></div><span id="sample-badge" class="badge" hidden>サンプル</span>
@@ -103,17 +105,15 @@
               <div class="axis-group-title">X軸<select id="x-scale" data-axis="xScale" aria-label="X軸の種類"><option value="linear">線形</option><option value="log">対数</option></select></div>
               <label title="両端をデータ範囲に合わせます。誤差棒・近似線を含み、オンで最小・最大の指定を解除します。その後の手動指定は優先します。"><input type="checkbox" data-axis="xFitData">データ範囲にフィット</label>
               <label class="log-format-field" data-log-format-for="x" hidden>目盛りの表記<select id="x-log-format" data-axis="xLogFormat" aria-label="X軸の対数目盛り表記"><option value="power">累乗（10ⁿ）</option><option value="decimal">数値（0.1、1、10）</option></select></label>
-              <div class="field-grid three"><label>最小<input id="x-min" data-axis="xMin" type="number" step="any" placeholder="自動"></label><label>最大<input id="x-max" data-axis="xMax" type="number" step="any" placeholder="自動"></label><label>主目盛り間隔<input id="x-step" data-axis="xStep" type="number" step="any" placeholder="自動"></label></div>
-              <div class="check-options axis-tick-auto"><label title="チェックすると手動の間隔を解除して自動に戻します。数値欄への入力でも手動に切り替わります。"><input type="checkbox" data-axis-auto="ticks" data-axis-name="x" aria-label="X軸の主目盛りを自動設定" checked>主目盛りを自動</label><label><input type="checkbox" data-axis-auto="minor" data-axis-name="x" aria-label="X軸の副目盛りを自動設定" checked>副目盛りを自動</label></div>
-              <label class="minor-step-field" title="空欄は自動分割。線形軸の副目盛り間隔を指定します。対数軸は自動で配置します。">副目盛り間隔<input id="x-minor-step" data-axis="xMinorStep" type="number" step="any" placeholder="自動"></label><div id="x-tick-appearance"></div>
+              <div class="field-grid three"><label>最小<input id="x-min" data-axis="xMin" type="number" step="any" placeholder="Auto"></label><label>最大<input id="x-max" data-axis="xMax" type="number" step="any" placeholder="Auto"></label><label>主目盛り間隔<input id="x-step" data-axis="xStep" type="number" step="any" placeholder="Auto"></label></div>
+              <label class="minor-step-field" title="空欄は自動分割。線形軸の副目盛り間隔を指定します。対数軸は自動で配置します。">副目盛り間隔<input id="x-minor-step" data-axis="xMinorStep" type="number" step="any" placeholder="Auto"></label><div id="x-tick-appearance"></div>
             </details>
             <details class="axis-group settings-panel"><summary><span>Y軸の範囲・目盛り</span><output id="y-settings-summary" class="settings-summary"></output></summary>
               <div class="axis-group-title">Y軸<select id="y-scale" data-axis="yScale" aria-label="Y軸の種類"><option value="linear">線形</option><option value="log">対数</option></select></div>
               <label title="線形軸は下端を0（負の値がある場合は最小値）に合わせ、上端にデータ幅の5%の余裕を付けます。対数軸は正のデータ範囲と対数幅を使います。誤差棒・近似線を含み、オンで最小・最大の指定を解除します。その後の手動指定は優先します。"><input type="checkbox" data-axis="yFitData">データ範囲にフィット</label>
               <label class="log-format-field" data-log-format-for="y" hidden>目盛りの表記<select id="y-log-format" data-axis="yLogFormat" aria-label="Y軸の対数目盛り表記"><option value="power">累乗（10ⁿ）</option><option value="decimal">数値（0.1、1、10）</option></select></label>
-              <div class="field-grid three"><label>最小<input id="y-min" data-axis="yMin" type="number" step="any" placeholder="自動"></label><label>最大<input id="y-max" data-axis="yMax" type="number" step="any" placeholder="自動"></label><label>主目盛り間隔<input id="y-step" data-axis="yStep" type="number" step="any" placeholder="自動"></label></div>
-              <div class="check-options axis-tick-auto"><label title="チェックすると手動の間隔を解除して自動に戻します。数値欄への入力でも手動に切り替わります。"><input type="checkbox" data-axis-auto="ticks" data-axis-name="y" aria-label="Y軸の主目盛りを自動設定" checked>主目盛りを自動</label><label><input type="checkbox" data-axis-auto="minor" data-axis-name="y" aria-label="Y軸の副目盛りを自動設定" checked>副目盛りを自動</label></div>
-              <label class="minor-step-field" title="空欄は自動分割。線形軸の副目盛り間隔を指定します。対数軸は自動で配置します。">副目盛り間隔<input id="y-minor-step" data-axis="yMinorStep" type="number" step="any" placeholder="自動"></label><div id="y-tick-appearance"></div>
+              <div class="field-grid three"><label>最小<input id="y-min" data-axis="yMin" type="number" step="any" placeholder="Auto"></label><label>最大<input id="y-max" data-axis="yMax" type="number" step="any" placeholder="Auto"></label><label>主目盛り間隔<input id="y-step" data-axis="yStep" type="number" step="any" placeholder="Auto"></label></div>
+              <label class="minor-step-field" title="空欄は自動分割。線形軸の副目盛り間隔を指定します。対数軸は自動で配置します。">副目盛り間隔<input id="y-minor-step" data-axis="yMinorStep" type="number" step="any" placeholder="Auto"></label><div id="y-tick-appearance"></div>
             </details>
             <div id="right-axis-controls" hidden>
               <div class="axis-group-title">右Y軸</div>
@@ -123,9 +123,8 @@
                 <div class="axis-group-title">右Y軸の種類<select id="y2-scale" data-axis="y2Scale" aria-label="右Y軸の種類"><option value="linear">線形</option><option value="log">対数</option></select></div>
                 <label title="線形軸は下端を0（負の値がある場合は最小値）に合わせ、上端にデータ幅の5%の余裕を付けます。対数軸は正のデータ範囲と対数幅を使います。誤差棒・近似線を含み、オンで最小・最大の指定を解除します。その後の手動指定は優先します。"><input type="checkbox" data-axis="y2FitData">データ範囲にフィット</label>
                 <label class="log-format-field" data-log-format-for="y2" hidden>目盛りの表記<select data-axis="y2LogFormat" aria-label="右Y軸の対数目盛り表記"><option value="power">累乗（10ⁿ）</option><option value="decimal">数値（0.1、1、10）</option></select></label>
-                <div class="field-grid three"><label>最小<input id="y2-min" data-axis="y2Min" type="number" step="any" placeholder="自動"></label><label>最大<input id="y2-max" data-axis="y2Max" type="number" step="any" placeholder="自動"></label><label>主目盛り間隔<input id="y2-step" data-axis="y2Step" type="number" step="any" placeholder="自動"></label></div>
-                <div class="check-options axis-tick-auto"><label title="手動の間隔を解除して自動に戻します。"><input type="checkbox" data-axis-auto="ticks" data-axis-name="y2" aria-label="右Y軸の主目盛りを自動設定" checked>主目盛りを自動</label><label><input type="checkbox" data-axis-auto="minor" data-axis-name="y2" aria-label="右Y軸の副目盛りを自動設定" checked>副目盛りを自動</label></div>
-                <label class="minor-step-field">副目盛り間隔<input id="y2-minor-step" data-axis="y2MinorStep" type="number" step="any" placeholder="自動"></label><div id="y2-tick-appearance"></div>
+                <div class="field-grid three"><label>最小<input id="y2-min" data-axis="y2Min" type="number" step="any" placeholder="Auto"></label><label>最大<input id="y2-max" data-axis="y2Max" type="number" step="any" placeholder="Auto"></label><label>主目盛り間隔<input id="y2-step" data-axis="y2Step" type="number" step="any" placeholder="Auto"></label></div>
+                <label class="minor-step-field">副目盛り間隔<input id="y2-minor-step" data-axis="y2MinorStep" type="number" step="any" placeholder="Auto"></label><div id="y2-tick-appearance"></div>
               </details>
               <details><summary>右Y軸の表示・余白</summary><div class="axis-switch-grid right-axis-visibility"><label><input data-axis="hideY2Label" data-invert="true" type="checkbox">ラベルを表示</label><label><input data-axis="hideY2TickLabels" data-invert="true" type="checkbox">目盛り数値を表示</label><label><input data-axis="hideY2Ticks" data-invert="true" type="checkbox">目盛り線を表示</label><label><input data-axis="hideY2MinorTicks" data-invert="true" type="checkbox">副目盛線を表示</label></div><div class="field-grid"><label title="0は標準の余白（2 pt）。正の値で広く、負の値で狭くします。">ラベル追加余白 (pt)<input data-axis="y2LabelPad" type="number" min="-102" max="98" step="0.1" value="0"></label><label>目盛り追加余白 (pt)<input data-axis="y2TickPad" type="number" min="-100" max="100" step="0.1" value="0"></label></div></details>
             </div>
@@ -192,6 +191,7 @@
       <section id="series-table-panel" class="series-table-panel" aria-labelledby="series-table-title" hidden>
         <div class="series-table-heading"><h2 id="series-table-title">系列表</h2><output id="series-table-summary" aria-live="polite"></output><button id="toggle-series-table" type="button" class="button quiet" aria-label="系列表を閉じる" aria-expanded="true" aria-controls="series-table-content" title="系列表を開閉します。">−</button></div>
         <div id="series-table-content">
+          <section id="matrix-statistics" class="matrix-statistics" hidden></section>
           <div class="series-table-toolbar"><label class="check" title="オフセット、線種、マーカー、誤差列などを表示します。横スクロールで確認できます。"><input id="series-table-details" type="checkbox">詳細列を表示</label></div>
           <div class="table-scroll series-table-scroll" tabindex="0" role="region" aria-label="系列の表（横・縦にスクロールできます）"><table id="series-table" data-details="false" aria-label="系列の設定一覧"><thead id="series-table-head"></thead><tbody id="series-table-body"></tbody></table></div>
         </div>
@@ -333,6 +333,27 @@
     <div class="dialog-heading"><strong id="update-title">アプリの更新</strong><button id="close-update" type="button" class="button quiet">閉じる</button></div>
     <p id="update-message" class="preset-message" role="status" aria-live="polite"></p>
     <div class="update-actions"><button id="apply-update" type="button" class="button primary" hidden>更新して再開</button><button id="recheck-update" type="button" class="button">再確認</button><button id="retry-update-restore" type="button" class="button" hidden>復元を再試行</button><button id="download-update-backup" type="button" class="button" hidden>プロジェクトを取り出す</button></div>
+  </dialog>
+  <dialog id="matrix-editor" aria-labelledby="matrix-editor-title">
+    <form>
+      <div class="dialog-heading"><strong id="matrix-editor-title">分布マップ・ヒストグラム</strong><button type="button" class="button quiet" data-matrix-close>閉じる</button></div>
+      <div class="field-grid"><label>図の種類<select name="kind"><option value="Surface Map">位置マップ</option><option value="Surface Histogram">比較ヒストグラム</option></select></label><label>分布データのセル範囲<input name="range" value="A1:S19" required placeholder="A1:S19"></label></div>
+      <p class="field-note">セルの配置を測定位置として読みます。空欄は欠測として扱い、既存の度数・累積表は使用しません。</p>
+      <div class="matrix-section"><h3>対象のシート</h3><div class="matrix-toolbar"><p data-matrix-summary></p><button type="button" class="button quiet" data-matrix-all>すべて</button><button type="button" class="button quiet" data-matrix-none>解除</button></div><div class="matrix-sheets" data-matrix-sheets></div><label data-matrix-map>表示するシート<select name="activeSheet"></select></label></div>
+      <div class="field-grid"><label>値のラベル<input name="valueLabel" value="Surface roughness, Sa" maxlength="200"></label><label>値の単位<input name="valueUnit" value="nm" maxlength="200"></label></div>
+      <section class="matrix-section" data-matrix-map><h3>マップの表示</h3>
+        <div class="field-grid"><label>配色<select name="palette"><option value="turbo">Turbo</option><option value="viridis">Viridis</option><option value="plasma">Plasma</option><option value="jet">Jet</option><option value="cividis">Cividis</option><option value="gray">グレー</option></select></label><label>表示方法<select name="mapStyle"><option value="points">測定点</option><option value="cells">セル</option></select></label><label>配色の最小<input name="colorMin" type="number" step="any" placeholder="Auto"></label><label>配色の最大<input name="colorMax" type="number" step="any" placeholder="Auto"></label></div>
+        <p class="field-note">Autoは選択シートで共通の配色範囲です。値を指定すると範囲外は端の色になります。</p>
+        <details class="settings-panel"><summary>座標・点・カラーバー</summary><div class="field-grid"><label>X間隔 (mm)<input name="pitchX" type="number" min="0.000000000001" step="any" value="5" required></label><label>Y間隔 (mm)<input name="pitchY" type="number" min="0.000000000001" step="any" value="5" required></label><label>中心X (mm)<input name="originX" type="number" step="any" value="0" required></label><label>中心Y (mm)<input name="originY" type="number" step="any" value="0" required></label><label>点面積 (pt²)<input name="markerSize" type="number" min="0.1" max="1000" step="0.1" value="18" required></label><label>点の縁幅 (pt)<input name="edgeWidth" type="number" min="0" max="10" step="0.05" value="0.25" required></label><label>点の縁色<input name="edgeColor" value="none" maxlength="10" placeholder="none / #色"></label></div><div class="check-options"><label><input name="equalAspect" type="checkbox" checked>XYを等縮尺</label><label><input name="colorbar" type="checkbox" checked>カラーバーを表示</label></div><p class="field-note">左から右へX増加、上から下へY減少。範囲の中央を中心座標に合わせます。</p></details>
+      </section>
+      <section class="matrix-section" data-matrix-hist><h3>ヒストグラムの表示</h3>
+        <div class="field-grid"><label>棒の表示<select name="histStyle"><option value="overlay">重ねる</option><option value="grouped">横に並べる</option><option value="step">輪郭線</option></select></label><label>棒の不透明度<input name="histAlpha" type="range" min="0" max="1" step="0.01" value="0.55"></label><label>ビン幅<input name="binWidth" type="number" min="0.000000000000001" step="any" placeholder="Auto"></label><label>ビン数<input name="binCount" type="number" min="1" max="500" step="1" placeholder="Auto"></label></div>
+        <p class="field-note">全シートに共通のビンを使用します。ビン幅・ビン数は片方のみ指定。両方空欄でAutoです。</p>
+        <label><input name="cumulative" type="checkbox" checked>右軸に累積率（%）を表示</label>
+        <details class="settings-panel"><summary>集計範囲・系列の色と名前</summary><div class="field-grid"><label>集計の最小<input name="binMin" type="number" step="any" placeholder="Auto"></label><label>集計の最大<input name="binMax" type="number" step="any" placeholder="Auto"></label></div><p class="field-note">範囲外の点数も表示します。累積率の分母は欠測を除いた全測定点です。</p><div class="matrix-series-styles" data-matrix-styles></div></details>
+      </section>
+      <p data-matrix-error class="error-text" role="alert" hidden></p><div class="matrix-apply-actions"><button type="button" class="button" data-matrix-close>キャンセル</button><button type="submit" class="button primary">グラフを作成</button></div>
+    </form>
   </dialog>
   <noscript>このアプリを使用するにはJavaScriptを有効にしてください。</noscript>
 </body>

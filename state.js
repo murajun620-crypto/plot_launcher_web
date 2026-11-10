@@ -1,6 +1,7 @@
+import {validateMatrixOptions} from './matrix-model.mjs?v=db41dbe0ccaf';
 import { resetPresetUnitScales, unitConversion, configureAFMUnits } from "./units.js?v=9127ec4c4f31";
 import { validateTableEdits } from './table-edits.mjs?v=27ae7675c457';
-export const APP_VERSION = '2.4.46';
+export const APP_VERSION = '2.5.0';
 
 // Accept one numeric value or fraction without evaluating JavaScript expressions.
 export function parseCoefficient(value) {
@@ -40,7 +41,7 @@ export const COLOR_PALETTE = {
     black:["#E6E6E6","#D5D5D5","#C4C4C4","#B3B3B3","#A2A2A2","#8F8F8F","#7C7C7C","#666666","#4A4A4A","#2A2A2A"],
   };
 
-export const PLOT_TYPES = ["CV/LSV", "CA", "CP", "EDX", "XPS Survey", "XPS Core", "XPS Fit", "XAFS", "Raman Spectrum", "AFM Section", "Particle Histogram", "General", "Roughness", "bar_graph_general", "Raman 3D", "Polishing Rate", "Waviness"];
+export const PLOT_TYPES = ["CV/LSV", "CA", "CP", "EDX", "XPS Survey", "XPS Core", "XPS Fit", "XAFS", "Raman Spectrum", "AFM Section", "Particle Histogram", "General", "Roughness", "bar_graph_general", "Raman 3D", "Polishing Rate", "Waviness", "Surface Map", "Surface Histogram"];
 
 export function applyPreset(config, preset, metadata) {
   resetPresetUnitScales(config, metadata);
@@ -297,6 +298,7 @@ export function restoreSettings(document, metadata) {
   const plotType = document.plotType || "General";
   if (!PLOT_TYPES.includes(plotType)) throw new Error("設定JSONのプロット種別を確認してください。");
   const restored = { axes, series, plotType, options: structuredClone(document.options || {}) };
+  if(restored.options.matrix!==undefined)restored.options.matrix=validateMatrixOptions(restored.options.matrix);
   if(restored.options.colormapRange!==undefined){
     const range=restored.options.colormapRange;
     if(!range || Array.isArray(range) || typeof range!=='object' || !['viridis','plasma','spectrum'].includes(range.name) || !['both','line','scatter'].includes(range.target) || [range.start,range.end].some(value=>typeof value!=='number' || !Number.isFinite(value) || value<0 || value>1) || range.start>range.end)throw new Error('配色の範囲を確認してください。');

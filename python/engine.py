@@ -546,6 +546,8 @@ class PlotEngine:
         self.infer_plot_type = infer_plot_type_from_filename
         self.gradient_colors = gradient_colors_from_name
         self.frame = None
+        self.matrix_sources = []
+        self.matrix_cache = {}
         self.figure = None
         self.filename = ""
         self.sheet_name = ""
@@ -645,6 +647,8 @@ class PlotEngine:
             self.column_labels = dict(zip(frame.columns, frame.columns))
             info = self._refresh_table_info(info)
         self.table_info = info
+        self.matrix_sources = [{"path":path,"filename":filename}]
+        self.matrix_cache = {}
         self.table_parts = [{'sourceIndex': source_index, 'sheetIndex': info['sheetIndex'], 'headerRow': info['headerRow'], 'rowCount': len(frame), 'columnCount': len(frame.columns), 'columns': list(frame.columns), 'offset': 0, 'filename': filename}]
         return info
 
@@ -682,6 +686,8 @@ class PlotEngine:
             rows = [[None if pd.isna(value) else str(value)[:140] for value in row] for row in frame.head(8).itertuples(index=False, name=None)]
             info = {"filename":filename, "sheets":["重ね描き"], "sheetIndex":0, "headerRow":1, "columns":columns, "rowCount":len(frame), "rows":rows, "plotType":"General", "groups":groups, "sources":source_info}
             self.table_info, self.table_parts, self.table_edits = info, parts, table_edits or []
+            self.matrix_sources = list(sources)
+            self.matrix_cache = {}
             return info
         except Exception:
             self.__dict__.clear(); self.__dict__.update(previous)
@@ -1658,6 +1664,9 @@ class PlotEngine:
     @micro_text_rendering()
     def render(self, config):
         preset = config.get("plotType", "General")
+        if preset in {"Surface Map", "Surface Histogram"}:
+            from spatial import render_matrix
+            return render_matrix(self, config)
         settings = config.get("axes", {})
         grid_styles = {"major": grid_style(settings), "minor": grid_style(settings, minor=True)}
         original_series = config.get("series", [])
@@ -2194,7 +2203,10 @@ class PlotEngine:
 
     def dispatch(self, operation, payload):
         args = json.loads(payload)
-        if operation == "sheet-list":
+        if operation == "matrix-info":
+            from spatial import matrix_info
+            result = matrix_info(self)
+        elif operation == "sheet-list":
             suffix = Path(args["filename"]).suffix.lower()
             with pd.ExcelFile(args["path"], engine="xlrd" if suffix == ".xls" else "openpyxl") as book:
                 names = book.sheet_names

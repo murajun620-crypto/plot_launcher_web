@@ -1,3 +1,5 @@
+import {createMatrixEditor} from './matrix-editor.mjs?v=db41dbe0ccaf';
+import {isMatrixPlot} from './matrix-model.mjs?v=db41dbe0ccaf';
 import {createFileProgress} from './file-progress.mjs?v=file-open-1';
 import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=source-save-v0717-1';
 import {setupDirectSendButton,getFigureWorkspace} from './direct-transfer.mjs?v=baaeeccc3ee1';
@@ -5,9 +7,9 @@ import {identifyPlotProject,plotSheetIndex,mergePlotCheckpoint,samePlotCheckpoin
 import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=9127ec4c4f31";
 import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=9127ec4c4f31";
 import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9127ec4c4f31";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=27ae7675c457";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=27ae7675c457";
-import { APP_VERSION, COLORS, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=baaeeccc3ee1";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=db41dbe0ccaf";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=db41dbe0ccaf";
+import { APP_VERSION, COLORS, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=db41dbe0ccaf";
 
 import {alignmentOffsets} from './object-layout.mjs?v=27ae7675c457';
 import {createDataEditor} from './data-editor.mjs?v=27ae7675c457';
@@ -20,7 +22,7 @@ import {createXRangePicker} from './x-range-picker.mjs?v=normalization-range-1';
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 const fileProgress=createFileProgress();
-const APP_BUILD = 'baaeeccc3ee1';
+const APP_BUILD = 'db41dbe0ccaf';
 window.FigureAppRelease?.assertRunning({version:APP_VERSION,build:APP_BUILD});
 function makeProject(settings,data,fonts,workspace={}){
   const live=sourceData&&data.filename===sourceData.filename&&(data.bytes===sourceData.bytes||data.files&&data.files===sourceData.files);
@@ -99,7 +101,7 @@ const axisSetting = key => config.axes[key] ?? (['xGrid','yGrid'].includes(key) 
 const fontPointBase = key => ({fontScale:8,tickFontScale:7,labelFontScale:8,legendFontScale:7})[key] * (key === 'fontScale' ? 1 : Number(config.axes.fontScale));
 const axisControlValue = (key, value) => isAxisSize(key) ? scaleAxisSize(value, 10) : isLabelPadding(key) ? Number((Number(value) - LABEL_PADDING_BASE).toPrecision(12)) : key === 'spineScale' ? Number((Number(value) * .8).toPrecision(12)) : /^(fontScale|tickFontScale|labelFontScale|legendFontScale)$/.test(key) ? Number((Number(value)*fontPointBase(key)).toPrecision(12)) : value;
 const axisConfigValue = (key, value) => isAxisSize(key) ? scaleAxisSize(value, .1) : isLabelPadding(key) ? Number((Number(value) + LABEL_PADDING_BASE).toPrecision(12)) : key === 'spineScale' ? Number((Number(value) / .8).toPrecision(12)) : /^(fontScale|tickFontScale|labelFontScale|legendFontScale)$/.test(key) ? Number((Number(value)/fontPointBase(key)).toPrecision(12)) : value;
-const editableXY = type => !['XPS Fit','Particle Histogram','bar_graph_general','Raman 3D'].includes(type);
+const editableXY = type => !['XPS Fit','Particle Histogram','bar_graph_general','Raman 3D','Surface Map','Surface Histogram'].includes(type);
 const seriesControlValue = (key,value) => key==='trendFontSize' ? Number((Number(value || 6)*Number(config.axes.fontScale)).toPrecision(12)) : value;
 const SERIES_APPEARANCE_FIELDS = ['mode','lineWidth','markerSize','lineInterpolation','lineStyle','marker','lineAlpha','scatterColor','markerEdgeColor','markerFaceColor','markerEdgeAlpha','markerFaceAlpha'];
 const PROCESSING_FIELDS = ['xFactor','yFactor','xOffset','yOffset','detrend','detrendMin','detrendMax','detrendSlope','density','currentUnit','area','areaUnit','normalization','referenceMode','referencePoint','referenceMin','referenceMax','referenceValue'];
@@ -363,6 +365,7 @@ function updateButtons() {
   $("#drop-zone").disabled = !engineReady || busy;
   $("#data-drop-area").setAttribute("aria-disabled", String(!engineReady || busy));
   $("#sample-data").disabled = !engineReady || busy;
+  $("#matrix-analysis").disabled=!engineReady||busy||!metadata||!!metadata.sources||!(/\.(xlsx|xlsm|xls)$/i.test(metadata.filename));
   $$('#sample-list button,#sample-groups button').forEach(button=>button.disabled=busy||pendingSampleId!==null);
   $('#file-name').disabled=!engineReady || busy || !metadata;
   $('#add-data').hidden=!sourceData;
@@ -388,14 +391,14 @@ function updateButtons() {
     $(`#sheet-mode-${mode}`).checked = sheetMode === mode;
     $(`#sheet-mode-${mode}`).disabled = !engineReady || busy || !multipleSheets;
   }
-  $('#sheet-navigation').hidden = $('#open-save-all').hidden = $('#save-all-sheets-field').hidden = !multipleSheets;
+  $('#sheet-navigation').hidden = $('#open-save-all').hidden = $('#save-all-sheets-field').hidden = !multipleSheets||config.plotType==='Surface Histogram';
   const batchLabel=sheetIndices.length<(metadata?.sheets.length??0)?'選択したシートを一括保存':'全シートを一括保存';
   $('#open-save-all').textContent=$('#save-all-sheets-label').textContent=batchLabel;
   $('#previous-sheet').disabled = !engineReady || busy || !multipleSheets || sheetPosition <= 0;
   $('#next-sheet').disabled = !engineReady || busy || !multipleSheets || sheetPosition >= sheetIndices.length - 1;
   $('#open-save-all').disabled = !engineReady || busy || !multipleSheets || renderRunning;
   $('#save-all-sheets').disabled = busy || !multipleSheets;
-  if (!multipleSheets) $('#save-all-sheets').checked = false;
+  if (!multipleSheets||config.plotType==='Surface Histogram') $('#save-all-sheets').checked = false;
   if (metadata) {
     $('#preview-sheet-name').textContent = `${sheetPosition + 1} / ${sheetIndices.length} · ${metadata.sheets[metadata.sheetIndex]}`;
     $('#preview-sheet-name').title = metadata.sheets[metadata.sheetIndex];
@@ -417,7 +420,7 @@ function updateButtons() {
   $("#confirm-save").disabled = !canSave;
   for (const id of ["#save-name", "#png-dpi", "#save-destination", "#choose-save-folder", "#close-save"]) $(id).disabled = busy;
   $("#copy-image").disabled = !engineReady || busy || renderedRevision !== revision || renderRunning;
-  $('#edit-all-series').hidden = !editableXY(config.plotType || 'General');
+  $('#edit-all-series').hidden = !editableXY(config.plotType || 'General') || isMatrixPlot(config.plotType);
   $('#restore-legend-items').hidden=!hasHiddenLegendItems();
   $$('#element-editor-fields [data-restore-legend-items]').forEach(button=>button.hidden=!hasHiddenLegendItems());
   $('#restore-legend-items').disabled=busy || !metadata;
@@ -460,7 +463,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=baaeeccc3ee1", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=db41dbe0ccaf", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") {
       if(data.id)requests.get(data.id)?.progressTask?.stage(data.text,{completed:data.completed,total:data.total,unit:data.unit||''});
@@ -507,7 +510,7 @@ function choiceOptions(choices, selected) {
 }
 
 function enhanceColorInputs() {
-  for (const input of $$('input[type="color"],input[data-axis$="Color"],input[data-series-field$="Color"],input[data-option$="Color"],input[data-legend-field="textColor"]')) {
+  for (const input of $$('input[type="color"],input[data-axis$="Color"],input[data-series-field$="Color"],input[data-option$="Color"],input[data-legend-field="textColor"],#matrix-editor input[name="edgeColor"]')) {
     if (input.closest('#color-panel') || input.dataset.paletteEnhanced) continue;
     input.dataset.paletteEnhanced = 'true';
     const title = input.getAttribute('aria-label') || input.closest('label')?.childNodes[0]?.textContent?.trim() || '色';
@@ -560,7 +563,7 @@ function chooseColor(value) {
   if (!colorTarget?.isConnected || colorTarget.matches(':disabled') || loading || exporting) {colorPanel.close();return;}
   if (!/^#[0-9a-f]{6}$/i.test(value) && !(colorTarget.type!=='color'&&['none','auto'].includes(value))) return;
   colorTarget.value=value;
-  applyControlInput({target:colorTarget});
+  if(colorTarget.closest('#matrix-editor'))colorTarget.dispatchEvent(new Event('change',{bubbles:true}));else applyControlInput({target:colorTarget});
   syncColorIcons();
 }
 enhanceColorInputs();
@@ -592,15 +595,12 @@ function openAxisEditor(axis, kind) {
       `<div class="field-grid">${label(`${axis}LabelPad`,'ラベル追加余白 (pt)','number',`min="${-100-LABEL_PADDING_BASE}" max="${100-LABEL_PADDING_BASE}" step="0.1"`)}${label('labelFontScale','フォントサイズ (pt)','number',`min="${axisControlValue('labelFontScale',.2)}" max="${axisControlValue('labelFontScale',3)}" step="0.1"`)}</div>` +
       `<button type="button" class="button quiet" data-reset-label>標準位置に戻す</button>`;
   } else {
-    const automatic = config.axes[`${axis}Min`] === '' && config.axes[`${axis}Max`] === '';
     html = `<div class="field-grid"><label>軸の種類<select data-axis="${axis}Scale">${choiceOptions([['linear','線形'],['log','対数']],config.axes[`${axis}Scale`])}</select></label>${label('tickFontScale','フォントサイズ (pt)','number',`min="${axisControlValue('tickFontScale',.2)}" max="${axisControlValue('tickFontScale',3)}" step="0.1"`)}</div>` + tickLineControls(axis) +
       `<details class="settings-panel"><summary>範囲・目盛り間隔</summary><label class="log-format-field" data-log-format-for="${axis}">目盛りの表記<select data-axis="${axis}LogFormat" aria-label="${axisName(axis)}軸の対数目盛り表記">${choiceOptions([['power','累乗（10ⁿ）'],['decimal','数値（0.1、1、10）']],config.axes[`${axis}LogFormat`])}</select></label>` +
-      `<label><input type="checkbox" data-axis-auto="range" ${automatic?'checked':''}>範囲を自動設定</label><div class="field-grid">${label(`${axis}Min`,'最小','number','step="any" placeholder="自動"')}${label(`${axis}Max`,'最大','number','step="any" placeholder="自動"')}</div>` +
+      `<p class="field-note">空欄はAuto。数値を入力すると、その値を使用します。</p><div class="field-grid">${label(`${axis}Min`,'最小','number','step="any" placeholder="Auto"')}${label(`${axis}Max`,'最大','number','step="any" placeholder="Auto"')}</div>` +
       `<label title="${axis==='x'?'両端をデータ範囲に合わせます。':'線形軸は下端を0（負の値がある場合は最小値）に合わせ、上端にデータ幅の5%の余裕を付けます。対数軸は正のデータ範囲と対数幅を使います。'}誤差棒・近似線を含みます。オンで最小・最大の指定を解除し、その後の手動指定は優先します。"><input type="checkbox" data-axis="${axis}FitData" ${config.axes[`${axis}FitData`]?'checked':''}>データ範囲にフィット</label>` +
-      `<label><input type="checkbox" data-axis-auto="ticks" data-axis-name="${axis}">主目盛りを自動設定</label>` +
-      label(`${axis}Step`,'主目盛り間隔','number','step="any" placeholder="自動"') +
-      `<label><input type="checkbox" data-axis-auto="minor" data-axis-name="${axis}">副目盛りを自動設定</label>` +
-      label(`${axis}MinorStep`,'副目盛り間隔','number','step="any" placeholder="自動"') + '</details>' +
+      label(`${axis}Step`,'主目盛り間隔','number','step="any" placeholder="Auto"') +
+      label(`${axis}MinorStep`,'副目盛り間隔','number','step="any" placeholder="Auto"') + '</details>' +
       `<details class="settings-panel"><summary>表示・色・余白</summary>` +
       `<label><input type="checkbox" data-axis="hide${axis === 'x' ? 'X' : axis === 'y2' ? 'Y2' : 'Y'}MinorTicks" data-invert="true" ${config.axes[`hide${axis === 'x' ? 'X' : axis === 'y2' ? 'Y2' : 'Y'}MinorTicks`]?'':'checked'}>副目盛線を表示</label>` +
       label(`${axis}TickPad`,'目盛り追加余白 (pt)','number','min="-100" max="100" step="0.1"');
@@ -613,14 +613,6 @@ function openAxisEditor(axis, kind) {
   syncAxisEditor(); syncUnitControls(); enhanceColorInputs(); showDialog('#axis-editor');
 }
 function syncAxisEditor() {
-  const fields = $('#axis-editor-fields'), axis = fields.dataset.axisName;
-  for (const [mode,keys] of [['range',['Min','Max']],['ticks',['Step']],['minor',['MinorStep']]]) {
-    const checkbox = fields.querySelector(`[data-axis-auto="${mode}"]`); if (!checkbox) continue;
-    for (const key of keys) {
-      const field = fields.querySelector(`[data-axis="${axis}${key}"]`);
-      field.disabled = (checkbox.checked && field !== document.activeElement) || (mode !== 'range' && config.axes[`${axis}Scale`] === 'log');
-    }
-  }
   syncAxisAutomaticControls();
 }
 function syncAxisAutomaticControls() {
@@ -638,7 +630,7 @@ function syncAxisAutomaticControls() {
   }
   for (const axis of ['x','y','y2']) for (const key of ['Step','MinorStep']) {
     $$(`[data-axis="${axis}${key}"]`).forEach(input => {
-      input.disabled = config.axes[`${axis}Scale`] === 'log' || (!!input.closest('#axis-editor-fields') && config.axes[`${axis}${key}`] === '' && input !== document.activeElement);
+      input.disabled = config.axes[`${axis}Scale`] === 'log';
     });
   }
 }
@@ -708,6 +700,7 @@ function drawPresetOptions() {
     html+=(options.fills || []).map((fill,index)=>`<details data-fill-index="${index}"><summary>成分 ${index+1}</summary><div class="field-grid">${[['x','X'],['upper','成分Y'],['lower','背景Y']].map(([key,label])=>`<label>${label}<select data-fill="${key}" ${metadata.xpsCSV?'disabled':''}>${columnOptions(fill[key])}</select></label>`).join('')}<label>色<input type="color" data-fill="color" value="${escapeHTML(fill.color)}"></label>${opacityControl('data-fill="alpha"','不透明度',fill.alpha ?? .3)}</div><button type="button" class="button quiet" data-remove-fill="${index}" ${metadata.xpsCSV?'disabled':''}>成分を削除</button></details>`).join('');
     if(!metadata.xpsCSV) html+='<button type="button" class="button quiet" id="add-fill">成分を追加</button>';
   }
+  if(isMatrixPlot(type))html=`<p class="field-note">${type==='Surface Map'?'各シートの測定点を同じ配色範囲で表示します。':'選択シートの生データから共通のビンと累積率を計算します。'}</p><button type="button" class="button" data-matrix-open>データ範囲・描画設定</button><p>軸・凡例はプレビューのダブルクリックで変更できます。</p>`;
   $("#preset-options").innerHTML=html;
   syncOpacityControls();
   enhanceColorInputs();
@@ -715,7 +708,40 @@ function drawPresetOptions() {
   document.querySelector('#axes-title').textContent=presets.find(preset=>preset.id===type)?.label || type;
 }
 
+const matrixEditor=createMatrixEditor({root:$('#matrix-editor'),request,getMetadata:()=>metadata,getConfig:()=>config,enhanceColors:enhanceColorInputs,showDialog:()=>showDialog('#matrix-editor'),onApply:async({kind,options,series,activeSheet})=>{
+  const previous=structuredClone(config);
+  if(kind==='Surface Map'&&activeSheet!==metadata.sheetIndex){
+    sourceData={...sourceData,selectedSheets:[...new Set([...selectedSheetIndices(),activeSheet])].sort((a,b)=>a-b)};
+    if(!await changeSheet(activeSheet))throw Error('表示するシートを開けませんでした。');
+  }
+  const same=previous.plotType===kind;
+  const axes=same?previous.axes:defaultAxes();
+  if(!same)Object.assign(axes,{width:kind==='Surface Map'?5:6,height:kind==='Surface Map'?5:4,legend:kind==='Surface Histogram',xGrid:kind==='Surface Map',yGrid:kind==='Surface Map'});
+  const columns=metadata.columns,x=columns[0]?.index??0,y=columns[1]?.index??x;
+  config={axes,plotType:kind,options:{...previous.options,matrix:options},annotations:previous.annotations||[],series:series.map((item,i)=>({...createSeries(x,y,item.name,i),color:item.color,mode:'line',trendType:'none',errorMode:'none'}))};
+  if(kind==='Surface Map'){
+    if(!same)Object.assign(axes,{xLabel:'X Position',xUnit:'mm',yLabel:'Y Position',yUnit:'mm'});
+    sourceData={...sourceData,selectedSheets:[...options.sheets].sort((a,b)=>a-b)};
+  }else {Object.assign(axes,{xLabel:options.valueLabel,yLabel:'Frequency',yUnit:'',y2Label:'Cumulative undersize',y2Unit:'%'});if(!same||previous.options?.matrix?.valueUnit!==options.valueUnit)Object.assign(axes,{xUnit:options.valueUnit,xUnitScale:1});}
+  drawMetadata();drawControls();changed(0);
+}});
+async function openMatrixEditor(kind){if(loading||exporting||!metadata)return;status('分布データのセル範囲を確認しています…');try{await matrixEditor.show(kind);status('セル範囲と対象シートを選択してください。','ready');}catch(error){status(error.message,'error');}}
+$('#matrix-analysis').addEventListener('click',()=>openMatrixEditor());
+$('#series-list').addEventListener('click',event=>{if(event.target.closest('[data-matrix-edit-series]'))void openMatrixEditor();});
+$('#preset-options').addEventListener('click',event=>{if(event.target.closest('[data-matrix-open]'))openMatrixEditor();});
+function drawMatrixStatistics(){
+ const panel=$('#matrix-statistics'),rows=isMatrixPlot(config.plotType)?figureResult?.matrixStatistics:null;
+ panel.hidden=!rows?.length;if(!rows?.length)return;
+ panel.innerHTML=`<p>${escapeHTML(config.options.matrix.range)} · ${escapeHTML(config.plotType==='Surface Histogram'?config.axes.xUnit:config.options.matrix.valueUnit)} · 空欄は集計から除外</p><table><thead><tr><th>シート／系列</th><th>点数</th><th>最小</th><th>最大</th><th>平均</th></tr></thead><tbody>${rows.map(row=>`<tr><td>${escapeHTML(row.name)}</td><td>${row.count}</td>${['min','max','mean'].map(key=>`<td>${Number(row[key].toPrecision(6))}</td>`).join('')}</tr>`).join('')}</tbody></table>${config.plotType==='Surface Histogram'?'<button type="button" class="button quiet" data-matrix-csv>集計データをCSV保存</button>':''}`;
+}
+$('#matrix-statistics').addEventListener('click',event=>{
+ if(!event.target.closest('[data-matrix-csv]')||renderedRevision!==revision)return;
+ const cell=value=>'"'+String(value??'').replace(/"/g,'""')+'"',rows=[['Series','Bin minimum','Bin maximum','Frequency','Cumulative (%)','Total valid points','Outside range']];
+ for(const row of figureResult.matrixStatistics)row.frequency?.forEach((count,i)=>rows.push([row.name,row.binEdges[i],row.binEdges[i+1],count,row.cumulative[i],row.count,row.outside]));
+ download(new Blob(['\uFEFF'+rows.map(row=>row.map(cell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}),safeStem(metadata.filename)+'_histogram.csv');
+});
 function changePlotType(type) {
+  if(isMatrixPlot(type)){void openMatrixEditor(type);$("#plot-type").value=config.plotType;return;}
   if(metadata?.sources && !editableXY(type)){status('複数ファイルの重ね描きでは通常のXYグラフを選んでください。','error');$('#plot-type').value=config.plotType;return;}
   applyPreset(config,presets.find(item=>item.id===type),metadata);
   delete config.options.processingAxes;
@@ -813,9 +839,14 @@ function seriesTableItems() {
 }
 function drawSeriesTableSummary() {
   const items=seriesTableItems();
+  if(isMatrixPlot(config.plotType)){$('#series-table-summary').textContent=config.plotType==='Surface Map'?'表示中のシート':`${config.options.matrix.sheets.length}シートを比較`;return;}
   $('#series-table-summary').textContent=`${items.length} 系列 · 表示 ${items.filter(item=>item.visible!==false).length}`;
 }
 function drawSeriesTable() {
+  const matrix=isMatrixPlot(config.plotType);$('#series-table-title').textContent=matrix?'分布の集計':'系列表';
+  $('#series-table-content .series-table-toolbar').hidden=matrix;$('#series-table').closest('.table-scroll').hidden=matrix;
+  $('#matrix-statistics').hidden=!matrix;
+  if(matrix){drawMatrixStatistics();drawSeriesTableSummary();return;}
   if(!metadata){$('#series-table-head').innerHTML='';$('#series-table-body').innerHTML='';drawSeriesTableSummary();return;}
   const items=seriesTableItems(),text=value=>escapeHTML(value ?? '—');
   const modes={line:'線',scatter:'点','line+scatter':'線＋点'},styles={'-':'実線','--':'破線','-.':'一点鎖線',':':'点線'};
@@ -880,10 +911,11 @@ function drawControls() {
   syncFontChoices();
   const xpsFit=config.plotType==='XPS Fit';
   const histogram=config.plotType==='Particle Histogram';
-  const visibleSeries=xpsFit || histogram?config.series.slice(0,1):config.series;
+  const visibleSeries=xpsFit || histogram || config.plotType==='Surface Map'?config.series.slice(0,1):config.series;
   $("#series-count").textContent = xpsFit?'実測点':`${visibleSeries.length} 系列`;
   $("#series-list").innerHTML = visibleSeries.map((series, index) => {
     const input = (key, label, attributes = '') => `<label>${label}<input data-series-field="${key}" type="number" value="${escapeHTML(seriesControlValue(key,series[key]))}" ${attributes}></label>`;
+    if(isMatrixPlot(config.plotType))return `<div class="series-card" data-series-index="${index}"><p>${escapeHTML(config.plotType==='Surface Map'?metadata.sheets[metadata.sheetIndex]:series.name)}</p><button type="button" class="button quiet" data-matrix-edit-series>分布の設定</button></div>`;
     if(histogram)return `<div class="series-card" data-series-index="${index}"><label class="series-visibility"><input data-series-field="visible" type="checkbox" ${series.visible!==false?'checked':''}>粒径分布を描画</label></div>`;
     return `<div class="series-card" data-series-index="${index}">
       <label class="series-visibility"><input data-series-field="visible" type="checkbox" ${series.visible!==false?'checked':''}>系列${index+1}を描画</label><div class="series-heading">${xpsFit?'実測点の列':`<input data-series-field="color" type="color" value="${escapeHTML(series.color)}" aria-label="系列${index + 1}の色"><input class="series-label" data-series-field="name" value="${escapeHTML(series.name)}" maxlength="200" aria-label="系列${index + 1}の名前"><button type="button" class="icon-button" data-remove="${index}" aria-label="系列${index + 1}を削除"><svg><use href="#i-close"/></svg></button>`}</div>
@@ -908,7 +940,7 @@ function drawControls() {
         <details class="trend-appearance"><summary>線・数式の表示</summary><div class="field-grid">${input('trendWidth','近似線幅 (pt)','min=".1" max="6" step="0.1"')}<label>近似線の線種<select data-series-field="trendStyle">${choiceOptions([['--','破線'],['-','実線'],['-.','一点鎖線'],[':','点線']],series.trendStyle || '--')}</select></label></div>
           <label title="autoは系列と同じ色です。">近似線・数式の色<input data-series-field="trendColor" value="${escapeHTML(series.trendColor || 'auto')}" placeholder="auto / #色"></label>
           <div class="field-grid">${input('trendFontSize','数式のフォントサイズ (pt)',`min="${3*config.axes.fontScale}" max="${24*config.axes.fontScale}" step="0.1"`)}${input('trendDigits','係数の有効桁数','min="2" max="15" step="1" title="表示だけを丸めます。近似線の描画には丸め前の係数を使います。"')}</div>
-          <div class="field-grid">${input('trendX','数式の横位置（左0・右1）','min="-10" max="10" step="0.01" placeholder="自動"')}${input('trendY','数式の縦位置（下0・上1）','min="-10" max="10" step="0.01" placeholder="自動"')}</div>
+          <div class="field-grid">${input('trendX','数式の横位置（左0・右1）','min="-10" max="10" step="0.01" placeholder="Auto"')}${input('trendY','数式の縦位置（下0・上1）','min="-10" max="10" step="0.01" placeholder="Auto"')}</div>
           <button type="button" class="button quiet" data-reset-trend="${index}">数式の位置を自動に戻す</button>
         </details>
       </details>${processingControls(series)}</div>`;
@@ -927,10 +959,10 @@ function drawControls() {
   syncTrendControls();
   syncProcessingControls();
   const seriesSection=$('#series-list').closest('.control-section');if(seriesSection)seriesSection.hidden=false;
-  $('#add-series').hidden=xpsFit || histogram;
-  $('#series-colormap').hidden=xpsFit || histogram;
+  $('#add-series').hidden=xpsFit || histogram || isMatrixPlot(config.plotType);
+  $('#series-colormap').hidden=xpsFit || histogram || isMatrixPlot(config.plotType);
   drawColormapControls();
-  $('#series-batch').hidden=xpsFit || histogram;
+  $('#series-batch').hidden=xpsFit || histogram || isMatrixPlot(config.plotType);
   $$('.series-errors').forEach(panel=>panel.hidden=!generic);
   if(config.plotType==='XPS Fit')$$('.series-advanced,.series-card .annotation-buttons').forEach(element=>element.hidden=true);
   if(config.plotType==='Raman 3D')$$('#series-list [data-series-field="lineWidth"]').forEach(input=>input.closest('label').hidden=true);
@@ -1069,7 +1101,7 @@ function syncProcessingAxes() {
 }
 
 function syncYAxesControls() {
-  const active = editableXY(config.plotType || 'General') && config.series.some(item=>item.yAxis === 'right');
+  const active = config.plotType==='Surface Histogram' ? !!config.options.matrix?.cumulative : !isMatrixPlot(config.plotType) && editableXY(config.plotType || 'General') && config.series.some(item=>item.yAxis === 'right');
   $('#right-axis-controls').hidden = !active;
   $$('[data-axis="yAxisRight"]').forEach(input=>input.closest('label').hidden=active);
 }
@@ -1756,6 +1788,7 @@ async function renderPreview() {
     $("#initial-message").hidden = true;
     $("#figure-stage").classList.remove("pending");
     figureResult = result;
+    drawMatrixStatistics();
     figureResult.normalizationXState=normalizationXState(snapshot);
     if(result.statistics){$('#preset-note').hidden=false;$('#preset-note').textContent=`粒径の統計：D50 = ${result.statistics.median.toFixed(3)}、平均 = ${result.statistics.mean.toFixed(3)}。ビン幅20 nm、頻度%。`;}
     $("#preview-state").className = "preview-state ready";
@@ -1944,7 +1977,7 @@ async function exportFigure(formats, allSheets = false) {
   if (exporting || loading || renderRunning || !engineReady || !metadata || (!allSheets && renderedRevision !== revision)) return;
   formats = typeof formats === 'string' ? [formats] : formats;
   if (!formats.length) {status('保存形式を1つ以上選択してください。', 'error'); return;}
-  if (allSheets && selectedSheetIndices().length > 1) return exportSheets(formats);
+  if (allSheets && config.plotType!=='Surface Histogram' && selectedSheetIndices().length > 1) return exportSheets(formats);
   exporting = true; updateButtons();
   const stem = safeStem($('#save-name').value), snapshot = structuredClone(config), dpi = Number($('#png-dpi').value);
   const saved = [];
@@ -2108,7 +2141,7 @@ function applyControlInput(event) {
     const axis=input.dataset.unitAxis,from=config.axes[key]==='auto' ? figureResult?.axisInfo?.[axis]?.unit : config.axes[key];
     try {
       if (input.value!==from && !figureResult?.axisInfo?.[axis]?.categorical && unitConversion(from,input.value)) {
-        config=convertAxisUnit(config,axis,from,input.value);drawControls();
+        const scale=unitConversion(from,input.value);config=convertAxisUnit(config,axis,from,input.value);if(config.plotType==='Surface Histogram'&&axis==='x'){for(const key of ['binMin','binMax','binWidth'])if(config.options.matrix[key]!=='')config.options.matrix[key]=Number(config.options.matrix[key])*scale;}drawControls();
       } else config.axes[key] = input.value;
     } catch(error) {syncUnitControls();status(error.message,'error');return;}
     syncUnitControls(); changed(); return;
@@ -2927,6 +2960,7 @@ function openElementEditor(part,index=0,{allowUnrendered=false}={}) {
   const switchingSeries=$('#element-editor').open && ['series','seriesAll'].includes(part);
   if(!metadata || loading || exporting || (renderRunning || renderedRevision!==revision) && !allowUnrendered&&!switchingSeries&&!figureWorkspaceRestoring&&part!=='annotation')return;
   const fields=$('#element-editor-fields');fields.dataset.workspacePart=part;fields.dataset.workspaceIndex=String(index);let sources=[],title='';
+  if(isMatrixPlot(config.plotType)&&['series','seriesAll','preset'].includes(part)){void openMatrixEditor();return;}
   if(part==='seriesAll') {
     if(!editableXY(config.plotType) || !config.series[index])return;
     title='全系列の設定';
@@ -2956,6 +2990,7 @@ function openElementEditor(part,index=0,{allowUnrendered=false}={}) {
     sources=keys.map(key=>$(`#plot-form [data-axis="${key}"]`)?.closest('label'));
   }
   fields.innerHTML=sources.filter(Boolean).map(source=>source.outerHTML).join('');
+  if(isMatrixPlot(config.plotType)&&['series','seriesAll','preset'].includes(part)){void openMatrixEditor();return;}
   if(part==='seriesAll') {
     const control=key=>$(`#series-list [data-series-index="${index}"] [data-series-field="${key}"]`)?.closest('label')?.outerHTML || '';
     fields.innerHTML=`<div data-series-index="${index}" data-series-all-root><div class="field-grid">${SERIES_APPEARANCE_FIELDS.slice(0,3).map(control).join('')}</div><details class="settings-panel"><summary>線・点の詳細</summary><div class="field-grid">${SERIES_APPEARANCE_FIELDS.slice(3).map(control).join('')}</div></details>${processingControls(config.series[index])}</div>`;
@@ -3090,6 +3125,7 @@ function positionInteractions() {
   const hitSize = 24;
   Object.assign(overlay.style, {left:'0',top:'0',width:'100%',height:'100%'});
   if(figureResult.geometry.series) dataInteractions(overlay,imageBox);
+  if(figureResult.geometry.colorbar){const [x,y,w,h]=figureResult.geometry.colorbar,button=document.createElement('button');button.type='button';button.dataset.editMatrix='colorbar';button.className='figure-drag-target';button.title='カラーバー：ダブルクリックで配色・範囲を変更';Object.assign(button.style,{left:x*100+'%',top:y*100+'%',width:w*100+'%',height:h*100+'%'});overlay.append(button);}
   const targets = [...(figureResult.geometry.axisLabels || []), ...(figureResult.geometry.tickLabels || []),
     ...[...plotObjects().map(entry=>({...entry,...(entry.kind==='legend'&&entry.id!=='legend'?{legendItem:entry}:{}),objectZOrder:objectZOrder(entry)})),
       ...(figureResult.geometry.trendEquations || []).map(entry=>({...entry,objectZOrder:30}))].sort((a,b)=>a.objectZOrder-b.objectZOrder)];
@@ -3391,6 +3427,7 @@ function nearestSeries(event,fallback) {
 }
 
 function editPreviewElement(event) {
+  if(event.target.closest('[data-edit-matrix]')){event.preventDefault();void openMatrixEditor();return;}
   const trend=event.target.closest('[data-trend-index]');
   if(trend?.dataset.trendIndex!==undefined){event.preventDefault();openElementEditor('trend',Number(trend.dataset.trendIndex));return;}
   const axis=event.target.closest('[data-edit-axis]');
@@ -3466,6 +3503,7 @@ const figureBridgeWait = (predicate,checkError=()=>null) => new Promise((resolve
 const plotPreviewCache=new Map(),plotAcknowledgements=createPlotAcknowledgements();
 let plotCollectionCache=null,plotMetadataSource=null,plotSheetMetadata=new Map();
 async function collectPlotGraphs({currentOnly=false}={}){
+  if(config.plotType==='Surface Histogram')currentOnly=true;
   if(!metadata||!sourceData||!config.series.length)throw Error('先にグラフを作成してください。');
   const before=projectEditState(),selectedIndex=metadata.sheetIndex;
   const cache=plotCollectionCache;
