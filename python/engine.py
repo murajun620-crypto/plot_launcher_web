@@ -663,10 +663,11 @@ class PlotEngine:
         details = {}
         valid = np.isfinite(x) & np.isfinite(raw_y)
         def region(prefix):
-            lo = number(item.get(prefix + "Min", ""), "補正範囲の最小", optional=True)
-            hi = number(item.get(prefix + "Max", ""), "補正範囲の最大", optional=True)
+            label = "規格化の基準範囲" if prefix == "reference" else "補正範囲"
+            lo = number(item.get(prefix + "Min", ""), label + "の最小", optional=True)
+            hi = number(item.get(prefix + "Max", ""), label + "の最大", optional=True)
             if lo is not None and hi is not None and lo > hi:
-                raise ValueError("補正範囲の最小値は最大値以下にしてください。")
+                raise ValueError(label + "の最小値は最大値以下にしてください。")
             return valid & (x >= (-np.inf if lo is None else lo)) & (x <= (np.inf if hi is None else hi))
         if not isinstance(item.get("detrend", False), bool) or not isinstance(item.get("density", False), bool):
             raise ValueError("データ補正のオン・オフを確認してください。")
@@ -700,14 +701,19 @@ class PlotEngine:
         if mode != "none":
             y = gain * raw_y + bias
             reference_mode = item.get("referenceMode", "max")
-            if reference_mode == "max":
-                if not valid.any(): raise ValueError("規格化の基準となる有効な点がありません。")
-                reference = float(np.max(y[valid]))
-            elif reference_mode == "peakHeight":
-                if not valid.any(): raise ValueError("規格化の基準となる有効な点がありません。")
-                reference = float(np.max(y[valid]) - np.min(y[valid]))
-                if reference == 0:
-                    raise ValueError("最大値と最小値が同じため、ピーク高さで規格化できません。")
+            if reference_mode in {"max", "peakHeight", "maxRange", "peakHeightRange"}:
+                mask = valid
+                if reference_mode in {"maxRange", "peakHeightRange"}:
+                    if item.get("referenceMin", "") in ("", None) or item.get("referenceMax", "") in ("", None):
+                        raise ValueError("規格化の基準範囲の最小・最大X値を指定してください。")
+                    mask = region("reference")
+                    if not mask.any(): raise ValueError("規格化の基準範囲に有効な点がありません。X範囲を広げてください。")
+                if not mask.any(): raise ValueError("規格化の基準となる有効な点がありません。")
+                minimum, maximum = float(np.min(y[mask])), float(np.max(y[mask]))
+                reference = maximum - minimum if reference_mode in {"peakHeight", "peakHeightRange"} else maximum
+                if reference_mode in {"peakHeight", "peakHeightRange"} and reference == 0:
+                    raise ValueError("最大値と最小値が同じため、ピーク高さで規格化できません。X範囲を広げるか、別の基準を選んでください。")
+                details.update(referenceMinimum=minimum, referenceMaximum=maximum, referencePoints=int(mask.sum()))
             elif reference_mode == "first":
                 if not valid.any(): raise ValueError("規格化の基準となる有効な点がありません。")
                 reference = y[np.flatnonzero(valid)[0]]
@@ -1892,7 +1898,7 @@ class PlotEngine:
                 axis_info[name] = {"unit": prepared.get(f"PLOT_{'X' if name == 'x' else 'Y'}UNIT", ""), "tickMax": max(ticks, default=0),
                     "hidden": bool(config.get("axes", {}).get(f"hide{name.upper()}TickLabels", False)),
                     "categorical": name == "x" and preset == "bar_graph_general" and not namespace.get("is_numeric_x", True)}
-            return {"svg": image.getvalue().decode("utf-8"), "series": [item for item in diagnostics if item["visible"]], "seriesProcessing": [item.get("processing", {}) for item in diagnostics], "fits": sorted(fits, key=lambda item: item["index"]), "warnings": warnings, "statistics": statistics, "xRange": list(annotation_axes.get_xlim()), "yRange": list(annotation_axes.get_ylim()), "y2Range": list((right_axes or axes).get_ylim()) if right_indices else None, "yDataScale": annotation_axes.get_yscale(), "tickSteps": tick_steps, "axisInfo": axis_info, "geometry": geometry, "fontFamily": values["PLOT_FONT_FAMILY"].split(",")[0]}
+            return {"svg": image.getvalue().decode("utf-8"), "series": [item for item in diagnostics if item["visible"]], "seriesProcessing": [item.get("processing", {}) for item in diagnostics], "fits": sorted(fits, key=lambda item: item["index"]), "warnings": warnings, "statistics": statistics, "xRange": list(annotation_axes.get_xlim()), "xDataScale": annotation_axes.get_xscale(), "yRange": list(annotation_axes.get_ylim()), "y2Range": list((right_axes or axes).get_ylim()) if right_indices else None, "yDataScale": annotation_axes.get_yscale(), "tickSteps": tick_steps, "axisInfo": axis_info, "geometry": geometry, "fontFamily": values["PLOT_FONT_FAMILY"].split(",")[0]}
         except Exception:
             for figure_number in set(plt.get_fignums()) - previous_figures:
                 plt.close(figure_number)

@@ -293,6 +293,14 @@ th:first-child,td:first-child{width:30px;color:#a3aebd}
 .annotation-buttons{flex-wrap:wrap}
 #preset-options details{margin-top:8px}
 #selection-marquee{position:absolute;border:1px dashed #205eb0;background:#205eb015;pointer-events:none;z-index:100}
+.x-range-picker-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 12px;margin:0 0 8px;border:1px solid #aac8ee;border-radius:6px;background:#f3f8ff;color:#234d7d;font-size:11px;line-height:1.6}
+.x-range-picker-banner output{white-space:normal;text-align:left}
+.x-range-picker-banner .button{flex-shrink:0}
+.x-range-picker-layer{position:absolute;z-index:200;cursor:crosshair;touch-action:none;border:1px dashed #205eb0;background:#205eb006;box-sizing:border-box;user-select:none}
+.x-range-picker-band{position:absolute;top:0;bottom:0;min-width:1px;border-inline:1px solid #205eb0;background:#205eb025;pointer-events:none}
+.paper.selecting-x-range{cursor:crosshair}
+.normalization-range-help{font-size:11px;line-height:1.6;color:#64738a;margin:8px 0}
+.normalization-range-values{display:block;white-space:pre-line;font-size:11px;line-height:1.7;color:#234d7d;max-height:180px;overflow:auto;margin:8px 0}
 #desktop-appearance>.field-grid{margin-top:12px}
 button:focus-visible,summary:focus-visible,a:focus-visible{outline:2px solid #abc8f3;outline-offset:3px}
 @keyframes spin{to{transform:rotate(360deg)}

@@ -1,6 +1,6 @@
 import { resetPresetUnitScales, unitConversion, configureAFMUnits } from "./units.js?v=9127ec4c4f31";
 import { validateTableEdits } from './table-edits.mjs?v=27ae7675c457';
-export const APP_VERSION = '2.4.40';
+export const APP_VERSION = '2.4.41';
 
 // Accept one numeric value or fraction without evaluating JavaScript expressions.
 export function parseCoefficient(value) {
@@ -271,7 +271,7 @@ export function restoreSettings(document, metadata) {
         }
         if (key === 'yAxis' && !['left','right'].includes(item[key])) throw new Error("設定JSONのY軸を確認してください。");
         if (key === 'trendType' && !['none','linear','polynomial','exponential','logarithmic','power'].includes(item[key])) throw new Error("設定JSONの近似線を確認してください。");
-        if (key === 'normalization' && !['none','ratio','relative'].includes(item[key]) || key === 'referenceMode' && !['max','peakHeight','manual','first','point','range'].includes(item[key]) || key === 'currentUnit' && !['A','mA','μA','nA','pA'].includes(item[key]) || key === 'areaUnit' && !['cm2','mm2','m2'].includes(item[key])) throw new Error('設定JSONのデータ補正を確認してください。');
+        if (key === 'normalization' && !['none','ratio','relative'].includes(item[key]) || key === 'referenceMode' && !['max','peakHeight','maxRange','peakHeightRange','manual','first','point','range'].includes(item[key]) || key === 'currentUnit' && !['A','mA','μA','nA','pA'].includes(item[key]) || key === 'areaUnit' && !['cm2','mm2','m2'].includes(item[key])) throw new Error('設定JSONのデータ補正を確認してください。');
         if (!["string", "number"].includes(typeof item[key])) throw new Error("設定JSONの系列設定を確認してください。");
         result[key] = item[key];
       }

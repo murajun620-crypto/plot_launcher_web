@@ -1,12 +1,12 @@
 import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=source-save-v0717-1';
-import {setupDirectSendButton,getFigureWorkspace} from './direct-transfer.mjs?v=a63d4e0f29b9';
-import {identifyPlotProject,plotSheetIndex,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=a63d4e0f29b9';
+import {setupDirectSendButton,getFigureWorkspace} from './direct-transfer.mjs?v=27588def3cda';
+import {identifyPlotProject,plotSheetIndex,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=27588def3cda';
 import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=9127ec4c4f31";
 import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=9127ec4c4f31";
 import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9127ec4c4f31";
 import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=27ae7675c457";
 import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=27ae7675c457";
-import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=a63d4e0f29b9";
+import { APP_VERSION, COLORS, COLOR_PALETTE, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=27588def3cda";
 
 import {alignmentOffsets} from './object-layout.mjs?v=27ae7675c457';
 import {createDataEditor} from './data-editor.mjs?v=27ae7675c457';
@@ -14,9 +14,10 @@ import {validateTableEdits} from './table-edits.mjs?v=27ae7675c457';
 import {createAnnotationTextEditor} from './annotation-editor.mjs?v=61d158587773';
 import {createShortcutHandler} from './shortcuts.mjs?v=61d158587773';
 import {formatText,TEXT_FORMAT_ACTIONS} from './text-format.mjs?v=61d158587773';
+import {createXRangePicker} from './x-range-picker.mjs?v=normalization-range-1';
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
-const APP_BUILD = 'a63d4e0f29b9';
+const APP_BUILD = '27588def3cda';
 window.FigureAppRelease?.assertRunning({version:APP_VERSION,build:APP_BUILD});
 function makeProject(settings,data,fonts,workspace={}){
   const live=sourceData&&data.filename===sourceData.filename&&(data.bytes===sourceData.bytes||data.files&&data.files===sourceData.files);
@@ -112,6 +113,9 @@ let metadata = null, config = { axes: defaultAxes(), series: [] };
 let loading = false, exporting = false, sample = false, loadedHeader = 1;
 let revision = 0, renderedRevision = -1, renderRunning = false, renderWanted = false, renderTimer;
 let previewURL, figureResult, dragging, livePreview;
+const normalizationRangeModes=['maxRange','peakHeightRange'];
+const normalizationRangePicker=createXRangePicker({paper:$('#figure-paper'),image:$('#figure-image')});
+const normalizationXState=state=>JSON.stringify([state.axes.xUnit,state.axes.xUnitScale,state.axes.xScale,state.options?.afmSourceUnits?.x,state.series.map(item=>[item.x,item.xFactor,item.xOffset])]);
 let colorTarget;
 const recentColors = [];
 let colormapControlConfig=null,colormapPreviewToken=0,colormapPreviewTimer,colormapApplying=false;
@@ -336,6 +340,7 @@ function status(text, kind = "working") {
 }
 
 function updateButtons() {
+  if(normalizationRangePicker.active&&(loading||exporting))normalizationRangePicker.cancel({notify:false});
   figureStudioDirectSender?.sync();
   compactHelp();
   const busy = loading || exporting || projectVersionChecking;
@@ -451,7 +456,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=a63d4e0f29b9", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=27588def3cda", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") status(data.text);
     else if (data.type === "ready") {
@@ -950,14 +955,15 @@ function processingControls(item) {
   const num=(key,label,extra='')=>`<label>${label}<input data-series-field="${key}" type="number" ${key==='referencePoint'?'step="1"':'step="any"'} value="${escapeHTML(item[key] ?? '')}" ${extra}></label>`;
   const factor=(key,label)=>`<label title="数値または分数を入力できます（例：0.5、1/2、1/0.25）。">${label}<input data-series-field="${key}" type="text" spellcheck="false" placeholder="例：1/2" value="${escapeHTML(item[key] ?? 1)}"></label>`;
   const referenceMode=item.referenceMode || 'max';
-  const legacyReference=!['max','peakHeight','manual'].includes(referenceMode)?`<option value="${escapeHTML(referenceMode)}" selected hidden>保存時の基準</option>`:'';
+  const legacyReference=!['max','peakHeight',...normalizationRangeModes,'manual'].includes(referenceMode)?`<option value="${escapeHTML(referenceMode)}" selected hidden>保存時の基準</option>`:'';
   return `<details class="series-processing settings-panel"><summary>データ補正</summary>
     <div class="field-grid" title="元データを保持し、Yは傾き補正→係数→規格化→単位表示・Yオフセットの順に適用します。誤差棒も同じ倍率で変換します。面積で割る場合は、面積の逆数をY係数に入力します。">${factor('xFactor','Xに掛ける係数')}${factor('yFactor','Yに掛ける係数')}</div>
     <label><input data-series-field="detrend" type="checkbox" ${item.detrend?'checked':''}>傾きを補正</label>
     <div data-processing-for="detrend"><div class="field-grid" title="空欄は全範囲。指定範囲で直線を当てはめ、先頭の有効点の高さを保って傾きだけを除きます。範囲は表示中のX値です。">${num('detrendMin','補正範囲 X最小','placeholder="全範囲"')}${num('detrendMax','X最大','placeholder="全範囲"')}</div>
     <div class="slope-control"><label title="自動計算した直線の傾きを表示します。手入力や▲▼で微調整できます。Y係数・規格化・表示単位の変換前のY値を、表示中のX値で割った傾きです。">補正する傾き<input data-series-field="detrendSlope" type="number" step="0.001" value="${escapeHTML(item.detrendSlope ?? '')}" placeholder="自動計算中"></label><button type="button" class="button quiet" data-reset-slope title="指定範囲の近似直線から求めた傾きに戻します。">自動に戻す</button></div></div>
     <label>規格化<select data-series-field="normalization">${choiceOptions([['none','なし'],['ratio','基準値で割る（Y/Y₀）'],['relative','相対変化（(Y−Y₀)/Y₀）']],item.normalization || 'none')}</select></label>
-    <div data-processing-for="normalization"><label title="最大値・ピーク高さは、傾き補正・Y係数を適用した後の各系列から別々に求めます。ピーク高さは最大値−最小値です。Yの最小値を引かず、その高さで割ります。">規格化の基準<select data-series-field="referenceMode">${legacyReference}${choiceOptions([['max','各系列の最大値'],['peakHeight','各系列のピーク高さ（最大値 − 最小値）'],['manual','値を入力']],referenceMode)}</select></label>
+    <div data-processing-for="normalization"><label title="最大値・ピーク高さは、傾き補正・Y係数を適用した後の各系列から別々に求めます。ピーク高さは最大値−最小値です。Yの最小値を引かず、その高さで割ります。指定X範囲は基準の取得にだけ使い、規格化は系列全体へ適用します。">規格化の基準<select data-series-field="referenceMode">${legacyReference}${choiceOptions([['max','各系列の最大値'],['peakHeight','各系列のピーク高さ（最大値 − 最小値）'],['maxRange','指定X範囲の最大値'],['peakHeightRange','指定X範囲のピーク高さ（最大値 − 最小値）'],['manual','値を入力']],referenceMode)}</select></label>
+    <div data-processing-for="referenceRange"><div class="field-grid" title="表示中のX単位・Xオフセットで指定します。範囲内の有効な実測点から最大・最小を求めます。">${num('referenceMin','基準範囲 X最小','placeholder="X最小"')}${num('referenceMax','X最大','placeholder="X最大"')}</div><button type="button" class="button quiet" data-pick-normalization-range>プレビューで範囲指定</button><p class="normalization-range-help">グラフ内の2点をクリック、または横方向にドラッグ。数値でも指定できます。規格化は系列全体に適用します。</p><output class="normalization-range-values" data-normalization-reference aria-live="polite"></output></div>
     <div data-processing-for="manual" title="傾き補正・Y係数を掛けた後、表示単位とYオフセットを適用する前の基準値です。系列ごとに指定できます。">${num('referenceValue','基準値 Y₀')}</div></div>
     <div class="field-grid" title="表示中の単位で位置をずらします。XはX係数・単位換算の後、Yは傾き補正・Y係数・規格化・単位換算の後に加算します。">${num('xOffset','Xオフセット')}${num('yOffset','Yオフセット')}</div>
   </details>`;
@@ -970,8 +976,17 @@ function syncProcessingControls() {
     const items=all?config.series:[config.series[Number(panel.closest('[data-series-index]')?.dataset.seriesIndex)]];
     panel.querySelectorAll('[data-processing-for]').forEach(group=>{
       const key=group.dataset.processingFor;
-      group.hidden=!items.some(item=>item && (key==='detrend'||key==='density'?item[key]:key==='normalization'?item.normalization!=='none':item.normalization!=='none'&&item.referenceMode===key));
+      group.hidden=!items.some(item=>item && (key==='detrend'||key==='density'?item[key]:key==='normalization'?item.normalization!=='none':item.normalization!=='none'&&(key==='referenceRange'?normalizationRangeModes.includes(item.referenceMode):item.referenceMode===key)));
     });
+    const reference=panel.querySelector('[data-normalization-reference]');
+    if(reference){
+      const format=value=>Number(value.toPrecision(7)).toString();
+      reference.textContent=renderedRevision!==revision?'プレビュー更新後に取得値を表示します。':items.flatMap(item=>{
+        if(!item||!normalizationRangeModes.includes(item.referenceMode)||item.normalization==='none')return [];
+        const result=figureResult?.seriesProcessing?.[config.series.indexOf(item)];
+        return Number.isFinite(result?.reference)?[`${all?item.name+'：':''}最小 ${format(result.referenceMinimum)} ／ 最大 ${format(result.referenceMaximum)}\n基準値 Y₀ = ${format(result.reference)}（${result.referencePoints}点）`]:['有効な範囲を指定してください。'];
+      }).join('\n');
+    }
     const input=panel.querySelector('[data-series-field="detrendSlope"]'),reset=panel.querySelector('[data-reset-slope]');
     if(!input)return;
     const values=items.map(item=>{
@@ -988,6 +1003,43 @@ function syncProcessingControls() {
     input.step=String(magnitude?Math.max(Number.MIN_VALUE,10**(Math.floor(Math.log10(magnitude))-2)):.001);
     reset.disabled=automatic;
   });
+}
+
+function pickNormalizationRange(event) {
+  const button=event.target.closest('[data-pick-normalization-range]');
+  if(!button)return false;
+  if(!engineReady||!figureResult?.geometry||loading||exporting||renderRunning||dragging||normalizationXState(config)!==figureResult.normalizationXState){
+    status('プレビューの更新後に、範囲を指定してください。','error');return true;
+  }
+  if(figureResult.axisInfo?.x?.categorical){status('数値のX軸で範囲を指定してください。','error');return true;}
+  const panel=button.closest('.series-processing'),all=!!panel.closest('[data-series-all-root]');
+  const index=Number(panel.closest('[data-series-index]').dataset.seriesIndex);
+  const items=all?[...config.series]:[config.series[index]];
+  const fromDialog=!!button.closest('#element-editor'),atConfig=config,atRevision=revision;
+  const restoreEditor=()=>{
+    if(!fromDialog||config!==atConfig)return;
+    openElementEditor(all?'seriesAll':'series',index,{allowUnrendered:true});
+    const processing=$('#element-editor-fields .series-processing');if(processing)processing.open=true;
+  };
+  try{
+    // A failed/narrow reference interval can be reselected on the last graph,
+    // provided its X coordinates still match. Pause redraws until selection ends.
+    clearTimeout(renderTimer);renderWanted=false;
+    if(fromDialog)$('#element-editor').close();
+    normalizationRangePicker.start({range:[...figureResult.xRange],scale:figureResult.xDataScale||config.axes.xScale,axes:[...figureResult.geometry.axes],label:all?'全系列の基準範囲':`系列${index+1}の基準範囲`,
+      onCommit:([minimum,maximum])=>{
+        if(config!==atConfig||revision!==atRevision||items.some(item=>!config.series.includes(item))){status('設定が変わりました。範囲を選び直してください。','error');return;}
+        for(const item of items){item.referenceMin=minimum;item.referenceMax=maximum;}
+        for(const key of ['referenceMin','referenceMax'])$$('[data-series-field="'+key+'"]').forEach(input=>{
+          const item=config.series[Number(input.closest('[data-series-index]').dataset.seriesIndex)];
+          if(items.includes(item))input.value=item[key];
+        });
+        changed(0);restoreEditor();
+      },
+      onCancel:()=>{restoreEditor();if(renderedRevision!==revision){renderWanted=true;void renderPreview();}},
+    });
+  }catch(error){restoreEditor();status(error.message,'error');if(renderedRevision!==revision){renderWanted=true;void renderPreview();}}
+  return true;
 }
 
 function resetProcessingSlope(event) {
@@ -1133,6 +1185,7 @@ $('#file-name').addEventListener('click',()=>{if(engineReady && !loading && !exp
 $('#edit-data-preview').addEventListener('click',()=>{if(engineReady && !loading && !exporting)void dataEditor.open();});
 
 function resetPreview() {
+  normalizationRangePicker.cancel({notify:false});
   clearLivePreview();
   figureResult = null;
   unitAdvice = null; $('#unit-suggestion').hidden = true;
@@ -1540,6 +1593,7 @@ $('#import-paste').addEventListener('click', async () => {
 });
 
 function changed(delay = 400) {
+  normalizationRangePicker.cancel({notify:false});
   if (!restoring && lastState && JSON.stringify(lastState)!==JSON.stringify(config)) {
     history.push(lastState); if(history.length>30)history.shift(); future=[];
   }
@@ -1665,9 +1719,10 @@ function restoreLegendItems() {
 $('#restore-legend-items').addEventListener('click',restoreLegendItems);
 
 async function renderPreview() {
+  if(normalizationRangePicker.active)return;
   if (!engineReady || !metadata || loading || exporting || renderRunning || !renderWanted) return;
   await loadCurrentLocalFonts();
-  if (loading || exporting || renderRunning || !renderWanted) return;
+  if (normalizationRangePicker.active || loading || exporting || renderRunning || !renderWanted) return;
   renderWanted = false;
   renderRunning = true;
   const snapshot = structuredClone(config), targetRevision = revision;
@@ -1687,12 +1742,13 @@ async function renderPreview() {
     $("#initial-message").hidden = true;
     $("#figure-stage").classList.remove("pending");
     figureResult = result;
+    figureResult.normalizationXState=normalizationXState(snapshot);
     if(result.statistics){$('#preset-note').hidden=false;$('#preset-note').textContent=`粒径の統計：D50 = ${result.statistics.median.toFixed(3)}、平均 = ${result.statistics.mean.toFixed(3)}。ビン幅20 nm、頻度%。`;}
     $("#preview-state").className = "preview-state ready";
     $("#preview-state").textContent = "更新済み";
     $('#preview-state').title='';$('#preview-state').removeAttribute('aria-label');
     $("#figure-size").textContent = `軸領域 ${axisControlValue('width', snapshot.axes.width)} × ${axisControlValue('height', snapshot.axes.height)} mm`;
-    const checks=[...result.warnings,...result.series.filter(item=>item.processing && Object.keys(item.processing).length).map(item=>`${item.name}: ${Object.entries(item.processing).map(([key,value])=>`${({slope:'補正した傾き',fittedSlope:'自動計算の傾き',reference:'基準値Y₀（表示単位変換前）',areaCm2:'試料面積（cm²）',factor:'Y係数'})[key] || key} = ${Number(value.toPrecision(8))}`).join('、')}`)];
+    const checks=[...result.warnings,...result.series.filter(item=>item.processing && Object.keys(item.processing).length).map(item=>`${item.name}: ${Object.entries(item.processing).map(([key,value])=>`${({slope:'補正した傾き',fittedSlope:'自動計算の傾き',reference:'基準値Y₀（表示単位変換前）',referenceMinimum:'基準範囲の最小Y',referenceMaximum:'基準範囲の最大Y',referencePoints:'基準範囲の点数',areaCm2:'試料面積（cm²）',factor:'Y係数'})[key] || key} = ${Number(value.toPrecision(8))}`).join('、')}`)];
     $("#warning-list").replaceChildren(...checks.map(text => { const item = document.createElement("li"); item.textContent = text; return item; }));
     $("#plot-warnings").hidden = !checks.length;
     status(`${result.series.length} 系列を描画しました · ${result.series.map(series => `${series.points.toLocaleString()} 点`).join(" / ")}`, "ready");
@@ -2098,6 +2154,13 @@ function applyControlInput(event) {
     const indices=input.dataset.seriesAll==='true' && [...SERIES_APPEARANCE_FIELDS,...PROCESSING_FIELDS].includes(key)?config.series.map((_,i)=>i):[index];
     for(const index of indices) {
       config.series[index][key] = coefficient ?? (input.type==='checkbox'?input.checked:key==='trendFontSize'?Number((Number(input.value)/Number(config.axes.fontScale)).toPrecision(12)):input.type==='range'?Number(input.value):input.value);
+      if(key==='referenceMode'&&normalizationRangeModes.includes(input.value)){
+        const item=config.series[index],range=figureResult?.xRange;
+        if((item.referenceMin===''||item.referenceMax===''||item.referenceMin==null||item.referenceMax==null)&&range?.every(Number.isFinite)){
+          [item.referenceMin,item.referenceMax]=[...range].sort((a,b)=>a-b);
+          for(const bound of ['referenceMin','referenceMax'])$$(`[data-series-index="${index}"] [data-series-field="${bound}"]`).forEach(field=>field.value=item[bound]);
+        }
+      }
       $$(`[data-series-index="${index}"] [data-series-field="${key}"]`).forEach(field=>{if(field!==input){field.value=coefficient ?? input.value;field.checked=input.checked;if(coefficient!==undefined){field.setCustomValidity?.('');field.setAttribute('aria-invalid','false');}}});
     }
     if (input.dataset.seriesField === 'errorMode') syncSeriesErrorControls();
@@ -2132,6 +2195,7 @@ function applyControlInput(event) {
 $("#plot-form").addEventListener("input", applyControlInput);
 $('#preset-options').addEventListener('input', applyControlInput);
 $("#series-list").addEventListener("click", event => {
+  if(pickNormalizationRange(event))return;
   if(resetProcessingSlope(event))return;
   const reset=event.target.closest('[data-reset-trend]');
   if(reset){const index=Number(reset.dataset.resetTrend);config.series[index].trendX=config.series[index].trendY='';for(const key of ['trendX','trendY'])$$(`[data-series-index="${index}"] [data-series-field="${key}"]`).forEach(input=>input.value='');changed();return;}
@@ -2895,7 +2959,7 @@ function openElementEditor(part,index=0,{allowUnrendered=false}={}) {
   // Reuse the sidebar controls, restoring live values and color-picker handlers.
   fields.querySelectorAll('.color-control').forEach(wrapper=>{const input=wrapper.querySelector('input');if(input){input.hidden=false;delete input.dataset.paletteEnhanced;wrapper.replaceWith(input);}});
   fields.querySelectorAll('[id]').forEach(element=>element.removeAttribute('id'));
-  fields.querySelectorAll('button').forEach(element=>{if(element.dataset.resetTrend===undefined&&element.dataset.resetLegend===undefined&&element.dataset.resetSlope===undefined&&element.dataset.restoreLegendItems===undefined&&element.dataset.openLayout===undefined)element.remove();});
+  fields.querySelectorAll('button').forEach(element=>{if(element.dataset.resetTrend===undefined&&element.dataset.resetLegend===undefined&&element.dataset.resetSlope===undefined&&element.dataset.restoreLegendItems===undefined&&element.dataset.openLayout===undefined&&element.dataset.pickNormalizationRange===undefined)element.remove();});
   // Position is edited by dragging; retain numeric coordinates in the sidebar only.
   fields.querySelectorAll('[data-axis="legendX"],[data-axis="legendY"],[data-series-field="trendX"],[data-series-field="trendY"],[data-annotation-field="x"],[data-annotation-field="y"],[data-annotation-field="x1"],[data-annotation-field="y1"],[data-annotation-field="x2"],[data-annotation-field="y2"],[data-annotation-field="coordinate_system"]').forEach(input=>input.closest('label')?.remove());
   fields.querySelectorAll('.annotation-card > summary').forEach(element=>element.remove());
@@ -2927,6 +2991,7 @@ for(const root of [$('#plot-form'),$('#element-editor-fields')])root.addEventLis
 $('#edit-all-series').addEventListener('click',()=>openElementEditor('seriesAll'));
 $('#normalize-all-series').addEventListener('click',()=>{openElementEditor('seriesAll',0,{allowUnrendered:true});const processing=$('#element-editor-fields .series-processing');if(processing){processing.open=true;processing.querySelector('[data-series-field="normalization"]')?.focus();}});
 $('#element-editor-fields').addEventListener('click',event=>{
+  if(pickNormalizationRange(event))return;
   if(resetProcessingSlope(event))return;
   if(event.target.closest('[data-restore-legend-items]')){restoreLegendItems();return;}
   if(event.target.closest('[data-reset-legend]')){const fields=$('#element-editor-fields');resetLegendPositions(fields.dataset.legendItemId?{seriesIndex:fields.dataset.legendSeriesIndex===''?null:Number(fields.dataset.legendSeriesIndex),key:fields.dataset.legendKey}:null);drawControls();changed();return;}
@@ -3244,6 +3309,7 @@ function layoutPreview(){
   content.style.width=`${image.naturalWidth*scale}px`;content.style.height=`${image.naturalHeight*scale}px`;
   content.style.transform=`translate(${view.x}px,${view.y}px) scale(${view.zoom})`;$("#zoom-level").textContent=`${Math.round(view.zoom*100)}%`;
   positionInteractions();
+  normalizationRangePicker.layout();
 }
 function zoomPreview(factor,point={x:0,y:0}){view=zoomAt(view,factor,point);layoutPreview();}
 $("#zoom-in").addEventListener('click',()=>zoomPreview(1.1));$("#zoom-out").addEventListener('click',()=>zoomPreview(1/1.1));
@@ -3354,7 +3420,7 @@ catch (error) { fatal(`描画機能を開始できませんでした。ブラウ
 
 // Figure Studio bridge: included in the source application's module scope.
 let figureBridgeBaseline=null,figureBridgePreservedOnReconnect=false;
-const figureBridgePendingInput=()=>dataEditor?.hasDraft()||dataEditor?.busy||plotTextEditor.active||$$('[data-axis],[data-option],[data-series-field],[data-annotation-field],[data-legend-field],[data-fill]').some(input=>!input.disabled&&input.getClientRects().length>0&&incompleteNumberInput(input));
+const figureBridgePendingInput=()=>normalizationRangePicker.active||dataEditor?.hasDraft()||dataEditor?.busy||plotTextEditor.active||$$('[data-axis],[data-option],[data-series-field],[data-annotation-field],[data-legend-field],[data-fill]').some(input=>!input.disabled&&input.getClientRects().length>0&&incompleteNumberInput(input));
 async function figureBridgeIsDirty(){
   if(loading||exporting||renderRunning||renderedRevision!==revision||dragging||colormapApplying||pendingDataFiles||figureBridgePendingInput())return true;
   try{return !samePlotCheckpoint(figureBridgeBaseline,(await collectPlotGraphs()).checkpoint);}catch{return true;}
@@ -3580,7 +3646,7 @@ function figureWorkspaceUI({rejectInvalid=false}={}){
   focus:locators.get(document.activeElement)||null};
 }
 function figureWorkspaceHasWork(){return !!sourceData||[...importedFonts.values()].some(font=>!font.automatic)||!!pendingDataFiles||!!$('#paste-text').value||JSON.stringify(config)!==JSON.stringify({axes:defaultAxes(),series:[]});}
-function figureWorkspaceBusy(){return dataEditor?.busy||figureWorkspaceCapturing||figureWorkspaceRestoring||loading||exporting||!!dragging||!!panning||colormapApplying||updateReloading||updateChecking||!!figureStudioDirectSender?.busy;}
+function figureWorkspaceBusy(){return normalizationRangePicker.active||dataEditor?.busy||figureWorkspaceCapturing||figureWorkspaceRestoring||loading||exporting||!!dragging||!!panning||colormapApplying||updateReloading||updateChecking||!!figureStudioDirectSender?.busy;}
 function figureWorkspaceSignature(){
  if(!figureWorkspaceHasWork())return 'plot-empty';
  const ui=figureWorkspaceUI();ui.focus=null;
