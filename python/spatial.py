@@ -113,6 +113,42 @@ def matrix_values(engine, sheet_index, region):
     return name,data,values
 
 
+def distribution_summary(values, name, sheet_index, unit=""):
+    n=len(values)
+    # Scaling avoids overflow in the sum of squares without altering source data.
+    scale=float(np.max(np.abs(values)))
+    scaled=values/scale if scale else values
+    mean=float(np.mean(scaled)*scale)
+    sd=float(np.std(scaled,ddof=1)*scale) if n>1 else None
+    if sd is not None and not math.isfinite(sd): sd=None
+    se=sd/math.sqrt(n) if sd is not None else None
+    suffix=f" {unit}" if unit and unit!="auto" else ""
+    def label(error,kind):
+        average=f"{0.0 if mean==0 else mean:.3g}"
+        if error is None: return f"avg. ± {kind} = {average} ± N/A{suffix} (n = {n})"
+        return f"avg. ± {kind} = {average} ± {error:.3g}{suffix}"
+    return {"name":name,"sheetIndex":sheet_index,"count":n,"min":float(values.min()),"max":float(values.max()),"mean":mean,"sd":sd,"se":se,"sdText":label(sd,"SD"),"seText":label(se,"SE")}
+
+
+def distribution_annotations(annotations, statistics, active):
+    rows={row["sheetIndex"]:row for row in statistics};resolved=[];updates=[]
+    for raw in annotations:
+        if not isinstance(raw,dict): raise ValueError("注記の設定を確認してください。")
+        item=dict(raw);link=raw.get("matrix_statistic")
+        if link is not None:
+            if not isinstance(link,dict) or raw.get("type")!="text" or not isinstance(raw.get("id"),str) or not raw["id"] or link.get("kind") not in ("sd","se") or not isinstance(link.get("includeName",False),bool):
+                raise ValueError("分布の集計注記を確認してください。")
+            index=link.get("sheetIndex")
+            if index!="active" and (type(index) is not int or not 0<=index<=1000): raise ValueError("集計注記の対象シートを確認してください。")
+            row=rows.get(active if index=="active" else index)
+            if row is None: item["visible"]=False
+            else:
+                item["text"]=(row["name"]+"\n" if link.get("includeName",False) else "")+row[link["kind"]+"Text"]
+                updates.append({"id":item["id"],"text":item["text"]})
+        resolved.append(item)
+    return resolved,updates
+
+
 def render_matrix(engine, config):
     from engine import number, grid_style, _MarkerExtent, smooth_line_coordinates
     options = config.get("options", {}).get("matrix", {})
@@ -191,7 +227,7 @@ def render_matrix(engine, config):
                         groups.append({"index":index,"artists":artists})
                     if under or over: warnings.append(f"{label}：ビンの範囲外 {under+over}点（累積率の分母は全{len(values)}点）。")
                     diagnostics.append({"name":label,"points":len(values),"count":len(values),"visible":visible,"processing":{}})
-                    statistics.append({"name":label,"sheetIndex":sheet_index,"count":len(values),"min":float(values.min()),"max":float(values.max()),"mean":float(values.mean()),"binEdges":edges.tolist(),"frequency":counts.tolist(),"cumulative":(100*(under+np.cumsum(counts))/len(values)).tolist(),"outside":under+over})
+                    statistics.append({**distribution_summary(values,label,sheet_index,settings.get("xUnit",options.get("valueUnit",""))),"binEdges":edges.tolist(),"frequency":counts.tolist(),"cumulative":(100*(under+np.cumsum(counts))/len(values)).tolist(),"outside":under+over})
                 axes.set_xlim(edges[0],edges[-1]); axes.set_ylim(0,max(1,axes.get_ylim()[1])*1.05)
                 if right:
                     right.set_ylabel(settings.get("y2Label") or "Cumulative frequency (%)")
@@ -246,7 +282,7 @@ def render_matrix(engine, config):
                         else: colorbar.ax.yaxis.labelpad=pad
                 groups=[{"index":0,"artists":[image]}];legend=None
                 diagnostics=[{"name":sheet,"points":len(values),"count":len(values),"visible":True,"processing":{}}]
-                statistics=[{"name":sheet,"sheetIndex":indices[0],"count":len(values),"min":float(values.min()),"max":float(values.max()),"mean":float(values.mean())}]
+                statistics=[distribution_summary(values,sheet,indices[0],options.get("valueUnit","nm"))]
             for name, axis in [("x",axes.xaxis),("y",axes.yaxis)]+([("y2",right.yaxis)] if right else []):
                 owner=axis.axes;axis_name="x" if name=="x" else "y"
                 low=number(settings.get(name+"Min",""),"軸の最小値",optional=True);high=number(settings.get(name+"Max",""),"軸の最大値",optional=True)
@@ -308,7 +344,8 @@ def render_matrix(engine, config):
             if legend: legend.set_gid("web-legend")
             for i,row in enumerate(legend_records):
                 if row["artist"] is not legend: row["artist"].set_gid(f"web-legend-item-{i}")
-            collection=AnnotationCollection();errors=collection.load_list(config.get("annotations",[]))
+            annotation_values,annotation_texts=distribution_annotations(config.get("annotations",[]),statistics,active)
+            collection=AnnotationCollection();errors=collection.load_list(annotation_values)
             if errors: raise ValueError("注釈の設定を確認してください。")
             for annotation in collection.items:
                 if annotation.type=="text": annotation.font_family=[font,settings.get("japaneseFontFamily","Noto Sans JP"),"DejaVu Sans"]
@@ -338,7 +375,7 @@ def render_matrix(engine, config):
             image=BytesIO();figure.savefig(image,format="svg",bbox_inches=box,bbox_extra_artists=extra,transparent=False,pad_inches=0)
             if engine.figure is not None: plt.close(engine.figure)
             engine.figure=figure;engine.matrix_colorbar=colorbar;engine.annotation_manager=manager;engine.export_extra_artists=extra;engine.transparent=False
-            return {"svg":image.getvalue().decode(),"series":diagnostics,"seriesProcessing":[{} for _ in diagnostics],"fits":[],"warnings":warnings,"statistics":None,"matrixStatistics":statistics,"xRange":list(axes.get_xlim()),"yRange":list(axes.get_ylim()),"y2Range":list(right.get_ylim()) if right else None,"xDataScale":axes.get_xscale(),"yDataScale":axes.get_yscale(),"tickSteps":{},"axisInfo":{},"geometry":geometry,"fontFamily":font,"matrix":True}
+            return {"svg":image.getvalue().decode(),"series":diagnostics,"seriesProcessing":[{} for _ in diagnostics],"fits":[],"warnings":warnings,"statistics":None,"matrixStatistics":statistics,"matrixAnnotationTexts":annotation_texts,"xRange":list(axes.get_xlim()),"yRange":list(axes.get_ylim()),"y2Range":list(right.get_ylim()) if right else None,"xDataScale":axes.get_xscale(),"yDataScale":axes.get_yscale(),"tickSteps":{},"axisInfo":{},"geometry":geometry,"fontFamily":font,"matrix":True}
         except Exception:
             plt.close(figure);raise
 

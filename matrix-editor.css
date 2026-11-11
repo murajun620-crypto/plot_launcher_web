@@ -10,3 +10,5 @@
 .matrix-apply-actions{display:flex;gap:8px;justify-content:flex-end;position:sticky;bottom:-20px;padding:12px 0;background:white}
 .matrix-statistics{font-size:12px;line-height:1.7;overflow-wrap:anywhere}.matrix-statistics table{width:100%;border-collapse:collapse}.matrix-statistics th,.matrix-statistics td{padding:6px;text-align:right;border-bottom:1px solid #e5ebf1}.matrix-statistics th:first-child,.matrix-statistics td:first-child{text-align:left}
 @media(max-width:620px){.matrix-sheets{grid-template-columns:1fr}.matrix-series-styles>div{grid-template-columns:1fr 70px 70px}}
+
+.matrix-statistic-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:8px 0}.matrix-statistic-actions label{display:flex;align-items:center;gap:6px}.matrix-statistic-actions select{width:auto;min-width:120px}.matrix-statistic-scroll{overflow-x:auto}.matrix-statistic-scroll th,.matrix-statistic-scroll td{white-space:nowrap}

@@ -1,4 +1,4 @@
-import {MATRIX_DEFAULTS,validateMatrixOptions,matrixColorbarVisible} from './matrix-model.mjs?v=98e909f2c547';
+import {MATRIX_DEFAULTS,validateMatrixOptions,matrixColorbarVisible} from './matrix-model.mjs?v=5b4889978030';
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function createMatrixEditor({root,request,getMetadata,getConfig,onApply,enhanceColors,showDialog,getColorbarVisibility=(index,fallback)=>fallback}){
  let info=null,openedMetadata=null,visibilityOnly=false,colorbarDefault=true;

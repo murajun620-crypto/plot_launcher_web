@@ -1,15 +1,16 @@
-import {createMatrixEditor} from './matrix-editor.mjs?v=98e909f2c547';
-import {isMatrixPlot,isCombinedHistogram,matrixColorbarVisible} from './matrix-model.mjs?v=98e909f2c547';
+import {statisticNumber,statisticAvailable,addStatisticAnnotation,syncStatisticAnnotationTexts,detachStatisticText,distributionCSV} from './matrix-statistics.mjs?v=5b4889978030';
+import {createMatrixEditor} from './matrix-editor.mjs?v=5b4889978030';
+import {isMatrixPlot,isCombinedHistogram,matrixColorbarVisible} from './matrix-model.mjs?v=5b4889978030';
 import {createFileProgress} from './file-progress.mjs?v=file-open-1';
-import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=98e909f2c547';
+import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=5b4889978030';
 import {setupDirectSendButton,getFigureWorkspace} from './direct-transfer.mjs?v=baaeeccc3ee1';
-import {identifyPlotProject,plotSheetIndex,currentPlotImageId,resolvePlotImage,savedPlotProjectId,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=98e909f2c547';
+import {identifyPlotProject,plotSheetIndex,currentPlotImageId,resolvePlotImage,savedPlotProjectId,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=5b4889978030';
 import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=9127ec4c4f31";
 import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=9127ec4c4f31";
 import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9127ec4c4f31";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=98e909f2c547";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=98e909f2c547";
-import { APP_VERSION, COLORS, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=98e909f2c547";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=5b4889978030";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=5b4889978030";
+import { APP_VERSION, COLORS, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=5b4889978030";
 
 import {alignmentOffsets} from './object-layout.mjs?v=27ae7675c457';
 import {createDataEditor} from './data-editor.mjs?v=27ae7675c457';
@@ -22,7 +23,7 @@ import {createXRangePicker} from './x-range-picker.mjs?v=normalization-range-1';
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 const fileProgress=createFileProgress();
-const APP_BUILD = '98e909f2c547';
+const APP_BUILD = '5b4889978030';
 window.FigureAppRelease?.assertRunning({version:APP_VERSION,build:APP_BUILD});
 function makeProject(settings,data,fonts,workspace={}){
   const live=sourceData&&data.filename===sourceData.filename&&(data.bytes===sourceData.bytes||data.files&&data.files===sourceData.files);
@@ -468,7 +469,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=98e909f2c547", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=5b4889978030", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") {
       if(data.id)requests.get(data.id)?.progressTask?.stage(data.text,{completed:data.completed,total:data.total,unit:data.unit||''});
@@ -753,16 +754,30 @@ async function openMatrixEditor(kind){if(loading||exporting||!metadata)return;st
 $('#matrix-analysis').addEventListener('click',()=>openMatrixEditor());
 $('#series-list').addEventListener('click',event=>{if(event.target.closest('[data-matrix-edit-series]'))void openMatrixEditor();});
 $('#preset-options').addEventListener('click',event=>{if(event.target.closest('[data-matrix-open]'))openMatrixEditor();});
+let matrixStatisticKind='sd';
 function drawMatrixStatistics(){
  const panel=$('#matrix-statistics'),rows=isMatrixPlot(config.plotType)?figureResult?.matrixStatistics:null;
  panel.hidden=!rows?.length;if(!rows?.length)return;
- panel.innerHTML=`<p>${escapeHTML(config.options.matrix.range)} · ${escapeHTML(config.plotType==='Surface Histogram'?config.axes.xUnit:config.options.matrix.valueUnit)} · 空欄は集計から除外</p><table><thead><tr><th>シート／系列</th><th>点数</th><th>最小</th><th>最大</th><th>平均</th></tr></thead><tbody>${rows.map(row=>`<tr><td>${escapeHTML(row.name)}</td><td>${row.count}</td>${['min','max','mean'].map(key=>`<td>${Number(row[key].toPrecision(6))}</td>`).join('')}</tr>`).join('')}</tbody></table>${config.plotType==='Surface Histogram'?'<button type="button" class="button quiet" data-matrix-csv>集計データをCSV保存</button>':''}`;
+ panel.innerHTML=`<p>${escapeHTML(config.options.matrix.range)} · ${escapeHTML(config.plotType==='Surface Histogram'?config.axes.xUnit:config.options.matrix.valueUnit)} · 空欄は集計から除外</p>
+ <p class="field-note">SDは標本標準偏差（n−1）、SEはSD÷√n。ビン範囲外も含む有効な全測定点で計算します。2点未満はSD・SEを表示しません。</p>
+ <div class="matrix-statistic-actions"><label>追加する表記<select data-matrix-stat-kind><option value="sd" ${matrixStatisticKind==='sd'?'selected':''}>avg. ± SD</option><option value="se" ${matrixStatisticKind==='se'?'selected':''}>avg. ± SE</option></select></label>${rows.length>1&&rows.some(row=>statisticAvailable(row,matrixStatisticKind))?'<button type="button" class="button quiet" data-matrix-stat-add="all">全系列の注記を追加</button>':''}<button type="button" class="button quiet" data-matrix-csv>集計データをCSV保存</button></div>
+ <div class="matrix-statistic-scroll"><table><thead><tr><th>シート／系列</th><th>点数</th><th>最小</th><th>最大</th><th>平均（avg.）</th><th>SD</th><th>SE</th><th>グラフへの追加</th></tr></thead><tbody>${rows.map((row,index)=>`<tr><td>${escapeHTML(row.name)}</td><td>${row.count}</td>${['min','max','mean','sd','se'].map(key=>`<td>${statisticNumber(row[key])}</td>`).join('')}<td><button type="button" class="button quiet" data-matrix-stat-add="${index}" ${statisticAvailable(row,matrixStatisticKind)?'':'disabled'}>注記を追加</button></td></tr>`).join('')}</tbody></table></div>
+ <p class="field-note">注記は有効3桁で表示し、CSVは丸めず保存します。ドラッグで移動、ダブルクリックで書式変更できます。データ変更時に数値も更新します。文字を直接書き換えると通常の注記になります。</p>`;
 }
+$('#matrix-statistics').addEventListener('change',event=>{if(!event.target.matches('[data-matrix-stat-kind]'))return;matrixStatisticKind=event.target.value==='se'?'se':'sd';drawMatrixStatistics();});
 $('#matrix-statistics').addEventListener('click',event=>{
- if(!event.target.closest('[data-matrix-csv]')||renderedRevision!==revision)return;
- const cell=value=>'"'+String(value??'').replace(/"/g,'""')+'"',rows=[['Series','Bin minimum','Bin maximum','Frequency','Cumulative (%)','Total valid points','Outside range']];
- for(const row of figureResult.matrixStatistics)row.frequency?.forEach((count,i)=>rows.push([row.name,row.binEdges[i],row.binEdges[i+1],count,row.cumulative[i],row.count,row.outside]));
- download(new Blob(['\uFEFF'+rows.map(row=>row.map(cell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}),safeStem(metadata.filename)+'_histogram.csv');
+ if(renderedRevision!==revision||loading||exporting)return;
+ const button=event.target.closest('[data-matrix-stat-add]');
+ if(button){
+  const rows=figureResult.matrixStatistics,target=button.dataset.matrixStatAdd==='all'?rows:[rows[Number(button.dataset.matrixStatAdd)]];
+  const valid=target.filter(row=>statisticAvailable(row,matrixStatisticKind));if(!valid.length)return;
+  const combined=isCombinedHistogram(config),before=structuredClone(config);
+  try{const ids=valid.map(row=>addStatisticAnnotation(config,row,matrixStatisticKind,{active:!combined,includeName:combined&&rows.length>1}).id);selected=new Set(ids);drawAnnotations();changed();status(`${ids.length}件の集計注記を追加しました。プレビューで位置や書式を調整できます。`,'ready');}
+  catch(error){config=before;drawAnnotations();status(error.message,'error');}return;
+ }
+ if(!event.target.closest('[data-matrix-csv]'))return;
+ const histogram=config.plotType==='Surface Histogram';
+ download(new Blob([distributionCSV(figureResult.matrixStatistics,histogram)],{type:'text/csv;charset=utf-8'}),safeStem(metadata.filename)+(histogram?'_histogram.csv':'_distribution.csv'));
 });
 function changePlotType(type) {
   if(isMatrixPlot(type)){void openMatrixEditor(type);$("#plot-type").value=config.plotType;return;}
@@ -1812,6 +1827,7 @@ async function renderPreview() {
     $("#initial-message").hidden = true;
     $("#figure-stage").classList.remove("pending");
     figureResult = result;
+    if(syncStatisticAnnotationTexts(config,result))drawAnnotations();
     drawMatrixStatistics();
     figureResult.normalizationXState=normalizationXState(snapshot);
     if(result.statistics){$('#preset-note').hidden=false;$('#preset-note').textContent=`粒径の統計：D50 = ${result.statistics.median.toFixed(3)}、平均 = ${result.statistics.mean.toFixed(3)}。ビン幅20 nm、頻度%。`;}
@@ -2248,6 +2264,7 @@ function applyControlInput(event) {
     (config.options.legendEntries[input.dataset.legendKey] ||= {})[input.dataset.legendField]=input.type==='checkbox'?input.checked:input.value;
   } else if (input.dataset.annotationField) {
     const item = config.annotations[Number(input.closest("[data-annotation-index]").dataset.annotationIndex)];
+    if(input.dataset.annotationField==='text')detachStatisticText(item,input.value);
     item[input.dataset.annotationField] = input.type === "checkbox" ? input.checked : ['number','range'].includes(input.type) ? Number(input.value) : input.value;
     const index=input.closest('[data-annotation-index]').dataset.annotationIndex,key=input.dataset.annotationField;
     $$(`[data-annotation-index="${index}"] [data-annotation-field="${key}"]`).forEach(field=>{
@@ -2942,7 +2959,7 @@ async function loadFontFiles(files) {
 }
 const plotTextEditor=createAnnotationTextEditor();let plotFormatClipboard=null;
 function plotTextValue(item){return {text:item.text,fontSize:item.font_size,fontFamily:item.font_family,bold:item.bold,italic:item.italic,underline:item.underline,textAlign:item.text_align||item.horizontal_alignment};}
-function plotTextPatch(item,value){Object.assign(item,{text:value.text,font_size:value.fontSize,font_family:value.fontFamily,bold:value.bold,italic:value.italic,underline:value.underline,text_align:value.textAlign,horizontal_alignment:value.textAlign==='justify'?'left':value.textAlign,font_weight:value.bold?'bold':'normal',font_style:value.italic?'italic':'normal'});}
+function plotTextPatch(item,value){detachStatisticText(item,value.text);Object.assign(item,{text:value.text,font_size:value.fontSize,font_family:value.fontFamily,bold:value.bold,italic:value.italic,underline:value.underline,text_align:value.textAlign,horizontal_alignment:value.textAlign==='justify'?'left':value.textAlign,font_weight:value.bold?'bold':'normal',font_style:value.italic?'italic':'normal'});}
 function previewAnnotationChange(){const previous=restoring;restoring=true;try{changed(180);}finally{restoring=previous;}}
 function beginPlotAnnotationText(id){
  if(loading||exporting)return;plotTextEditor.finish(false,{focus:false});const item=config.annotations?.find(a=>a.id===id);if(!item||item.type!=='text'||item.locked)return;
