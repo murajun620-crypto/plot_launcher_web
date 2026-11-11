@@ -1,5 +1,5 @@
 import {mm} from './model.mjs?v=nested-groups-v0712-1';
-import {panelLabelUnits,panelLabelText} from './panel-labels.mjs?v=panel-label-frame-v0731-1';
+import {panelLabelUnits,panelLabelText} from './panel-labels.mjs?v=panel-label-close-v0732-1';
 
 export function createPanelLabelDialog({root,getDocument,getSelection,onApply,onClose=()=>{}}){
  const form=root.querySelector('form'),field=name=>form.elements.namedItem(name),summary=root.querySelector('[data-panel-summary]'),preview=root.querySelector('[data-panel-preview]'),error=root.querySelector('[data-panel-error]'),apply=root.querySelector('[type="submit"]');

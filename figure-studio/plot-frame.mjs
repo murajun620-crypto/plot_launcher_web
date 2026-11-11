@@ -7,9 +7,16 @@ function rectangle(node){
   const box={x:Number(node.getAttribute('x')||0),y:Number(node.getAttribute('y')||0),w:Number(node.getAttribute('width')),h:Number(node.getAttribute('height'))};
   return valid(box)?box:null;
  }
- const tokens=String(node.getAttribute('d')||'').match(/[A-Za-z]|[-+]?(?:\d*\.?\d+)(?:e[-+]?\d+)?/gi)||[];
- if(tokens.filter(token=>/[A-Za-z]/.test(token)&&!Number.isFinite(Number(token))).join('')!=='MLLLz'&&tokens.filter(token=>/[A-Za-z]/.test(token)&&!Number.isFinite(Number(token))).join('')!=='MLLLZ')return null;
+ return svgRectanglePathBounds(node.getAttribute('d'));
+}
+
+/** Matplotlib may repeat the first corner before closing its rectangle. */
+export function svgRectanglePathBounds(path){
+ const tokens=String(path||'').match(/[A-Za-z]|[-+]?(?:\d*\.?\d+)(?:e[-+]?\d+)?/gi)||[];
+ const commands=tokens.filter(token=>/^[A-Za-z]$/.test(token)).join('');
+ if(!/^ML{3,4}[zZ]$/.test(commands))return null;
  const values=tokens.map(Number).filter(Number.isFinite);
+ if(values.length===10&&values[0]===values[8]&&values[1]===values[9])values.splice(-2);
  if(values.length!==8)return null;
  const xs=values.filter((_,i)=>i%2===0),ys=values.filter((_,i)=>i%2===1);
  if(new Set(xs).size!==2||new Set(ys).size!==2||new Set(xs.map((x,i)=>`${x},${ys[i]}`)).size!==4)return null;
