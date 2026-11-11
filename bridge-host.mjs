@@ -43,7 +43,7 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
   const nativeOwner=context?(context.ownerId||crypto.randomUUID()):null;
   let normalVisit=!context;
   const hostId=crypto.randomUUID();
-  let dismissConfirmation=null;
+  let dismissConfirmation=null,restoredBinding=null;
   let active={panelId:'',requestId:'',editKey:'',sourceName:''},revision=0,initialized=false,loaded=false,busy=false,awaiting=0,awaitTimer=0,captured=null,baseline=null,disposed=false,clientBatch=false,clientAdd=false,acceptedCheckpoint=null,loadingRequest=null;
   const send=(type,extra={})=>{if(!disposed&&context&&parent&&!parent.closed)parent.postMessage({protocol:PROTOCOL,nonce:context.nonce,hostId,app,type,panelId:active.panelId,requestId:active.requestId,editKey:active.editKey,...extra},context.origin);};
   const ready=()=>send('ready',{capabilities:['reuse-v1',...(captureBatchResult?['batch-v1']:[])],loaded,busy:busy||!!awaiting});
@@ -76,12 +76,12 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
     return checkpoint===acceptedCheckpoint&&sameWorkspace===true?checkpoint:null;
   }
   const matchesActive=data=>data.panelId===active.panelId&&(data.requestId||'')===active.requestId;
-  async function reuseLoaded(data){
+  async function reuseLoaded(data,{preserveSelection=false}={}){
     busy=true;setDisabled(true);discard.disabled=true;
     try{
       // The user may have selected another image inside the warm editor.
       // Reusing a project must still resolve the image requested by Studio.
-      if(data.imageId&&typeof selectImage==='function')await selectImage(data.imageId);
+      if(!preserveSelection&&data.imageId&&typeof selectImage==='function')await selectImage(data.imageId);
       if(disposed)return;
       active.requestId=data.requestId||'';
       if(data.imageId)active.imageId=data.imageId;
@@ -102,6 +102,10 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
     if(external&&connection){const previous=connection;removeConnectionListener?.();removeConnectionListener=null;connection=null;parent=null;context=null;unmount();previous.close();}
   }
   async function confirmReplacement(data,blockedText){
+    if(workspace?.persistenceBusy){
+      block(data,'workspace-restore','保存した編集状態との関連付けを復元できませんでした。現在の編集内容は保持しています。');
+      return false;
+    }
     const owner=context,requestParent=parent;
     let prompt;
     try{prompt=documentRef.createElement('dialog');}catch{}
@@ -155,6 +159,15 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
       let releaseInteraction=null;
       busy=true;setDisabled(true);discard.disabled=true;
       try{
+        // Studio already validated this binding against the saved book. Reattach
+        // the exact baseline without changing the restored selection or drafts.
+        // A pending input is part of that saved workspace, not another project.
+        const restored=restoredBinding;
+        if(loaded&&restored&&data.panelId===active.panelId&&data.editKey===active.editKey&&(!data.imageId||data.imageId===active.imageId)&&data.project.size===restored.project.size){
+          const [incoming,saved]=await Promise.all([digest(data.project),digest(restored.project)]);
+          if(disposed)return;
+          if(restoredBinding===restored&&incoming===saved){restoredBinding=null;await reuseLoaded(data,{preserveSelection:true});return;}
+        }
         let adoptedCheckpoint=null,reuseProject=false,forceProject=false;
         if(typeof canReuseProject==='function')try{reuseProject=await canReuseProject(data)===true;}catch{}
         if(disposed)return;
@@ -182,6 +195,7 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
             forceProject=true;
           }
         }
+        restoredBinding=null;
         active={panelId:data.panelId,requestId:data.requestId||'',editKey:data.editKey||'',sourceName:String(data.sourceName||(app==='plot'?'figure.plotproject':'figure.mifito')).replace(/[\\/]/g,'_'),...(data.imageId?{imageId:data.imageId}:{})};
         clientBatch=Array.isArray(data.capabilities)&&data.capabilities.includes('batch-v1');clientAdd=Array.isArray(data.capabilities)&&data.capabilities.includes('add-v1');
         // Transport reconnection does not prove that this editor contains the
@@ -297,7 +311,7 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
     if(busy||awaiting||loadingRequest)throw Error('読み込み・反映処理が終わってから、作業内容を復元してください。');
     if(loaded&&active.panelId&&active.requestId)send('detached',{message:'編集画面の元プロジェクトが切り替わりました。対象の図を開くと再接続します。'});
     const previous=connection;removeConnectionListener?.();removeConnectionListener=null;connection=null;parent=null;context=null;previous?.close();unmount();
-    clearTimeout(awaitTimer);awaitTimer=0;active={panelId:'',requestId:'',editKey:'',sourceName:''};revision=0;initialized=false;loaded=false;captured=null;baseline=null;clientBatch=false;clientAdd=false;acceptedCheckpoint=null;
+    clearTimeout(awaitTimer);awaitTimer=0;active={panelId:'',requestId:'',editKey:'',sourceName:''};revision=0;initialized=false;loaded=false;captured=null;baseline=null;restoredBinding=null;clientBatch=false;clientAdd=false;acceptedCheckpoint=null;
     // Detaching can follow a manual project replacement even in a tab originally
     // opened by Studio. Its new local content now needs the normal adoption guard.
     normalVisit=true;
@@ -315,6 +329,7 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
       resetWorkspaceBinding();if(!binding)return;
       active={panelId:binding.panelId,requestId:'',editKey:binding.editKey,sourceName:binding.sourceName,...(binding.imageId?{imageId:binding.imageId}:{})};
       baseline={project:new Blob([binding.baselineProject],{type:binding.baselineProject.type||'application/octet-stream'}),sourceName:binding.sourceName};
+      restoredBinding={project:baseline.project};
       initialized=true;loaded=true;registry?.update();
       // A fresh Studio request may attach to this exact identity, but neither
       // the current editor nor its unreflected preview is loaded or applied.

@@ -7,14 +7,14 @@ import {imageAsset,imagePhysicalSize,imageMiFiToBodySize,blobToDataURL,dataURLTo
 import {importedImageSize,replacedImageSize,replacedMiFiToImageSize,miFiToSizeCorrection,imageInsertionPoint} from './image-placement.mjs?v=nested-groups-v0712-1';
 import {rasterResolution} from './image-resolution.mjs?v=image-quality-v066-1';
 import {saveDraft,loadDraft,saveProjectFileTarget,loadProjectFileTarget} from './storage.mjs?v=0.3.6-1';
-import {createDemo} from './demo.mjs?v=panel-labels-v0723-1';
+import {createDemo} from './demo.mjs?v=workspace-restore-v0724-1';
 import {createShortcutHandler,shortcutLabel} from './shortcuts.mjs?v=nested-groups-v0712-1';
 import {installShortcutUI} from './shortcut-ui.mjs?v=nested-groups-v0712-1';
 import {createRibbon} from './ribbon.mjs?v=source-batch-v070-1';
 import {imageArrayUnits,arrangeImageArray} from './image-array.mjs?v=nested-groups-v0712-1';
 import {createImageArrayDialog} from './image-array-dialog.mjs?v=nested-groups-v0712-1';
-import {applyPanelLabels} from './panel-labels.mjs?v=panel-labels-v0723-1';
-import {createPanelLabelDialog} from './panel-label-dialog.mjs?v=panel-labels-v0723-1';
+import {applyPanelLabels} from './panel-labels.mjs?v=workspace-restore-v0724-1';
+import {createPanelLabelDialog} from './panel-label-dialog.mjs?v=workspace-restore-v0724-1';
 import {createColorPickers} from './colors.mjs?v=unified-palette-1';
 import {renderTextPaint} from './text-paint.mjs?v=tex-v061-1';
 import {createTexRenderer} from './tex.mjs?v=micro-v0711-2';
@@ -23,10 +23,10 @@ import {openSource,SOURCE_APPS,setupSourceDiscovery,closeSourceSessions} from '.
 import {createFigureSidebar} from './thumbnails.mjs?v=live-v062-1';
 import {setupTransferReceiver,getFigureWorkspace} from './integration/direct-transfer.mjs?v=studio-send-v0714-1';
 import {readMifitoIdentity} from './integration/mifito-sync.mjs?v=0.3.5-1';
-import {readPlotIdentity} from './integration/plot-sync.mjs?v=panel-labels-v0723-1';
+import {readPlotIdentity} from './integration/plot-sync.mjs?v=workspace-restore-v0724-1';
 import {planMiFiToSync} from './mifito-batch.mjs?v=studio-send-v0714-1';
-import {setupUpdateCheck} from './update-check.mjs?v=panel-labels-v0723-1';
-import {installWorkspaceUpdater} from './workspace-update.mjs?v=panel-labels-v0723-1';
+import {setupUpdateCheck} from './update-check.mjs?v=workspace-restore-v0724-1';
+import {installWorkspaceUpdater} from './workspace-update.mjs?v=workspace-restore-v0724-1';
 import {marqueeSelection,resolveObjectSelection,clickObjectSelection,selectionDescription} from './selection.mjs?v=nested-groups-v0712-1';
 import {renderGroupLayers} from './group-layers.mjs?v=nested-groups-v0712-1';
 import {drawSelectionFrames} from './selection-overlay.mjs?v=studio-send-v0714-1';
@@ -43,11 +43,11 @@ import {reorderFigures} from './figure-order.mjs';
 import {renumberFigureNames} from './figure-names.mjs?v=0.3.3-1';
 import {deleteFigures,duplicateFigures} from './figure-commands.mjs?v=nested-groups-v0712-1';
 import {ProjectFileSession,projectFilePickerOptions} from './project-file.mjs?v=project-switch-v051-1';
-import {installWorkspacePersistence} from './workspace-session.mjs?v=panel-labels-v0723-1';
+import {installWorkspacePersistence} from './workspace-session.mjs?v=workspace-restore-v0724-1';
 import {decodeWorkspaceState} from './workspace-state.mjs?v=project-switch-v051-1';
-import {validateWorkspaceBinding} from './integration/bridge-host.mjs?v=source-save-v0717-1';
+import {validateWorkspaceBinding} from './integration/bridge-host.mjs?v=workspace-restore-v0724-1';
 
-const STUDIO_RELEASE={version:'0.7.23',build:'panel-labels-v0723-1'};
+const STUDIO_RELEASE={version:'0.7.24',build:'workspace-restore-v0724-1'};
 window.FigureAppRelease?.assertRunning(STUDIO_RELEASE);
 if(window.FigureAppRelease&&!await window.FigureAppRelease.startup())throw Error('最新版へ切り替えています。');
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
@@ -612,7 +612,9 @@ async function readProject(file,handle=null,{recovery=false}={}){
    finally{projectVersionChecking=false;}
   }
   if(file.size>400*1024*1024)throw Error('プロジェクトは400 MB以内で開いてください。');
+  toast('プロジェクトのデータを読み込んでいます…');
   const raw=JSON.parse(await file.text()),next=raw.format==='figure-studio-book'?validateBook(raw):{format:'figure-studio-book',version:1,id:uid(),activeId:raw.id,figures:[validateDocument(raw)]};
+  toast('プロジェクトの画像を復元しています…');
   const loaded=new Map(),imageIds=new Set(next.figures.flatMap(f=>f.objects.filter(o=>o.type==='image').map(o=>o.assetId)));
   for(const[id,a]of Object.entries(raw.assets||{})){
    if(typeof a.dataUrl!=='string'||!a.dataUrl.startsWith('data:'))throw Error('素材データが不正です。');
@@ -622,7 +624,7 @@ async function readProject(file,handle=null,{recovery=false}={}){
   const workspace=workspacePersistence(),hasEditorChanges=workspace?await workspace.hasWorkspaceChanges():false;
   if(gesture)endGesture(null,true);finishText();
   if(!recovery&&(dirty||pathDrawing?.drawing||hasEditorChanges)&&!confirm('現在の作業内容を閉じて、選択したプロジェクトを開きますか？'))return;
-  if(workspace)plan=await workspace.prepareWorkspaceRestore(raw.workspace??null);
+  if(workspace){toast('PlotLauncher／MiFiToの作業状態を復元しています…');plan=await workspace.prepareWorkspaceRestore(raw.workspace??null);}
   else if(raw.workspace)await decodeWorkspaceState(raw.workspace);
   const bindings=plan?await savedEditorBindings(plan.decoded,next,loaded):null;
   previous={book:snapshot(),assets,selection:[...selection],groupScope,dirty,revision,manualSavedRevision,preservedWorkspace,past:history.past,future:history.future};
