@@ -1,11 +1,13 @@
 import {SOURCE_APPS} from './integration/bridge-client.mjs?v=force-switch-v072-1';
 import {installWorkspacePersistence} from './workspace-session.mjs?v=panel-labels-v0723-1';
 import {installWorkspaceUpdater} from './workspace-update.mjs?v=panel-labels-v0723-1';
+import {installBrowserZoomGuard} from './browser-zoom.mjs?v=browser-zoom-v0729-1';
 
 const APPS=['studio','plot','mifito'];
 
 /** One live document per editor: changing the visible workspace never navigates it. */
 export function createWorkspace({windowRef=window,documentRef=windowRef.document}={}){
+ installBrowserZoomGuard(documentRef);
  const workspaceOwner=windowRef.crypto?.randomUUID?.()||crypto.randomUUID();
  const frames=new Map([['studio',documentRef.getElementById('studio-frame')]]);
  const reloadToken=new URL(windowRef.location.href).searchParams.get('_workspaceUpdate');
