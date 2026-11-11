@@ -225,7 +225,11 @@ def render_matrix(engine, config):
                     extent=_MarkerExtent(image);axes.add_artist(extent);extra.append(extent)
                 axes.set_xlim(xs[0]-px/2,xs[-1]+px/2);axes.set_ylim(ys[-1]-py/2,ys[0]+py/2)
                 if options.get("equalAspect",True): axes.set_aspect("equal",adjustable="box")
-                if options.get("colorbar",True):
+                visibility=options.get("colorbarVisibility",{})
+                if not isinstance(visibility,dict): raise ValueError("シートごとのカラーバー表示を確認してください。")
+                show_colorbar=visibility.get(str(active),options.get("colorbar",True))
+                if not isinstance(show_colorbar,bool): raise ValueError("カラーバーの表示設定を確認してください。")
+                if show_colorbar:
                     cax=figure.add_axes([(width+1.18)/(width+2.6),.9/(height+2),.16/(width+2.6),height/(height+2)])
                     colorbar=figure.colorbar(image,cax=cax)
                     colorbar.outline.set_visible(False)

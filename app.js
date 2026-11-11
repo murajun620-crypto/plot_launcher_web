@@ -1,15 +1,15 @@
-import {createMatrixEditor} from './matrix-editor.mjs?v=940afceb1b0d';
-import {isMatrixPlot,isCombinedHistogram} from './matrix-model.mjs?v=940afceb1b0d';
+import {createMatrixEditor} from './matrix-editor.mjs?v=d94b6f0be905';
+import {isMatrixPlot,isCombinedHistogram,matrixColorbarVisible} from './matrix-model.mjs?v=d94b6f0be905';
 import {createFileProgress} from './file-progress.mjs?v=file-open-1';
-import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=940afceb1b0d';
+import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=d94b6f0be905';
 import {setupDirectSendButton,getFigureWorkspace} from './direct-transfer.mjs?v=baaeeccc3ee1';
 import {identifyPlotProject,plotSheetIndex,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=baaeeccc3ee1';
 import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=9127ec4c4f31";
 import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=9127ec4c4f31";
 import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9127ec4c4f31";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=940afceb1b0d";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=940afceb1b0d";
-import { APP_VERSION, COLORS, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=940afceb1b0d";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=d94b6f0be905";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=d94b6f0be905";
+import { APP_VERSION, COLORS, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=d94b6f0be905";
 
 import {alignmentOffsets} from './object-layout.mjs?v=27ae7675c457';
 import {createDataEditor} from './data-editor.mjs?v=27ae7675c457';
@@ -22,7 +22,7 @@ import {createXRangePicker} from './x-range-picker.mjs?v=normalization-range-1';
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 const fileProgress=createFileProgress();
-const APP_BUILD = '940afceb1b0d';
+const APP_BUILD = 'd94b6f0be905';
 window.FigureAppRelease?.assertRunning({version:APP_VERSION,build:APP_BUILD});
 function makeProject(settings,data,fonts,workspace={}){
   const live=sourceData&&data.filename===sourceData.filename&&(data.bytes===sourceData.bytes||data.files&&data.files===sourceData.files);
@@ -467,7 +467,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=940afceb1b0d", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=d94b6f0be905", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") {
       if(data.id)requests.get(data.id)?.progressTask?.stage(data.text,{completed:data.completed,total:data.total,unit:data.unit||''});
@@ -712,7 +712,23 @@ function drawPresetOptions() {
   document.querySelector('#axes-title').textContent=presets.find(preset=>preset.id===type)?.label || type;
 }
 
-const matrixEditor=createMatrixEditor({root:$('#matrix-editor'),request,getMetadata:()=>metadata,getConfig:()=>config,enhanceColors:enhanceColorInputs,showDialog:()=>showDialog('#matrix-editor'),onApply:async({kind,options,series,activeSheet})=>{
+function mapColorbarForSheet(index,fallback){
+  let settings=config;
+  const saved=sheetSettings.get(index);
+  if(sheetMode==='individual'&&index!==metadata.sheetIndex&&saved)settings=saved.inheritSharedSettings?sharedSettings:saved.inheritFirstSheet?sheetSettings.get(0):saved;
+  return settings?.plotType==='Surface Map'&&settings.options?.matrix?matrixColorbarVisible(settings.options.matrix,index):fallback;
+}
+function applyMapColorbarVisibility(options){
+  const changes=Object.fromEntries(options.sheets.map(index=>[index,matrixColorbarVisible(options,index)]));
+  const update=settings=>{if(settings?.plotType==='Surface Map'&&settings.options?.matrix)settings.options.matrix={...settings.options.matrix,colorbarVisibility:{...settings.options.matrix.colorbarVisibility,...changes}};};
+  update(config);update(sharedSettings);for(const settings of sheetSettings.values())update(settings);
+  config.options.matrix.colorbar=options.colorbar;
+  if(sharedSettings?.plotType==='Surface Map'&&sharedSettings.options?.matrix)sharedSettings.options.matrix.colorbar=options.colorbar;
+  sheetSettings.set(metadata.sheetIndex,makeSettings(config,metadata,loadedHeader));
+  drawControls();changed(0);
+}
+const matrixEditor=createMatrixEditor({root:$('#matrix-editor'),request,getMetadata:()=>metadata,getConfig:()=>config,getColorbarVisibility:mapColorbarForSheet,enhanceColors:enhanceColorInputs,showDialog:()=>showDialog('#matrix-editor'),onApply:async({kind,options,series,activeSheet,visibilityOnly})=>{
+  if(visibilityOnly){applyMapColorbarVisibility(options);return;}
   const previous=structuredClone(config),perSheet=kind==='Surface Map'||options.histSheetMode==='separate';
   if(perSheet&&activeSheet!==metadata.sheetIndex){
     sourceData={...sourceData,selectedSheets:[...new Set([...selectedSheetIndices(),activeSheet])].sort((a,b)=>a-b)};
