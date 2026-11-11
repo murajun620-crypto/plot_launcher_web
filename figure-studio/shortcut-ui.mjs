@@ -9,7 +9,7 @@ export function installShortcutUI({documentRef=globalThis.document,platform=keyb
  const table=documentRef.querySelector('#helpDialog .shortcut-table tbody');
  if(table){
   table.replaceChildren();
-  const rows=[...shortcutRows(platform),['サムネイルの複数選択',mac?'⌘ + クリック / Shift + クリック':'Ctrl + クリック / Shift + クリック'],['サイドバーでFigure追加','Enter'],['Figureの並べ替え','サムネイルをドラッグ']];
+  const rows=[...shortcutRows(platform),['プレゼン中の移動／終了','← / → / Space / PageUp / PageDown / Esc'],['ツールを折りたたむ／展開',format('Ctrl+F1')],['サムネイルの複数選択',mac?'⌘ + クリック / Shift + クリック':'Ctrl + クリック / Shift + クリック'],['サイドバーでFigure追加','Enter'],['Figureの並べ替え','サムネイルをドラッグ']];
   for(const [label,keys] of rows){const row=documentRef.createElement('tr'),name=documentRef.createElement('td'),value=documentRef.createElement('td'),key=documentRef.createElement('kbd');name.textContent=label;key.textContent=keys;value.append(key);row.append(name,value);table.append(row);}
  }
  const lead=documentRef.querySelector('#helpDialog .dialog-lead');

@@ -7,3 +7,5 @@
 @media(max-width:850px){.workspace-header{gap:14px;padding-inline:12px}.workspace-tab{padding:8px 10px;font-size:12px}.workspace-brand{font-size:14px}.workspace-release{gap:6px}.update-check-button{padding-inline:5px}}
 @media(max-width:640px){.workspace-header{flex-wrap:wrap;gap:0 12px;padding:9px 10px 7px}.workspace-identity{order:0;max-width:100%;gap:8px}.workspace-brand{flex:none}.workspace-release{flex:none}.workspace-tabs{order:1;flex-basis:100%;margin-top:7px;gap:5px}.workspace-tab{flex:1;min-height:34px;padding:6px}.workspace-status{bottom:12px}}
 @media(prefers-reduced-motion:no-preference){.workspace-tab,.update-check-button{transition:background .1s,color .1s}}
+
+html[data-presentation-mode=true] .workspace-header{display:none}

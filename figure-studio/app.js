@@ -4,19 +4,21 @@ import {PT_PER_MM,mm,toMM,uid,clone,newDocument,makeObject,bounds,objectBounds,e
 import {isPathObject,pathData,objectFromPoints} from './paths.mjs?v=ribbon-v060-1';
 import {createPathDrawing} from './path-drawing.mjs?v=ribbon-v060-1';
 import {imageAsset,imagePhysicalSize,imageMiFiToBodySize,blobToDataURL,dataURLToBlob,download,sanitizeSVG} from './assets.mjs?v=nested-groups-v0712-1';
-import {serializeOfficeSVG} from './svg-export.mjs?v=compact-header-v0727-1';
-import {preparePNG} from './png-export.mjs?v=compact-header-v0727-1';
+import {serializeOfficeSVG} from './svg-export.mjs?v=presentation-v0728-1';
+import {preparePNG} from './png-export.mjs?v=presentation-v0728-1';
 import {importedImageSize,replacedImageSize,replacedMiFiToImageSize,miFiToSizeCorrection,imageInsertionPoint} from './image-placement.mjs?v=nested-groups-v0712-1';
 import {rasterResolution} from './image-resolution.mjs?v=image-quality-v066-1';
 import {saveDraft,loadDraft,saveProjectFileTarget,loadProjectFileTarget} from './storage.mjs?v=0.3.6-1';
-import {createDemo} from './demo.mjs?v=compact-header-v0727-1';
+import {stageStudioUpdate,restoreStudioUpdate,isLegacyStudioUpdate,finishLegacyStudioUpdate} from './startup-session.mjs?v=presentation-v0728-1';
+import {createDemo} from './demo.mjs?v=presentation-v0728-1';
 import {createShortcutHandler,shortcutLabel} from './shortcuts.mjs?v=nested-groups-v0712-1';
-import {installShortcutUI} from './shortcut-ui.mjs?v=nested-groups-v0712-1';
-import {createRibbon} from './ribbon.mjs?v=compact-header-v0727-1';
+import {installShortcutUI} from './shortcut-ui.mjs?v=presentation-v0728-1';
+import {createRibbon} from './ribbon.mjs?v=presentation-v0728-1';
+import {createPresentation} from './presentation.mjs?v=presentation-v0728-1';
 import {imageArrayUnits,arrangeImageArray} from './image-array.mjs?v=nested-groups-v0712-1';
 import {createImageArrayDialog} from './image-array-dialog.mjs?v=nested-groups-v0712-1';
-import {applyPanelLabels} from './panel-labels.mjs?v=compact-header-v0727-1';
-import {createPanelLabelDialog} from './panel-label-dialog.mjs?v=compact-header-v0727-1';
+import {applyPanelLabels} from './panel-labels.mjs?v=presentation-v0728-1';
+import {createPanelLabelDialog} from './panel-label-dialog.mjs?v=presentation-v0728-1';
 import {createColorPickers} from './colors.mjs?v=unified-palette-1';
 import {renderTextPaint} from './text-paint.mjs?v=tex-v061-1';
 import {createTexRenderer} from './tex.mjs?v=micro-v0711-2';
@@ -25,10 +27,10 @@ import {openSource,SOURCE_APPS,setupSourceDiscovery,closeSourceSessions} from '.
 import {createFigureSidebar} from './thumbnails.mjs?v=live-v062-1';
 import {setupTransferReceiver,getFigureWorkspace} from './integration/direct-transfer.mjs?v=studio-send-v0714-1';
 import {readMifitoIdentity} from './integration/mifito-sync.mjs?v=0.3.5-1';
-import {readPlotIdentity} from './integration/plot-sync.mjs?v=compact-header-v0727-1';
+import {readPlotIdentity} from './integration/plot-sync.mjs?v=presentation-v0728-1';
 import {planMiFiToSync} from './mifito-batch.mjs?v=studio-send-v0714-1';
-import {setupUpdateCheck} from './update-check.mjs?v=compact-header-v0727-1';
-import {installWorkspaceUpdater} from './workspace-update.mjs?v=compact-header-v0727-1';
+import {setupUpdateCheck} from './update-check.mjs?v=presentation-v0728-1';
+import {installWorkspaceUpdater} from './workspace-update.mjs?v=presentation-v0728-1';
 import {marqueeSelection,resolveObjectSelection,clickObjectSelection,selectionDescription} from './selection.mjs?v=nested-groups-v0712-1';
 import {renderGroupLayers} from './group-layers.mjs?v=nested-groups-v0712-1';
 import {drawSelectionFrames} from './selection-overlay.mjs?v=studio-send-v0714-1';
@@ -45,11 +47,11 @@ import {reorderFigures} from './figure-order.mjs';
 import {renumberFigureNames} from './figure-names.mjs?v=0.3.3-1';
 import {deleteFigures,duplicateFigures} from './figure-commands.mjs?v=nested-groups-v0712-1';
 import {ProjectFileSession,projectFilePickerOptions} from './project-file.mjs?v=project-switch-v051-1';
-import {installWorkspacePersistence} from './workspace-session.mjs?v=compact-header-v0727-1';
+import {installWorkspacePersistence} from './workspace-session.mjs?v=presentation-v0728-1';
 import {decodeWorkspaceState} from './workspace-state.mjs?v=project-switch-v051-1';
-import {validateWorkspaceBinding} from './integration/bridge-host.mjs?v=compact-header-v0727-1';
+import {validateWorkspaceBinding} from './integration/bridge-host.mjs?v=presentation-v0728-1';
 
-const STUDIO_RELEASE={version:'0.7.27',build:'compact-header-v0727-1'};
+const STUDIO_RELEASE={version:'0.7.28',build:'presentation-v0728-1'};
 window.FigureAppRelease?.assertRunning(STUDIO_RELEASE);
 if(window.FigureAppRelease&&!await window.FigureAppRelease.startup())throw Error('最新版へ切り替えています。');
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
@@ -60,7 +62,7 @@ const el=(tag,attrs={},text)=>{const n=document.createElementNS(ns,tag);for(cons
 let doc=newDocument(),assets=new Map(),selection=[],tool='select',scale=1.5,history=new History(),gesture=null,textBefore=null,editingId=null,dirty=false,saveTimer,revision=0,clipboard=null,formatClipboard=null,frame=0,spaceDown=false,manualSavedRevision=-1,bridge=null;
 let groupScope=null;
 let figures=[doc],bookId=uid(),initialDemo=false,transferQueue=Promise.resolve(),updateReloading=false;
-let projectSaving=false,projectOpening=false,projectVersionChecking=false;
+let projectSaving=false,projectOpening=false,projectVersionChecking=false,startupRestoring=false;
 let preservedWorkspace=null,textCaret=null,lastPendingPropertyInput=null;
 let clipboardMarker='Figure Studio objects',clipboardGeneration=0,clipboardPNG=null;
 const pendingPropertyInputs=new WeakSet();
@@ -87,6 +89,31 @@ const measure=document.createElement('canvas').getContext('2d');
 let texFrame=0,editingTexSession=false,editorComposing=false;
 const texRenderer=createTexRenderer({measure:(text,object)=>{measure.font=font(object);return measure.measureText(text).width;},onReady:key=>{let resized=false;for(const figure of figures)for(const object of figure.objects)if(object.textAutoSize&&texRenderer.key(object)===key)resized=fitText(object)||resized;if(resized&&!editingId){dirty=true;revision++;scheduleSave();}figureSidebar.invalidate(figures.filter(f=>f.objects.some(o=>o.type==='text'&&texRenderer.key(o)===key)).map(f=>f.id));if(!texFrame)texFrame=requestAnimationFrame(()=>{texFrame=0;render();});},onError:(error,key)=>{if(!editingId&&!livePreview.ownsKey(key)&&doc.objects.some(o=>o.type==='text'&&texRenderer.key(o)===key))toast(error.message);}});
 const livePreview=createLiveTexPreview({renderer:texRenderer,root:$('#texPreviewPanel'),svg:$('#texPreviewSvg'),status:$('#texPreviewStatus'),sourceSlot:$('#texSourceSlot'),paint:renderTextPaint,el,onPosition:placeTexSource});
+const presentationTexRenderer=createTexRenderer({measure:(text,object)=>{measure.font=font(object);return measure.measureText(text).width;}});
+let presentationScroll=null;
+const presentation=createPresentation({
+ root:$('#studioPresentation'),editorRoot:$('.app-shell'),
+ getSlides:()=>figures.map(figure=>({id:figure.id,name:figure.name,width:figure.width,height:figure.height,version:`${bookId}:${revision}`})),getCurrentId:()=>doc.id,
+ beforeStart:()=>{
+  if(projectSaving||projectOpening||startupRestoring||updateReloading||getFigureWorkspace(window)?.persistenceBusy){toast('保存・読み込みが完了してから開始してください');return false;}
+  if(gesture){toast('ドラッグ操作を終えてから開始してください');return false;}
+  if(!commitFocusedProperty())return false;
+  if(pathDrawing?.drawing&&!pathDrawing.finish()){toast('作図を確定するか、Escで取り消してから開始してください');return false;}
+  finishText();syncFigure();presentationScroll={left:viewport.scrollLeft,top:viewport.scrollTop};for(const menu of $$('details:not(.sidebar-text-panel)[open]'))menu.open=false;$('#contextMenu').hidden=true;$('#keyHint').hidden=true;livePreview.hide();return true;
+ },
+ renderSlide:async slide=>{
+  const figure=figures.find(figure=>figure.id===slide.id);if(!figure)throw Error('Figureが見つかりません');
+  const captured=clone(figure.objects),sourceAssets=new Map(assets);
+  await presentationTexRenderer.prepare(captured);
+  const urls=new Set(captured.filter(object=>object.type==='image').map(object=>sourceAssets.get(object.assetId)?.dataUrl).filter(Boolean));
+  await Promise.all([...urls].map(async url=>{const image=new Image();image.src=url;await image.decode();}));
+  const out=el('svg',{xmlns:ns,viewBox:`0 0 ${slide.width} ${slide.height}`,width:slide.width,height:slide.height});
+  for(const object of captured){const group=el('g');drawContent(object,group,true,sourceAssets,presentationTexRenderer);group.removeAttribute('data-id');group.removeAttribute('style');out.append(group);}return out;
+ },
+ onActiveChange:active=>getFigureWorkspace(window)?.setPresentationMode?.(active),
+ onAfterExit:()=>{const saved=presentationScroll;presentationScroll=null;if(saved)requestAnimationFrame(()=>{viewport.scrollLeft=saved.left;viewport.scrollTop=saved.top;renderOverlay();positionEditor();});},onError:error=>toast(error.message)
+});
+window.FigureStudioPresentation={exit:()=>presentation.exit()};
 const arrowPicker=createArrowPicker({root:$('#arrowProperties'),onChange:(property,value)=>change(()=>editable().forEach(o=>setArrowProperty(o,property,value)))});
 const lineStylePicker=createLineStylePicker({root:$('#lineStylePicker'),onChange:value=>change(()=>editable().forEach(o=>setLineStyle(o,value)))});
 let previewErrorShown=false;
@@ -120,12 +147,12 @@ function transform(o){return `translate(${o.x} ${o.y}) rotate(${o.rotation||0} $
 function font(o){return `${o.italic?'italic ':''}${o.bold?'bold ':''}${o.fontSize}px ${o.fontFamily||'Arial'}`;}
 function fitText(o){if(o?.type!=='text'||o.locked)return false;o.textAutoSize=true;const layout=texRenderer.hasMath(o)?texRenderer.getLayout(o):null;if(texRenderer.hasMath(o)&&!layout)return false;return fitTextBox(o,{layout,measure:(text,object)=>{measure.font=font(object);return measure.measureText(text);}});}
 function textLines(o){if(o.textAutoSize)return naturalTextLines(o.text);measure.font=font(o);const out=[];for(const paragraph of o.text.split('\n')){let line='';for(const c of paragraph){if(line&&measure.measureText(line+c).width>Math.max(1,o.w-2)){out.push(line);line=c;}else line+=c;}out.push(line);}return out;}
-function drawContent(o,g,full=false,sourceAssets){
- const mathText=o.type==='text'&&texRenderer.hasMath(o);
+function drawContent(o,g,full=false,sourceAssets,textRenderer=texRenderer){
+ const mathText=o.type==='text'&&textRenderer.hasMath(o);
  g.replaceChildren();g.style.visibility=!full&&editingId===o.id&&(editingTexSession||mathText||!(o.type==='text'&&o.stroke&&o.stroke!=='none'&&o.strokeWidth>0&&(o.strokeTransparency??0)<100))?'hidden':'';g.setAttribute('transform',transform(o));g.setAttribute('opacity',o.opacity??1);g.setAttribute('fill-opacity',1-(o.fillTransparency??0)/100);g.setAttribute('stroke-opacity',1-(o.strokeTransparency??0)/100);g.setAttribute('data-id',o.id);g.style.cursor=o.locked?'default':'move';
  if(o.type==='image'){const a=(sourceAssets||assets).get(o.assetId);if(a){g.append(el('image',{width:o.w,height:o.h,href:full===true?a.dataUrl:full==='thumbnail'?(a.previewUrl||a.dataUrl):previewQuality.getURL(a,{width:Math.abs(o.w*scale),height:Math.abs(o.h*scale),pixelRatio:globalThis.devicePixelRatio||1}),preserveAspectRatio:'none'}));}else{g.append(el('rect',{width:o.w,height:o.h,fill:'#f4ddd9',stroke:'#c27466'}));g.append(el('text',{x:5,y:18,'font-size':10},'画像が見つかりません'));}}
  else if(o.type==='text'){
- const layout=mathText&&(full||editingId!==o.id)?texRenderer.getLayout(o):null;g.append(...renderTextPaint(o,{el,lines:layout?undefined:textLines(o),layout,uniqueId:uid()}));
+ const layout=mathText&&(full||editingId!==o.id)?textRenderer.getLayout(o):null;g.append(...renderTextPaint(o,{el,lines:layout?undefined:textLines(o),layout,uniqueId:uid()}));
  if(!full)g.prepend(el('rect',{width:Math.max(o.w,5),height:Math.max(o.h,o.fontSize*1.2,layout?.height??0),fill:'transparent','data-hit':'true'}));
  }else if(o.type==='line'||o.type==='arrow'){
  if(!full)g.append(el('line',{x1:0,y1:0,x2:o.w,y2:o.h,stroke:'transparent','stroke-width':Math.max(12/scale,o.strokeWidth),'pointer-events':'stroke'}));
@@ -351,6 +378,9 @@ function applyTextStyle(property,value){if(editingId){const o=doc.objects.find(o
 function changeFont(action){applyTextStyle('fontSize',v=>fontSizeForAction(v,action));}
 function addLabels(){finishText();panelLabelDialog.show();}
 function execute(action,payload={}){
+ if(startupRestoring)return;
+ if(action==='present')return presentation.start({fromCurrent:true});
+ if(presentation.active)return;
  if(pathDrawing?.drawing){if(action==='save'||action==='save-as'){if(!pathDrawing.finish()){toast('2点以上を指定してから保存してください');return;}}else if(['undo','redo','new','sample','new-figure','open','next-figure','previous-figure'].includes(action)){pathDrawing.cancel();if(action==='undo')return;}}
  if(action==='edit-points'){const object=editable()[0];if(selection.length===1&&['curve','freeform'].includes(object?.type)){pathEditId=pathEditId===object.id?null:object.id;renderOverlay();renderInspector();svg.focus({preventScroll:true});}return;}
  if(action==='close-path')return change(()=>editable().filter(object=>['curve','freeform'].includes(object.type)&&(object.closed||object.points.length>=3)).forEach(object=>object.closed=!object.closed));
@@ -408,7 +438,7 @@ function execute(action,payload={}){
 }
 const shortcut=createShortcutHandler({execute,isEditing:e=>e.target===editor?'canvas-text':e.target.isContentEditable||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName),isCanvasActive:()=>document.querySelector('dialog[open]')?false:document.activeElement?.closest('#studioRibbon,#ribbonSelectionPane,.app-header')?'ribbon':(document.activeElement===svg||document.activeElement===document.body||document.activeElement===editor||!!document.activeElement?.closest('#figureTabs')),onHint:text=>{$('#keyHint').textContent=text;$('#keyHint').hidden=!text;}});
 window.addEventListener('keydown',shortcut);document.addEventListener('pointerdown',()=>shortcut.reset());
-document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b||b.disabled)return;const action=b.dataset.action;execute(action);for(const d of $$('details:not(.sidebar-text-panel)[open]'))d.open=false;if(['new-figure','duplicate-figure','delete-figure','move-figure-left','move-figure-right'].includes(action)){focusFigure();return;}if(!['labels','image-array','help','open','import','save','save-as','attach-source','edit-source','export-pdf','toggle-selection-pane','show-text-pane'].includes(action)&&!editingId)svg.focus({preventScroll:true});});
+document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b||b.disabled)return;const action=b.dataset.action;execute(action);for(const d of $$('details:not(.sidebar-text-panel)[open]'))d.open=false;if(['new-figure','duplicate-figure','delete-figure','move-figure-left','move-figure-right'].includes(action)){focusFigure();return;}if(!['labels','image-array','help','open','import','save','save-as','attach-source','edit-source','export-pdf','toggle-selection-pane','show-text-pane','present'].includes(action)&&!editingId)svg.focus({preventScroll:true});});
 for(const button of $$('#studioRibbon [data-action],#ribbonSelectionPane [data-action]'))button.addEventListener('pointerdown',event=>{if(editingId&&isRibbonTextControl(button))event.preventDefault();});
 $('#docName').addEventListener('input',e=>{const name=e.target.value||'Untitled Figure';change(()=>doc.name=name);});
 for(const [id,key]of [['pageWidth','width'],['pageHeight','height']])$('#'+id).addEventListener('change',e=>{const v=Number(e.target.value);if(v>=10&&v<=2000){change(()=>doc[key]=mm(v));fit();}else{toast('用紙サイズは10〜2000 mmです');renderInspector();}});
@@ -811,7 +841,13 @@ svg.addEventListener('contextmenu',e=>{e.preventDefault();finishText();const id=
 document.addEventListener('pointerdown',e=>{if(!e.target.closest('#contextMenu'))$('#contextMenu').hidden=true;for(const d of $$('details:not(.sidebar-text-panel)[open]'))if(!d.contains(e.target))d.open=false;});
 window.addEventListener('beforeunload',e=>{if(!updateReloading&&(projectSaving||dirty||pathDrawing?.drawing||(editingId&&textBefore&&JSON.stringify(snapshot())!==JSON.stringify(textBefore)))){e.preventDefault();e.returnValue='';}});
 window.addEventListener('resize',()=>{if(!gesture)renderOverlay();});
-try{const restored=await loadDraft();if(restored){if(restored.doc.format==='figure-studio-book')restoreBook(validateBook(restored.doc));else{doc=validateDocument(restored.doc);figures=[doc];}assets=restored.assets;$('#saveStatus').textContent='ブラウザから復元';}else{const demo=createDemo();doc=demo.doc;figures=[doc];assets=demo.assets;initialDemo=true;$('#saveStatus').textContent='デモ · 模擬データ';}}catch{const demo=createDemo();doc=demo.doc;figures=[doc];assets=demo.assets;initialDemo=true;$('#saveStatus').textContent='自動保存を利用できません';}
+// Ordinary launches/reloads start empty; explicit update sessions restore below.
+doc.name='Fig. 1';$('#saveStatus').textContent='新規プロジェクト';
+if(isLegacyStudioUpdate(STUDIO_RELEASE.build))try{
+ const restored=await loadDraft();if(!restored)throw Error('一時保存が見つかりません。');
+ if(restored){if(restored.doc.format==='figure-studio-book')restoreBook(validateBook(restored.doc));else{doc=validateDocument(restored.doc);figures=[doc];}assets=restored.assets;dirty=true;$('#saveStatus').textContent='更新前の作業を復元';}
+ finishLegacyStudioUpdate();
+}catch(error){toast('更新前の作業を復元できませんでした。再読み込みで再試行できます。'+error.message);}
 try{const target=await loadProjectFileTarget(bookId);if(target)projectFiles.opened(bookId,target);}catch{}
 renumberFigureNames(figures);render();fit();setTool('select');
 const workspaceReceiver=setupTransferReceiver({onImport:receiveDirectFigure,allowAdd:true,onStatus:({state,message})=>{if(state==='error')toast(message);}});
@@ -853,12 +889,8 @@ const integratedWorkspace=getFigureWorkspace(window);
 let standaloneUpdater=null;
 if(integratedWorkspace)installWorkspaceUpdater(integratedWorkspace,{windowRef:window.parent,documentRef:window.parent.document});
 else standaloneUpdater=setupUpdateCheck({onStatus:toast,beforeReload:async()=>{
- if(pathDrawing?.drawing&&!pathDrawing.finish())throw Error('作図中の線を確定するか、Escで取り消してから更新してください。');
- if(!commitFocusedProperty())throw Error('入力中の数値を確定してから更新してください。');
- if(projectSaving||projectOpening&&!projectVersionChecking)throw Error('プロジェクトの保存・読み込みが完了してから更新してください。');
- updateReloading=true;
- try{await transferQueue;if(gesture)endGesture(null,true);finishText();const rev=revision;clearTimeout(saveTimer);await saveDraft(snapshot(),assets);if(rev!==revision)throw Error('保存中に変更がありました。もう一度「更新する」を押してください。');dirty=false;return true;}
- catch(error){updateReloading=false;throw error;}
+ try{const saved=await window.FigureStudioWorkspaceUpdate.capture();return {resumeToken:await stageStudioUpdate(saved)};}
+ catch(error){window.FigureStudioWorkspaceUpdate.cancel();throw error;}
 }});
 window.FigureStudioWorkspaceSave=async()=>{
  if(pathDrawing?.drawing&&!pathDrawing.finish())throw Error('作図中の線を確定するか、Escで取り消してください。');
@@ -874,9 +906,14 @@ window.FigureStudioWorkspaceSave=async()=>{
 };
 
 window.FigureAppRelease?.configure({
- ready:()=>!projectSaving&&!projectOpening,
+ ready:()=>!projectSaving&&!projectOpening&&!startupRestoring,
  update:(target,pendingToken)=>standaloneUpdater?.forceUpdate(target,pendingToken),
  open:record=>readProject(record.file,record.handle,record.options),
  error:error=>toast(error.message)
 });
-if(!integratedWorkspace)void window.FigureAppRelease?.resumePending().catch(error=>toast(error.message));
+if(!integratedWorkspace){
+ const resumeRoot=$('.app-shell'),wasInert=resumeRoot.inert;startupRestoring=new URL(location.href).searchParams.has('_studioResume');if(startupRestoring)resumeRoot.inert=true;
+ try{await restoreStudioUpdate({restore:saved=>window.FigureStudioWorkspaceUpdate.restore(saved)});}catch(error){toast('更新前の作業を復元できませんでした。再読み込みで再試行できます。'+error.message);}
+ finally{startupRestoring=false;resumeRoot.inert=wasInert;}
+ void window.FigureAppRelease?.resumePending().catch(error=>toast(error.message));
+}
