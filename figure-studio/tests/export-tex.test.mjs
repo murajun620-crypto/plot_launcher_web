@@ -30,15 +30,15 @@ const flatten=nodes=>nodes.flatMap(node=>[node,...flatten(node.children)]);
 function harness(objects,texRenderer,{onFinishText=()=>{}}={}){
  const initialDoc={...newDocument(),name:'TeX Figure',objects},downloads=[],messages=[];let exported;
  class Serializer{serializeToString(node){exported=node;return serialize(node);}}
- const api=Function('initialDoc','texRenderer','el','toMM','XMLSerializer','renderTextPaint','download','toast','onFinishText','lineStrokeAttributes',
+ const api=Function('initialDoc','texRenderer','el','toMM','XMLSerializer','renderTextPaint','download','toast','onFinishText','lineStrokeAttributes','serializeOfficeSVG',
   `let doc=initialDoc,finished=0,editingId=null,scale=1;const ns='http://www.w3.org/2000/svg',measure={measureText:text=>({width:text.length*10})};
    const uid=()=> 'export-tex',safeName=name=>name;
    function finishText(){finished++;onFinishText(doc);}`+
   section('function transform(','function drawContent(')+section('function drawContent(','function render(){')+
-  section('function buildExport(){','function validateBook(')+
+  section('function buildExport(','function validateBook(')+
   section('async function prepareFigureExport(){','function withPNGResolution(')+
   'return {prepareFigureExport,exportSVG,buildExport,setDocument(value){doc=value;},get doc(){return doc;},get finished(){return finished;}};'
- )(initialDoc,texRenderer,el,toMM,Serializer,renderTextPaint,(blob,name)=>downloads.push({blob,name}),message=>messages.push(message),onFinishText,lineStrokeAttributes);
+ )(initialDoc,texRenderer,el,toMM,Serializer,renderTextPaint,(blob,name)=>downloads.push({blob,name}),message=>messages.push(message),onFinishText,lineStrokeAttributes,node=>new Serializer().serializeToString(node));
  return {api,downloads,messages,get exported(){return exported;}};
 }
 
