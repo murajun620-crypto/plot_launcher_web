@@ -4,23 +4,23 @@ import {PT_PER_MM,mm,toMM,uid,clone,newDocument,makeObject,bounds,objectBounds,e
 import {isPathObject,pathData,objectFromPoints} from './paths.mjs?v=ribbon-v060-1';
 import {createPathDrawing} from './path-drawing.mjs?v=ribbon-v060-1';
 import {imageAsset,imagePhysicalSize,imageMiFiToBodySize,blobToDataURL,dataURLToBlob,download,sanitizeSVG} from './assets.mjs?v=nested-groups-v0712-1';
-import {serializeOfficeSVG} from './svg-export.mjs?v=panel-label-close-v0732-1';
-import {preparePNG} from './png-export.mjs?v=panel-label-close-v0732-1';
+import {serializeOfficeSVG} from './svg-export.mjs?v=plot-output-v0733-1';
+import {preparePNG} from './png-export.mjs?v=plot-output-v0733-1';
 import {importedImageSize,replacedImageSize,replacedMiFiToImageSize,miFiToSizeCorrection,imageInsertionPoint} from './image-placement.mjs?v=nested-groups-v0712-1';
 import {rasterResolution} from './image-resolution.mjs?v=image-quality-v066-1';
 import {saveDraft,loadDraft,saveProjectFileTarget,loadProjectFileTarget} from './storage.mjs?v=0.3.6-1';
-import {stageStudioUpdate,restoreStudioUpdate,isLegacyStudioUpdate,finishLegacyStudioUpdate} from './startup-session.mjs?v=panel-label-close-v0732-1';
-import {createDemo} from './demo.mjs?v=panel-label-close-v0732-1';
+import {stageStudioUpdate,restoreStudioUpdate,isLegacyStudioUpdate,finishLegacyStudioUpdate} from './startup-session.mjs?v=plot-output-v0733-1';
+import {createDemo} from './demo.mjs?v=plot-output-v0733-1';
 import {createShortcutHandler,shortcutLabel} from './shortcuts.mjs?v=nested-groups-v0712-1';
-import {installShortcutUI} from './shortcut-ui.mjs?v=panel-label-close-v0732-1';
-import {createRibbon} from './ribbon.mjs?v=panel-label-close-v0732-1';
-import {createPresentation} from './presentation.mjs?v=panel-label-close-v0732-1';
-import {installBrowserZoomGuard} from './browser-zoom.mjs?v=panel-label-close-v0732-1';
+import {installShortcutUI} from './shortcut-ui.mjs?v=plot-output-v0733-1';
+import {createRibbon} from './ribbon.mjs?v=plot-output-v0733-1';
+import {createPresentation} from './presentation.mjs?v=plot-output-v0733-1';
+import {installBrowserZoomGuard} from './browser-zoom.mjs?v=plot-output-v0733-1';
 import {imageArrayUnits,arrangeImageArray} from './image-array.mjs?v=nested-groups-v0712-1';
 import {createImageArrayDialog} from './image-array-dialog.mjs?v=nested-groups-v0712-1';
-import {applyPanelLabels} from './panel-labels.mjs?v=panel-label-close-v0732-1';
-import {plotPanelBounds} from './plot-frame.mjs?v=panel-label-close-v0732-1';
-import {createPanelLabelDialog} from './panel-label-dialog.mjs?v=panel-label-close-v0732-1';
+import {applyPanelLabels} from './panel-labels.mjs?v=plot-output-v0733-1';
+import {plotPanelBounds} from './plot-frame.mjs?v=plot-output-v0733-1';
+import {createPanelLabelDialog} from './panel-label-dialog.mjs?v=plot-output-v0733-1';
 import {createColorPickers} from './colors.mjs?v=unified-palette-1';
 import {renderTextPaint} from './text-paint.mjs?v=tex-v061-1';
 import {createTexRenderer} from './tex.mjs?v=micro-v0711-2';
@@ -29,10 +29,10 @@ import {openSource,SOURCE_APPS,setupSourceDiscovery,closeSourceSessions} from '.
 import {createFigureSidebar} from './thumbnails.mjs?v=live-v062-1';
 import {setupTransferReceiver,getFigureWorkspace} from './integration/direct-transfer.mjs?v=studio-send-v0714-1';
 import {readMifitoIdentity} from './integration/mifito-sync.mjs?v=0.3.5-1';
-import {readPlotIdentity} from './integration/plot-sync.mjs?v=panel-label-close-v0732-1';
-import {planMiFiToSync} from './mifito-batch.mjs?v=studio-send-v0714-1';
-import {setupUpdateCheck} from './update-check.mjs?v=panel-label-close-v0732-1';
-import {installWorkspaceUpdater} from './workspace-update.mjs?v=panel-label-close-v0732-1';
+import {readPlotIdentity,resolvePlotImage,currentPlotImageId} from './integration/plot-sync.mjs?v=plot-output-v0733-1';
+import {planMiFiToSync} from './mifito-batch.mjs?v=plot-output-v0733-1';
+import {setupUpdateCheck} from './update-check.mjs?v=plot-output-v0733-1';
+import {installWorkspaceUpdater} from './workspace-update.mjs?v=plot-output-v0733-1';
 import {marqueeSelection,resolveObjectSelection,clickObjectSelection,selectionDescription} from './selection.mjs?v=nested-groups-v0712-1';
 import {renderGroupLayers} from './group-layers.mjs?v=nested-groups-v0712-1';
 import {drawSelectionFrames} from './selection-overlay.mjs?v=studio-send-v0714-1';
@@ -49,11 +49,11 @@ import {reorderFigures} from './figure-order.mjs';
 import {renumberFigureNames} from './figure-names.mjs?v=0.3.3-1';
 import {deleteFigures,duplicateFigures} from './figure-commands.mjs?v=nested-groups-v0712-1';
 import {ProjectFileSession,projectFilePickerOptions} from './project-file.mjs?v=project-switch-v051-1';
-import {installWorkspacePersistence} from './workspace-session.mjs?v=panel-label-close-v0732-1';
+import {installWorkspacePersistence} from './workspace-session.mjs?v=plot-output-v0733-1';
 import {decodeWorkspaceState} from './workspace-state.mjs?v=project-switch-v051-1';
-import {validateWorkspaceBinding} from './integration/bridge-host.mjs?v=panel-label-close-v0732-1';
+import {validateWorkspaceBinding} from './integration/bridge-host.mjs?v=plot-output-v0733-1';
 
-const STUDIO_RELEASE={version:'0.7.32',build:'panel-label-close-v0732-1'};
+const STUDIO_RELEASE={version:'0.7.33',build:'plot-output-v0733-1'};
 installBrowserZoomGuard();
 window.FigureAppRelease?.assertRunning(STUDIO_RELEASE);
 if(window.FigureAppRelease&&!await window.FigureAppRelease.startup())throw Error('最新版へ切り替えています。');
@@ -620,9 +620,11 @@ async function savedEditorBindings(decoded,next,loaded){
      const currentProjectId=decoded.editors.mifito.state?.ui?.figureStudioProjectId;
      if(!currentProjectId||currentProjectId!==(await readMifitoIdentity(baseline)).projectId)break;
     }
-    if(app==='plot'&&panel.source.projectId){
-     const currentProjectId=decoded.editors.plot.state?.sourceData?.figureStudioProjectId;
-     if(!currentProjectId||currentProjectId!==(await readPlotIdentity(baseline)).projectId)break;
+    if(app==='plot'){
+     const state=decoded.editors.plot.state,identity=await readPlotIdentity(baseline);
+     const currentProjectId=state?.sourceData?.figureStudioProjectId;
+     const image=resolvePlotImage(identity,binding.imageId||panel.source.imageId||identity.activeImageId);
+     if(!currentProjectId||currentProjectId!==identity.projectId||!image||currentPlotImageId(state,image.sheetIndex)!==image.imageId)break;
     }
     bindings[app]={...binding,baselineProject:baseline,sourceName:panel.source.name};
    }
@@ -704,7 +706,8 @@ async function syncMiFiToFigures(result,{app='mifito',guard,anchorPanelId,target
  if(updateReloading)throw Error('Figure Studioの更新後にもう一度反映してください。');
  const expectedBook=bookId,check=()=>{if(bookId!==expectedBook||!figures.some(f=>f.id===targetFigureId))throw Error('受け取り先のFigureが変わりました。対象の図を開き直してください。');guard?.();};
  check();const anchor=guard?.(),identity=await (app==='plot'?readPlotIdentity(result.project):readMifitoIdentity(result.project));
- const incoming=result.batch||{projectId:result.image?.projectId,images:[{...result.image,preview:result.preview}]};
+ let incoming=result.batch||{projectId:result.image?.projectId,images:[{...result.image,preview:result.preview}]};
+ if(app==='plot')incoming={...incoming,images:incoming.images.map(image=>({...image,imageId:resolvePlotImage(identity,image.imageId)?.imageId||image.imageId}))};
  if(incoming.projectId!==identity.projectId)throw Error('画像と元プロジェクトの対応情報が一致しません。');
  const definitions=new Map(identity.images.map(image=>[image.imageId,image]));
  for(const image of incoming.images){const defined=definitions.get(image.imageId);if(!defined||defined.fingerprint!==image.fingerprint)throw Error('画像と元アプリの編集設定が一致しません。もう一度反映してください。');}
@@ -712,7 +715,7 @@ async function syncMiFiToFigures(result,{app='mifito',guard,anchorPanelId,target
  if(result.intent==='add'&&transferId){syncFigure();const existing=figures.flatMap(f=>f.objects).filter(o=>o.source?.app===app&&o.source.transferId===transferId);if(existing.length){const summary={updated:0,added:0,unchanged:new Set(existing.map(o=>o.source.imageId)).size};return {summary,message:'この図はすでにStudioへ追加されています。'};}}
  if(anchor){const origin=await sourceIdentity(assets.get(anchor.source.assetId),app);if(origin.projectId!==identity.projectId)throw Error('別の元プロジェクトが開いています。元のプロジェクトを開き直してください。');}
  check();syncFigure();const identityByAsset=new Map();
- const legacyIds=new Set(figures.flatMap(f=>f.objects.filter(o=>o.source?.app===app&&(!o.source.projectId||!o.source.imageId)).map(o=>o.source.assetId)));
+ const legacyIds=new Set(figures.flatMap(f=>f.objects.filter(o=>o.source?.app===app&&(!o.source.projectId||!o.source.imageId||app==='plot'&&/^plot-sheet-\d{6}$/.test(o.source.imageId))).map(o=>o.source.assetId)));
  for(const id of legacyIds){try{identityByAsset.set(id,await sourceIdentity(assets.get(id),app));}catch{/* Unrelated old attachments remain untouched. */}}
  check();let plan=planMiFiToSync(figures,incoming,identityByAsset,{anchorPanelId,app,addOnly:result.intent==='add'});
  const prepared=new Map(),needed=new Set([...plan.matches.filter(m=>m.changed).map(m=>m.imageId),...plan.additions.map(m=>m.imageId)]);
@@ -732,7 +735,7 @@ async function syncMiFiToFigures(result,{app='mifito',guard,anchorPanelId,target
   if(panel&&app==='mifito'&&!match.changed){const previous=previousSizes.get(panel.assetId),correction=miFiToSizeCorrection(panel,previous.physical,previous.body);if(correction)sizeCorrections.set(panel.id,correction);}
  }
  check();
- const needsIdentity=plan.linked.some(link=>{const panel=figures.find(f=>f.id===link.figureId)?.objects.find(o=>o.id===link.panelId);return !panel?.source?.projectId||!panel.source.imageId||!panel.source.fingerprint;});
+ const needsIdentity=plan.linked.some(link=>{const panel=figures.find(f=>f.id===link.figureId)?.objects.find(o=>o.id===link.panelId);return !panel?.source?.projectId||!panel.source.imageId||!panel.source.fingerprint||panel.source.imageId!==link.imageId;});
  const response=()=>{
   const panel=figures.find(f=>f.id===targetFigureId)?.objects.find(o=>o.id===anchorPanelId),link=plan.linked.find(m=>m.panelId===anchorPanelId);
   const anchorImageId=panel?.source?.imageId||link?.imageId;

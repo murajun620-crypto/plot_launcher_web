@@ -1,8 +1,8 @@
-import { APP_VERSION, restoreSettings } from "./state.js?v=d94b6f0be905";
+import { APP_VERSION, restoreSettings } from "./state.js?v=dc51beddd098";
 import { validateTableEdits } from './table-edits.mjs?v=27ae7675c457';
 // All user data stays in this worker's in-memory filesystem.
 const PYODIDE_VERSION = "0.29.3";
-const WORKER_BUILD = 'd94b6f0be905';
+const WORKER_BUILD = 'dc51beddd098';
 const INDEX_URL = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
 let pyodide, dispatch, currentPath = "", uploadNumber = 0;
 let currentSources = [];
@@ -45,7 +45,7 @@ async function initialize() {
   await Promise.all([...new Set([...catalog.map(preset => preset.script), "xps_csv.py", "desktop_defaults.py"])].map(async name => {
     pyodide.FS.writeFile(`/app/python/${name}`, await fetchAsset(`./python/${name}`));
   }));
-  pyodide.FS.writeFile("/app/python/spatial.py", await fetchAsset("./python/spatial.py?v=d94b6f0be905"));
+  pyodide.FS.writeFile("/app/python/spatial.py", await fetchAsset("./python/spatial.py?v=dc51beddd098"));
   await pyodide.runPythonAsync("import sys\nsys.path.insert(0, '/app/python')\nfrom engine import PlotEngine\n_engine = PlotEngine('/app/python', '/app/NotoSansJP.ttf')\n_dispatch = _engine.dispatch");
   pyodide.globals.set("_report_file_progress",(text,completed,total)=>operationProgress(text,completed,total,'ファイル'));
   pyodide.runPython("_engine.progress_callback = _report_file_progress");
@@ -110,7 +110,7 @@ self.onmessage = ({ data }) => {
         payload = { path };
       }
       if (operation === 'sheet-info' || operation === 'sheet-export') {
-        payload = {path:currentPath,...(currentSources.length?{sources:currentSources}:{}),filename:args.filename, sheet_index:args.sheetIndex, header_row:args.headerRow, config:args.config, format:args.format, dpi:args.dpi,table_edits:validateTableEdits(args.tableEdits)};
+        payload = {path:currentPath,...(currentSources.length?{sources:currentSources}:{}),filename:args.filename, sheet_index:args.sheetIndex, header_row:args.headerRow, config:args.config, format:args.format, content:args.content, dpi:args.dpi,table_edits:validateTableEdits(args.tableEdits)};
       }
       if (operation === 'table-apply') {
         payload = {columns:args.columns,cells:args.cells,path:currentPath,filename:args.filename,...(currentSources.length?{sources:currentSources}:{})};

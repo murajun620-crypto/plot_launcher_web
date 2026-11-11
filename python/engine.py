@@ -2059,9 +2059,20 @@ class PlotEngine:
 
     @micro_text_rendering()
     @mathtext_glyph_layout()
-    def export(self, config, format_name, dpi=1200):
+    def export(self, config, format_name, dpi=1200, content='figure'):
         if format_name not in {"svg", "png", "pdf", "pptx"}:
             raise ValueError("SVG・PNG・PDF・PowerPointのいずれかを選んでください。")
+        if content not in {'figure', 'colorbar'}:
+            raise ValueError('Studioへの出力内容を確認してください。')
+        if content == 'colorbar':
+            if config.get('plotType') != 'Surface Map' or format_name == 'pptx':
+                raise ValueError('カラーバーのみの出力は分布マップで使用できます。')
+            # Export independently even when the map hides its own colorbar.
+            from copy import deepcopy
+            config = deepcopy(config)
+            matrix = config.setdefault('options', {}).setdefault('matrix', {})
+            matrix['colorbar'] = True
+            matrix['colorbarVisibility'] = {}
         rendered = self.render(config)
         if config.get("plotType", "General") not in {"XPS Fit", "Particle Histogram", "bar_graph_general", "Raman 3D"}:
             requested = {i for i, item in enumerate(config.get("series", [])) if item.get("visible", True) and item.get("trendType", "none") != "none"}
@@ -2076,7 +2087,22 @@ class PlotEngine:
         if format_name == "png" and width * height * resolution**2 > 25_000_000:
             raise ValueError("画像が大きすぎます。軸領域のサイズまたはPNG解像度を小さくしてください。")
         image = BytesIO()
-        self.figure.savefig(image, format=format_name, dpi=resolution, bbox_inches="tight", bbox_extra_artists=self.export_extra_artists, pad_inches=0.03, transparent=self.transparent)
+        if content == 'colorbar':
+            colorbar = self.matrix_colorbar
+            if colorbar is None:
+                raise ValueError('カラーバーを作成できませんでした。')
+            self.figure.canvas.draw()
+            bbox = colorbar.ax.get_tightbbox(self.figure.canvas.get_renderer()).transformed(self.figure.dpi_scale_trans.inverted()).padded(.03)
+            hidden = [(artist, artist.get_visible()) for artist in [*self.figure.axes, *self.figure.texts, *self.figure.artists] if artist is not colorbar.ax]
+            try:
+                for artist, _visible in hidden:
+                    artist.set_visible(False)
+                self.figure.savefig(image, format=format_name, dpi=resolution, bbox_inches=bbox, pad_inches=0, transparent=True)
+            finally:
+                for artist, visible in hidden:
+                    artist.set_visible(visible)
+        else:
+            self.figure.savefig(image, format=format_name, dpi=resolution, bbox_inches="tight", bbox_extra_artists=self.export_extra_artists, pad_inches=0.03, transparent=self.transparent)
         return {"format": format_name, "base64": base64.b64encode(image.getvalue()).decode("ascii")}
 
     def powerpoint_file(self):
@@ -2219,7 +2245,7 @@ class PlotEngine:
             result = self.load(**args)
         elif operation in {"sheet-info", "sheet-export"}:
             with self.sheet_data(args["path"], args["filename"], args["sheet_index"], args["header_row"], args.get("sources"), args.get('table_edits')) as metadata:
-                result = metadata if operation == "sheet-info" else self.export(args["config"], args["format"], args.get("dpi", 1200))
+                result = metadata if operation == "sheet-info" else self.export(args["config"], args["format"], args.get("dpi", 1200), args.get("content", "figure"))
         elif operation == 'table-page':
             result = self.table_page(**args)
         elif operation == 'table-apply':
@@ -2229,7 +2255,7 @@ class PlotEngine:
         elif operation == "render":
             result = self.render(args["config"])
         elif operation == "export":
-            result = self.export(args["config"], args["format"], args.get("dpi", 1200))
+            result = self.export(args["config"], args["format"], args.get("dpi", 1200), args.get("content", "figure"))
         elif operation == "font":
             result = self.add_font(args["path"])
         elif operation == "colors":

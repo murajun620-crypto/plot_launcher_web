@@ -2,12 +2,29 @@
 const id=value=>typeof value==='string'&&/^[a-zA-Z0-9-]{16,100}$/.test(value);
 const stable=value=>Array.isArray(value)?value.map(stable):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,stable(value[key])])):value;
 const hash=async value=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(stable(value))))),n=>n.toString(16).padStart(2,'0')).join('');
-export const plotSheetId=index=>`plot-sheet-${String(index).padStart(6,'0')}`;
-export function plotSheetIndex(imageId){const match=/^plot-sheet-(\d{6})$/.exec(imageId||'');return match&&Number(match[1])<=1000?Number(match[1]):null;}
+export const plotSheetId=(index,plotType,content='figure')=>`plot-sheet-${String(index).padStart(6,'0')}${plotType==='Surface Map'?(content==='colorbar'?'-map-colorbar':'-map'):plotType==='Surface Histogram'?'-histogram':''}`;
+export const resolvePlotImage=(identity,imageId)=>identity.images.find(image=>image.imageId===imageId)||identity.images.find(image=>image.legacyImageId===imageId);
+export function currentPlotImageId(state,index){
+ const {config,metadata,sheetMode,sheetSettings,sharedSettings,sourceData}=state;
+ const sheets=sheetSettings instanceof Map?sheetSettings:new Map(sheetSettings||[]);
+ let settings=index===metadata?.sheetIndex||sheetMode==='shared'?config:sheets.get(index);
+ if(settings?.inheritSharedSettings)settings=sharedSettings;
+ else if(settings?.inheritFirstSheet)settings=sheets.get(0);
+ return settings?plotSheetId(index,settings.plotType,sourceData?.figureStudioContent||'figure'):null;
+}
+// A different save destination is a new source project; overwrite keeps its identity.
+export async function savedPlotProjectId(currentId,previousHandle,nextHandle,{saveAs=false}={}){
+ if(!saveAs)return currentId;
+ if(previousHandle&&nextHandle){try{if(await previousHandle.isSameEntry(nextHandle))return currentId;}catch{/* Unknown destinations must not share the old link. */}}
+ return crypto.randomUUID();
+}
+export function plotSheetIndex(imageId){const match=/^plot-sheet-(\d{6})(?:-map(?:-colorbar)?|-histogram)?$/.exec(imageId||'');return match&&Number(match[1])<=1000?Number(match[1]):null;}
 export async function identifyPlotProject(saved){
  const fail=()=>{throw Error('PlotLauncherのシート情報が正しくありません。');};
  if(saved?.format!=='plotlauncher-project'||saved.version!==1||!saved.data||!Number.isInteger(saved.data.sheetIndex)||saved.data.sheetIndex<0||saved.data.sheetIndex>1000||!saved.settings||!Array.isArray(saved.fonts)||saved.fonts.length>32)fail();
  const workspace=saved.workspace||{};if(workspace.figureStudioProjectId!==undefined&&!id(workspace.figureStudioProjectId))fail();
+ if(workspace.figureStudioContent!==undefined&&!['figure','colorbar'].includes(workspace.figureStudioContent))fail();
+ const content=workspace.figureStudioContent||'figure';
  const projectId=workspace.figureStudioProjectId||`legacy-plot-${await hash(saved)}`;
  const source=await hash({data:{filename:saved.data.filename,base64:saved.data.base64,files:saved.data.files,...(saved.data.tableEdits?.length?{tableEdits:saved.data.tableEdits}:{})},fonts:saved.fonts});
  const settings=new Map();for(const entry of workspace.sheetSettings||[]){if(!Number.isInteger(entry?.sheetIndex)||entry.sheetIndex<0||entry.sheetIndex>1000||!entry.settings||settings.has(entry.sheetIndex))fail();settings.set(entry.sheetIndex,entry.settings);}
@@ -18,9 +35,10 @@ export async function identifyPlotProject(saved){
   if(selected&&!selected.includes(index))continue;
   if(setting.format!=='plotlauncher-web'||setting.version!==1||!setting.axes||!Array.isArray(setting.series)||!setting.series.length||typeof setting.data?.sheet!=='string')fail();
   const {inheritFirstSheet,inheritSharedSettings,...rendering}=setting;
-  images.push({imageId:plotSheetId(index),sheetIndex:index,name:(setting.data.sheet||`Sheet ${index+1}`).slice(0,255),fingerprint:await hash({source,settings:rendering})});
+  const part=setting.plotType==='Surface Map'?content:'figure';
+  images.push({imageId:plotSheetId(index,setting.plotType,part),...(part==='figure'?{legacyImageId:plotSheetId(index)}:{}),sheetIndex:index,name:((setting.data.sheet||`Sheet ${index+1}`)+(part==='colorbar'?' — カラーバー':'')).slice(0,255),fingerprint:await hash({source,settings:rendering})});
  }
- return {projectId,activeImageId:plotSheetId(saved.data.sheetIndex),images};
+ return {projectId,content,activeImageId:images.find(image=>image.sheetIndex===saved.data.sheetIndex).imageId,images};
 }
 export async function readPlotIdentity(blob){if(!(blob instanceof Blob)||!blob.size||blob.size>130*1024*1024)throw Error('PlotLauncherプロジェクトは130 MB以内にしてください。');return identifyPlotProject(JSON.parse(await blob.text()));}
 export function mergePlotCheckpoint(previous,captured,batch=false){

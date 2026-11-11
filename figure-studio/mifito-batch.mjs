@@ -22,11 +22,12 @@ export function planMiFiToSync(figures,batch,identityByAsset=new Map(),{anchorPa
   // A partially present identity must not fall back into a different project.
   if(explicit&&(!nonempty(source.projectId)||!nonempty(source.imageId)))continue;
   const projectId=explicit?source.projectId:identity?.projectId;
-  const imageId=explicit?source.imageId:identity?.activeImageId;
+  const originalId=explicit?source.imageId:identity?.activeImageId;
+  const descriptor=identity?.images?.find(image=>image.imageId===originalId)||(app==='plot'?identity?.images?.find(image=>image.legacyImageId===originalId):null);
+  const imageId=descriptor?.imageId||originalId;
   if(projectId!==batch.projectId||!nonempty(imageId))continue;
   // Reject stale metadata if its actual project no longer contains the image.
   if(identity&&identity.projectId!==projectId)continue;
-  const descriptor=identity?.images?.find(image=>image.imageId===imageId);
   if(identity&&!descriptor)continue;
   if(!explicit&&(!descriptor||descriptor.ambiguous&&panel.id!==anchorPanelId))continue;
   const fingerprint=validFingerprint(source.fingerprint)?source.fingerprint:validFingerprint(descriptor?.fingerprint)?descriptor.fingerprint:null;

@@ -1,15 +1,15 @@
-import {createMatrixEditor} from './matrix-editor.mjs?v=d94b6f0be905';
-import {isMatrixPlot,isCombinedHistogram,matrixColorbarVisible} from './matrix-model.mjs?v=d94b6f0be905';
+import {createMatrixEditor} from './matrix-editor.mjs?v=dc51beddd098';
+import {isMatrixPlot,isCombinedHistogram,matrixColorbarVisible} from './matrix-model.mjs?v=dc51beddd098';
 import {createFileProgress} from './file-progress.mjs?v=file-open-1';
-import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=d94b6f0be905';
+import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=dc51beddd098';
 import {setupDirectSendButton,getFigureWorkspace} from './direct-transfer.mjs?v=baaeeccc3ee1';
-import {identifyPlotProject,plotSheetIndex,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=baaeeccc3ee1';
+import {identifyPlotProject,plotSheetIndex,currentPlotImageId,resolvePlotImage,savedPlotProjectId,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=dc51beddd098';
 import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=9127ec4c4f31";
 import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=9127ec4c4f31";
 import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9127ec4c4f31";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=d94b6f0be905";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=d94b6f0be905";
-import { APP_VERSION, COLORS, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=d94b6f0be905";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=dc51beddd098";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=dc51beddd098";
+import { APP_VERSION, COLORS, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=dc51beddd098";
 
 import {alignmentOffsets} from './object-layout.mjs?v=27ae7675c457';
 import {createDataEditor} from './data-editor.mjs?v=27ae7675c457';
@@ -22,12 +22,12 @@ import {createXRangePicker} from './x-range-picker.mjs?v=normalization-range-1';
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 const fileProgress=createFileProgress();
-const APP_BUILD = 'd94b6f0be905';
+const APP_BUILD = 'dc51beddd098';
 window.FigureAppRelease?.assertRunning({version:APP_VERSION,build:APP_BUILD});
 function makeProject(settings,data,fonts,workspace={}){
   const live=sourceData&&data.filename===sourceData.filename&&(data.bytes===sourceData.bytes||data.files&&data.files===sourceData.files);
   const projectId=workspace.figureStudioProjectId||data.figureStudioProjectId||(live?(sourceData.figureStudioProjectId||=crypto.randomUUID()):crypto.randomUUID());
-  return encodePlotProject(settings,data,fonts,{...workspace,figureStudioProjectId:projectId});
+  return encodePlotProject(settings,data,fonts,{...workspace,figureStudioProjectId:projectId,figureStudioContent:workspace.figureStudioContent||data.figureStudioContent||(live?sourceData.figureStudioContent:null)||'figure'});
 }
 
 function positionDialog(dialog, left, top) {
@@ -351,6 +351,7 @@ function status(text, kind = "working") {
 function updateButtons() {
   if(normalizationRangePicker.active&&(loading||exporting))normalizationRangePicker.cancel({notify:false});
   figureStudioDirectSender?.sync();
+  syncStudioContentControl();
   compactHelp();
   const busy = loading || exporting || projectVersionChecking;
   $('#check-update').disabled=busy || updateChecking;
@@ -467,7 +468,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=d94b6f0be905", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=dc51beddd098", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") {
       if(data.id)requests.get(data.id)?.progressTask?.stage(data.text,{completed:data.completed,total:data.total,unit:data.unit||''});
@@ -1347,7 +1348,7 @@ async function loadDataFiles(files, append=false, selection=null) {
     opening.stage('グラフ設定を準備しています…');await opening.paint();
     if(!append&&!selection)prepareFigureStudioProjectReplacement();
     config=combinedConfig(data,append || selection?oldMetadata:null,oldConfig);metadata=data;loadedHeader=1;
-    sourceData={filename,...((append||selection)&&sourceData?.tableEdits?{tableEdits:sourceData.tableEdits}:{}),files:originals.map((file,index)=>({...file,sheetIndex:data.sources[index].sheetIndex,headerRow:data.sources[index].headerRow})),...((append||selection)&&sourceData?.figureStudioProjectId?{figureStudioProjectId:sourceData.figureStudioProjectId}:{})};
+    sourceData={filename,...((append||selection)&&sourceData?.tableEdits?{tableEdits:sourceData.tableEdits}:{}),files:originals.map((file,index)=>({...file,sheetIndex:data.sources[index].sheetIndex,headerRow:data.sources[index].headerRow})),...((append||selection)&&sourceData?.figureStudioProjectId?{figureStudioProjectId:sourceData.figureStudioProjectId,figureStudioContent:sourceData.figureStudioContent}:{})};
     dataFileHandles=nextHandles;
     if(!append && !selection){projectHandle=null;projectFilename='';sourceHandle=sourceHandles.get(files[0]) || null;sourceDirectory=null;$('#save-destination').value=folderSupported?'source':'download';}
     sample=false;sheetMode='shared';sharedSettings=null;sheetSettings.clear();
@@ -1416,7 +1417,7 @@ async function reloadSourceData(chosenFiles=null,{fromFolder=false,discardEdits=
     const result=await request('project',{filename:sourceData.filename,remapColumns:!!sourceData.tableEdits?.length,...(sourceData.files?{files:refreshed.map(file=>({...file,bytes:file.bytes.slice(0)}))}:{bytes:refreshed[0].bytes.slice(0)}),sheetIndex:metadata.sheetIndex,headerRow:loadedHeader,settings,fonts:[],sheetSettings:projectSheetSettings(),sharedSettings});
     ++revision;metadata=result.metadata;config=result.config;
     const currentSettings=makeSettings(config,metadata,loadedHeader);sheetSettings.set(metadata.sheetIndex,currentSettings);if(sheetMode==='shared')sharedSettings=currentSettings;
-    sourceData=sourceData.files?{filename:sourceData.filename,files:refreshed,figureStudioProjectId:sourceData.figureStudioProjectId}:{filename:sourceData.filename,bytes:refreshed[0].bytes,figureStudioProjectId:sourceData.figureStudioProjectId};
+    sourceData=sourceData.files?{filename:sourceData.filename,files:refreshed,figureStudioProjectId:sourceData.figureStudioProjectId,figureStudioContent:sourceData.figureStudioContent}:{filename:sourceData.filename,bytes:refreshed[0].bytes,figureStudioProjectId:sourceData.figureStudioProjectId,figureStudioContent:sourceData.figureStudioContent};
     if(selectionNames)sourceData=sourceWithSheetSelection(sourceData,[...new Set([...selectionNames.map(name=>metadata.sheets.indexOf(name)).filter(index=>index>=0),metadata.sheetIndex])].sort((a,b)=>a-b),metadata.sheets.length);
     dataFileHandles=ordered.map(index=>handles[index]);
     if(dataFileHandles[0] && sourceHandle!==dataFileHandles[0]){sourceHandle=dataFileHandles[0];sourceDirectory=null;refreshSaveDestination();}
@@ -2305,13 +2306,20 @@ async function saveProject({saveAs=false}={}) {
       if(projectHandle.queryPermission && await projectHandle.queryPermission(permission)!=='granted' && (!projectHandle.requestPermission || await projectHandle.requestPermission(permission)!=='granted'))throw new Error('このファイルへの上書きが許可されていません。「名前を付けて保存」から保存先を選んでください。');
       saveFile=await documentSaver({name,handle:projectHandle});
     } else saveFile=await prepareDocumentSaver(name,"PlotLauncherプロジェクト",".plotproject",projectHandle || undefined);
-    const savedState=projectEditState();
+    if(saveAs)await figureStudioBridge?.captureWorkspaceBinding();
+    const savedState=projectEditState(),savingSource=sourceData;
+    const currentId=sourceData.figureStudioProjectId||crypto.randomUUID();
+    const savedId=await savedPlotProjectId(currentId,projectHandle,saveFile.handle,{saveAs});
     const project=makeProject(makeSettings(config,metadata,loadedHeader), {...sourceData,sheetIndex:metadata.sheetIndex,headerRow:loadedHeader,sample}, [...importedFonts.values()], {
-      saveName:$("#save-name").value,pngDpi:Number($("#png-dpi").value),view:{...view},sections:$$('#controls-panel .control-section').map(section=>section.open),sheetSettings:projectSheetSettings(),sheetMode,sharedSettings:sheetMode === 'shared' ? currentSharedSettings() : sharedSettings
+      figureStudioProjectId:savedId,saveName:$("#save-name").value,pngDpi:Number($("#png-dpi").value),view:{...view},sections:$$('#controls-panel .control-section').map(section=>section.open),sheetSettings:projectSheetSettings(),sheetMode,sharedSettings:sheetMode === 'shared' ? currentSharedSettings() : sharedSettings
     });
     const blob=new Blob([JSON.stringify(project)],{type:'application/json'});
     if(blob.size>PROJECT_MAX_SIZE)throw new Error('プロジェクトは130 MB以内にしてください。');
     const savedName=await saveFile(blob,name);
+    if(sourceData===savingSource&&savedId!==sourceData.figureStudioProjectId){
+      sourceData={...sourceData,figureStudioProjectId:savedId};savedState.source=sourceData;
+      if(savedId!==currentId){figureBridgeBaseline=null;figureBridgePreservedOnReconnect=false;figureStudioBridge?.resetWorkspaceBinding();}
+    }
     projectHandle=saveFile.handle || null;projectFilename=savedName; savedProjectState=savedState; status(`${savedName} を保存しました。データと設定をまとめて再開できます。`,'ready');
   } catch(error){status(error.name==='AbortError'?'保存をキャンセルしました。':`プロジェクトを保存できませんでした: ${error.message}`,error.name==='AbortError'?'ready':'error');}
   finally{exporting=false;updateButtons();if(renderWanted)renderPreview();}
@@ -2509,7 +2517,7 @@ async function readProject(file, saved, options={}) {
     const projectText=saved?null:await opening.read(file,{text:true});
     opening.stage('プロジェクトの内容を確認しています…');await opening.paint();
     const raw=saved || JSON.parse(projectText),project=parseProject(raw),identity=await identifyPlotProject(raw);
-    const retainedData={filename:project.data.filename,figureStudioProjectId:identity.projectId,...(project.data.selectedSheets?{selectedSheets:[...project.data.selectedSheets]}:{}),...(project.data.tableEdits?{tableEdits:project.data.tableEdits}:{}),...(project.data.files?{files:project.data.files.map(file=>({...file,bytes:file.bytes.slice(0)}))}:{bytes:project.data.bytes.slice(0)})};
+    const retainedData={filename:project.data.filename,figureStudioProjectId:identity.projectId,figureStudioContent:identity.content,...(project.data.selectedSheets?{selectedSheets:[...project.data.selectedSheets]}:{}),...(project.data.tableEdits?{tableEdits:project.data.tableEdits}:{}),...(project.data.files?{files:project.data.files.map(file=>({...file,bytes:file.bytes.slice(0)}))}:{bytes:project.data.bytes.slice(0)})};
     const retainedFonts=project.fonts.map(font=>({...font,bytes:font.bytes.slice(0)}));
     await checkFigureStudioProjectReplacement(options);
     opening.stage('データとフォントを復元しています…');
@@ -3581,7 +3589,7 @@ async function captureFigureStudioImages(batch=false){
     for(const descriptor of wanted){
      try{
       const cached=plotPreviewCache.get(descriptor.imageId),graph=captured.graphs.find(graph=>graph.index===descriptor.sheetIndex);let preview=cached?.fingerprint===descriptor.fingerprint?cached.preview:null;
-      if(!preview){const rendered=await request('sheet-export',{filename:metadata.filename,sheetIndex:graph.index,headerRow:graph.headerRow,config:graph.config,format:'svg',dpi:Number($('#png-dpi').value)});const bytes=Uint8Array.from(atob(rendered.base64),c=>c.charCodeAt(0));preview=new Blob([bytes],{type:'image/svg+xml'});plotPreviewCache.set(descriptor.imageId,{fingerprint:descriptor.fingerprint,preview});}
+      if(!preview){const rendered=await request('sheet-export',{filename:metadata.filename,sheetIndex:graph.index,headerRow:graph.headerRow,config:graph.config,format:'svg',content:graph.config.plotType==='Surface Map'?captured.identity.content:'figure',dpi:Number($('#png-dpi').value)});const bytes=Uint8Array.from(atob(rendered.base64),c=>c.charCodeAt(0));preview=new Blob([bytes],{type:'image/svg+xml'});plotPreviewCache.set(descriptor.imageId,{fingerprint:descriptor.fingerprint,preview});}
       images.push({...descriptor,preview,...(batch&&plotAcknowledgements.isUnchanged(captured.identity.projectId,descriptor)?{unchanged:true}:{})});
      }catch(error){
       if(!batch||descriptor.imageId===captured.identity.activeImageId)throw Error(`シート「${descriptor.name}」：${error.message}`);
@@ -3620,14 +3628,19 @@ async function acceptDirectFigureStudioResult(result){
   acceptFigureStudioResult(result);
 }
 async function figureStudioProjectLoaded(){if(!figureBridgePreservedOnReconnect)figureBridgeBaseline=(await collectPlotGraphs()).checkpoint;}
+function currentPlotMatchesIdentity(identity,imageId){
+ const image=resolvePlotImage(identity,imageId),index=image?.sheetIndex;
+ if(identity.projectId!==sourceData?.figureStudioProjectId||index===undefined||!selectedSheetIndices().includes(index))return false;
+ return image.imageId===currentPlotImageId({config,metadata,sheetMode,sheetSettings,sharedSettings,sourceData},index);
+}
 function figureStudioHasUnreflectedContent(){return !!metadata&&!!sourceData&&(figureBridgeBaseline?figureBridgeIsDirty():hasUnsavedChanges());}
 figureStudioBridge=setupFigureBridge({
   app:'plot',
   hasContent:figureStudioHasUnreflectedContent,
   async canReuseProject({project,imageId}){
     if(!sourceData||!metadata||loading||exporting||dragging||colormapApplying||pendingDataFiles||figureBridgePendingInput())return false;
-    const identity=await identifyPlotProject(JSON.parse(await project.text())),index=plotSheetIndex(imageId);
-    return identity.projectId===sourceData.figureStudioProjectId&&(!imageId||index!==null&&selectedSheetIndices().includes(index)&&identity.images.some(image=>image.imageId===imageId));
+    const identity=await identifyPlotProject(JSON.parse(await project.text()));
+    return currentPlotMatchesIdentity(identity,imageId||identity.activeImageId);
   },
   canAdoptAccepted:result=>!!sourceData&&!loading&&!exporting&&!dragging&&!colormapApplying&&!pendingDataFiles&&!figureBridgePendingInput()&&sourceData===result?.bridgeState?.source,
   onConnectionChange(connected){figureStudioDirectSender?.setBridgeConnected(connected);},
@@ -3637,7 +3650,7 @@ figureStudioBridge=setupFigureBridge({
       opening.stage('描画機能の準備を待っています…');await figureBridgeWait(() => engineReady && !loading && !exporting);incomingIdentity=await identifyPlotProject(saved);
     }catch(error){opening.fail(error);throw error;}
     finally{opening.release();}
-    figureBridgePreservedOnReconnect=!!(!force&&reconnect&&metadata&&sourceData&&incomingIdentity.projectId===sourceData.figureStudioProjectId);
+    figureBridgePreservedOnReconnect=!!(!force&&reconnect&&metadata&&sourceData&&currentPlotMatchesIdentity(incomingIdentity,imageId||incomingIdentity.activeImageId));
     if (!figureBridgePreservedOnReconnect && !await readProject(file,saved,{fromBridge:true,...(force?{force:true}:{})})) throw new Error('プロジェクトを復元できませんでした。編集画面のエラーを確認してください。');
     if(imageId)await chooseFigureStudioSheet(imageId);
     await figureBridgeWait(() => !loading && !renderRunning && renderedRevision === revision,
@@ -3654,6 +3667,24 @@ figureStudioDirectSender = setupDirectSendButton({app:'plot',standalone:true,cap
   onAccepted:acceptDirectFigureStudioResult,
   isReady:()=>engineReady&&!loading&&!exporting&&!renderRunning&&!!metadata&&!!sourceData&&!!config.series.length&&renderedRevision===revision});
 figureStudioDirectSender?.setBridgeConnected(figureStudioBridge?.isConnected===true);
+// The map preview stays editable; only the Studio output is cropped.
+var studioContentControl=document.createElement('label');
+studioContentControl.className='studio-content-control';studioContentControl.style.cssText='display:inline-flex;align-items:center;gap:6px';
+studioContentControl.append(document.createTextNode('Studio出力'));
+const studioContentSelect=document.createElement('select');studioContentSelect.id='studio-output-content';studioContentSelect.setAttribute('aria-label','Studioへ送る内容');
+studioContentSelect.style.cssText='width:auto;min-width:0;padding:8px;border:1px solid #b8cfcb;border-radius:7px;background:#fff;font:inherit';
+for(const [value,label]of [['figure','図全体'],['colorbar','カラーバーのみ']])studioContentSelect.add(new Option(label,value));
+studioContentControl.append(studioContentSelect);
+const studioSendGroup=$('#send-to-figure-studio')?.parentElement;
+if(studioSendGroup)studioSendGroup.before(studioContentControl);else $('.header-actions').append(studioContentControl);
+studioContentSelect.addEventListener('change',()=>{if(!sourceData||loading||exporting)return;sourceData={...sourceData,figureStudioContent:studioContentSelect.value};plotCollectionCache=null;updateButtons();status(studioContentSelect.value==='colorbar'?'Studioへはカラーバーだけを送ります。':'Studioへは図全体を送ります。','ready');});
+function syncStudioContentControl(){
+ if(!studioContentControl)return;
+ studioContentControl.hidden=config.plotType!=='Surface Map'||!sourceData;
+ studioContentControl.style.display=studioContentControl.hidden?'none':'inline-flex';
+ studioContentSelect.value=sourceData?.figureStudioContent||'figure';studioContentSelect.disabled=!engineReady||loading||exporting;
+}
+syncStudioContentControl();
 
 // Figure Studio workspace snapshots retain editor work separately from reflected figures.
 var figureWorkspaceSavedSignature=null;
@@ -3695,6 +3726,7 @@ function validateFigureWorkspaceState(snapshot){
  let fontBytes=0;for(const font of state.fonts){if(!string(font?.name,255)||!string(font?.family,200)||!(font.bytes instanceof ArrayBuffer)||!font.bytes.byteLength||font.bytes.byteLength>20*1024*1024)fail();fontBytes+=font.bytes.byteLength;}if(fontBytes>60*1024*1024)fail();
  if(state.sourceData){const data=state.sourceData,meta=state.metadata;if(!string(data.filename,255)||!/\.(xlsx|xlsm|xls|csv|txt)$/i.test(data.filename)||!meta||meta.filename!==data.filename||!list(meta.columns,20000)||!list(meta.sheets,1001)||!Number.isInteger(meta.sheetIndex)||meta.sheetIndex<0||meta.sheetIndex>=meta.sheets.length)fail();
   if(data.figureStudioProjectId!==undefined&&(typeof data.figureStudioProjectId!=='string'||!/^[a-zA-Z0-9-]{16,100}$/.test(data.figureStudioProjectId)))fail();
+  if(data.figureStudioContent!==undefined&&!['figure','colorbar'].includes(data.figureStudioContent))fail();
   if(data.selectedSheets!==undefined&&(!list(data.selectedSheets,1001)||!data.selectedSheets.length||new Set(data.selectedSheets).size!==data.selectedSheets.length||data.selectedSheets.some(index=>!Number.isInteger(index)||index<0||index>=meta.sheets.length)||!data.selectedSheets.includes(meta.sheetIndex)))fail();
   validateTableEdits(data.tableEdits);
   const files=data.files??[data];if(!list(files,16)||!files.length)fail();let total=0;for(const file of files){if(!string(file?.filename,255)||!/\.(xlsx|xlsm|xls|csv|txt)$/i.test(file.filename)||!(file.bytes instanceof ArrayBuffer)||!file.bytes.byteLength)fail();total+=file.bytes.byteLength;if(data.files&&(!Number.isInteger(file.sheetIndex)||file.sheetIndex<0||file.sheetIndex>1000||!Number.isInteger(file.headerRow)||file.headerRow<1||file.headerRow>1000))fail();}if(total>30*1024*1024)fail();

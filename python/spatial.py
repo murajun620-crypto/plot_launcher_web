@@ -320,7 +320,7 @@ def render_matrix(engine, config):
                     geometry["annotations"].append({"id":annotation.id,"box":svg_box(Bbox.union([a.get_window_extent(renderer) for a in artists])),"svgIds":ids})
             image=BytesIO();figure.savefig(image,format="svg",bbox_inches=box,bbox_extra_artists=extra,transparent=False,pad_inches=0)
             if engine.figure is not None: plt.close(engine.figure)
-            engine.figure=figure;engine.annotation_manager=manager;engine.export_extra_artists=extra;engine.transparent=False
+            engine.figure=figure;engine.matrix_colorbar=colorbar;engine.annotation_manager=manager;engine.export_extra_artists=extra;engine.transparent=False
             return {"svg":image.getvalue().decode(),"series":diagnostics,"seriesProcessing":[{} for _ in diagnostics],"fits":[],"warnings":warnings,"statistics":None,"matrixStatistics":statistics,"xRange":list(axes.get_xlim()),"yRange":list(axes.get_ylim()),"y2Range":list(right.get_ylim()) if right else None,"xDataScale":axes.get_xscale(),"yDataScale":axes.get_yscale(),"tickSteps":{},"axisInfo":{},"geometry":geometry,"fontFamily":font,"matrix":True}
         except Exception:
             plt.close(figure);raise
