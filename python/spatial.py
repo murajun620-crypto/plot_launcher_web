@@ -209,7 +209,7 @@ def render_matrix(engine, config):
                 if options.get("mapStyle","points")=="cells":
                     image=axes.pcolormesh(np.r_[xs-px/2,xs[-1]+px/2],np.r_[ys+py/2,ys[-1]-py/2],np.ma.masked_invalid(matrix),cmap=palette,norm=norm,shading="flat")
                 else:
-                    area=number(options.get("markerSize",18),"点面積",minimum=.1,maximum=1000)
+                    area=number(options.get("markerSize",30),"点面積",minimum=.1,maximum=1000)
                     image=axes.scatter(xx[valid],yy[valid],c=matrix[valid],s=area,cmap=palette,norm=norm,edgecolors=options.get("edgeColor","none"),linewidths=number(options.get("edgeWidth",.25),"点の縁幅",minimum=0,maximum=10),clip_on=False,zorder=3)
                     extent=_MarkerExtent(image);axes.add_artist(extent);extra.append(extent)
                 axes.set_xlim(xs[0]-px/2,xs[-1]+px/2);axes.set_ylim(ys[-1]-py/2,ys[0]+py/2)
@@ -217,6 +217,7 @@ def render_matrix(engine, config):
                 if options.get("colorbar",True):
                     cax=figure.add_axes([(width+1.18)/(width+2.6),.9/(height+2),.16/(width+2.6),height/(height+2)])
                     colorbar=figure.colorbar(image,cax=cax)
+                    colorbar.outline.set_visible(False)
                     colorbar.set_label(label_text(options.get("valueLabel","Surface roughness, Sa"),options.get("valueUnit","nm")))
                     colorbar.ax.tick_params(labelsize=size*.875*float(settings.get("tickFontScale",1)))
                 groups=[{"index":0,"artists":[image]}];legend=None

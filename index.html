@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Excel・CSV・TXTの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
-  <link rel="stylesheet" href="./matrix-editor.css?v=e010fdc84b6e">
+  <link rel="stylesheet" href="./matrix-editor.css?v=f28eaf5cc6ff">
   <link rel="stylesheet" href="./file-progress.css?v=file-open-1">
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
   <link rel="stylesheet" href="./style.css?v=baaeeccc3ee1">
   <link rel="stylesheet" href="./colors.css?v=unified-palette-1">
-  <script type="module" src="./release-loader.mjs?v=release-gate-1" data-release-app="plot" data-release-version="2.5.2" data-release-build="e010fdc84b6e" data-release-entry="./app.js?v=e010fdc84b6e"></script>
+  <script type="module" src="./release-loader.mjs?v=release-gate-1" data-release-app="plot" data-release-version="2.5.3" data-release-build="f28eaf5cc6ff" data-release-entry="./app.js?v=f28eaf5cc6ff"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -344,7 +344,7 @@
       <section class="matrix-section" data-matrix-map><h3>マップの表示</h3>
         <div class="field-grid"><label>配色<select name="palette"><option value="turbo">Turbo</option><option value="viridis">Viridis</option><option value="plasma">Plasma</option><option value="jet">Jet</option><option value="cividis">Cividis</option><option value="gray">グレー</option></select></label><label>表示方法<select name="mapStyle"><option value="points">測定点</option><option value="cells">セル</option></select></label><label>配色の最小<input name="colorMin" type="number" step="any" placeholder="Auto"></label><label>配色の最大<input name="colorMax" type="number" step="any" placeholder="Auto"></label></div>
         <p class="field-note">Autoは選択シートで共通の配色範囲です。値を指定すると範囲外は端の色になります。</p>
-        <details class="settings-panel"><summary>座標・点・カラーバー</summary><div class="field-grid"><label>X間隔 (mm)<input name="pitchX" type="number" min="0.000000000001" step="any" value="5" required></label><label>Y間隔 (mm)<input name="pitchY" type="number" min="0.000000000001" step="any" value="5" required></label><label>中心X (mm)<input name="originX" type="number" step="any" value="0" required></label><label>中心Y (mm)<input name="originY" type="number" step="any" value="0" required></label><label>点面積 (pt²)<input name="markerSize" type="number" min="0.1" max="1000" step="0.1" value="18" required></label><label>点の縁幅 (pt)<input name="edgeWidth" type="number" min="0" max="10" step="0.05" value="0.25" required></label><label>点の縁色<input name="edgeColor" value="none" maxlength="10" placeholder="none / #色"></label></div><div class="check-options"><label><input name="equalAspect" type="checkbox" checked>XYを等縮尺</label><label><input name="colorbar" type="checkbox" checked>カラーバーを表示</label><label><input name="frame" type="checkbox">外枠を表示</label></div><p class="field-note">左から右へX増加、上から下へY減少。範囲の中央を中心座標に合わせます。</p></details>
+        <details class="settings-panel"><summary>座標・点・カラーバー</summary><div class="field-grid"><label>X間隔 (mm)<input name="pitchX" type="number" min="0.000000000001" step="any" value="5" required></label><label>Y間隔 (mm)<input name="pitchY" type="number" min="0.000000000001" step="any" value="5" required></label><label>中心X (mm)<input name="originX" type="number" step="any" value="0" required></label><label>中心Y (mm)<input name="originY" type="number" step="any" value="0" required></label><label>点面積 (pt²)<input name="markerSize" type="number" min="0.1" max="1000" step="0.1" value="30" required></label><label>点の縁幅 (pt)<input name="edgeWidth" type="number" min="0" max="10" step="0.05" value="0.25" required></label><label>点の縁色<input name="edgeColor" value="none" maxlength="10" placeholder="none / #色"></label></div><div class="check-options"><label><input name="equalAspect" type="checkbox" checked>XYを等縮尺</label><label><input name="colorbar" type="checkbox" checked>カラーバーを表示</label><label><input name="frame" type="checkbox">外枠を表示</label></div><p class="field-note">左から右へX増加、上から下へY減少。範囲の中央を中心座標に合わせます。</p></details>
       </section>
       <section class="matrix-section" data-matrix-hist><h3>ヒストグラムの表示</h3>
         <div class="field-grid"><label>棒の表示<select name="histStyle"><option value="overlay">重ねる</option><option value="grouped">横に並べる</option><option value="step">輪郭線</option></select></label><label>棒の不透明度<input name="histAlpha" type="range" min="0" max="1" step="0.01" value="0.55"></label><label>ビン幅<input name="binWidth" type="number" min="0.000000000000001" step="any" placeholder="Auto"></label><label>ビン数<input name="binCount" type="number" min="1" max="500" step="1" placeholder="Auto"></label></div>

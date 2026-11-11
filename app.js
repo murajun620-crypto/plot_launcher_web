@@ -1,15 +1,15 @@
-import {createMatrixEditor} from './matrix-editor.mjs?v=e010fdc84b6e';
-import {isMatrixPlot} from './matrix-model.mjs?v=e010fdc84b6e';
+import {createMatrixEditor} from './matrix-editor.mjs?v=f28eaf5cc6ff';
+import {isMatrixPlot} from './matrix-model.mjs?v=f28eaf5cc6ff';
 import {createFileProgress} from './file-progress.mjs?v=file-open-1';
-import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=e010fdc84b6e';
+import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=f28eaf5cc6ff';
 import {setupDirectSendButton,getFigureWorkspace} from './direct-transfer.mjs?v=baaeeccc3ee1';
 import {identifyPlotProject,plotSheetIndex,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=baaeeccc3ee1';
 import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=9127ec4c4f31";
 import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=9127ec4c4f31";
 import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9127ec4c4f31";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=e010fdc84b6e";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=e010fdc84b6e";
-import { APP_VERSION, COLORS, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=e010fdc84b6e";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=f28eaf5cc6ff";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=f28eaf5cc6ff";
+import { APP_VERSION, COLORS, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=f28eaf5cc6ff";
 
 import {alignmentOffsets} from './object-layout.mjs?v=27ae7675c457';
 import {createDataEditor} from './data-editor.mjs?v=27ae7675c457';
@@ -22,7 +22,7 @@ import {createXRangePicker} from './x-range-picker.mjs?v=normalization-range-1';
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 const fileProgress=createFileProgress();
-const APP_BUILD = 'e010fdc84b6e';
+const APP_BUILD = 'f28eaf5cc6ff';
 window.FigureAppRelease?.assertRunning({version:APP_VERSION,build:APP_BUILD});
 function makeProject(settings,data,fonts,workspace={}){
   const live=sourceData&&data.filename===sourceData.filename&&(data.bytes===sourceData.bytes||data.files&&data.files===sourceData.files);
@@ -463,7 +463,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=e010fdc84b6e", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=f28eaf5cc6ff", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") {
       if(data.id)requests.get(data.id)?.progressTask?.stage(data.text,{completed:data.completed,total:data.total,unit:data.unit||''});
@@ -720,7 +720,8 @@ const matrixEditor=createMatrixEditor({root:$('#matrix-editor'),request,getMetad
   const columns=metadata.columns,x=columns[0]?.index??0,y=columns[1]?.index??x;
   config={axes,plotType:kind,options:{...previous.options,matrix:options},annotations:previous.annotations||[],series:series.map((item,i)=>({...createSeries(x,y,item.name,i),color:item.color,mode:'line',trendType:'none',errorMode:'none'}))};
   if(kind==='Surface Map'){
-    if(!same)Object.assign(axes,{xLabel:'X Position',xUnit:'mm',yLabel:'Y Position',yUnit:'mm'});
+    if(!same)Object.assign(axes,{xLabel:'X position',xUnit:'mm',yLabel:'Y position',yUnit:'mm'});
+    for(const axis of ['x','y'])if(axes[axis+'Label']===axis.toUpperCase()+' Position')axes[axis+'Label']=axis.toUpperCase()+' position';
     sourceData={...sourceData,selectedSheets:[...options.sheets].sort((a,b)=>a-b)};
   }else {Object.assign(axes,{xLabel:options.valueLabel,yLabel:'Frequency',yUnit:'',y2Label:'Cumulative undersize',y2Unit:'%'});if(!same||previous.options?.matrix?.valueUnit!==options.valueUnit)Object.assign(axes,{xUnit:options.valueUnit,xUnitScale:1});}
   drawMetadata();drawControls();changed(0);

@@ -1,6 +1,6 @@
 export const MATRIX_TYPES=['Surface Map','Surface Histogram'];
 export const isMatrixPlot=type=>MATRIX_TYPES.includes(type);
-export const MATRIX_DEFAULTS={range:'A1:S19',sheets:[],pitchX:5,pitchY:5,originX:0,originY:0,valueLabel:'Surface roughness, Sa',valueUnit:'nm',palette:'turbo',colorMin:'',colorMax:'',markerSize:18,mapStyle:'points',edgeColor:'none',edgeWidth:.25,equalAspect:true,colorbar:true,frame:false,binMin:'',binMax:'',binWidth:'',binCount:'',histStyle:'overlay',histAlpha:.55,cumulative:true,cumulativeColors:{}};
+export const MATRIX_DEFAULTS={range:'A1:S19',sheets:[],pitchX:5,pitchY:5,originX:0,originY:0,valueLabel:'Surface roughness, Sa',valueUnit:'nm',palette:'turbo',colorMin:'',colorMax:'',markerSize:30,mapStyle:'points',edgeColor:'none',edgeWidth:.25,equalAspect:true,colorbar:true,frame:false,binMin:'',binMax:'',binWidth:'',binCount:'',histStyle:'overlay',histAlpha:.55,cumulative:true,cumulativeColors:{}};
 export function validateMatrixOptions(raw){
  if(!raw||typeof raw!=='object'||Array.isArray(raw))throw Error('マップ・分布の設定を確認してください。');
  const value={...structuredClone(MATRIX_DEFAULTS),...structuredClone(raw)};

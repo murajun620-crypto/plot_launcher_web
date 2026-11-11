@@ -1,8 +1,8 @@
-import { APP_VERSION, restoreSettings } from "./state.js?v=e010fdc84b6e";
+import { APP_VERSION, restoreSettings } from "./state.js?v=f28eaf5cc6ff";
 import { validateTableEdits } from './table-edits.mjs?v=27ae7675c457';
 // All user data stays in this worker's in-memory filesystem.
 const PYODIDE_VERSION = "0.29.3";
-const WORKER_BUILD = 'e010fdc84b6e';
+const WORKER_BUILD = 'f28eaf5cc6ff';
 const INDEX_URL = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
 let pyodide, dispatch, currentPath = "", uploadNumber = 0;
 let currentSources = [];
@@ -45,7 +45,7 @@ async function initialize() {
   await Promise.all([...new Set([...catalog.map(preset => preset.script), "xps_csv.py", "desktop_defaults.py"])].map(async name => {
     pyodide.FS.writeFile(`/app/python/${name}`, await fetchAsset(`./python/${name}`));
   }));
-  pyodide.FS.writeFile("/app/python/spatial.py", await fetchAsset("./python/spatial.py?v=e010fdc84b6e"));
+  pyodide.FS.writeFile("/app/python/spatial.py", await fetchAsset("./python/spatial.py?v=f28eaf5cc6ff"));
   await pyodide.runPythonAsync("import sys\nsys.path.insert(0, '/app/python')\nfrom engine import PlotEngine\n_engine = PlotEngine('/app/python', '/app/NotoSansJP.ttf')\n_dispatch = _engine.dispatch");
   pyodide.globals.set("_report_file_progress",(text,completed,total)=>operationProgress(text,completed,total,'ファイル'));
   pyodide.runPython("_engine.progress_callback = _report_file_progress");
