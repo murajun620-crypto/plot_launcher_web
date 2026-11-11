@@ -282,10 +282,18 @@ def render_matrix(engine, config):
                 if settings.get(name+"LabelX","")!="" and settings.get(name+"LabelY","")!="": axis.set_label_coords(float(settings[name+"LabelX"]),float(settings[name+"LabelY"]))
             for target in [axes]+([right] if right else []):
                 for side,spine in target.spines.items(): spine.set_visible((histogram or options.get("frame",False)) and bool(settings.get("spine"+side.title(),True)));spine.set_linewidth(.8*float(settings.get("spineScale",1)));spine.set_color(settings.get("spineColor","#000000"))
+            # Style arguments make Matplotlib enable a grid even with False.
+            # As in ordinary presets, disable without passing line properties.
+            if right is not None:
+                right.grid(False,which="both")
             for name in ["x","y"]:
                 for minor in [False,True]:
-                    enabled=settings.get(name+("MinorGrid" if minor else "Grid"),False)
-                    axes.grid(bool(enabled),which="minor" if minor else "major",axis=name,**grid_style(settings,minor=minor))
+                    enabled=settings.get(name+("MinorGrid" if minor else "Grid"),False if minor else settings.get("grid",False))
+                    which="minor" if minor else "major"
+                    if enabled:
+                        axes.grid(True,which=which,axis=name,**grid_style(settings,minor=minor))
+                    else:
+                        axes.grid(False,which=which,axis=name)
             if legend and settings.get("legendX","")!="" and settings.get("legendY","")!="": legend.set_bbox_to_anchor((float(settings["legendX"]),float(settings["legendY"])),transform=axes.transAxes);legend._loc=2
             legend,legend_records=engine._web_legends(figure,legend,config,diagnostics,config["plotType"])
             if legend: legend.set_gid("web-legend")
