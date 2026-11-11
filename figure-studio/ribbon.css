@@ -267,3 +267,45 @@ html[data-selection-pane=open] #toast{left:calc((100% + var(--figures) - var(--i
 #layers .layer-row.selected .layer-meta{color:inherit;font-weight:600}
 #layers .layer-meta{margin-left:auto;flex:none;font-size:10px;color:#8b819a}
 #layers .layer-child{font-size:11px;padding:7px 6px}
+
+/* In the workspace, file commands share the tab row instead of consuming a row. */
+#studioRibbon[data-file-controls=joined]{height:auto;min-height:0}
+#studioRibbon[data-file-controls=joined] .ribbon-tab-row{height:42px;gap:8px;padding-inline:10px}
+.ribbon-file-controls{display:flex;align-items:center;gap:10px;flex:1;min-width:0}
+#studioRibbon .ribbon-file-controls .document-title{flex:0 1 150px;min-width:55px;max-width:150px;border:0;padding:0}
+#studioRibbon .ribbon-file-controls .document-title input{width:100%;max-width:100%;font-size:12px}
+#studioRibbon .ribbon-file-controls .save-status{max-width:100%;overflow:hidden;text-overflow:ellipsis;font-size:9px}
+#studioRibbon .ribbon-file-controls .header-actions{margin-left:auto;gap:4px}
+#studioRibbon .ribbon-file-controls .header-actions>.separator{display:none}
+#studioRibbon .ribbon-file-controls .button{min-height:30px;padding:5px 8px;font-size:11px;gap:5px}
+#studioRibbon .ribbon-file-controls .button .icon{width:16px;height:16px}
+#studioRibbon[data-file-controls=joined] .ribbon-tabs [role=tab]{min-width:58px;padding-inline:10px}
+#studioRibbon[data-file-controls=joined] .ribbon-selection-info{max-width:140px}
+#studioRibbon .ribbon-collapse-toggle{display:inline-flex;align-self:center;align-items:center;justify-content:center;flex:none;width:28px;height:27px;border:1px solid transparent;border-radius:4px;color:#62776c}
+#studioRibbon .ribbon-collapse-toggle:hover{background:var(--accent-soft);border-color:#cbd9d7;color:var(--accent)}
+#studioRibbon .ribbon-collapse-toggle .icon{width:15px;height:15px}
+#studioRibbon .ribbon-collapse-toggle[aria-expanded=true] .icon{transform:rotate(180deg)}
+#studioRibbon[data-ribbon-collapsed=true]{height:auto;min-height:0}
+@media(max-width:1250px){
+ #studioRibbon[data-file-controls=joined] .ribbon-selection-info{display:none}
+ #studioRibbon .ribbon-file-controls .document-title{max-width:115px}
+}
+@media(max-width:1050px){
+ #studioRibbon[data-file-controls=joined] .sidebar-toggle{width:28px;padding:4px;justify-content:center}
+ #studioRibbon[data-file-controls=joined] .sidebar-toggle>span{display:none}
+ #studioRibbon .ribbon-file-controls .document-title{max-width:95px}
+ #studioRibbon .ribbon-file-controls [data-action=import]>span{display:none}
+}
+@media(max-width:800px){
+ #studioRibbon[data-file-controls=joined] .ribbon-tab-row{gap:4px;padding-inline:6px}
+ #studioRibbon[data-file-controls=joined] .ribbon-tabs{gap:0}
+ #studioRibbon[data-file-controls=joined] .ribbon-tabs [role=tab]{min-width:48px;padding-inline:7px;font-size:11px}
+ #studioRibbon .ribbon-file-controls{gap:5px}
+ #studioRibbon .ribbon-file-controls .document-title{max-width:80px}
+ #studioRibbon .ribbon-file-controls .button{padding-inline:6px}
+}
+@media(max-width:640px){
+ #studioRibbon[data-file-controls=joined] .ribbon-tab-row{height:auto;min-height:42px;flex-wrap:wrap;column-gap:6px;row-gap:0}
+ #studioRibbon .ribbon-file-controls{order:-1;flex-basis:100%;min-height:40px;border-bottom:1px solid #e5e8eb}
+ #studioRibbon[data-file-controls=joined] .ribbon-tabs{height:32px;flex:1}
+}

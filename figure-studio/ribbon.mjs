@@ -1,4 +1,5 @@
 const PANE_PREFERENCE='figure-studio-right-sidebar';
+const RIBBON_PREFERENCE='figure-studio-ribbon-display';
 
 /** Small, native-control ribbon. Editing commands remain owned by the app. */
 export function createRibbon({root,documentRef=globalThis.document,storage,onResize=()=>{},onFocusCanvas}={}){
@@ -6,10 +7,22 @@ export function createRibbon({root,documentRef=globalThis.document,storage,onRes
  if(!root)throw Error('Figure Studioのリボンが見つかりません。');
  const view=documentRef.defaultView||globalThis;
  if(storage===undefined)try{storage=view.localStorage;}catch{storage=null;}
+ // Keep the original controls and handlers in this document. In the workspace
+ // their own header row is redundant with the shell's brand/app navigation.
+ const header=documentRef.querySelector?.('.app-header'),tabRow=root.querySelector('.ribbon-tab-row');
+ let fileControls=null,headerWasHidden=false;
+ if(documentRef.documentElement?.dataset.workspaceEmbedded==='true'&&header&&tabRow){
+  const title=header.querySelector('.document-title'),actions=header.querySelector('.header-actions');
+  if(title&&actions){
+   headerWasHidden=header.hidden;fileControls=documentRef.createElement('div');fileControls.className='ribbon-file-controls';fileControls.append(title,actions);
+   tabRow.insertBefore(fileControls,tabRow.querySelector('.ribbon-selection-info'));header.hidden=true;root.dataset.fileControls='joined';
+  }
+ }
  const tabs=[...root.querySelectorAll('[data-ribbon-tab]')],panels=new Map([...root.querySelectorAll('[data-ribbon-panel]')].map(panel=>[panel.dataset.ribbonPanel,panel]));
  const pane=documentRef.getElementById('ribbonSelectionPane')||documentRef.getElementById('selectionPane');
  const paneButtons=[...documentRef.querySelectorAll('[data-action="toggle-selection-pane"]')];
- let activeTab=null,paneOpen=!!pane,previousFocus=null,frame=null,disposed=false;
+ const collapseButton=root.querySelector('#ribbonCollapseButton');
+ let activeTab=null,paneOpen=!!pane,previousFocus=null,frame=null,disposed=false,collapsed=false;
  const details=()=>[...root.querySelectorAll('details[open]')];
  const tabFor=key=>tabs.find(tab=>tab.dataset.ribbonTab===key);
  const requestFrame=typeof view.requestAnimationFrame==='function'?callback=>view.requestAnimationFrame(callback):callback=>{callback();return null;};
@@ -34,17 +47,30 @@ export function createRibbon({root,documentRef=globalThis.document,storage,onRes
   frame=requestFrame(()=>{frame=null;if(!disposed){positionMenus();onResize();}});
  }
  function closeMenus(except=null){for(const menu of details())if(menu!==except)menu.open=false;}
- function show(key,{focus=false}={}){
+ function show(key,{focus=false,expand=false}={}){
   const tab=tabFor(key),panel=panels.get(key);
   if(disposed||!tab||!panel||tab.disabled||tab.hidden)return false;
   const previousPanel=panels.get(activeTab),movingFocus=!!previousPanel&&previousPanel!==panel&&previousPanel.contains(documentRef.activeElement);
-  const changed=activeTab!==key;activeTab=key;
+  const changed=activeTab!==key;activeTab=key;if(expand&&collapsed)setCollapsed(false);
   closeMenus();
   for(const item of tabs){const selected=item===tab;item.setAttribute('aria-selected',String(selected));item.tabIndex=selected?0:-1;}
-  for(const[name,item]of panels){const selected=name===key;item.hidden=!selected;item.inert=!selected;}
+  for(const[name,item]of panels){const shown=name===key&&!collapsed;item.hidden=!shown;item.inert=!shown;}
   if(focus||movingFocus)tab.focus({preventScroll:true});
   if(changed)scheduleLayout();
   return true;
+ }
+ function setCollapsed(next){
+  if(disposed)return collapsed;
+  collapsed=!!next;closeMenus();root.dataset.ribbonCollapsed=String(collapsed);
+  if(collapsed&&[...panels.values()].some(panel=>panel.contains(documentRef.activeElement)))tabFor(activeTab)?.focus({preventScroll:true});
+  for(const[name,panel]of panels){const shown=name===activeTab&&!collapsed;panel.hidden=!shown;panel.inert=!shown;}
+  if(collapseButton){const label=collapsed?'ツールを展開':'ツールを折りたたむ';collapseButton.setAttribute('aria-expanded',String(!collapsed));collapseButton.setAttribute('aria-label',label);collapseButton.title=`${label} (Ctrl+F1)`;}
+  try{storage?.setItem(RIBBON_PREFERENCE,collapsed?'collapsed':'expanded');}catch{}
+  scheduleLayout();return collapsed;
+ }
+ function collapseShortcut(event){
+  if(event.defaultPrevented||event.isComposing||event.altKey||event.shiftKey||!(event.ctrlKey||event.metaKey)||event.key!=='F1')return;
+  event.preventDefault();event.stopPropagation();setCollapsed(!collapsed);
  }
  function updateSelection(objects=[]){
   const format=tabFor('format');if(!format||disposed)return;
@@ -74,8 +100,9 @@ export function createRibbon({root,documentRef=globalThis.document,storage,onRes
   scheduleLayout();return paneOpen;
  }
  function click(event){
+  if(collapseButton&&event.target.closest?.('#ribbonCollapseButton')===collapseButton){setCollapsed(!collapsed);return;}
   const tab=event.target.closest?.('[data-ribbon-tab]');
-  if(tabs.includes(tab)&&!tab.disabled)show(tab.dataset.ribbonTab);
+  if(tabs.includes(tab)&&!tab.disabled)show(tab.dataset.ribbonTab,{expand:true});
  }
  function keydown(event){
   if(event.defaultPrevented||event.isComposing||event.keyCode===229)return;
@@ -93,7 +120,7 @@ export function createRibbon({root,documentRef=globalThis.document,storage,onRes
   else if(event.key==='Home')index=0;
   else if(event.key==='End')index=available.length-1;
   else return; // Enter and Space retain native button activation.
-  event.preventDefault();event.stopPropagation();show(available[index].dataset.ribbonTab,{focus:true});
+  event.preventDefault();event.stopPropagation();show(available[index].dataset.ribbonTab,{focus:true,expand:true});
  }
  function toggled(event){if(event.target.tagName==='DETAILS'&&event.target.open){closeMenus(event.target);scheduleLayout();}}
  for(const tab of tabs){
@@ -103,8 +130,9 @@ export function createRibbon({root,documentRef=globalThis.document,storage,onRes
  }
  try{paneOpen=!!pane&&storage?.getItem(PANE_PREFERENCE)!=='closed';}catch{}
  syncPane();updateSelection([]);show('home');
- root.addEventListener('click',click);root.addEventListener('keydown',keydown);root.addEventListener('toggle',toggled,true);root.addEventListener('scroll',scheduleLayout,true);view.addEventListener?.('resize',scheduleLayout);
+ try{collapsed=storage?.getItem(RIBBON_PREFERENCE)==='collapsed';}catch{}setCollapsed(collapsed);
+ root.addEventListener('click',click);root.addEventListener('keydown',keydown);root.addEventListener('toggle',toggled,true);root.addEventListener('scroll',scheduleLayout,true);view.addEventListener?.('resize',scheduleLayout);view.addEventListener?.('keydown',collapseShortcut);
  return {show,updateSelection,toggleSelectionPane,get activeTab(){return activeTab;},get selectionPaneOpen(){return paneOpen;},
-  destroy(){if(disposed)return;disposed=true;if(frame!==null)view.cancelAnimationFrame?.(frame);root.removeEventListener('click',click);root.removeEventListener('keydown',keydown);root.removeEventListener('toggle',toggled,true);root.removeEventListener('scroll',scheduleLayout,true);view.removeEventListener?.('resize',scheduleLayout);}
+  destroy(){if(disposed)return;disposed=true;if(frame!==null)view.cancelAnimationFrame?.(frame);root.removeEventListener('click',click);root.removeEventListener('keydown',keydown);root.removeEventListener('toggle',toggled,true);root.removeEventListener('scroll',scheduleLayout,true);view.removeEventListener?.('resize',scheduleLayout);view.removeEventListener?.('keydown',collapseShortcut);if(fileControls){header.append(...fileControls.children);fileControls.remove();header.hidden=headerWasHidden;delete root.dataset.fileControls;}}
  };
 }
