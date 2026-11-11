@@ -114,14 +114,19 @@ def matrix_values(engine, sheet_index, region):
 
 
 def render_matrix(engine, config):
-    from engine import number, grid_style, _MarkerExtent
+    from engine import number, grid_style, _MarkerExtent, smooth_line_coordinates
     options = config.get("options", {}).get("matrix", {})
     settings = config.get("axes", {})
     histogram = config["plotType"] == "Surface Histogram"
     region = options.get("range", "A1:S19")
     indices = options.get("sheets", [engine.table_info["sheetIndex"]])
     if not isinstance(indices,list) or not 1 <= len(indices) <= 32 or len(set(indices)) != len(indices) or any(not isinstance(i,int) or not 0<=i<=1000 for i in indices): raise ValueError("分布の比較対象は1〜32シートで選択してください。")
-    if not histogram: indices = [engine.table_info["sheetIndex"]]
+    sheet_mode=options.get("histSheetMode","combined")
+    if sheet_mode not in {"separate","combined"}: raise ValueError("グラフのまとめ方を確認してください。")
+    separate=histogram and sheet_mode=="separate"
+    active=engine.table_info["sheetIndex"]
+    if separate and active not in indices: raise ValueError("表示するシートを分布の対象にも選択してください。")
+    if not histogram: indices = [active]
     datasets = [matrix_values(engine, i, region) for i in indices]
     font = settings.get("fontFamily", "Arial")
     if font not in engine.font_families: font = "Liberation Sans" if "Liberation Sans" in engine.font_families else engine.font_family
@@ -153,6 +158,8 @@ def render_matrix(engine, config):
                     n = int(count) if count is not None else min(100,max(5,len(np.histogram_bin_edges(all_values,bins="fd",range=(lo,hi)))-1))
                     edges = np.linspace(lo,hi,n+1)
                 cumulative = options.get("cumulative",True)
+                interpolation=options.get("cdfInterpolation","smooth")
+                if interpolation not in {"smooth","linear"}: raise ValueError("累積線の表示方法を確認してください。")
                 if cumulative: right = axes.twinx(); right.set_ylim(0,100)
                 style = options.get("histStyle","overlay")
                 if style not in {"overlay","grouped","step"}: raise ValueError("ヒストグラムの表示方法を確認してください。")
@@ -162,6 +169,9 @@ def render_matrix(engine, config):
                     series = config["series"][index] if index<len(config["series"]) else {}
                     label = series.get("name") or sheet; color = series.get("color",f"C{index%10}")
                     if not colors.is_color_like(color): raise ValueError("系列の色を確認してください。")
+                    if separate and sheet_index!=active:
+                        diagnostics.append({"name":label,"points":len(values),"count":len(values),"visible":False,"processing":{}})
+                        continue
                     visible = series.get("visible",True); counts,_ = np.histogram(values,edges)
                     under = int(np.count_nonzero(values<edges[0])); over = int(np.count_nonzero(values>edges[-1]))
                     artists = []
@@ -176,14 +186,15 @@ def render_matrix(engine, config):
                             ccolor=color if ccolor=="auto" else ccolor
                             if not colors.is_color_like(ccolor): raise ValueError("累積線の色を確認してください。")
                             curve=100*np.r_[under,under+np.cumsum(counts)]/len(values)
-                            artists+=right.plot(edges,curve,color=ccolor,linewidth=float(series.get("lineWidth",1)),label=f"CDF · {label}" if ccolor!=color else "_nolegend_")
+                            line_x,line_y=smooth_line_coordinates(edges,curve,xlog=settings.get("xScale")=="log",xlim=(edges[0],edges[-1])) if interpolation=="smooth" else (edges,curve)
+                            artists+=right.plot(line_x,line_y,color=ccolor,linewidth=float(series.get("lineWidth",1)),label=f"CDF · {label}" if ccolor!=color else "_nolegend_")
                         groups.append({"index":index,"artists":artists})
                     if under or over: warnings.append(f"{label}：ビンの範囲外 {under+over}点（累積率の分母は全{len(values)}点）。")
                     diagnostics.append({"name":label,"points":len(values),"count":len(values),"visible":visible,"processing":{}})
                     statistics.append({"name":label,"sheetIndex":sheet_index,"count":len(values),"min":float(values.min()),"max":float(values.max()),"mean":float(values.mean()),"binEdges":edges.tolist(),"frequency":counts.tolist(),"cumulative":(100*(under+np.cumsum(counts))/len(values)).tolist(),"outside":under+over})
                 axes.set_xlim(edges[0],edges[-1]); axes.set_ylim(0,max(1,axes.get_ylim()[1])*1.05)
                 if right:
-                    right.set_ylabel(settings.get("y2Label") or "Cumulative undersize (%)")
+                    right.set_ylabel(settings.get("y2Label") or "Cumulative frequency (%)")
                     right.tick_params(labelsize=size*.875*float(settings.get("tickFontScale",1)),direction="in")
                 handles, labels = axes.get_legend_handles_labels()
                 if right:
@@ -243,7 +254,7 @@ def render_matrix(engine, config):
                         (axis.set_major_locator if which=="major" else axis.set_minor_locator)(locator)
                 for which,prefix,base_length in [("major","Major",3),("minor","Minor",1.5)]:
                     flag=name.upper();hidden=settings.get("hide"+flag+"Ticks",False) or which=="minor" and settings.get("hide"+flag+"MinorTicks",False)
-                    owner.tick_params(axis=axis_name,which=which,direction="in",length=0 if hidden else base_length*float(settings.get(name+prefix+"TickLength",1)),width=float(settings.get(name+prefix+"TickWidth",1)),labelsize=size*.875*float(settings.get("tickFontScale",1)),pad=float(settings.get(name+"TickPad",0)))
+                    owner.tick_params(axis=axis_name,which=which,direction="in",length=0 if hidden else base_length*float(settings.get(name+prefix+"TickLength",1)),width=float(settings.get(name+prefix+"TickWidth",1)),labelsize=size*.875*float(settings.get("tickFontScale",1)),pad=2+float(settings.get(name+"TickPad",0)))
                 top=name=="x" and settings.get("xAxisTop",False)
                 right_side=name=="y2" or name=="y" and settings.get("yAxisRight",False) and right is None
                 if name=="x":
@@ -258,8 +269,9 @@ def render_matrix(engine, config):
                     if not colors.is_color_like(axis_color): raise ValueError("軸の色を確認してください。")
                     axis.set_tick_params(colors=axis_color);axis.label.set_color(axis_color)
                 label=settings.get(name+"Label","")
+                if histogram and name=="y2" and label=="Cumulative undersize": label="Cumulative frequency"
                 unit=settings.get(name+"Unit","")
-                if name=="y2" and not label: label="Cumulative undersize";unit="%"
+                if name=="y2" and not label: label="Cumulative frequency";unit="%"
                 axis.set_label_text(label_text(label,unit),fontsize=size*float(settings.get("labelFontScale",1)))
                 axis.label.set_visible(not settings.get("hide"+name.upper()+"Label",False));axis.labelpad=float(settings.get(name+"LabelPad",2))
                 axis.label.set_gid("web-axis-label-"+name)

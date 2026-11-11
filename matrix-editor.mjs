@@ -1,4 +1,4 @@
-import {MATRIX_DEFAULTS,validateMatrixOptions} from './matrix-model.mjs?v=f28eaf5cc6ff';
+import {MATRIX_DEFAULTS,validateMatrixOptions} from './matrix-model.mjs?v=940afceb1b0d';
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function createMatrixEditor({root,request,getMetadata,getConfig,onApply,enhanceColors,showDialog}){
  let info=null,openedMetadata=null;
@@ -8,14 +8,20 @@ export function createMatrixEditor({root,request,getMetadata,getConfig,onApply,e
   const histogram=field('kind').value==='Surface Histogram';
   for(const node of root.querySelectorAll('[data-matrix-map]'))node.hidden=histogram;
   for(const node of root.querySelectorAll('[data-matrix-hist]'))node.hidden=!histogram;
-  const ids=selected();root.querySelector('[data-matrix-summary]').textContent=`${ids.length}シートを選択。指定したセル範囲の数値だけを使用し、空欄を除外します。`;
+  const perSheet=!histogram||field('histSheetMode').value==='separate';
+  root.querySelector('[data-matrix-active]').hidden=!perSheet;
+  const ids=selected(),active=field('activeSheet');
+  for(const option of active.options)option.disabled=!ids.includes(Number(option.value));
+  if(active.value===''||!ids.includes(Number(active.value)))active.value=String(ids[0]??'');
+  field('cdfInterpolation').disabled=!field('cumulative').checked;
+  root.querySelector('[data-matrix-summary]').textContent=`${ids.length}シートを選択。指定したセル範囲の数値だけを使用し、空欄を除外します。`;
   for(const row of styles.children)row.hidden=!ids.includes(Number(row.dataset.matrixStyleSheet));
   root.querySelector('[type=submit]').disabled=!ids.length;error.hidden=true;
  }
  async function show(kind){
   error.hidden=true;openedMetadata=getMetadata();if(!openedMetadata)throw Error('先にExcelファイルを開いてください。');
   const result=await request('matrix-info',{});if(getMetadata()!==openedMetadata)throw Error('読み込み中に対象のファイルが変わりました。もう一度開いてください。');info=result;
-  const config=getConfig(),saved=config.options?.matrix,options={...structuredClone(MATRIX_DEFAULTS),...structuredClone(saved||{})};
+  const config=getConfig(),saved=config.options?.matrix,options=saved?validateMatrixOptions(saved):structuredClone(MATRIX_DEFAULTS);
   if(!saved){const detected=info.sheets.find(s=>s.index===openedMetadata.sheetIndex&&s.count)||info.sheets.find(s=>s.count);options.range=detected?.range||options.range;options.sheets=info.sheets.filter(s=>s.count).map(s=>s.index).slice(0,32);}
   field('kind').value=kind||(config.plotType==='Surface Histogram'?'Surface Histogram':'Surface Map');
   if(kind)field('kind').value=kind;
@@ -38,7 +44,7 @@ export function createMatrixEditor({root,request,getMetadata,getConfig,onApply,e
    for(const key of Object.keys(value)){const input=field(key);if(!input)continue;value[key]=input.type==='checkbox'?input.checked:['number','range'].includes(input.type)?input.value===''?'':Number(input.value):input.value;}
    const series=value.sheets.map(id=>{const row=styles.querySelector(`[data-matrix-style-sheet="${id}"]`);value.cumulativeColors[id]=row.querySelector('[data-matrix-cdf-color]').value;return {name:row.querySelector('[data-matrix-name]').value,color:row.querySelector('[data-matrix-color]').value};});
    const options=validateMatrixOptions(value),kind=field('kind').value,active=Number(field('activeSheet').value);
-   if(kind==='Surface Map'&&!options.sheets.includes(active))throw Error('表示するシートを比較対象にも選択してください。');
+   if((kind==='Surface Map'||options.histSheetMode==='separate')&&!options.sheets.includes(active))throw Error('表示するシートを比較対象にも選択してください。');
    root.querySelector('[type=submit]').disabled=true;await onApply({kind,options,series,activeSheet:active});root.close();
   }catch(cause){error.textContent=cause.message;error.hidden=false;}finally{root.querySelector('[type=submit]').disabled=!selected().length;}
  });

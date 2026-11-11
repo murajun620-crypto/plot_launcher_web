@@ -1,4 +1,5 @@
-import { restoreSettings, safeStem } from "./state.js?v=f28eaf5cc6ff";
+import {isMatrixPlot} from './matrix-model.mjs?v=940afceb1b0d';
+import { restoreSettings, safeStem } from "./state.js?v=940afceb1b0d";
 
 // An unedited sheet inherits appearance and column choices from the preview.
 // Prefer matching headers; use the same column position when headers differ.
@@ -10,6 +11,13 @@ export function configForSheet(settings, metadata) {
     return found.name;
   };
   document.data = {filename:metadata.filename, sheet:metadata.sheets[metadata.sheetIndex], headerRow:metadata.headerRow};
+  if(isMatrixPlot(document.plotType)){
+    const x=metadata.columns[0],y=metadata.columns[1]||x;
+    if(!x)throw Error('シートに分布データがありません。');
+    // Cell matrices are read by range, independent of worksheet column headers.
+    for(const series of document.series){series.xColumn=x.name;series.yColumn=y.name;}
+    return restoreSettings(document,metadata);
+  }
   for (const series of document.series) {
     const oldName = series.yColumn;
     for (const key of ['x','y','error','errorMin','errorMax','errorPlus','errorMinus']) {

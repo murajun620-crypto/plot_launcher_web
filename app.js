@@ -1,15 +1,15 @@
-import {createMatrixEditor} from './matrix-editor.mjs?v=f28eaf5cc6ff';
-import {isMatrixPlot} from './matrix-model.mjs?v=f28eaf5cc6ff';
+import {createMatrixEditor} from './matrix-editor.mjs?v=940afceb1b0d';
+import {isMatrixPlot,isCombinedHistogram} from './matrix-model.mjs?v=940afceb1b0d';
 import {createFileProgress} from './file-progress.mjs?v=file-open-1';
-import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=f28eaf5cc6ff';
+import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=940afceb1b0d';
 import {setupDirectSendButton,getFigureWorkspace} from './direct-transfer.mjs?v=baaeeccc3ee1';
 import {identifyPlotProject,plotSheetIndex,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=baaeeccc3ee1';
 import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=9127ec4c4f31";
 import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=9127ec4c4f31";
 import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9127ec4c4f31";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=f28eaf5cc6ff";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=f28eaf5cc6ff";
-import { APP_VERSION, COLORS, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=f28eaf5cc6ff";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=940afceb1b0d";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=940afceb1b0d";
+import { APP_VERSION, COLORS, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=940afceb1b0d";
 
 import {alignmentOffsets} from './object-layout.mjs?v=27ae7675c457';
 import {createDataEditor} from './data-editor.mjs?v=27ae7675c457';
@@ -22,7 +22,7 @@ import {createXRangePicker} from './x-range-picker.mjs?v=normalization-range-1';
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 const fileProgress=createFileProgress();
-const APP_BUILD = 'f28eaf5cc6ff';
+const APP_BUILD = '940afceb1b0d';
 window.FigureAppRelease?.assertRunning({version:APP_VERSION,build:APP_BUILD});
 function makeProject(settings,data,fonts,workspace={}){
   const live=sourceData&&data.filename===sourceData.filename&&(data.bytes===sourceData.bytes||data.files&&data.files===sourceData.files);
@@ -157,6 +157,10 @@ function projectSheetSettings() {
 function selectedSheetIndices(data=sourceData,info=metadata){
   if(!info)return [];
   return data?.selectedSheets?[...data.selectedSheets].filter(index=>index<info.sheets.length).sort((a,b)=>a-b):info.sheets.map((_,index)=>index);
+}
+function plotSheetIndices(){
+  const indices=selectedSheetIndices();
+  return isMatrixPlot(config.plotType)&&!isCombinedHistogram(config)?indices.filter(index=>config.options.matrix.sheets.includes(index)):indices;
 }
 function sourceWithSheetSelection(data,indices,count){
   const {selectedSheets,...rest}=data;
@@ -380,25 +384,25 @@ function updateButtons() {
   $('#preset-fields').disabled = !engineReady || !metadata || busy;
   $("#header-row").disabled = !engineReady || !metadata || busy;
   $('#data-options').hidden = !metadata;
-  const sheetIndices=selectedSheetIndices(),sheetPosition=sheetIndices.indexOf(metadata?.sheetIndex);
+  const sheetIndices=plotSheetIndices(),sheetPosition=sheetIndices.indexOf(metadata?.sheetIndex);
   const multipleSheets = sheetIndices.length > 1;
   $("#sheet-select").disabled = !engineReady || !metadata || busy || !multipleSheets;
   $('#sheet-select-field').hidden = (metadata?.sheets.length ?? 0) < 2;
   $('#choose-sheets').hidden=!!sourceData?.files||(metadata?.sheets.length ?? 0)<2;
   $('#choose-sheets').disabled=!engineReady||busy||!metadata;
-  $('#choose-sheets').textContent=`読み込むシートを選択（${sheetIndices.length} / ${metadata?.sheets.length ?? 0}）`;
+  $('#choose-sheets').textContent=`読み込むシートを選択（${selectedSheetIndices().length} / ${metadata?.sheets.length ?? 0}）`;
   for (const mode of ['shared','individual']) {
     $(`#sheet-mode-${mode}`).checked = sheetMode === mode;
     $(`#sheet-mode-${mode}`).disabled = !engineReady || busy || !multipleSheets;
   }
-  $('#sheet-navigation').hidden = $('#open-save-all').hidden = $('#save-all-sheets-field').hidden = !multipleSheets||config.plotType==='Surface Histogram';
+  $('#sheet-navigation').hidden = $('#open-save-all').hidden = $('#save-all-sheets-field').hidden = !multipleSheets||isCombinedHistogram(config);
   const batchLabel=sheetIndices.length<(metadata?.sheets.length??0)?'選択したシートを一括保存':'全シートを一括保存';
   $('#open-save-all').textContent=$('#save-all-sheets-label').textContent=batchLabel;
   $('#previous-sheet').disabled = !engineReady || busy || !multipleSheets || sheetPosition <= 0;
   $('#next-sheet').disabled = !engineReady || busy || !multipleSheets || sheetPosition >= sheetIndices.length - 1;
   $('#open-save-all').disabled = !engineReady || busy || !multipleSheets || renderRunning;
   $('#save-all-sheets').disabled = busy || !multipleSheets;
-  if (!multipleSheets||config.plotType==='Surface Histogram') $('#save-all-sheets').checked = false;
+  if (!multipleSheets||isCombinedHistogram(config)) $('#save-all-sheets').checked = false;
   if (metadata) {
     $('#preview-sheet-name').textContent = `${sheetPosition + 1} / ${sheetIndices.length} · ${metadata.sheets[metadata.sheetIndex]}`;
     $('#preview-sheet-name').title = metadata.sheets[metadata.sheetIndex];
@@ -463,7 +467,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=f28eaf5cc6ff", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=940afceb1b0d", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") {
       if(data.id)requests.get(data.id)?.progressTask?.stage(data.text,{completed:data.completed,total:data.total,unit:data.unit||''});
@@ -709,8 +713,8 @@ function drawPresetOptions() {
 }
 
 const matrixEditor=createMatrixEditor({root:$('#matrix-editor'),request,getMetadata:()=>metadata,getConfig:()=>config,enhanceColors:enhanceColorInputs,showDialog:()=>showDialog('#matrix-editor'),onApply:async({kind,options,series,activeSheet})=>{
-  const previous=structuredClone(config);
-  if(kind==='Surface Map'&&activeSheet!==metadata.sheetIndex){
+  const previous=structuredClone(config),perSheet=kind==='Surface Map'||options.histSheetMode==='separate';
+  if(perSheet&&activeSheet!==metadata.sheetIndex){
     sourceData={...sourceData,selectedSheets:[...new Set([...selectedSheetIndices(),activeSheet])].sort((a,b)=>a-b)};
     if(!await changeSheet(activeSheet))throw Error('表示するシートを開けませんでした。');
   }
@@ -722,8 +726,10 @@ const matrixEditor=createMatrixEditor({root:$('#matrix-editor'),request,getMetad
   if(kind==='Surface Map'){
     if(!same)Object.assign(axes,{xLabel:'X position',xUnit:'mm',yLabel:'Y position',yUnit:'mm'});
     for(const axis of ['x','y'])if(axes[axis+'Label']===axis.toUpperCase()+' Position')axes[axis+'Label']=axis.toUpperCase()+' position';
-    sourceData={...sourceData,selectedSheets:[...options.sheets].sort((a,b)=>a-b)};
-  }else {Object.assign(axes,{xLabel:options.valueLabel,yLabel:'Frequency',yUnit:'',y2Label:'Cumulative undersize',y2Unit:'%'});if(!same||previous.options?.matrix?.valueUnit!==options.valueUnit)Object.assign(axes,{xUnit:options.valueUnit,xUnitScale:1});}
+  }else {Object.assign(axes,{xLabel:options.valueLabel,yLabel:'Frequency',yUnit:'',y2Label:'Cumulative frequency',y2Unit:'%'});if(!same||previous.options?.matrix?.valueUnit!==options.valueUnit)Object.assign(axes,{xUnit:options.valueUnit,xUnitScale:1});}
+  if(perSheet)sourceData={...sourceData,selectedSheets:[...options.sheets].sort((a,b)=>a-b)};
+  const snapshot=makeSettings(config,metadata,loadedHeader);sharedSettings=snapshot;
+  for(const index of options.sheets)sheetSettings.set(index,{...structuredClone(snapshot),data:{...snapshot.data,sheet:metadata.sheets[index]},...(index===metadata.sheetIndex?{}:{inheritSharedSettings:true})});
   drawMetadata();drawControls();changed(0);
 }});
 async function openMatrixEditor(kind){if(loading||exporting||!metadata)return;status('分布データのセル範囲を確認しています…');try{await matrixEditor.show(kind);status('セル範囲と対象シートを選択してください。','ready');}catch(error){status(error.message,'error');}}
@@ -840,7 +846,7 @@ function seriesTableItems() {
 }
 function drawSeriesTableSummary() {
   const items=seriesTableItems();
-  if(isMatrixPlot(config.plotType)){$('#series-table-summary').textContent=config.plotType==='Surface Map'?'表示中のシート':`${config.options.matrix.sheets.length}シートを比較`;return;}
+  if(isMatrixPlot(config.plotType)){$('#series-table-summary').textContent=!isCombinedHistogram(config)?'表示中のシート':`${config.options.matrix.sheets.length}シートを比較`;return;}
   $('#series-table-summary').textContent=`${items.length} 系列 · 表示 ${items.filter(item=>item.visible!==false).length}`;
 }
 function drawSeriesTable() {
@@ -912,11 +918,11 @@ function drawControls() {
   syncFontChoices();
   const xpsFit=config.plotType==='XPS Fit';
   const histogram=config.plotType==='Particle Histogram';
-  const visibleSeries=xpsFit || histogram || config.plotType==='Surface Map'?config.series.slice(0,1):config.series;
+  const visibleSeries=xpsFit || histogram || config.plotType==='Surface Map'?config.series.slice(0,1):config.plotType==='Surface Histogram'&&!isCombinedHistogram(config)?config.series.filter((_,i)=>config.options.matrix.sheets[i]===metadata.sheetIndex):config.series;
   $("#series-count").textContent = xpsFit?'実測点':`${visibleSeries.length} 系列`;
   $("#series-list").innerHTML = visibleSeries.map((series, index) => {
     const input = (key, label, attributes = '') => `<label>${label}<input data-series-field="${key}" type="number" value="${escapeHTML(seriesControlValue(key,series[key]))}" ${attributes}></label>`;
-    if(isMatrixPlot(config.plotType))return `<div class="series-card" data-series-index="${index}"><p>${escapeHTML(config.plotType==='Surface Map'?metadata.sheets[metadata.sheetIndex]:series.name)}</p><button type="button" class="button quiet" data-matrix-edit-series>分布の設定</button></div>`;
+    if(isMatrixPlot(config.plotType))return `<div class="series-card" data-series-index="${index}"><p>${escapeHTML(!isCombinedHistogram(config)?metadata.sheets[metadata.sheetIndex]:series.name)}</p><button type="button" class="button quiet" data-matrix-edit-series>分布の設定</button></div>`;
     if(histogram)return `<div class="series-card" data-series-index="${index}"><label class="series-visibility"><input data-series-field="visible" type="checkbox" ${series.visible!==false?'checked':''}>粒径分布を描画</label></div>`;
     return `<div class="series-card" data-series-index="${index}">
       <label class="series-visibility"><input data-series-field="visible" type="checkbox" ${series.visible!==false?'checked':''}>系列${index+1}を描画</label><div class="series-heading">${xpsFit?'実測点の列':`<input data-series-field="color" type="color" value="${escapeHTML(series.color)}" aria-label="系列${index + 1}の色"><input class="series-label" data-series-field="name" value="${escapeHTML(series.name)}" maxlength="200" aria-label="系列${index + 1}の名前"><button type="button" class="icon-button" data-remove="${index}" aria-label="系列${index + 1}を削除"><svg><use href="#i-close"/></svg></button>`}</div>
@@ -1161,7 +1167,7 @@ function drawMetadata() {
   $("#file-name").textContent = metadata.filename;
   $("#file-stats").textContent = `${metadata.rowCount.toLocaleString()} 行 · ${metadata.columns.length} 列`;
   $("#sample-badge").hidden = !sample;
-  $("#sheet-select").replaceChildren(...selectedSheetIndices().map(index => new Option(metadata.sheets[index], String(index))));
+  $("#sheet-select").replaceChildren(...plotSheetIndices().map(index => new Option(metadata.sheets[index], String(index))));
   $("#sheet-select").value = String(metadata.sheetIndex);
   $("#header-row").value = loadedHeader;
   $("#data-preview").hidden = false;
@@ -1978,7 +1984,7 @@ async function exportFigure(formats, allSheets = false) {
   if (exporting || loading || renderRunning || !engineReady || !metadata || (!allSheets && renderedRevision !== revision)) return;
   formats = typeof formats === 'string' ? [formats] : formats;
   if (!formats.length) {status('保存形式を1つ以上選択してください。', 'error'); return;}
-  if (allSheets && config.plotType!=='Surface Histogram' && selectedSheetIndices().length > 1) return exportSheets(formats);
+  if (!isCombinedHistogram(config) && allSheets && plotSheetIndices().length > 1) return exportSheets(formats);
   exporting = true; updateButtons();
   const stem = safeStem($('#save-name').value), snapshot = structuredClone(config), dpi = Number($('#png-dpi').value);
   const saved = [];
@@ -2000,7 +2006,7 @@ async function exportFigure(formats, allSheets = false) {
 async function exportSheets(formats) {
   exporting = true; cancelBatch = false;
   $('#cancel-batch').hidden = false; $('#cancel-batch').disabled = false; updateButtons();
-  const filename = metadata.filename, names = [...metadata.sheets],sheetIndices=selectedSheetIndices();
+  const filename = metadata.filename, names = [...metadata.sheets],sheetIndices=plotSheetIndices();
   const snapshots = new Map(projectSheetSettings().map(item=>[item.sheetIndex,item.settings]));
   const template = sheetMode === 'shared' ? currentSharedSettings() : sharedSettings || snapshots.get(0) || (config.series.length ? makeSettings(config, metadata, loadedHeader) : null);
   const stem = safeStem($('#save-name').value), dpi = Number($('#png-dpi').value);
@@ -2105,8 +2111,8 @@ async function changeSheet(index) {
   $('#sheet-select').value = String(index);
   return loadFile(null, false, true);
 }
-$('#previous-sheet').addEventListener('click', () => {const indices=selectedSheetIndices();return changeSheet(indices[indices.indexOf(metadata?.sheetIndex)-1]);});
-$('#next-sheet').addEventListener('click', () => {const indices=selectedSheetIndices();return changeSheet(indices[indices.indexOf(metadata?.sheetIndex)+1]);});
+$('#previous-sheet').addEventListener('click', () => {const indices=plotSheetIndices();return changeSheet(indices[indices.indexOf(metadata?.sheetIndex)-1]);});
+$('#next-sheet').addEventListener('click', () => {const indices=plotSheetIndices();return changeSheet(indices[indices.indexOf(metadata?.sheetIndex)+1]);});
 for (const mode of ['shared','individual']) $(`#sheet-mode-${mode}`).addEventListener('change', () => setSheetMode(mode));
 $("#header-row").addEventListener("change", () => loadFile(null, false, true));
 $("#plot-form").addEventListener("submit", event => event.preventDefault());
@@ -3504,14 +3510,14 @@ const figureBridgeWait = (predicate,checkError=()=>null) => new Promise((resolve
 const plotPreviewCache=new Map(),plotAcknowledgements=createPlotAcknowledgements();
 let plotCollectionCache=null,plotMetadataSource=null,plotSheetMetadata=new Map();
 async function collectPlotGraphs({currentOnly=false}={}){
-  if(config.plotType==='Surface Histogram')currentOnly=true;
+  if(isCombinedHistogram(config))currentOnly=true;
   if(!metadata||!sourceData||!config.series.length)throw Error('先にグラフを作成してください。');
   const before=projectEditState(),selectedIndex=metadata.sheetIndex;
   const cache=plotCollectionCache;
   if(cache&&cache.currentOnly===currentOnly&&cache.source===before.source&&cache.content===before.content&&cache.fonts.length===before.fonts.length&&cache.fonts.every((font,i)=>font===before.fonts[i]))return cache.value;
   if(plotMetadataSource!==sourceData){plotMetadataSource=sourceData;plotSheetMetadata=new Map();plotPreviewCache.clear();}
   const names=[...metadata.sheets],filename=metadata.filename,snapshots=new Map(projectSheetSettings().map(item=>[item.sheetIndex,item.settings]));
-  const sheetIndices=selectedSheetIndices();
+  const sheetIndices=plotSheetIndices();
   if(!currentOnly&&sheetIndices.length>100)throw Error('Studioへの一括送信は100シート以内にしてください。');
   const template=sheetMode==='shared'?currentSharedSettings():sharedSettings||snapshots.get(0)||makeSettings(config,metadata,loadedHeader),graphs=[],failures=[];
   for(const index of currentOnly?[selectedIndex]:sheetIndices){
@@ -3555,7 +3561,7 @@ async function captureFigureStudioImages(batch=false){
     const captured=await collectPlotGraphs({currentOnly:!batch}),project=new Blob([JSON.stringify(captured.project)],{type:'application/json'});
     if(project.size>PROJECT_MAX_SIZE)throw Error('プロジェクトは130 MB以内にしてください。');
     if(batch&&captured.failures.length)await confirmCurrentPlotSend(captured.failures);
-    const images=[],renderFailures=[],wanted=batch&&!captured.failures.length?captured.identity.images:captured.identity.images.filter(image=>image.imageId===captured.identity.activeImageId);
+    const images=[],renderFailures=[],wanted=(batch&&!captured.failures.length?captured.identity.images:captured.identity.images.filter(image=>image.imageId===captured.identity.activeImageId)).filter(image=>captured.graphs.some(graph=>graph.index===image.sheetIndex));
     for(const descriptor of wanted){
      try{
       const cached=plotPreviewCache.get(descriptor.imageId),graph=captured.graphs.find(graph=>graph.index===descriptor.sheetIndex);let preview=cached?.fingerprint===descriptor.fingerprint?cached.preview:null;
