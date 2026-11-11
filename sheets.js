@@ -1,5 +1,5 @@
-import {isMatrixPlot} from './matrix-model.mjs?v=d94b6f0be905';
-import { restoreSettings, safeStem } from "./state.js?v=d94b6f0be905";
+import {isMatrixPlot} from './matrix-model.mjs?v=98e909f2c547';
+import { restoreSettings, safeStem } from "./state.js?v=98e909f2c547";
 
 // An unedited sheet inherits appearance and column choices from the preview.
 // Prefer matching headers; use the same column position when headers differ.

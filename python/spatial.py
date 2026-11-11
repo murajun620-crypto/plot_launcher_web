@@ -235,6 +235,15 @@ def render_matrix(engine, config):
                     colorbar.outline.set_visible(False)
                     colorbar.set_label(label_text(options.get("valueLabel","Surface roughness, Sa"),options.get("valueUnit","nm")))
                     colorbar.ax.tick_params(labelsize=size*.875*float(settings.get("tickFontScale",1)))
+                    # Match MiFiTo: gaps are percentages of the image/axes short side.
+                    short_points=min(width,height)*72/2.54
+                    for key,kind in [("colorbarTickGapPercent","ticks"),("colorbarTitleGapPercent","title")]:
+                        value=options.get(key,"")
+                        if value=="": continue
+                        percent=number(value,"カラーバーの文字余白",minimum=0,maximum=20)
+                        pad=short_points*percent/100
+                        if kind=="ticks": colorbar.ax.tick_params(pad=pad)
+                        else: colorbar.ax.yaxis.labelpad=pad
                 groups=[{"index":0,"artists":[image]}];legend=None
                 diagnostics=[{"name":sheet,"points":len(values),"count":len(values),"visible":True,"processing":{}}]
                 statistics=[{"name":sheet,"sheetIndex":indices[0],"count":len(values),"min":float(values.min()),"max":float(values.max()),"mean":float(values.mean())}]

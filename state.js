@@ -1,7 +1,7 @@
-import {validateMatrixOptions} from './matrix-model.mjs?v=62abdc4241b6';
+import {validateMatrixOptions} from './matrix-model.mjs?v=98e909f2c547';
 import { resetPresetUnitScales, unitConversion, configureAFMUnits } from "./units.js?v=9127ec4c4f31";
 import { validateTableEdits } from './table-edits.mjs?v=27ae7675c457';
-export const APP_VERSION = '2.5.7';
+export const APP_VERSION = '2.5.8';
 
 // Accept one numeric value or fraction without evaluating JavaScript expressions.
 export function parseCoefficient(value) {

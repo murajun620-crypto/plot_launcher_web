@@ -1,7 +1,7 @@
 export const MATRIX_TYPES=['Surface Map','Surface Histogram'];
 export const isMatrixPlot=type=>MATRIX_TYPES.includes(type);
 export const isCombinedHistogram=config=>config?.plotType==='Surface Histogram'&&config.options?.matrix?.histSheetMode!=='separate';
-export const MATRIX_DEFAULTS={range:'A1:S19',sheets:[],pitchX:5,pitchY:5,originX:0,originY:0,valueLabel:'Surface roughness, Sa',valueUnit:'nm',palette:'turbo',colorMin:'',colorMax:'',markerSize:30,mapStyle:'points',edgeColor:'none',edgeWidth:.25,equalAspect:true,colorbar:true,colorbarVisibility:{},frame:false,binMin:'',binMax:'',binWidth:'',binCount:'',histSheetMode:'separate',cdfInterpolation:'smooth',histStyle:'overlay',histAlpha:.55,cumulative:true,cumulativeColors:{}};
+export const MATRIX_DEFAULTS={range:'A1:S19',sheets:[],pitchX:5,pitchY:5,originX:0,originY:0,valueLabel:'Surface roughness, Sa',valueUnit:'nm',palette:'turbo',colorMin:'',colorMax:'',markerSize:30,mapStyle:'points',edgeColor:'none',edgeWidth:.25,equalAspect:true,colorbar:true,colorbarVisibility:{},colorbarTickGapPercent:'',colorbarTitleGapPercent:'',frame:false,binMin:'',binMax:'',binWidth:'',binCount:'',histSheetMode:'separate',cdfInterpolation:'smooth',histStyle:'overlay',histAlpha:.55,cumulative:true,cumulativeColors:{}};
 export const matrixColorbarVisible=(options,index)=>options?.colorbarVisibility?.[index]??options?.colorbar??true;
 export function validateMatrixOptions(raw){
  if(!raw||typeof raw!=='object'||Array.isArray(raw))throw Error('マップ・分布の設定を確認してください。');
@@ -11,6 +11,7 @@ export function validateMatrixOptions(raw){
  for(const key of ['pitchX','pitchY','originX','originY','markerSize','edgeWidth','histAlpha'])if(typeof value[key]!=='number'||!Number.isFinite(value[key])||Math.abs(value[key])>1e15)throw Error('座標・描画の数値を確認してください。');
  if(value.pitchX<=0||value.pitchY<=0||value.markerSize<=0||value.markerSize>1000||value.edgeWidth<0||value.edgeWidth>10||value.histAlpha<0||value.histAlpha>1)throw Error('座標間隔・点の大きさ・不透明度を確認してください。');
  for(const key of ['colorMin','colorMax','binMin','binMax','binWidth','binCount'])if(value[key]!==''&&(!Number.isFinite(Number(value[key]))||Math.abs(Number(value[key]))>1e15))throw Error('範囲・ビンの値を確認してください。');
+ for(const key of ['colorbarTickGapPercent','colorbarTitleGapPercent'])if(value[key]!==''&&(typeof value[key]!=='number'||!Number.isFinite(value[key])||value[key]<0||value[key]>20))throw Error('カラーバーの文字余白は短辺の0〜20%で指定してください。');
  for(const [a,b]of [['colorMin','colorMax'],['binMin','binMax']])if(value[a]!==''&&value[b]!==''&&Number(value[b])<=Number(value[a]))throw Error('最大値は最小値より大きくしてください。');
  if(value.binWidth!==''&&Number(value.binWidth)<=0||value.binCount!==''&&(!Number.isInteger(Number(value.binCount))||Number(value.binCount)<1||Number(value.binCount)>500))throw Error('ビン幅は正の値、ビン数は1〜500の整数にしてください。');
  if(value.binWidth!==''&&value.binCount!=='')throw Error('ビン幅とビン数はいずれか一方を指定してください。');
