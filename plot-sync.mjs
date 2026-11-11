@@ -2,6 +2,16 @@
 const id=value=>typeof value==='string'&&/^[a-zA-Z0-9-]{16,100}$/.test(value);
 const stable=value=>Array.isArray(value)?value.map(stable):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,stable(value[key])])):value;
 const hash=async value=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(stable(value))))),n=>n.toString(16).padStart(2,'0')).join('');
+const projectFileName=value=>typeof value==='string'&&value.length>0&&value.length<=255&&!/[\\/\u0000-\u001f]/.test(value);
+export async function openedPlotIdentity(identity,fileName){
+ const stored=identity.projectFileName||'';
+ if(!projectFileName(fileName))throw Error('プロジェクトのファイル名を確認してください。');
+ fileName=fileName.normalize('NFC');
+ if(stored&&stored.normalize('NFC')===fileName)return identity;
+ // Stable across reopening an unsaved external copy. Legacy links migrate only
+ // when Studio's original source filename matches this exact file.
+ return {...identity,projectId:`plot-file-${await hash({projectId:identity.projectId,fileName})}`,projectFileName:fileName,legacyProjectId:stored?null:identity.projectId};
+}
 export const plotSheetId=(index,plotType,content='figure')=>`plot-sheet-${String(index).padStart(6,'0')}${plotType==='Surface Map'?(content==='colorbar'?'-map-colorbar':'-map'):plotType==='Surface Histogram'?'-histogram':''}`;
 export const resolvePlotImage=(identity,imageId)=>identity.images.find(image=>image.imageId===imageId)||identity.images.find(image=>image.legacyImageId===imageId);
 export function currentPlotImageId(state,index){
@@ -24,6 +34,8 @@ export async function identifyPlotProject(saved){
  if(saved?.format!=='plotlauncher-project'||saved.version!==1||!saved.data||!Number.isInteger(saved.data.sheetIndex)||saved.data.sheetIndex<0||saved.data.sheetIndex>1000||!saved.settings||!Array.isArray(saved.fonts)||saved.fonts.length>32)fail();
  const workspace=saved.workspace||{};if(workspace.figureStudioProjectId!==undefined&&!id(workspace.figureStudioProjectId))fail();
  if(workspace.figureStudioContent!==undefined&&!['figure','colorbar'].includes(workspace.figureStudioContent))fail();
+ if(workspace.projectFileName!==undefined&&!projectFileName(workspace.projectFileName))fail();
+ if(workspace.figureStudioLegacyProjectId!==undefined&&!id(workspace.figureStudioLegacyProjectId))fail();
  const content=workspace.figureStudioContent||'figure';
  const projectId=workspace.figureStudioProjectId||`legacy-plot-${await hash(saved)}`;
  const source=await hash({data:{filename:saved.data.filename,base64:saved.data.base64,files:saved.data.files,...(saved.data.tableEdits?.length?{tableEdits:saved.data.tableEdits}:{})},fonts:saved.fonts});
@@ -38,7 +50,7 @@ export async function identifyPlotProject(saved){
   const part=setting.plotType==='Surface Map'?content:'figure';
   images.push({imageId:plotSheetId(index,setting.plotType,part),...(part==='figure'?{legacyImageId:plotSheetId(index)}:{}),sheetIndex:index,name:((setting.data.sheet||`Sheet ${index+1}`)+(part==='colorbar'?' — カラーバー':'')).slice(0,255),fingerprint:await hash({source,settings:rendering})});
  }
- return {projectId,content,activeImageId:images.find(image=>image.sheetIndex===saved.data.sheetIndex).imageId,images};
+ return {projectId,content,projectFileName:workspace.projectFileName||'',legacyProjectId:workspace.figureStudioLegacyProjectId||null,activeImageId:images.find(image=>image.sheetIndex===saved.data.sheetIndex).imageId,images};
 }
 export async function readPlotIdentity(blob){if(!(blob instanceof Blob)||!blob.size||blob.size>130*1024*1024)throw Error('PlotLauncherプロジェクトは130 MB以内にしてください。');return identifyPlotProject(JSON.parse(await blob.text()));}
 export function mergePlotCheckpoint(previous,captured,batch=false){

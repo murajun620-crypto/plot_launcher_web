@@ -113,6 +113,28 @@ def matrix_values(engine, sheet_index, region):
     return name,data,values
 
 
+def statistic_format(raw=None):
+    if raw is None: raw={}
+    if not isinstance(raw,dict): raise ValueError("集計注記の表示桁数を確認してください。")
+    value={"mode":"significant","meanDigits":3,"errorDigits":3,**raw}
+    minimum=0 if value["mode"]=="decimal" else 1
+    if value["mode"] not in ("significant","decimal") or any(type(value[key]) is not int or not minimum<=value[key]<=12 for key in ("meanDigits","errorDigits")):
+        raise ValueError("表示桁数は有効数字1〜12桁、小数点以下0〜12桁で指定してください。")
+    return value
+
+
+def distribution_label(row,kind,raw_format=None):
+    display=statistic_format(raw_format)
+    def number_text(value,digits):
+        text=format(value,f".{digits}{'f' if display['mode']=='decimal' else 'g'}")
+        return text[1:] if text.startswith("-") and float(text)==0 else text
+    average=number_text(row["mean"],display["meanDigits"])
+    unit=row.get("unit","");suffix=f" {unit}" if unit and unit!="auto" else ""
+    if row[kind] is None: return f"avg. ± {kind.upper()} = {average} ± N/A{suffix} (n = {row['count']})"
+    error=number_text(row[kind],display["errorDigits"])
+    return f"avg. ± {kind.upper()} = {average} ± {error}{suffix}"
+
+
 def distribution_summary(values, name, sheet_index, unit=""):
     n=len(values)
     # Scaling avoids overflow in the sum of squares without altering source data.
@@ -122,12 +144,9 @@ def distribution_summary(values, name, sheet_index, unit=""):
     sd=float(np.std(scaled,ddof=1)*scale) if n>1 else None
     if sd is not None and not math.isfinite(sd): sd=None
     se=sd/math.sqrt(n) if sd is not None else None
-    suffix=f" {unit}" if unit and unit!="auto" else ""
-    def label(error,kind):
-        average=f"{0.0 if mean==0 else mean:.3g}"
-        if error is None: return f"avg. ± {kind} = {average} ± N/A{suffix} (n = {n})"
-        return f"avg. ± {kind} = {average} ± {error:.3g}{suffix}"
-    return {"name":name,"sheetIndex":sheet_index,"count":n,"min":float(values.min()),"max":float(values.max()),"mean":mean,"sd":sd,"se":se,"sdText":label(sd,"SD"),"seText":label(se,"SE")}
+    row={"name":name,"sheetIndex":sheet_index,"count":n,"min":float(values.min()),"max":float(values.max()),"mean":mean,"sd":sd,"se":se,"unit":unit}
+    row.update(sdText=distribution_label(row,"sd"),seText=distribution_label(row,"se"))
+    return row
 
 
 def distribution_annotations(annotations, statistics, active):
@@ -140,10 +159,11 @@ def distribution_annotations(annotations, statistics, active):
                 raise ValueError("分布の集計注記を確認してください。")
             index=link.get("sheetIndex")
             if index!="active" and (type(index) is not int or not 0<=index<=1000): raise ValueError("集計注記の対象シートを確認してください。")
+            display=statistic_format(link.get("format"))
             row=rows.get(active if index=="active" else index)
             if row is None: item["visible"]=False
             else:
-                item["text"]=(row["name"]+"\n" if link.get("includeName",False) else "")+row[link["kind"]+"Text"]
+                item["text"]=(row["name"]+"\n" if link.get("includeName",False) else "")+distribution_label(row,link["kind"],display)
                 updates.append({"id":item["id"],"text":item["text"]})
         resolved.append(item)
     return resolved,updates
@@ -345,6 +365,14 @@ def render_matrix(engine, config):
             for i,row in enumerate(legend_records):
                 if row["artist"] is not legend: row["artist"].set_gid(f"web-legend-item-{i}")
             annotation_values,annotation_texts=distribution_annotations(config.get("annotations",[]),statistics,active)
+            # AnnotationManager draws line endpoints in data coordinates. Match
+            # ordinary presets before creating both artists and drag geometry.
+            for item in annotation_values:
+                if item.get("type")!="text" and item.get("coordinate_system")=="axes_fraction":
+                    for suffix in ("1","2"):
+                        xy=axes.transData.inverted().transform(axes.transAxes.transform((item[f"x{suffix}"],item[f"y{suffix}"])))
+                        item[f"x{suffix}"],item[f"y{suffix}"]=map(float,xy)
+                    item["coordinate_system"]="data"
             collection=AnnotationCollection();errors=collection.load_list(annotation_values)
             if errors: raise ValueError("注釈の設定を確認してください。")
             for annotation in collection.items:
@@ -369,9 +397,16 @@ def render_matrix(engine, config):
                 artists=manager.artist_by_id.get(annotation.id);artists=artists if isinstance(artists,list) else [artists] if artists is not None else []
                 ids=[]
                 for part,artist in enumerate(artists): artist.set_gid(f"web-matrix-annotation-{annotation.id}-{part}");ids.append(artist.get_gid())
-                if artists:
+                if artists and annotation.visible:
                     from matplotlib.transforms import Bbox
-                    geometry["annotations"].append({"id":annotation.id,"box":svg_box(Bbox.union([a.get_window_extent(renderer) for a in artists])),"svgIds":ids})
+                    entry={"id":annotation.id,"box":svg_box(Bbox.union([a.get_window_extent(renderer) for a in artists])),"svgIds":ids}
+                    if annotation.type=="text":
+                        point=artists[0].get_transform().transform(artists[0].get_position())/figure.dpi
+                        entry["anchor"]=[(point[0]-box.x0)/box.width,(box.y1-point[1])/box.height]
+                    else:
+                        points=axes.transData.transform([(annotation.x1,annotation.y1),(annotation.x2,annotation.y2)])/figure.dpi
+                        entry["points"]=[[(x-box.x0)/box.width,(box.y1-y)/box.height] for x,y in points]
+                    geometry["annotations"].append(entry)
             image=BytesIO();figure.savefig(image,format="svg",bbox_inches=box,bbox_extra_artists=extra,transparent=False,pad_inches=0)
             if engine.figure is not None: plt.close(engine.figure)
             engine.figure=figure;engine.matrix_colorbar=colorbar;engine.annotation_manager=manager;engine.export_extra_artists=extra;engine.transparent=False

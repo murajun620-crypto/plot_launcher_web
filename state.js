@@ -1,7 +1,7 @@
-import {validateMatrixOptions} from './matrix-model.mjs?v=5b4889978030';
+import {validateMatrixOptions} from './matrix-model.mjs?v=88e6604ff6b6';
 import { resetPresetUnitScales, unitConversion, configureAFMUnits } from "./units.js?v=9127ec4c4f31";
 import { validateTableEdits } from './table-edits.mjs?v=27ae7675c457';
-export const APP_VERSION = '2.5.9';
+export const APP_VERSION = '2.5.10';
 
 // Accept one numeric value or fraction without evaluating JavaScript expressions.
 export function parseCoefficient(value) {
@@ -176,6 +176,8 @@ export function parseProject(saved) {
   const data = saved.data, settings = saved.settings, workspace = saved.workspace || {};
   validateTableEdits(data?.tableEdits);
   if(workspace.figureStudioContent!==undefined&&!['figure','colorbar'].includes(workspace.figureStudioContent))throw Error('Studioへの出力設定を確認してください。');
+  if(workspace.projectFileName!==undefined&&(typeof workspace.projectFileName!=='string'||!workspace.projectFileName||workspace.projectFileName.length>255||/[\\/\u0000-\u001f]/.test(workspace.projectFileName)))throw Error('プロジェクトのファイル名を確認してください。');
+  if(workspace.figureStudioLegacyProjectId!==undefined&&(typeof workspace.figureStudioLegacyProjectId!=='string'||!/^[a-zA-Z0-9-]{16,100}$/.test(workspace.figureStudioLegacyProjectId)))throw Error('元プロジェクトの識別情報を確認してください。');
   if(workspace.figureStudioProjectId!==undefined&&!/^[a-zA-Z0-9-]{16,100}$/.test(workspace.figureStudioProjectId))throw Error('プロジェクトの識別情報を確認してください。');
   if (!data || typeof data.filename !== 'string' || data.filename.length > 255 || !/\.(xlsx|xlsm|xls|csv|txt)$/i.test(data.filename) || !Number.isInteger(data.sheetIndex) || data.sheetIndex < 0 || data.sheetIndex > 1000 || !Number.isInteger(data.headerRow) || data.headerRow < 1 || data.headerRow > 1000 || typeof data.sample !== 'boolean') throw new Error('プロジェクトのデータ・シート・ヘッダー行を確認してください。');
   if(data.selectedSheets!==undefined&&(!Array.isArray(data.selectedSheets)||!data.selectedSheets.length||data.selectedSheets.length>1001||new Set(data.selectedSheets).size!==data.selectedSheets.length||data.selectedSheets.some(index=>!Number.isInteger(index)||index<0||index>1000)||!data.selectedSheets.includes(data.sheetIndex)))throw new Error('プロジェクトの選択シートを確認してください。');

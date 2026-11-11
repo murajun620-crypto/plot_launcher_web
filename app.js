@@ -1,16 +1,17 @@
-import {statisticNumber,statisticAvailable,addStatisticAnnotation,syncStatisticAnnotationTexts,detachStatisticText,distributionCSV} from './matrix-statistics.mjs?v=5b4889978030';
-import {createMatrixEditor} from './matrix-editor.mjs?v=5b4889978030';
-import {isMatrixPlot,isCombinedHistogram,matrixColorbarVisible} from './matrix-model.mjs?v=5b4889978030';
+import {primarySeriesColor,seriesFaceColor,setSeriesColor,applySeriesPalette} from './series-colors.mjs?v=88e6604ff6b6';
+import {statisticNumber,statisticAvailable,statisticFormat,defaultStatisticFormat,patchStatisticFormat,applyStatisticFormat,addStatisticAnnotation,syncStatisticAnnotationTexts,detachStatisticText,distributionCSV} from './matrix-statistics.mjs?v=88e6604ff6b6';
+import {createMatrixEditor} from './matrix-editor.mjs?v=88e6604ff6b6';
+import {isMatrixPlot,isCombinedHistogram,matrixColorbarVisible} from './matrix-model.mjs?v=88e6604ff6b6';
 import {createFileProgress} from './file-progress.mjs?v=file-open-1';
-import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=5b4889978030';
+import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=88e6604ff6b6';
 import {setupDirectSendButton,getFigureWorkspace} from './direct-transfer.mjs?v=baaeeccc3ee1';
-import {identifyPlotProject,plotSheetIndex,currentPlotImageId,resolvePlotImage,savedPlotProjectId,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=5b4889978030';
+import {identifyPlotProject,openedPlotIdentity,plotSheetIndex,currentPlotImageId,resolvePlotImage,savedPlotProjectId,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=88e6604ff6b6';
 import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=9127ec4c4f31";
 import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=9127ec4c4f31";
 import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9127ec4c4f31";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=5b4889978030";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=5b4889978030";
-import { APP_VERSION, COLORS, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=5b4889978030";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=88e6604ff6b6";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=88e6604ff6b6";
+import { APP_VERSION, COLORS, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=88e6604ff6b6";
 
 import {alignmentOffsets} from './object-layout.mjs?v=27ae7675c457';
 import {createDataEditor} from './data-editor.mjs?v=27ae7675c457';
@@ -23,12 +24,15 @@ import {createXRangePicker} from './x-range-picker.mjs?v=normalization-range-1';
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 const fileProgress=createFileProgress();
-const APP_BUILD = '5b4889978030';
+const APP_BUILD = '88e6604ff6b6';
 window.FigureAppRelease?.assertRunning({version:APP_VERSION,build:APP_BUILD});
 function makeProject(settings,data,fonts,workspace={}){
   const live=sourceData&&data.filename===sourceData.filename&&(data.bytes===sourceData.bytes||data.files&&data.files===sourceData.files);
   const projectId=workspace.figureStudioProjectId||data.figureStudioProjectId||(live?(sourceData.figureStudioProjectId||=crypto.randomUUID()):crypto.randomUUID());
-  return encodePlotProject(settings,data,fonts,{...workspace,figureStudioProjectId:projectId,figureStudioContent:workspace.figureStudioContent||data.figureStudioContent||(live?sourceData.figureStudioContent:null)||'figure'});
+  const {figureStudioLegacyProjectId:legacyOverride,...rest}=workspace;
+  const legacy=Object.hasOwn(workspace,'figureStudioLegacyProjectId')?legacyOverride:data.figureStudioLegacyProjectId||(live?sourceData.figureStudioLegacyProjectId:null);
+  const fileName=workspace.projectFileName||data.figureStudioProjectFileName||(live?(sourceData.figureStudioProjectFileName||projectFilename||`${safeStem(workspace.saveName||'figure')}.plotproject`):'');
+  return encodePlotProject(settings,data,fonts,{...rest,figureStudioProjectId:projectId,figureStudioContent:workspace.figureStudioContent||data.figureStudioContent||(live?sourceData.figureStudioContent:null)||'figure',...(fileName?{projectFileName:fileName}:{}),...(legacy&&legacy!==projectId?{figureStudioLegacyProjectId:legacy}:{})});
 }
 
 function positionDialog(dialog, left, top) {
@@ -469,7 +473,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=5b4889978030", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=88e6604ff6b6", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") {
       if(data.id)requests.get(data.id)?.progressTask?.stage(data.text,{completed:data.completed,total:data.total,unit:data.unit||''});
@@ -754,19 +758,38 @@ async function openMatrixEditor(kind){if(loading||exporting||!metadata)return;st
 $('#matrix-analysis').addEventListener('click',()=>openMatrixEditor());
 $('#series-list').addEventListener('click',event=>{if(event.target.closest('[data-matrix-edit-series]'))void openMatrixEditor();});
 $('#preset-options').addEventListener('click',event=>{if(event.target.closest('[data-matrix-open]'))openMatrixEditor();});
+function statisticPrecisionControls(raw,attribute){
+ const format=statisticFormat(raw),min=format.mode==='decimal'?0:1;
+ return `<div class="field-grid"><label>桁の指定<select ${attribute}="mode">${choiceOptions([['significant','有効数字'],['decimal','小数点以下']],format.mode)}</select></label><label>平均値の桁数<input ${attribute}="meanDigits" type="number" min="${min}" max="12" step="1" value="${format.meanDigits}"></label><label>SD・SEの桁数<input ${attribute}="errorDigits" type="number" min="${min}" max="12" step="1" value="${format.errorDigits}"></label></div><p class="field-note">小数点以下では末尾の0も表示します。有効数字では末尾の0を省略します。</p>`;
+}
+function syncStatisticPrecisionFields(root,attribute,raw){
+ const format=statisticFormat(raw);
+ for(const input of root.querySelectorAll(`[${attribute}]`)){const key=input.getAttribute(attribute);if(input!==document.activeElement||String(format[key])!==input.value)input.value=format[key];if(input.type==='number')input.min=format.mode==='decimal'?'0':'1';}
+}
 let matrixStatisticKind='sd';
 function drawMatrixStatistics(){
  const panel=$('#matrix-statistics'),rows=isMatrixPlot(config.plotType)?figureResult?.matrixStatistics:null;
  panel.hidden=!rows?.length;if(!rows?.length)return;
+ const precisionOpen=panel.querySelector('[data-matrix-stat-settings]')?.open,focused=document.activeElement?.getAttribute('data-matrix-stat-default');
  panel.innerHTML=`<p>${escapeHTML(config.options.matrix.range)} · ${escapeHTML(config.plotType==='Surface Histogram'?config.axes.xUnit:config.options.matrix.valueUnit)} · 空欄は集計から除外</p>
  <p class="field-note">SDは標本標準偏差（n−1）、SEはSD÷√n。ビン範囲外も含む有効な全測定点で計算します。2点未満はSD・SEを表示しません。</p>
  <div class="matrix-statistic-actions"><label>追加する表記<select data-matrix-stat-kind><option value="sd" ${matrixStatisticKind==='sd'?'selected':''}>avg. ± SD</option><option value="se" ${matrixStatisticKind==='se'?'selected':''}>avg. ± SE</option></select></label>${rows.length>1&&rows.some(row=>statisticAvailable(row,matrixStatisticKind))?'<button type="button" class="button quiet" data-matrix-stat-add="all">全系列の注記を追加</button>':''}<button type="button" class="button quiet" data-matrix-csv>集計データをCSV保存</button></div>
+ <details class="settings-panel" data-matrix-stat-settings ${precisionOpen?'open':''}><summary>注記の表示桁数</summary>${statisticPrecisionControls(defaultStatisticFormat(config),'data-matrix-stat-default')}<button type="button" class="button quiet" data-matrix-stat-apply-format>全注記に適用</button><p class="field-note">新しい注記の初期設定です。追加済みの注記へは「全注記に適用」を押してください。</p></details>
  <div class="matrix-statistic-scroll"><table><thead><tr><th>シート／系列</th><th>点数</th><th>最小</th><th>最大</th><th>平均（avg.）</th><th>SD</th><th>SE</th><th>グラフへの追加</th></tr></thead><tbody>${rows.map((row,index)=>`<tr><td>${escapeHTML(row.name)}</td><td>${row.count}</td>${['min','max','mean','sd','se'].map(key=>`<td>${statisticNumber(row[key])}</td>`).join('')}<td><button type="button" class="button quiet" data-matrix-stat-add="${index}" ${statisticAvailable(row,matrixStatisticKind)?'':'disabled'}>注記を追加</button></td></tr>`).join('')}</tbody></table></div>
- <p class="field-note">注記は有効3桁で表示し、CSVは丸めず保存します。ドラッグで移動、ダブルクリックで書式変更できます。データ変更時に数値も更新します。文字を直接書き換えると通常の注記になります。</p>`;
+ <p class="field-note">表示桁数は注記だけに適用し、CSVは丸めず保存します。ドラッグで移動、ダブルクリックで書式変更できます。データ変更時に数値も更新します。文字を直接書き換えると通常の注記になります。</p>`;
+ if(focused)panel.querySelector(`[data-matrix-stat-default="${focused}"]`)?.focus({preventScroll:true});
 }
-$('#matrix-statistics').addEventListener('change',event=>{if(!event.target.matches('[data-matrix-stat-kind]'))return;matrixStatisticKind=event.target.value==='se'?'se':'sd';drawMatrixStatistics();});
+$('#matrix-statistics').addEventListener('change',event=>{
+ const input=event.target;
+ if(input.matches('[data-matrix-stat-kind]')){matrixStatisticKind=input.value==='se'?'se':'sd';drawMatrixStatistics();return;}
+ if(!input.matches('[data-matrix-stat-default]')||loading||exporting)return;
+ try{if(!input.checkValidity()||input.value==='')throw Error('表示桁数を範囲内の整数で入力してください。');const key=input.dataset.matrixStatDefault,value=key==='mode'?input.value:Number(input.value);config.options.matrixStatisticFormat=patchStatisticFormat(defaultStatisticFormat(config),key,value);syncStatisticPrecisionFields($('#matrix-statistics'),'data-matrix-stat-default',config.options.matrixStatisticFormat);changed();}
+ catch(error){syncStatisticPrecisionFields($('#matrix-statistics'),'data-matrix-stat-default',defaultStatisticFormat(config));status(error.message,'error');}
+});
 $('#matrix-statistics').addEventListener('click',event=>{
- if(renderedRevision!==revision||loading||exporting)return;
+ if(loading||exporting)return;
+ if(event.target.closest('[data-matrix-stat-apply-format]')){const count=applyStatisticFormat(config,defaultStatisticFormat(config));if(count){drawAnnotations();changed();status(`${count}件の集計注記に表示桁数を適用しました。`,'ready');}return;}
+ if(renderedRevision!==revision)return;
  const button=event.target.closest('[data-matrix-stat-add]');
  if(button){
   const rows=figureResult.matrixStatistics,target=button.dataset.matrixStatAdd==='all'?rows:[rows[Number(button.dataset.matrixStatAdd)]];
@@ -860,7 +883,7 @@ $("#apply-colormap").addEventListener('click',async()=>{
     if(loading || exporting || config!==original || revision!==atRevision){status('グラフ設定が変更されました。もう一度「配色を適用」を押してください。','ready');return;}
     if(result.colors?.length!==count || !result.colors.every(color=>/^#[\da-f]{6}$/i.test(color)))throw new Error('配色を取得できませんでした。もう一度お試しください。');
     config.options ||= {};config.options.colormapRange=selection;
-    config.series.forEach((item,i)=>{if(selection.target!=='scatter')item.color=result.colors[i];if(selection.target!=='line')item.scatterColor=result.colors[i];});
+    config.series.forEach((item,i)=>applySeriesPalette(item,result.colors[i],selection.target));
     drawControls();changed();$('#colormap-error').hidden=true;
   }catch(error){status(error.message,'error');}
   finally{colormapApplying=false;updateButtons();if($('#series-colormap').open)scheduleColormapPreview();}
@@ -891,7 +914,7 @@ function drawSeriesTable() {
   const modes={line:'線',scatter:'点','line+scatter':'線＋点'},styles={'-':'実線','--':'破線','-.':'一点鎖線',':':'点線'};
   const markers={o:'丸',s:'四角','^':'三角 ▲',v:'三角 ▼',D:'ひし形','+':'+',x:'×','*':'星',p:'五角形',h:'六角形'};
   const errors={auto:'±列から自動',none:'なし',symmetric:'±値',asymmetric:'正・負の誤差幅',minmax:'最小・最大値'};
-  const headers=['No.','表示','系列名','X列','Y列','Y軸','描画','線・棒色','点色','線幅 (pt)','点面積 (pt²)','線種','マーカー','Xオフセット','Yオフセット','誤差','±列','正の誤差列','負の誤差列','最小値列','最大値列','線の結び方'];
+  const headers=['No.','表示','系列名','X列','Y列','Y軸','描画','線・枠色','点の塗り色','線幅 (pt)','点面積 (pt²)','線種','マーカー','Xオフセット','Yオフセット','誤差','±列','正の誤差列','負の誤差列','最小値列','最大値列','線の結び方'];
   $('#series-table-head').innerHTML=`<tr>${headers.map((label,index)=>`<th scope="col"${index>=11?' data-series-detail':''}>${text(label)}</th>`).join('')}<th scope="col">設定</th></tr>`;
   $('#series-table-body').innerHTML=items.map((item,index)=>{
     const histogram=config.plotType==='Particle Histogram',xps=config.plotType==='XPS Fit',bar=config.plotType==='bar_graph_general',threeD=config.plotType==='Raman 3D',options=config.options || {};
@@ -904,8 +927,8 @@ function drawSeriesTable() {
       name,column(histogram?'diameterColumn':'x','X列',false,histogram,histogram?options.diameterColumn ?? item.y:item.x),histogram?'頻度（算出）':column('y','Y列'),
       threeD?'強度（Z）':editableXY(config.plotType)?select('yAxis','Y軸',{left:'左軸',right:'右軸'}):'左',
       histogram?'ヒストグラム':xps?'点':bar?'棒':threeD?'3D線':select('mode','描画',modes),
-      xps?'—':histogram?input('histogramColor','線・棒色','color','',true,options.histogramColor ?? '#70BEFF'):input('color','線・棒色','color'),
-      histogram || bar || threeD?'—':xps?input('scatterFaceColor','点色','text','',true,options.scatterFaceColor ?? '#ffffff'):input('scatterColor','点色'),
+      xps?'—':histogram?input('histogramColor','線・棒色','color','',true,options.histogramColor ?? '#70BEFF'):input('color','線・枠色','color','',false,primarySeriesColor(item)),
+      histogram || bar || threeD?'—':xps?input('scatterFaceColor','点色','text','',true,options.scatterFaceColor ?? '#ffffff'):input('markerFaceColor','点の塗り色','text','',false,seriesFaceColor(item)),
       histogram || xps || threeD?'—':bar?input('barEdgeWidth','線幅 (pt)','number','min="0" max="6" step="0.1" title="全ての棒に適用します。"',true,options.barEdgeWidth ?? .4):input('lineWidth','線幅 (pt)','number','min="0" max="6" step="0.1"'),
       histogram || bar || threeD?'—':xps?input('scatterSize','点面積 (pt²)','number','min="1" max="200" step="0.1"',true,options.scatterSize ?? 18):input('markerSize','点面積 (pt²)','number','min="1" max="200" step="0.1"'),
       editableXY(config.plotType)?select('lineStyle','線種',styles):'—',histogram || bar || threeD?'—':xps?'丸':select('marker','マーカー',markers),
@@ -957,7 +980,7 @@ function drawControls() {
     if(isMatrixPlot(config.plotType))return `<div class="series-card" data-series-index="${index}"><p>${escapeHTML(!isCombinedHistogram(config)?metadata.sheets[metadata.sheetIndex]:series.name)}</p><button type="button" class="button quiet" data-matrix-edit-series>分布の設定</button></div>`;
     if(histogram)return `<div class="series-card" data-series-index="${index}"><label class="series-visibility"><input data-series-field="visible" type="checkbox" ${series.visible!==false?'checked':''}>粒径分布を描画</label></div>`;
     return `<div class="series-card" data-series-index="${index}">
-      <label class="series-visibility"><input data-series-field="visible" type="checkbox" ${series.visible!==false?'checked':''}>系列${index+1}を描画</label><div class="series-heading">${xpsFit?'実測点の列':`<input data-series-field="color" type="color" value="${escapeHTML(series.color)}" aria-label="系列${index + 1}の色"><input class="series-label" data-series-field="name" value="${escapeHTML(series.name)}" maxlength="200" aria-label="系列${index + 1}の名前"><button type="button" class="icon-button" data-remove="${index}" aria-label="系列${index + 1}を削除"><svg><use href="#i-close"/></svg></button>`}</div>
+      <label class="series-visibility"><input data-series-field="visible" type="checkbox" ${series.visible!==false?'checked':''}>系列${index+1}を描画</label><div class="series-heading">${xpsFit?'実測点の列':`<input data-series-field="color" type="color" value="${escapeHTML(primarySeriesColor(series))}" aria-label="系列${index + 1}の色"><input class="series-label" data-series-field="name" value="${escapeHTML(series.name)}" maxlength="200" aria-label="系列${index + 1}の名前"><button type="button" class="icon-button" data-remove="${index}" aria-label="系列${index + 1}を削除"><svg><use href="#i-close"/></svg></button>`}</div>
       <div class="field-grid"><label>グラフの種類<select data-series-field="mode">${choiceOptions([["line", "線"], ["scatter", "点"], ["line+scatter", "線＋点"]], series.mode)}</select></label><label title="右軸を選ぶと右側に独立したY軸を表示します。">使用するY軸<select data-series-field="yAxis">${choiceOptions([['left','左軸'],['right','右軸']],series.yAxis || 'left')}</select></label></div>
       <details class="series-columns settings-panel"><summary>${editableXY(config.plotType)?'データ列':'データ列・オフセット'}</summary><div class="field-grid"><label>X列<select data-series-field="x">${columnOptions(series.x)}</select></label><label>Y列<select data-series-field="y">${columnOptions(series.y)}</select></label></div>${editableXY(config.plotType)?'':`<div class="field-grid">${input("xOffset", "Xオフセット", 'step="any"')}${input("yOffset", "Yオフセット", 'step="any"')}</div>`}</details>
       <div class="annotation-buttons"><button type="button" class="button quiet" data-series-up="${index}" ${index===0?'disabled':''}>↑</button><button type="button" class="button quiet" data-series-down="${index}" ${index===config.series.length-1?'disabled':''}>↓</button><button type="button" class="button quiet" data-series-copy="${index}">複製</button></div><details class="series-advanced settings-panel"><summary>線・点の見た目</summary>
@@ -965,7 +988,7 @@ function drawControls() {
         <div class="field-grid">${input("lineWidth", "線幅 (pt)", 'min="0" max="6" step="0.1"')}<label>線種<select data-series-field="lineStyle">${choiceOptions([["-", "実線"], ["--", "破線"], ["-.", "一点鎖線"], [":", "点線"]], series.lineStyle)}</select></label></div>
         <div class="field-grid"><label>マーカー<select data-series-field="marker">${choiceOptions([["o", "丸"], ["s", "四角"], ["^", "三角 ▲"], ["v", "三角 ▼"], ["D", "ひし形"], ["+", "+"], ["x", "×"], ["*", "星"], ["p", "五角形"], ["h", "六角形"]], series.marker)}</select></label>${input("markerSize", "マーカー面積 (pt²)", 'min="1" max="200" step="0.1"')}</div>
         <label title="全系列に共通です。">点の縁の太さ (pt・全系列)<input data-axis="markerEdgeWidth" type="number" min="0" max="20" step="0.1" value="${config.axes.markerEdgeWidth}"></label>
-        <div class="field-grid"><label>マーカー色<input data-series-field="scatterColor" value="${escapeHTML(series.scatterColor)}" placeholder="auto / #色"></label>${opacityControl('data-series-field="lineAlpha"','線の不透明度',series.lineAlpha ?? 1)}<label>マーカー縁色<input data-series-field="markerEdgeColor" value="${escapeHTML(series.markerEdgeColor)}" placeholder="auto / none / #色"></label><label>マーカー塗り色<input data-series-field="markerFaceColor" value="${escapeHTML(series.markerFaceColor)}" placeholder="auto / none / #色"></label>${opacityControl('data-series-field="markerEdgeAlpha"','縁の不透明度',series.markerEdgeAlpha ?? 1)}${opacityControl('data-series-field="markerFaceAlpha"','塗りの不透明度',series.markerFaceAlpha ?? 1)}</div>
+        <div class="field-grid"><label title="枠・塗りをこの色に揃えます。個別の色は縁色・塗り色で変更できます。">マーカー色<input data-series-field="scatterColor" value="${escapeHTML(series.scatterColor)}" placeholder="auto / #色"></label>${opacityControl('data-series-field="lineAlpha"','線の不透明度',series.lineAlpha ?? 1)}<label>マーカー縁色<input data-series-field="markerEdgeColor" value="${escapeHTML(series.markerEdgeColor)}" placeholder="auto / none / #色"></label><label>マーカー塗り色<input data-series-field="markerFaceColor" value="${escapeHTML(series.markerFaceColor)}" placeholder="auto / none / #色"></label>${opacityControl('data-series-field="markerEdgeAlpha"','縁の不透明度',series.markerEdgeAlpha ?? 1)}${opacityControl('data-series-field="markerFaceAlpha"','塗りの不透明度',series.markerFaceAlpha ?? 1)}</div>
       </details><details class="series-errors settings-panel"><summary>エラーバー</summary><label class="draw-mode">誤差の種類<select data-series-field="errorMode">${choiceOptions([["auto", "±列から自動"], ["none", "なし"], ["symmetric", "±値"], ["asymmetric", "正・負の誤差幅"], ["minmax", "最小・最大値"]], series.errorMode)}</select></label>
         <label class="draw-mode">Y誤差（±）の列<select data-series-field="error">${columnOptions(series.error, true)}</select></label>
         <div class="field-grid"><label title="Yから上方向の誤差幅。0以上の値が入った列を選びます。上端＝Y＋正の誤差幅。">正の誤差幅（＋）<select data-series-field="errorPlus">${columnOptions(series.errorPlus, true)}</select></label><label title="Yから下方向の誤差幅。こちらも0以上の値を指定します。下端＝Y−負の誤差幅。">負の誤差幅（−）<select data-series-field="errorMinus">${columnOptions(series.errorMinus, true)}</select></label></div>
@@ -1175,6 +1198,7 @@ function drawAnnotations() {
     const text = (key, label) => `<label>${label}<input data-annotation-field="${key}" value="${escapeHTML(item[key] ?? '')}"></label>`;
     const num = (key, label) => `<label>${label}<input type="number" step="${/^[xy][12]?$/.test(key) ? (item.coordinate_system === 'data' ? 'any' : '.01') : key === 'rotation' ? '1' : '.1'}" data-annotation-field="${key}" value="${escapeHTML(item[key] ?? '')}"></label>`;
     return `<details class="annotation-card ${selected.has(item.id)?'selected':''}" data-annotation-index="${index}" ${selected.has(item.id)?'open':''}><summary><button type="button" class="button quiet" data-select-annotation="${escapeHTML(item.id)}" aria-pressed="${selected.has(item.id)}">${{text:"文字",arrow:"矢印",segment:"線"}[item.type]} ${index+1} ${escapeHTML(item.text || '')}</button></summary>
+      ${item.matrix_statistic?`<fieldset class="axis-control-group"><legend>集計値の表示桁数</legend>${statisticPrecisionControls(item.matrix_statistic.format,'data-matrix-stat-annotation')}</fieldset>`:''}
       ${item.type === "text" ? `<label>文字<textarea data-annotation-field="text" rows="3" spellcheck="false">${escapeHTML(item.text ?? '')}</textarea></label>` : ''}
       <div class="field-grid">${item.type === "text" ? num("x", "X") + num("y", "Y") + num("font_size", "フォントサイズ (pt)") + num("rotation", "回転 (度)") : num("x1", "始点X") + num("y1", "始点Y") + num("x2", "終点X") + num("y2", "終点Y") + num("line_width", "線幅 (pt)") + text("line_style", "線種 (- / -- / -. / :)")}
       ${item.type === "arrow" ? `<label>矢印<select data-annotation-field="arrow_style">${choiceOptions([["->","片矢印"],["<->","両矢印"],["-|>","塗り矢印"]],item.arrow_style)}</select></label>` + num("arrow_size", "矢印サイズ (pt)") : ''}
@@ -1363,7 +1387,7 @@ async function loadDataFiles(files, append=false, selection=null) {
     opening.stage('グラフ設定を準備しています…');await opening.paint();
     if(!append&&!selection)prepareFigureStudioProjectReplacement();
     config=combinedConfig(data,append || selection?oldMetadata:null,oldConfig);metadata=data;loadedHeader=1;
-    sourceData={filename,...((append||selection)&&sourceData?.tableEdits?{tableEdits:sourceData.tableEdits}:{}),files:originals.map((file,index)=>({...file,sheetIndex:data.sources[index].sheetIndex,headerRow:data.sources[index].headerRow})),...((append||selection)&&sourceData?.figureStudioProjectId?{figureStudioProjectId:sourceData.figureStudioProjectId,figureStudioContent:sourceData.figureStudioContent}:{})};
+    sourceData={filename,...((append||selection)&&sourceData?.tableEdits?{tableEdits:sourceData.tableEdits}:{}),files:originals.map((file,index)=>({...file,sheetIndex:data.sources[index].sheetIndex,headerRow:data.sources[index].headerRow})),...((append||selection)&&sourceData?.figureStudioProjectId?{figureStudioProjectId:sourceData.figureStudioProjectId,figureStudioContent:sourceData.figureStudioContent,figureStudioProjectFileName:sourceData.figureStudioProjectFileName,figureStudioLegacyProjectId:sourceData.figureStudioLegacyProjectId}:{})};
     dataFileHandles=nextHandles;
     if(!append && !selection){projectHandle=null;projectFilename='';sourceHandle=sourceHandles.get(files[0]) || null;sourceDirectory=null;$('#save-destination').value=folderSupported?'source':'download';}
     sample=false;sheetMode='shared';sharedSettings=null;sheetSettings.clear();
@@ -1432,7 +1456,7 @@ async function reloadSourceData(chosenFiles=null,{fromFolder=false,discardEdits=
     const result=await request('project',{filename:sourceData.filename,remapColumns:!!sourceData.tableEdits?.length,...(sourceData.files?{files:refreshed.map(file=>({...file,bytes:file.bytes.slice(0)}))}:{bytes:refreshed[0].bytes.slice(0)}),sheetIndex:metadata.sheetIndex,headerRow:loadedHeader,settings,fonts:[],sheetSettings:projectSheetSettings(),sharedSettings});
     ++revision;metadata=result.metadata;config=result.config;
     const currentSettings=makeSettings(config,metadata,loadedHeader);sheetSettings.set(metadata.sheetIndex,currentSettings);if(sheetMode==='shared')sharedSettings=currentSettings;
-    sourceData=sourceData.files?{filename:sourceData.filename,files:refreshed,figureStudioProjectId:sourceData.figureStudioProjectId,figureStudioContent:sourceData.figureStudioContent}:{filename:sourceData.filename,bytes:refreshed[0].bytes,figureStudioProjectId:sourceData.figureStudioProjectId,figureStudioContent:sourceData.figureStudioContent};
+    sourceData=sourceData.files?{filename:sourceData.filename,files:refreshed,figureStudioProjectId:sourceData.figureStudioProjectId,figureStudioContent:sourceData.figureStudioContent,figureStudioProjectFileName:sourceData.figureStudioProjectFileName,figureStudioLegacyProjectId:sourceData.figureStudioLegacyProjectId}:{filename:sourceData.filename,bytes:refreshed[0].bytes,figureStudioProjectId:sourceData.figureStudioProjectId,figureStudioContent:sourceData.figureStudioContent,figureStudioProjectFileName:sourceData.figureStudioProjectFileName,figureStudioLegacyProjectId:sourceData.figureStudioLegacyProjectId};
     if(selectionNames)sourceData=sourceWithSheetSelection(sourceData,[...new Set([...selectionNames.map(name=>metadata.sheets.indexOf(name)).filter(index=>index>=0),metadata.sheetIndex])].sort((a,b)=>a-b),metadata.sheets.length);
     dataFileHandles=ordered.map(index=>handles[index]);
     if(dataFileHandles[0] && sourceHandle!==dataFileHandles[0]){sourceHandle=dataFileHandles[0];sourceDirectory=null;refreshSaveDestination();}
@@ -2170,6 +2194,11 @@ function applyControlInput(event) {
   // Native number inputs keep an internal editing buffer for "0.", "-", "1e-".
   // Do not commit incomplete values or assign back to the field being edited.
   if (incompleteNumberInput(input)) return;
+  if(input.dataset.matrixStatAnnotation!==undefined){
+    const index=Number(input.closest('[data-annotation-index]')?.dataset.annotationIndex),item=config.annotations?.[index];if(!item?.matrix_statistic)return;
+    try{if(!input.checkValidity()||input.value==='')throw Error('表示桁数を範囲内の整数で入力してください。');const key=input.dataset.matrixStatAnnotation,value=key==='mode'?input.value:Number(input.value);item.matrix_statistic.format=patchStatisticFormat(item.matrix_statistic.format,key,value);for(const root of document.querySelectorAll(`[data-annotation-index="${index}"]`))syncStatisticPrecisionFields(root,'data-matrix-stat-annotation',item.matrix_statistic.format);changed();}
+    catch(error){status(error.message,'error');}return;
+  }
   if (input.dataset.axisAuto) {setAxisAutomatic(input);return;}
   if (input.dataset.unitAxis) {
     const key = `${input.dataset.unitAxis}Unit`;
@@ -2243,6 +2272,7 @@ function applyControlInput(event) {
     const indices=input.dataset.seriesAll==='true' && [...SERIES_APPEARANCE_FIELDS,...PROCESSING_FIELDS].includes(key)?config.series.map((_,i)=>i):[index];
     for(const index of indices) {
       config.series[index][key] = coefficient ?? (input.type==='checkbox'?input.checked:key==='trendFontSize'?Number((Number(input.value)/Number(config.axes.fontScale)).toPrecision(12)):input.type==='range'?Number(input.value):input.value);
+      if(key==='color'||key==='scatterColor')setSeriesColor(config.series[index],key,config.series[index][key]);
       if(key==='referenceMode'&&normalizationRangeModes.includes(input.value)){
         const item=config.series[index],range=figureResult?.xRange;
         if((item.referenceMin===''||item.referenceMax===''||item.referenceMin==null||item.referenceMax==null)&&range?.every(Number.isFinite)){
@@ -2251,6 +2281,11 @@ function applyControlInput(event) {
         }
       }
       $$(`[data-series-index="${index}"] [data-series-field="${key}"]`).forEach(field=>{if(field!==input){field.value=coefficient ?? input.value;field.checked=input.checked;if(coefficient!==undefined){field.setCustomValidity?.('');field.setAttribute('aria-invalid','false');}}});
+    }
+    if(['color','scatterColor','markerEdgeColor','markerFaceColor','mode'].includes(key))for(const i of indices){
+      const item=config.series[i];
+      for(const field of $$(`[data-series-index="${i}"] [data-series-field="color"]`))field.value=primarySeriesColor(item);
+      for(const related of ['markerEdgeColor','markerFaceColor'])for(const field of $$(`[data-series-index="${i}"] [data-series-field="${related}"]`))field.value=related==='markerFaceColor'&&field.closest('#series-table')?seriesFaceColor(item):item[related];
     }
     if (input.dataset.seriesField === 'errorMode') syncSeriesErrorControls();
     if (input.dataset.seriesField === 'yAxis') syncYAxesControls();
@@ -2327,15 +2362,17 @@ async function saveProject({saveAs=false}={}) {
     const savedState=projectEditState(),savingSource=sourceData;
     const currentId=sourceData.figureStudioProjectId||crypto.randomUUID();
     const savedId=await savedPlotProjectId(currentId,projectHandle,saveFile.handle,{saveAs});
+    const savedFileName=saveFile.handle?.name||name;
     const project=makeProject(makeSettings(config,metadata,loadedHeader), {...sourceData,sheetIndex:metadata.sheetIndex,headerRow:loadedHeader,sample}, [...importedFonts.values()], {
-      figureStudioProjectId:savedId,saveName:$("#save-name").value,pngDpi:Number($("#png-dpi").value),view:{...view},sections:$$('#controls-panel .control-section').map(section=>section.open),sheetSettings:projectSheetSettings(),sheetMode,sharedSettings:sheetMode === 'shared' ? currentSharedSettings() : sharedSettings
+      figureStudioProjectId:savedId,projectFileName:savedFileName,figureStudioLegacyProjectId:savedId===currentId?sourceData.figureStudioLegacyProjectId:null,saveName:$("#save-name").value,pngDpi:Number($("#png-dpi").value),view:{...view},sections:$$('#controls-panel .control-section').map(section=>section.open),sheetSettings:projectSheetSettings(),sheetMode,sharedSettings:sheetMode === 'shared' ? currentSharedSettings() : sharedSettings
     });
     const blob=new Blob([JSON.stringify(project)],{type:'application/json'});
     if(blob.size>PROJECT_MAX_SIZE)throw new Error('プロジェクトは130 MB以内にしてください。');
     const savedName=await saveFile(blob,name);
-    if(sourceData===savingSource&&savedId!==sourceData.figureStudioProjectId){
-      sourceData={...sourceData,figureStudioProjectId:savedId};savedState.source=sourceData;
-      if(savedId!==currentId){figureBridgeBaseline=null;figureBridgePreservedOnReconnect=false;figureStudioBridge?.resetWorkspaceBinding();}
+    if(sourceData===savingSource&&(savedId!==sourceData.figureStudioProjectId||savedFileName!==sourceData.figureStudioProjectFileName)){
+      sourceData={...sourceData,figureStudioProjectId:savedId,figureStudioProjectFileName:savedFileName};savedState.source=sourceData;
+      if(savedId!==currentId){delete sourceData.figureStudioLegacyProjectId;figureBridgeBaseline=null;figureBridgePreservedOnReconnect=false;figureStudioBridge?.resetWorkspaceBinding();}
+      else if(figureBridgeBaseline?.source===savingSource)figureBridgeBaseline={...figureBridgeBaseline,source:sourceData};
     }
     projectHandle=saveFile.handle || null;projectFilename=savedName; savedProjectState=savedState; status(`${savedName} を保存しました。データと設定をまとめて再開できます。`,'ready');
   } catch(error){status(error.name==='AbortError'?'保存をキャンセルしました。':`プロジェクトを保存できませんでした: ${error.message}`,error.name==='AbortError'?'ready':'error');}
@@ -2533,8 +2570,8 @@ async function readProject(file, saved, options={}) {
     if(file.size>PROJECT_MAX_SIZE)throw new Error('プロジェクトは130 MB以内のファイルを選んでください。');
     const projectText=saved?null:await opening.read(file,{text:true});
     opening.stage('プロジェクトの内容を確認しています…');await opening.paint();
-    const raw=saved || JSON.parse(projectText),project=parseProject(raw),identity=await identifyPlotProject(raw);
-    const retainedData={filename:project.data.filename,figureStudioProjectId:identity.projectId,figureStudioContent:identity.content,...(project.data.selectedSheets?{selectedSheets:[...project.data.selectedSheets]}:{}),...(project.data.tableEdits?{tableEdits:project.data.tableEdits}:{}),...(project.data.files?{files:project.data.files.map(file=>({...file,bytes:file.bytes.slice(0)}))}:{bytes:project.data.bytes.slice(0)})};
+    const raw=saved || JSON.parse(projectText),project=parseProject(raw),identity=await openedPlotIdentity(await identifyPlotProject(raw),file.name);
+    const retainedData={filename:project.data.filename,figureStudioProjectId:identity.projectId,figureStudioContent:identity.content,figureStudioProjectFileName:identity.projectFileName,figureStudioLegacyProjectId:identity.legacyProjectId||undefined,...(project.data.selectedSheets?{selectedSheets:[...project.data.selectedSheets]}:{}),...(project.data.tableEdits?{tableEdits:project.data.tableEdits}:{}),...(project.data.files?{files:project.data.files.map(file=>({...file,bytes:file.bytes.slice(0)}))}:{bytes:project.data.bytes.slice(0)})};
     const retainedFonts=project.fonts.map(font=>({...font,bytes:font.bytes.slice(0)}));
     await checkFigureStudioProjectReplacement(options);
     opening.stage('データとフォントを復元しています…');
@@ -3304,7 +3341,7 @@ $("#figure-interactions").addEventListener("pointerdown", event => {
   const id=target.dataset.dragId, item=config.annotations?.find(item=>item.id===id);
   target.focus({preventScroll:true});
   if(item || isLegendId(id)){
-    if(event.shiftKey){if(selected.has(id))selected.delete(id);else selected.add(id);}else if(!selected.has(id))selected=new Set([id]);
+    if(event.shiftKey&&!target.dataset.handle){if(selected.has(id))selected.delete(id);else selected.add(id);}else if(!selected.has(id))selected=new Set([id]);
     drawAnnotations();
   } else {
     selected.clear();drawAnnotations();
@@ -3534,7 +3571,7 @@ catch (error) { fatal(`描画機能を開始できませんでした。ブラウ
 
 // Figure Studio bridge: included in the source application's module scope.
 let figureBridgeBaseline=null,figureBridgePreservedOnReconnect=false;
-const figureBridgePendingInput=()=>normalizationRangePicker.active||dataEditor?.hasDraft()||dataEditor?.busy||plotTextEditor.active||$$('[data-axis],[data-option],[data-series-field],[data-annotation-field],[data-legend-field],[data-fill]').some(input=>!input.disabled&&input.getClientRects().length>0&&incompleteNumberInput(input));
+const figureBridgePendingInput=()=>normalizationRangePicker.active||dataEditor?.hasDraft()||dataEditor?.busy||plotTextEditor.active||$$('[data-axis],[data-option],[data-series-field],[data-annotation-field],[data-matrix-stat-annotation],[data-matrix-stat-default],[data-legend-field],[data-fill]').some(input=>!input.disabled&&input.getClientRects().length>0&&incompleteNumberInput(input));
 async function figureBridgeIsDirty(){
   if(loading||exporting||renderRunning||renderedRevision!==revision||dragging||colormapApplying||pendingDataFiles||figureBridgePendingInput())return true;
   try{return !samePlotCheckpoint(figureBridgeBaseline,(await collectPlotGraphs()).checkpoint);}catch{return true;}
@@ -3654,9 +3691,9 @@ function figureStudioHasUnreflectedContent(){return !!metadata&&!!sourceData&&(f
 figureStudioBridge=setupFigureBridge({
   app:'plot',
   hasContent:figureStudioHasUnreflectedContent,
-  async canReuseProject({project,imageId}){
+  async canReuseProject({project,imageId,sourceName}){
     if(!sourceData||!metadata||loading||exporting||dragging||colormapApplying||pendingDataFiles||figureBridgePendingInput())return false;
-    const identity=await identifyPlotProject(JSON.parse(await project.text()));
+    const rawIdentity=await identifyPlotProject(JSON.parse(await project.text())),identity=await openedPlotIdentity(rawIdentity,sourceName||rawIdentity.projectFileName);
     return currentPlotMatchesIdentity(identity,imageId||identity.activeImageId);
   },
   canAdoptAccepted:result=>!!sourceData&&!loading&&!exporting&&!dragging&&!colormapApplying&&!pendingDataFiles&&!figureBridgePendingInput()&&sourceData===result?.bridgeState?.source,
@@ -3664,7 +3701,7 @@ figureStudioBridge=setupFigureBridge({
   async loadProject(file,{reconnect,imageId,force=false}={}) {
     const opening=fileProgress.begin(file);let saved,incomingIdentity;
     try{const text=await opening.read(file,{text:true});opening.stage('プロジェクトの内容を確認しています…');await opening.paint();saved=JSON.parse(text);parseProject(saved);
-      opening.stage('描画機能の準備を待っています…');await figureBridgeWait(() => engineReady && !loading && !exporting);incomingIdentity=await identifyPlotProject(saved);
+      opening.stage('描画機能の準備を待っています…');await figureBridgeWait(() => engineReady && !loading && !exporting);incomingIdentity=await openedPlotIdentity(await identifyPlotProject(saved),file.name);
     }catch(error){opening.fail(error);throw error;}
     finally{opening.release();}
     figureBridgePreservedOnReconnect=!!(!force&&reconnect&&metadata&&sourceData&&currentPlotMatchesIdentity(incomingIdentity,imageId||incomingIdentity.activeImageId));
@@ -3707,7 +3744,7 @@ syncStudioContentControl();
 var figureWorkspaceSavedSignature=null;
 let figureWorkspaceRestoring=false,figureWorkspaceCapturing=false;
 const figureWorkspaceTokens=new WeakMap();
-const figureWorkspaceAttributes=['data-axis','data-option','data-series-field','data-annotation-field','data-legend-field','data-legend-key','data-fill','data-unit-axis','data-axis-auto','data-axis-name','data-series-scope','data-preview-preset'];
+const figureWorkspaceAttributes=['data-axis','data-option','data-series-field','data-annotation-field','data-matrix-stat-annotation','data-matrix-stat-default','data-legend-field','data-legend-key','data-fill','data-unit-axis','data-axis-auto','data-axis-name','data-series-scope','data-preview-preset'];
 const figureWorkspaceDialogIds=new Set($$('dialog[id]').map(node=>node.id));
 const figureWorkspaceToken=value=>{if(!value)return null;if(!figureWorkspaceTokens.has(value))figureWorkspaceTokens.set(value,crypto.randomUUID());return figureWorkspaceTokens.get(value);};
 
@@ -3744,6 +3781,8 @@ function validateFigureWorkspaceState(snapshot){
  if(state.sourceData){const data=state.sourceData,meta=state.metadata;if(!string(data.filename,255)||!/\.(xlsx|xlsm|xls|csv|txt)$/i.test(data.filename)||!meta||meta.filename!==data.filename||!list(meta.columns,20000)||!list(meta.sheets,1001)||!Number.isInteger(meta.sheetIndex)||meta.sheetIndex<0||meta.sheetIndex>=meta.sheets.length)fail();
   if(data.figureStudioProjectId!==undefined&&(typeof data.figureStudioProjectId!=='string'||!/^[a-zA-Z0-9-]{16,100}$/.test(data.figureStudioProjectId)))fail();
   if(data.figureStudioContent!==undefined&&!['figure','colorbar'].includes(data.figureStudioContent))fail();
+  if(data.figureStudioLegacyProjectId!==undefined&&(typeof data.figureStudioLegacyProjectId!=='string'||!/^[a-zA-Z0-9-]{16,100}$/.test(data.figureStudioLegacyProjectId)))fail();
+  if(data.figureStudioProjectFileName!==undefined&&(!string(data.figureStudioProjectFileName,255)||!data.figureStudioProjectFileName||/[\\/\u0000-\u001f]/.test(data.figureStudioProjectFileName)))fail();
   if(data.selectedSheets!==undefined&&(!list(data.selectedSheets,1001)||!data.selectedSheets.length||new Set(data.selectedSheets).size!==data.selectedSheets.length||data.selectedSheets.some(index=>!Number.isInteger(index)||index<0||index>=meta.sheets.length)||!data.selectedSheets.includes(meta.sheetIndex)))fail();
   validateTableEdits(data.tableEdits);
   const files=data.files??[data];if(!list(files,16)||!files.length)fail();let total=0;for(const file of files){if(!string(file?.filename,255)||!/\.(xlsx|xlsm|xls|csv|txt)$/i.test(file.filename)||!(file.bytes instanceof ArrayBuffer)||!file.bytes.byteLength)fail();total+=file.bytes.byteLength;if(data.files&&(!Number.isInteger(file.sheetIndex)||file.sheetIndex<0||file.sheetIndex>1000||!Number.isInteger(file.headerRow)||file.headerRow<1||file.headerRow>1000))fail();}if(total>30*1024*1024)fail();

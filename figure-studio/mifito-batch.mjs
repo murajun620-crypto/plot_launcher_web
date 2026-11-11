@@ -1,3 +1,4 @@
+const sameFileName=(a,b)=>typeof a==='string'&&typeof b==='string'&&!!a&&!!b&&a.normalize('NFC')===b.normalize('NFC');
 const nonempty=value=>typeof value==='string'&&value.length>0;
 const validFingerprint=value=>typeof value==='string'&&/^[a-f0-9]{64}$/.test(value);
 
@@ -5,7 +6,7 @@ const validFingerprint=value=>typeof value==='string'&&/^[a-f0-9]{64}$/.test(val
  * `fingerprint` in linked/matched entries describes the existing Studio preview.
  * No document, panel, source reference, or descriptor is changed here.
  */
-export function planMiFiToSync(figures,batch,identityByAsset=new Map(),{anchorPanelId,app='mifito',addOnly=false}={}){
+export function planMiFiToSync(figures,batch,identityByAsset=new Map(),{anchorPanelId,app='mifito',addOnly=false,legacyProjectId=null,projectFileName=''}={}){
  if(!nonempty(batch?.projectId)||!Array.isArray(batch.images))throw Error('MiFiToの同期情報が正しくありません。');
  const incoming=new Map();
  for(const image of batch.images){
@@ -21,13 +22,15 @@ export function planMiFiToSync(figures,batch,identityByAsset=new Map(),{anchorPa
   const explicit=source.projectId!==undefined||source.imageId!==undefined;
   // A partially present identity must not fall back into a different project.
   if(explicit&&(!nonempty(source.projectId)||!nonempty(source.imageId)))continue;
-  const projectId=explicit?source.projectId:identity?.projectId;
+  const originalProjectId=explicit?source.projectId:identity?.projectId;
+  const migrate=app==='plot'&&originalProjectId===legacyProjectId&&sameFileName(source.name,projectFileName);
+  const projectId=migrate?batch.projectId:originalProjectId;
   const originalId=explicit?source.imageId:identity?.activeImageId;
   const descriptor=identity?.images?.find(image=>image.imageId===originalId)||(app==='plot'?identity?.images?.find(image=>image.legacyImageId===originalId):null);
   const imageId=descriptor?.imageId||originalId;
   if(projectId!==batch.projectId||!nonempty(imageId))continue;
   // Reject stale metadata if its actual project no longer contains the image.
-  if(identity&&identity.projectId!==projectId)continue;
+  if(identity&&identity.projectId!==originalProjectId&&identity.projectId!==projectId)continue;
   if(identity&&!descriptor)continue;
   if(!explicit&&(!descriptor||descriptor.ambiguous&&panel.id!==anchorPanelId))continue;
   const fingerprint=validFingerprint(source.fingerprint)?source.fingerprint:validFingerprint(descriptor?.fingerprint)?descriptor.fingerprint:null;
