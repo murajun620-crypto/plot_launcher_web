@@ -4,18 +4,19 @@ import {PT_PER_MM,mm,toMM,uid,clone,newDocument,makeObject,bounds,objectBounds,e
 import {isPathObject,pathData,objectFromPoints} from './paths.mjs?v=ribbon-v060-1';
 import {createPathDrawing} from './path-drawing.mjs?v=ribbon-v060-1';
 import {imageAsset,imagePhysicalSize,imageMiFiToBodySize,blobToDataURL,dataURLToBlob,download,sanitizeSVG} from './assets.mjs?v=nested-groups-v0712-1';
-import {serializeOfficeSVG} from './svg-export.mjs?v=office-svg-v0725-1';
+import {serializeOfficeSVG} from './svg-export.mjs?v=transparent-export-v0726-1';
+import {preparePNG} from './png-export.mjs?v=transparent-export-v0726-1';
 import {importedImageSize,replacedImageSize,replacedMiFiToImageSize,miFiToSizeCorrection,imageInsertionPoint} from './image-placement.mjs?v=nested-groups-v0712-1';
 import {rasterResolution} from './image-resolution.mjs?v=image-quality-v066-1';
 import {saveDraft,loadDraft,saveProjectFileTarget,loadProjectFileTarget} from './storage.mjs?v=0.3.6-1';
-import {createDemo} from './demo.mjs?v=office-svg-v0725-1';
+import {createDemo} from './demo.mjs?v=transparent-export-v0726-1';
 import {createShortcutHandler,shortcutLabel} from './shortcuts.mjs?v=nested-groups-v0712-1';
 import {installShortcutUI} from './shortcut-ui.mjs?v=nested-groups-v0712-1';
 import {createRibbon} from './ribbon.mjs?v=source-batch-v070-1';
 import {imageArrayUnits,arrangeImageArray} from './image-array.mjs?v=nested-groups-v0712-1';
 import {createImageArrayDialog} from './image-array-dialog.mjs?v=nested-groups-v0712-1';
-import {applyPanelLabels} from './panel-labels.mjs?v=office-svg-v0725-1';
-import {createPanelLabelDialog} from './panel-label-dialog.mjs?v=office-svg-v0725-1';
+import {applyPanelLabels} from './panel-labels.mjs?v=transparent-export-v0726-1';
+import {createPanelLabelDialog} from './panel-label-dialog.mjs?v=transparent-export-v0726-1';
 import {createColorPickers} from './colors.mjs?v=unified-palette-1';
 import {renderTextPaint} from './text-paint.mjs?v=tex-v061-1';
 import {createTexRenderer} from './tex.mjs?v=micro-v0711-2';
@@ -24,10 +25,10 @@ import {openSource,SOURCE_APPS,setupSourceDiscovery,closeSourceSessions} from '.
 import {createFigureSidebar} from './thumbnails.mjs?v=live-v062-1';
 import {setupTransferReceiver,getFigureWorkspace} from './integration/direct-transfer.mjs?v=studio-send-v0714-1';
 import {readMifitoIdentity} from './integration/mifito-sync.mjs?v=0.3.5-1';
-import {readPlotIdentity} from './integration/plot-sync.mjs?v=office-svg-v0725-1';
+import {readPlotIdentity} from './integration/plot-sync.mjs?v=transparent-export-v0726-1';
 import {planMiFiToSync} from './mifito-batch.mjs?v=studio-send-v0714-1';
-import {setupUpdateCheck} from './update-check.mjs?v=office-svg-v0725-1';
-import {installWorkspaceUpdater} from './workspace-update.mjs?v=office-svg-v0725-1';
+import {setupUpdateCheck} from './update-check.mjs?v=transparent-export-v0726-1';
+import {installWorkspaceUpdater} from './workspace-update.mjs?v=transparent-export-v0726-1';
 import {marqueeSelection,resolveObjectSelection,clickObjectSelection,selectionDescription} from './selection.mjs?v=nested-groups-v0712-1';
 import {renderGroupLayers} from './group-layers.mjs?v=nested-groups-v0712-1';
 import {drawSelectionFrames} from './selection-overlay.mjs?v=studio-send-v0714-1';
@@ -44,11 +45,11 @@ import {reorderFigures} from './figure-order.mjs';
 import {renumberFigureNames} from './figure-names.mjs?v=0.3.3-1';
 import {deleteFigures,duplicateFigures} from './figure-commands.mjs?v=nested-groups-v0712-1';
 import {ProjectFileSession,projectFilePickerOptions} from './project-file.mjs?v=project-switch-v051-1';
-import {installWorkspacePersistence} from './workspace-session.mjs?v=office-svg-v0725-1';
+import {installWorkspacePersistence} from './workspace-session.mjs?v=transparent-export-v0726-1';
 import {decodeWorkspaceState} from './workspace-state.mjs?v=project-switch-v051-1';
-import {validateWorkspaceBinding} from './integration/bridge-host.mjs?v=office-svg-v0725-1';
+import {validateWorkspaceBinding} from './integration/bridge-host.mjs?v=transparent-export-v0726-1';
 
-const STUDIO_RELEASE={version:'0.7.25',build:'office-svg-v0725-1'};
+const STUDIO_RELEASE={version:'0.7.26',build:'transparent-export-v0726-1'};
 window.FigureAppRelease?.assertRunning(STUDIO_RELEASE);
 if(window.FigureAppRelease&&!await window.FigureAppRelease.startup())throw Error('最新版へ切り替えています。');
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
@@ -779,13 +780,31 @@ function editSource(o,{figureId=doc.id}={}){
  return bridge;
 }
 
-function buildExport({office=false}={}){finishText();const out=el('svg',{xmlns:ns,width:`${toMM(doc.width)}mm`,height:`${toMM(doc.height)}mm`,viewBox:`0 0 ${doc.width} ${doc.height}`});out.append(el('rect',{width:doc.width,height:doc.height,fill:'#ffffff'}));for(const o of doc.objects){const g=el('g');drawContent(o,g,true);g.removeAttribute('data-id');g.removeAttribute('style');out.append(g);}return office?serializeOfficeSVG(out):new XMLSerializer().serializeToString(out);}
+function buildExport({office=false}={}){finishText();const out=el('svg',{xmlns:ns,width:`${toMM(doc.width)}mm`,height:`${toMM(doc.height)}mm`,viewBox:`0 0 ${doc.width} ${doc.height}`});for(const o of doc.objects){const g=el('g');drawContent(o,g,true);g.removeAttribute('data-id');g.removeAttribute('style');out.append(g);}return office?serializeOfficeSVG(out):new XMLSerializer().serializeToString(out);}
 function validateBook(raw){if(raw.format!=='figure-studio-book'||raw.version!==1||!Array.isArray(raw.figures)||!raw.figures.length||raw.figures.length>100)throw Error('Figureの構成が不正です（最大100枚）。');const ids=new Set();const figs=raw.figures.map(f=>{const d=validateDocument(f);if(typeof d.id!=='string'||ids.has(d.id))throw Error('Figure IDが不正です。');ids.add(d.id);return d;});return {format:'figure-studio-book',version:1,id:typeof raw.id==='string'?raw.id:uid(),activeId:ids.has(raw.activeId)?raw.activeId:figs[0].id,figures:figs};}
 function safeName(s){return s.replace(/[\\/:*?"<>|]/g,'_').slice(0,120)||'Figure';}
 async function prepareFigureExport(){finishText();const figureId=doc.id;for(let attempt=0;attempt<3;attempt++){const keys=doc.objects.filter(o=>o.type==='text').map(o=>texRenderer.key(o)).join('\n');await texRenderer.prepare(doc.objects);if(doc.id!==figureId)throw Error('Figureが切り替わりました。書き出すFigureでもう一度実行してください。');if(keys===doc.objects.filter(o=>o.type==='text').map(o=>texRenderer.key(o)).join('\n'))return;}throw Error('文字の編集中です。確定してからもう一度書き出してください。');}
-async function exportSVG(){try{await prepareFigureExport();download(new Blob([buildExport({office:true})],{type:'image/svg+xml'}),`${safeName(doc.name)}.svg`);toast('SVGを保存しました（PowerPoint対応・文字・数式・線はベクター）');}catch(error){toast(error.message);}}
-function withPNGResolution(blob,dpi){return blob.arrayBuffer().then(buffer=>{const bytes=new Uint8Array(buffer),pp=Math.round(dpi/0.0254),chunk=new Uint8Array(21);new DataView(chunk.buffer).setUint32(0,9);chunk.set([112,72,89,115],4);new DataView(chunk.buffer).setUint32(8,pp);new DataView(chunk.buffer).setUint32(12,pp);chunk[16]=1;let crc=0xffffffff;for(const b of chunk.slice(4,17)){crc^=b;for(let j=0;j<8;j++)crc=(crc>>>1)^((crc&1)?0xedb88320:0);}new DataView(chunk.buffer).setUint32(17,(crc^0xffffffff)>>>0);return new Blob([bytes.slice(0,33),chunk,bytes.slice(33)],{type:'image/png'});});}
-async function exportPNG(){try{await prepareFigureExport();const dpi=Number($('#exportDpi').value),w=Math.round(doc.width/72*dpi),h=Math.round(doc.height/72*dpi);if(w*h>100000000||w>16384||h>16384)throw Error('出力が大きすぎます。DPIまたは用紙サイズを下げてください。');toast('PNGを書き出しています…');const s=buildExport(),url=URL.createObjectURL(new Blob([s],{type:'image/svg+xml'}));try{const img=new Image();img.src=url;await img.decode();const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);const blob=await new Promise(resolve=>c.toBlob(resolve,'image/png'));if(!blob)throw Error('PNGの生成に失敗しました');download(await withPNGResolution(blob,dpi),`${safeName(doc.name)}_${dpi}dpi.png`);c.width=c.height=1;toast(`${w} × ${h} px・${dpi} dpiで保存しました`);}finally{URL.revokeObjectURL(url);}}catch(e){toast(e.message);}}
+async function exportSVG(){try{await prepareFigureExport();download(new Blob([buildExport({office:true})],{type:'image/svg+xml'}),`${safeName(doc.name)}.svg`);toast('SVGを保存しました（透明背景・PowerPoint対応・ベクター）');}catch(error){toast(error.message);}}
+function withPNGResolution(blob,dpi){return preparePNG(blob,dpi);}
+async function exportPNG(){
+ let canvas,url;
+ try{
+  await prepareFigureExport();
+  const dpi=Number($('#exportDpi').value),w=Math.round(doc.width/72*dpi),h=Math.round(doc.height/72*dpi),name=safeName(doc.name);
+  if(w*h>100000000||w>16384||h>16384)throw Error('出力が大きすぎます。DPIまたは用紙サイズを下げてください。');
+  toast('PNGを書き出しています…');
+  url=URL.createObjectURL(new Blob([buildExport()],{type:'image/svg+xml'}));
+  const img=new Image();img.src=url;await img.decode();
+  canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;canvas.getContext('2d').drawImage(img,0,0,w,h);
+  const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));if(!blob)throw Error('PNGの生成に失敗しました');
+  canvas.width=canvas.height=1;
+  toast('PNGを圧縮しています（画質維持）…');
+  const output=await withPNGResolution(blob,dpi);
+  download(output,`${name}_${dpi}dpi.png`);
+  toast(`${w} × ${h} px・${dpi} dpi・透明背景・${(output.size/1000000).toFixed(1)} MBで保存しました`);
+ }catch(error){toast(error.message);}
+ finally{if(canvas)canvas.width=canvas.height=1;if(url)URL.revokeObjectURL(url);}
+}
 async function exportPDF(){const win=window.open('','figure-studio-print');if(!win){toast('PDF保存用の別タブを許可してください');return;}try{await prepareFigureExport();const s=buildExport();win.document.open();win.document.write(`<!doctype html><html><head><title>Figure PDF</title><style>@page{size:${toMM(doc.width)}mm ${toMM(doc.height)}mm;margin:0}html,body{margin:0;padding:0}svg{display:block;width:${toMM(doc.width)}mm;height:${toMM(doc.height)}mm}@media screen{body{background:#ddd;padding:20px}svg{background:white}}</style></head><body>${s}</body></html>`);win.document.close();Promise.all([win.document.fonts.ready,...[...win.document.querySelectorAll('svg image')].map(i=>{const image=new win.Image();image.src=i.getAttribute('href');return image.decode();})]).then(()=>win.print()).catch(()=>toast('画像の読み込みが完了しませんでした。SVG保存をお使いください'));toast('印刷画面で「PDFに保存」、倍率100%、余白なしを選んでください');}catch(error){win.close();toast(error.message);}}
 
 svg.addEventListener('contextmenu',e=>{e.preventDefault();finishText();const id=e.target.closest('[data-id]')?.dataset.id;if(id&&!selection.includes(id)){const target=doc.objects.find(object=>object.id===id);setSelection([id],{scope:target?.groupId===groupScope?groupScope:null});}const menu=$('#contextMenu');menu.replaceChildren();for(const[label,action,key]of [...(doc.objects.find(object=>object.id===id)?.groupId?[['グループ内を個別選択','select-member','Ctrl / ⌘＋クリック']]:[]),...(groupScope?[['グループ全体へ戻る','select-group','Esc']]:[]),['複製','duplicate','Ctrl+D'],['最前面へ','front','Alt → 3'],['最背面へ','back','Alt → 4'],['一段前へ','forward',''],['一段後ろへ','backward',''],['左揃え','align-left','Alt → 5 → L'],['グループ化','group','Ctrl+G'],['グループ解除（1階層）','ungroup','Ctrl+Shift+G'],['全グループ解除','ungroup-all','Ctrl+Shift+A → G'],['固定 / 解除','lock',''],['元アプリで編集','edit-source',''],['削除','delete','Delete']]){const b=document.createElement('button');b.type='button';b.textContent=label;const k=document.createElement('kbd');k.textContent=shortcutLabel(key);b.append(k);b.onclick=()=>{menu.hidden=true;execute(action,{id});svg.focus();};menu.append(b);}menu.hidden=false;menu.style.left=`${Math.min(e.clientX,innerWidth-250)}px`;menu.style.top=`${Math.min(e.clientY,innerHeight-450)}px`;});
