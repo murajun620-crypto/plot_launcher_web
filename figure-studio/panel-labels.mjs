@@ -19,7 +19,7 @@ export function panelLabelUnits(doc,ids,{scope='selection'}={}){
 }
 
 /** Labels are ordinary editable text; group membership makes them travel with panels. */
-export function applyPanelLabels(doc,ids,{scope='selection',style='alpha',start=1,numbering={},fontSize=9,bold=false,gap=0,position='outside'}={},fitText=()=>{}){
+export function applyPanelLabels(doc,ids,{scope='selection',style='alpha',start=1,numbering={},fontSize=9,bold=false,gap=0,position='outside'}={},fitText=()=>{},measureText=()=>null){
  if(!PANEL_LABEL_STYLES.includes(style)||!Number.isSafeInteger(start)||start<1||start>9999||!Number.isFinite(fontSize)||fontSize<1||fontSize>1000||!Number.isFinite(gap)||gap<0||gap>mm(100)||!['outside','inside'].includes(position))throw Error('ラベルの設定を確認してください。');
  const targets=panelLabelUnits(doc,ids,{scope});
  if(!targets.length)throw Error('固定されていない画像または画像グループを選択してください。');
@@ -34,7 +34,16 @@ export function applyPanelLabels(doc,ids,{scope='selection',style='alpha',start=
   if(!previous.length)Object.assign(label,{fill:'#000000',stroke:'none',fontFamily:'Arial'});
   fitText(label);
   label.x=box.x+(position==='inside'?gap:0);
-  label.y=position==='inside'?box.y+gap:box.y-label.h-gap;
+  if(position==='inside')label.y=box.y+gap;
+  else{
+   // MiFiTo uses a tight glyph box with a one-em text allocation and a
+   // small image-relative clearance, rather than Studio's padded edit box.
+   const metrics=measureText(text,label);
+   const ascent=Number.isFinite(metrics?.actualBoundingBoxAscent)?metrics.actualBoundingBoxAscent:fontSize*.75;
+   const descent=Number.isFinite(metrics?.actualBoundingBoxDescent)?metrics.actualBoundingBoxDescent:fontSize*.2;
+   const bottom=fontSize*.95+descent+Math.max(0,fontSize-ascent-descent);
+   label.y=box.y-bottom-Math.min(box.w,box.h)*.003-gap;
+  }
   if(!Number.isFinite(label.x)||!Number.isFinite(label.y)||Math.abs(label.x)>1e6||Math.abs(label.y)>1e6)throw Error('ラベルを配置できる範囲を超えています。');
   return {unit,groupId,label};
  });
