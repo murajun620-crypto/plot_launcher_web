@@ -1,13 +1,12 @@
 """Matrix measurements: preserve blank cells and derive distributions from raw values."""
 from io import BytesIO, StringIO
+from contextlib import redirect_stdout
 from pathlib import Path
 import math, re, json
 import numpy as np
 import pandas as pd
-from matplotlib import pyplot as plt, colors, ticker
+from matplotlib import pyplot as plt, colors
 from matplotlib.backends.backend_svg import RendererSVG
-from annotation_model import AnnotationCollection
-from annotation_manager import AnnotationManager
 
 TYPES = {"Surface Map", "Surface Histogram"}
 
@@ -170,7 +169,8 @@ def distribution_annotations(annotations, statistics, active):
 
 
 def render_matrix(engine, config):
-    from engine import number, grid_style, _MarkerExtent, smooth_line_coordinates
+    from engine import number, plot_environment, _MarkerExtent, smooth_line_coordinates
+    import plot_utils
     options = config.get("options", {}).get("matrix", {})
     settings = config.get("axes", {})
     histogram = config["plotType"] == "Surface Histogram"
@@ -184,16 +184,19 @@ def render_matrix(engine, config):
     if separate and active not in indices: raise ValueError("表示するシートを分布の対象にも選択してください。")
     if not histogram: indices = [active]
     datasets = [matrix_values(engine, i, region) for i in indices]
-    font = settings.get("fontFamily", "Arial")
-    if font not in engine.font_families: font = "Liberation Sans" if "Liberation Sans" in engine.font_families else engine.font_family
-    size = number(settings.get("fontScale",1),"フォントサイズ",minimum=.1,maximum=10)*8
-    width = number(settings.get("width",4),"軸の幅",minimum=.5,maximum=24)
-    height = number(settings.get("height",3),"軸の高さ",minimum=.5,maximum=24)
-    with plt.rc_context({"font.family":[font, settings.get("japaneseFontFamily","Noto Sans JP"),"DejaVu Sans"],"font.size":size,"svg.fonttype":"none","mathtext.fontset":"dejavusans"}):
+    primary_settings = {**settings, "yAxisRight": False} if histogram and options.get("cumulative",True) else settings
+    style_values, _, font, requested_font = engine._style_values(primary_settings)
+    right_settings = engine._secondary_axis_settings(settings)
+    right_values = engine._style_values(right_settings)[0] if histogram and options.get("cumulative", True) else None
+    size = float(settings.get("fontScale", 1))*8
+    width = float(style_values["PLOT_AX_W_CM"]); height = float(style_values["PLOT_AX_H_CM"])
+    with plot_environment(style_values, engine.frame, engine.sheet_name, engine.filename), redirect_stdout(StringIO()):
         figure = plt.figure(figsize=((width+2.6)/2.54,(height+2)/2.54),dpi=100)
         try:
             axes = figure.add_axes([1/(width+2.6),.9/(height+2),width/(width+2.6),height/(height+2)])
             right = None; colorbar = None; groups = []; extra = []; warnings = []; statistics = []; diagnostics = []
+            if requested_font != font:
+                warnings.append(f"Arialが未読込のため{font}で代替表示しています。")
             if histogram:
                 arrays = [data[2]*float(settings.get("xUnitScale",1)) for data in datasets]
                 all_values = np.concatenate(arrays)
@@ -249,13 +252,17 @@ def render_matrix(engine, config):
                     diagnostics.append({"name":label,"points":len(values),"count":len(values),"visible":visible,"processing":{}})
                     statistics.append({**distribution_summary(values,label,sheet_index,settings.get("xUnit",options.get("valueUnit",""))),"binEdges":edges.tolist(),"frequency":counts.tolist(),"cumulative":(100*(under+np.cumsum(counts))/len(values)).tolist(),"outside":under+over})
                 axes.set_xlim(edges[0],edges[-1]); axes.set_ylim(0,max(1,axes.get_ylim()[1])*1.05)
-                if right:
-                    right.set_ylabel(settings.get("y2Label") or "Cumulative frequency (%)")
-                    right.tick_params(labelsize=size*.875*float(settings.get("tickFontScale",1)),direction="in")
                 handles, labels = axes.get_legend_handles_labels()
                 if right:
                     h,l=right.get_legend_handles_labels();handles+=h;labels+=l
-                legend=axes.legend(handles,labels,loc=settings.get("legendPosition","best"),frameon=False,fontsize=size*.875*float(settings.get("legendFontScale",1))) if settings.get("legend",True) and handles else None
+                legend = None
+                if handles:
+                    plot_utils.apply_preview_legend(axes, handles=handles, labels=labels)
+                    legend = axes.get_legend()
+                    position = settings.get("legendPosition", "best")
+                    if position not in {"best", "upper right", "upper left", "lower right", "lower left"}:
+                        raise ValueError("凡例の位置を選び直してください。")
+                    if legend and style_values["PLOT_LEGEND_X"] == "": legend.set_loc(position)
             else:
                 sheet, matrix, values = datasets[0]
                 px=number(options.get("pitchX",5),"X間隔",minimum=1e-12,maximum=1e12);py=number(options.get("pitchY",5),"Y間隔",minimum=1e-12,maximum=1e12)
@@ -289,7 +296,7 @@ def render_matrix(engine, config):
                     cax=figure.add_axes([(width+1.18)/(width+2.6),.9/(height+2),.16/(width+2.6),height/(height+2)])
                     colorbar=figure.colorbar(image,cax=cax)
                     colorbar.outline.set_visible(False)
-                    colorbar.set_label(label_text(options.get("valueLabel","Surface roughness, Sa"),options.get("valueUnit","nm")))
+                    colorbar.set_label(label_text(options.get("valueLabel","Surface roughness, Sa"),options.get("valueUnit","nm")),fontsize=size)
                     colorbar.ax.tick_params(labelsize=size*.875*float(settings.get("tickFontScale",1)))
                     # Match MiFiTo: gaps are percentages of the image/axes short side.
                     short_points=min(width,height)*72/2.54
@@ -303,83 +310,72 @@ def render_matrix(engine, config):
                 groups=[{"index":0,"artists":[image]}];legend=None
                 diagnostics=[{"name":sheet,"points":len(values),"count":len(values),"visible":True,"processing":{}}]
                 statistics=[distribution_summary(values,sheet,indices[0],options.get("valueUnit","nm"))]
-            for name, axis in [("x",axes.xaxis),("y",axes.yaxis)]+([("y2",right.yaxis)] if right else []):
-                owner=axis.axes;axis_name="x" if name=="x" else "y"
-                low=number(settings.get(name+"Min",""),"軸の最小値",optional=True);high=number(settings.get(name+"Max",""),"軸の最大値",optional=True)
-                limits=list(owner.get_xlim() if name=="x" else owner.get_ylim())
+            editable_axes = [("x",axes.xaxis),("y",axes.yaxis)]+([("y2",right.yaxis)] if right else [])
+            # Validate against the generated bin/coordinate extents before locators
+            # allocate ticks. Data primitives stay specific; appearance uses the
+            # same paper style, environment and finishers as ordinary presets.
+            for name, axis in editable_axes:
+                low=number(settings.get(name+"Min",""),"軸の最小値",optional=True)
+                high=number(settings.get(name+"Max",""),"軸の最大値",optional=True)
+                limits=list(axis.get_view_interval())
                 if low is not None: limits[0]=low
                 if high is not None: limits[1]=high
-                if not limits[1]>limits[0]: raise ValueError("軸の最大値を最小値より大きくしてください。")
-                (owner.set_xlim if name=="x" else owner.set_ylim)(limits)
                 scale=settings.get(name+"Scale","linear")
-                if scale=="log" and name=="y" and histogram and low is None: limits[0]=.8;owner.set_ylim(limits)
+                if scale=="log" and name=="y" and histogram and low is None: limits[0]=.8;axes.set_ylim(limits)
+                if not limits[1]>limits[0]: raise ValueError("軸の最大値を最小値より大きくしてください。")
                 if scale=="log" and limits[0]<=0: raise ValueError("対数軸の範囲は0より大きくしてください。")
-                (owner.set_xscale if name=="x" else owner.set_yscale)(scale)
-                for suffix,which in [("Step","major"),("MinorStep","minor")]:
+                for suffix,maximum in [("Step",200),("MinorStep",1000)]:
                     step=number(settings.get(name+suffix,""),"目盛り間隔",minimum=1e-15,maximum=1e15,optional=True)
-                    if step is not None and (limits[1]-limits[0])/step>(200 if which=="major" else 1000): raise ValueError("目盛りが多すぎます。間隔を大きくしてください。")
-                    if scale=="linear":
-                        locator=ticker.MultipleLocator(step) if step is not None else ticker.AutoMinorLocator() if which=="minor" else ticker.AutoLocator()
-                        (axis.set_major_locator if which=="major" else axis.set_minor_locator)(locator)
-                for which,prefix,base_length in [("major","Major",3),("minor","Minor",1.5)]:
-                    flag=name.upper();hidden=settings.get("hide"+flag+"Ticks",False) or which=="minor" and settings.get("hide"+flag+"MinorTicks",False)
-                    owner.tick_params(axis=axis_name,which=which,direction="in",length=0 if hidden else base_length*float(settings.get(name+prefix+"TickLength",1)),width=float(settings.get(name+prefix+"TickWidth",1)),labelsize=size*.875*float(settings.get("tickFontScale",1)),pad=2+float(settings.get(name+"TickPad",0)))
-                top=name=="x" and settings.get("xAxisTop",False)
-                right_side=name=="y2" or name=="y" and settings.get("yAxisRight",False) and right is None
-                if name=="x":
-                    axis.set_ticks_position("top" if top else "bottom");axis.set_label_position("top" if top else "bottom")
-                    axis.set_tick_params(labeltop=top and not settings.get("hideXTickLabels",False),labelbottom=not top and not settings.get("hideXTickLabels",False))
-                else:
-                    axis.set_ticks_position("right" if right_side else "left");axis.set_label_position("right" if right_side else "left")
-                    visible=not settings.get("hide"+name.upper()+"TickLabels",False)
-                    axis.set_tick_params(labelright=right_side and visible,labelleft=not right_side and visible)
-                axis_color=settings.get(name+"Color","auto")
-                if axis_color!="auto":
-                    if not colors.is_color_like(axis_color): raise ValueError("軸の色を確認してください。")
-                    axis.set_tick_params(colors=axis_color);axis.label.set_color(axis_color)
-                label=settings.get(name+"Label","")
-                if histogram and name=="y2" and label=="Cumulative undersize": label="Cumulative frequency"
-                unit=settings.get(name+"Unit","")
-                if name=="y2" and not label: label="Cumulative frequency";unit="%"
-                axis.set_label_text(label_text(label,unit),fontsize=size*float(settings.get("labelFontScale",1)))
-                axis.label.set_visible(not settings.get("hide"+name.upper()+"Label",False));axis.labelpad=float(settings.get(name+"LabelPad",2))
-                axis.label.set_gid("web-axis-label-"+name)
-                if settings.get(name+"LabelX","")!="" and settings.get(name+"LabelY","")!="": axis.set_label_coords(float(settings[name+"LabelX"]),float(settings[name+"LabelY"]))
-            for target in [axes]+([right] if right else []):
-                for side,spine in target.spines.items(): spine.set_visible((histogram or options.get("frame",False)) and bool(settings.get("spine"+side.title(),True)));spine.set_linewidth(.8*float(settings.get("spineScale",1)));spine.set_color(settings.get("spineColor","#000000"))
-            # Style arguments make Matplotlib enable a grid even with False.
-            # As in ordinary presets, disable without passing line properties.
+                    if step is not None and (limits[1]-limits[0])/step>maximum: raise ValueError("目盛りが多すぎます。間隔を大きくしてください。")
+            def apply_style(target, axis_settings, env):
+                for name in ("x", "y"):
+                    label = axis_settings.get(name+"Label", "")
+                    unit = axis_settings.get(name+"Unit", "")
+                    if target is right and name=="y":
+                        if label=="Cumulative undersize": label="Cumulative frequency"
+                        if not label: label="Cumulative frequency";unit="%"
+                    env["PLOT_"+name.upper()+"LABEL_TEXT"] = str(label)
+                    env["PLOT_"+name.upper()+"UNIT"] = "" if unit=="auto" else str(unit)
+                with plot_environment(env, engine.frame, engine.sheet_name, engine.filename):
+                    plot_utils.apply_paper_style(target, ax_w_cm=width, **plot_utils.env_style_options({}))
+                    plot_utils.configure_axes_with_env(target, {})
+                    for spine in target.spines.values(): spine.set_color(env["PLOT_SPINE_COLOR"])
+                    target.tick_params(axis="both", which="both", colors=env["PLOT_SPINE_COLOR"])
+                    target.xaxis.label.set_color(env["PLOT_SPINE_COLOR"])
+                    target.yaxis.label.set_color(env["PLOT_SPINE_COLOR"])
+                    plot_utils.apply_axis_overrides_from_env(target)
+                    plot_utils.apply_axis_labels_from_env(target)
+            apply_style(axes, primary_settings, style_values)
             if right is not None:
+                apply_style(right, right_settings, right_values)
+                right.xaxis.set_visible(False)
                 right.grid(False,which="both")
-            for name in ["x","y"]:
-                for minor in [False,True]:
-                    enabled=settings.get(name+("MinorGrid" if minor else "Grid"),False if minor else settings.get("grid",False))
-                    which="minor" if minor else "major"
-                    if enabled:
-                        axes.grid(True,which=which,axis=name,**grid_style(settings,minor=minor))
-                    else:
-                        axes.grid(False,which=which,axis=name)
-            if legend and settings.get("legendX","")!="" and settings.get("legendY","")!="": legend.set_bbox_to_anchor((float(settings["legendX"]),float(settings["legendY"])),transform=axes.transAxes);legend._loc=2
-            legend,legend_records=engine._web_legends(figure,legend,config,diagnostics,config["plotType"])
+                for side in ("left","top","bottom"): right.spines[side].set_visible(False)
+                axes.spines["right"].set_visible(False)
+            if not histogram and not options.get("frame",False):
+                for spine in axes.spines.values(): spine.set_visible(False)
+            positioned_labels=engine._finish_axes(figure,axes,editable_axes,config,style_values,config["plotType"])
+            for name,axis in editable_axes: axis.label.set_gid("web-axis-label-"+name)
+            if right is not None:
+                annotation_axes=figure.add_axes(axes.get_position(),frameon=False,zorder=5)
+                annotation_axes.set_xscale(axes.get_xscale());annotation_axes.set_yscale(axes.get_yscale())
+                annotation_axes.set_xlim(axes.get_xlim());annotation_axes.set_ylim(axes.get_ylim())
+                annotation_axes.set_axis_off()
+            else: annotation_axes=axes
+            legend,legend_records=engine._finish_legends(figure,annotation_axes,legend,config,diagnostics,config["plotType"])
             if legend: legend.set_gid("web-legend")
             for i,row in enumerate(legend_records):
                 if row["artist"] is not legend: row["artist"].set_gid(f"web-legend-item-{i}")
             annotation_values,annotation_texts=distribution_annotations(config.get("annotations",[]),statistics,active)
-            # AnnotationManager draws line endpoints in data coordinates. Match
-            # ordinary presets before creating both artists and drag geometry.
-            for item in annotation_values:
-                if item.get("type")!="text" and item.get("coordinate_system")=="axes_fraction":
-                    for suffix in ("1","2"):
-                        xy=axes.transData.inverted().transform(axes.transAxes.transform((item[f"x{suffix}"],item[f"y{suffix}"])))
-                        item[f"x{suffix}"],item[f"y{suffix}"]=map(float,xy)
-                    item["coordinate_system"]="data"
-            collection=AnnotationCollection();errors=collection.load_list(annotation_values)
-            if errors: raise ValueError("注釈の設定を確認してください。")
-            for annotation in collection.items:
-                if annotation.type=="text": annotation.font_family=[font,settings.get("japaneseFontFamily","Noto Sans JP"),"DejaVu Sans"]
-            manager=AnnotationManager(collection,logger=warnings.append);manager.attach(figure,axes)
-            figure.patch.set_facecolor(settings.get("backgroundColor","#ffffff"));figure.patch.set_alpha(0 if settings.get("transparent",True) else float(settings.get("backgroundAlpha",1)))
-            axes.patch.set_facecolor(settings.get("plotBackgroundColor","#ffffff"));axes.patch.set_alpha(float(settings.get("plotBackgroundAlpha",1)) if settings.get("plotBackgroundEnabled",False) else 0)
+            collection,manager=engine._attach_annotations(figure,annotation_axes,annotation_values,config,style_values,warnings)
+            annotation_svg_ids=engine._tag_annotations(collection,manager)
+            engine._finish_background(figure,axes,style_values)
+            figure.canvas.draw()
+            for _,axis in editable_axes:
+                low,high=sorted(axis.get_view_interval())
+                for tick in axis.get_major_ticks():
+                    if not low<=tick.get_loc()<=high:
+                        tick.label1.set_visible(False);tick.label2.set_visible(False)
             figure.set_dpi(72);renderer=RendererSVG(*(figure.get_size_inches()*72),StringIO());figure.draw(renderer)
             box=figure.get_tightbbox(renderer,bbox_extra_artists=extra).padded(.05)
             def svg_box(b):
@@ -388,29 +384,13 @@ def render_matrix(engine, config):
             geometry["colorbar"]=svg_box(colorbar.ax.get_tightbbox(renderer)) if colorbar else None
             for row in legend_records:
                 if "id" in row: geometry["legendItems"].append({"id":row["id"],"svgIds":[row["artist"].get_gid()],"seriesIndex":row["seriesIndex"],"key":row["key"],"label":row["label"],"box":svg_box(row["artist"].get_window_extent(renderer))})
-            for name,axis in [("x",axes.xaxis),("y",axes.yaxis)]+([("y2",right.yaxis)] if right else []):
-                if axis.label.get_visible() and axis.label.get_text():
-                    anchor=axes.transAxes.inverted().transform(axis.label.get_transform().transform(axis.label.get_position()))
-                    geometry["axisLabels"].append({"id":"axis-label-"+name,"svgIds":[axis.label.get_gid()],"axis":name,"kind":"label","box":svg_box(axis.label.get_window_extent(renderer)),"anchor":list(map(float,anchor))})
-                geometry["tickLabels"] += [{"id":f"axis-ticks-{name}-{i}","axis":name,"kind":"ticks","box":svg_box(t.get_window_extent(renderer))} for i,t in enumerate(axis.get_ticklabels()) if t.get_visible() and t.get_text()]
-            for annotation in collection.items:
-                artists=manager.artist_by_id.get(annotation.id);artists=artists if isinstance(artists,list) else [artists] if artists is not None else []
-                ids=[]
-                for part,artist in enumerate(artists): artist.set_gid(f"web-matrix-annotation-{annotation.id}-{part}");ids.append(artist.get_gid())
-                if artists and annotation.visible:
-                    from matplotlib.transforms import Bbox
-                    entry={"id":annotation.id,"box":svg_box(Bbox.union([a.get_window_extent(renderer) for a in artists])),"svgIds":ids}
-                    if annotation.type=="text":
-                        point=artists[0].get_transform().transform(artists[0].get_position())/figure.dpi
-                        entry["anchor"]=[(point[0]-box.x0)/box.width,(box.y1-point[1])/box.height]
-                    else:
-                        points=axes.transData.transform([(annotation.x1,annotation.y1),(annotation.x2,annotation.y2)])/figure.dpi
-                        entry["points"]=[[(x-box.x0)/box.width,(box.y1-y)/box.height] for x,y in points]
-                    geometry["annotations"].append(entry)
+            engine._axis_geometry(geometry,figure,axes,right,editable_axes,positioned_labels,config["plotType"],box,renderer,svg_box)
+            geometry["annotations"]=engine._annotation_geometry(collection,manager,annotation_axes,figure,box,renderer,svg_box,annotation_svg_ids)
+            tick_steps,axis_info=engine._axis_metadata(editable_axes,config,{"x":style_values,"y":style_values,"y2":right_values})
             image=BytesIO();figure.savefig(image,format="svg",bbox_inches=box,bbox_extra_artists=extra,transparent=False,pad_inches=0)
             if engine.figure is not None: plt.close(engine.figure)
             engine.figure=figure;engine.matrix_colorbar=colorbar;engine.annotation_manager=manager;engine.export_extra_artists=extra;engine.transparent=False
-            return {"svg":image.getvalue().decode(),"series":diagnostics,"seriesProcessing":[{} for _ in diagnostics],"fits":[],"warnings":warnings,"statistics":None,"matrixStatistics":statistics,"matrixAnnotationTexts":annotation_texts,"xRange":list(axes.get_xlim()),"yRange":list(axes.get_ylim()),"y2Range":list(right.get_ylim()) if right else None,"xDataScale":axes.get_xscale(),"yDataScale":axes.get_yscale(),"tickSteps":{},"axisInfo":{},"geometry":geometry,"fontFamily":font,"matrix":True}
+            return {"svg":image.getvalue().decode(),"series":diagnostics,"seriesProcessing":[{} for _ in diagnostics],"fits":[],"warnings":warnings,"statistics":None,"matrixStatistics":statistics,"matrixAnnotationTexts":annotation_texts,"xRange":list(axes.get_xlim()),"yRange":list(axes.get_ylim()),"y2Range":list(right.get_ylim()) if right else None,"xDataScale":axes.get_xscale(),"yDataScale":axes.get_yscale(),"tickSteps":tick_steps,"axisInfo":axis_info,"geometry":geometry,"fontFamily":font,"matrix":True}
         except Exception:
             plt.close(figure);raise
 

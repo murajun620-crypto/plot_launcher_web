@@ -885,31 +885,7 @@ class PlotEngine:
             raise ValueError("補正結果が数値の範囲を超えました。係数・面積・基準値を確認してください。")
         return result, gain, bias, details
 
-    def _prepare(self, config):
-        preset = config.get("plotType", "General")
-        if getattr(self,'multi_source',False) and preset in {'XPS Fit','Particle Histogram','bar_graph_general','Raman 3D'}:
-            raise ValueError('複数ファイルの重ね描きでは通常のXYグラフを選んでください。専用グラフは単一ファイルで使用できます。')
-        if preset not in self.presets:
-            raise ValueError("プロット種別を選び直してください。")
-        if self.frame is None:
-            raise ValueError("先にExcel/CSVファイルを読み込んでください。")
-        series = config.get("series", [])
-        corrected = any(item.get("detrend") or item.get("density") or item.get("normalization", "none") != "none" or float(item.get("yFactor", 1)) != 1 or float(item.get("xFactor", 1)) != 1 for item in series)
-        if corrected and preset in {"XPS Fit", "Particle Histogram", "bar_graph_general", "Raman 3D"}:
-            raise ValueError("この専用グラフではデータ補正を解除してください。通常のXYグラフで補正できます。")
-        options = config.get("options", {})
-        if not isinstance(options, dict):
-            raise ValueError("専用プロットの設定を確認してください。")
-        if preset in {"XPS Fit", "Particle Histogram"} and series:
-            first = series[0]
-            diameter = options.get("diameterColumn", min(2, len(self.frame.columns) - 1)) if self.frame is not None else 0
-            series = [{"x": first.get("x", 0) if preset == "XPS Fit" else diameter, "y": first.get("y", 1) if preset == "XPS Fit" else diameter, "name": first.get("name", "Raw"), "visible": first.get("visible", True)}]
-        if not 1 <= len(series) <= MAX_SERIES:
-            raise ValueError(f"系列を1〜{MAX_SERIES}個追加してください。")
-        count = len(self.frame.columns)
-        if count < 2:
-            raise ValueError("X列とY列が必要です。シートとヘッダー行を確認してください。")
-        axes = config.get("axes", {})
+    def _style_values(self, axes):
         width = number(axes.get("width", 4), "軸領域の幅", minimum=0.5, maximum=24)
         height = number(axes.get("height", 3), "軸領域の高さ", minimum=0.5, maximum=24)
         font_scale = number(axes.get("fontScale", 1), "文字サイズ", minimum=0.5, maximum=3)
@@ -1000,6 +976,232 @@ class PlotEngine:
                 raise ValueError("対数軸の副目盛りは自動にしてください。")
             values[f"PLOT_{axis.upper()}MINOR_TICK_STEP"] = "" if minor_step is None else str(minor_step)
 
+        return values, limits, family, requested_family
+
+    def _finish_axes(self, figure, axes, editable_axes, config, values, preset, auto_colors=None):
+        settings = config.get("axes", {})
+        grid_styles = {"major": grid_style(settings), "minor": grid_style(settings, minor=True)}
+        # Some presets reset minor locators after applying axis options.
+        # Apply per-axis visibility after all preset drawing is complete.
+        from matplotlib.ticker import NullLocator
+        for name, axis in editable_axes:
+            for which, prefix, ticks in (("major", "Major", axis.get_major_ticks()), ("minor", "Minor", axis.get_minor_ticks())):
+                width = number(config.get("axes", {}).get(f"{name}{prefix}TickWidth", 1), "目盛線の太さ（標準比）", minimum=0, maximum=5)
+                length = number(config.get("axes", {}).get(f"{name}{prefix}TickLength", 1), "目盛線の長さ（標準比）", minimum=0, maximum=5)
+                if ticks:
+                    base = ticks[0].tick1line
+                    axis.set_tick_params(which=which, width=base.get_markeredgewidth()*width, length=base.get_markersize()*length)
+            if config.get("axes", {}).get(f"hide{name.upper()}MinorTicks", config.get("axes", {}).get("hideMinorTicks", False)):
+                axis.set_minor_locator(NullLocator())
+        if preset != "Raman 3D":
+            from matplotlib.ticker import AutoMinorLocator, LogLocator, MultipleLocator
+            settings = config.get("axes", {})
+            # Draw one horizontal grid against the primary Y axis,
+            # including projects whose only plotted data use the right axis.
+            for name, axis in editable_axes[:2]:
+                direction = "x" if name == "x" else "y"
+                minor = settings.get(f"{direction}MinorGrid", False)
+                if minor and isinstance(axis.get_minor_locator(), NullLocator):
+                    step = number(settings.get(f"{name}MinorStep", ""), "副目盛り間隔", minimum=0, optional=True)
+                    axis.set_minor_locator(LogLocator(base=10, subs=range(2, 10)) if axis.get_scale() == "log" else MultipleLocator(step) if step else AutoMinorLocator())
+                    axis.set_minor_formatter(matplotlib.ticker.NullFormatter())
+                if minor and settings.get(f"hide{name.upper()}MinorTicks", settings.get("hideMinorTicks", False)):
+                    axis.set_tick_params(which="minor", length=0)
+                for which, enabled in (("major", settings.get(f"{direction}Grid", settings.get("grid", False))), ("minor", minor)):
+                    if enabled:
+                        axis.grid(True, which=which, **grid_styles[which])
+                    else:
+                        axis.grid(False, which=which)
+        for name, axis in editable_axes:
+            color = str(settings.get(f"{name}Color", "auto"))
+            if color == "auto":
+                color = (auto_colors or {}).get(name)
+                if color is None:
+                    continue
+            if not is_color_like(color):
+                raise ValueError("軸の色はautoまたは色を指定してください。")
+            direction = "x" if name == "x" else "y"
+            axis.axes.tick_params(axis=direction, which="both", colors=color)
+            axis.label.set_color(color)
+            if axis in (axis.axes.xaxis, axis.axes.yaxis):
+                axis.axes.spines[axis.get_label_position()].set_color(color)
+        positioned_labels = {}
+        if preset == "Raman 3D":
+            # The displayed Y quantity is the 3D Z axis. Apply the
+            # same padding as every 2D Y label before projection.
+            axes.xaxis.labelpad = float(values["PLOT_XLABEL_PAD"])
+            axes.zaxis.labelpad = float(values["PLOT_YLABEL_PAD"])
+            figure.canvas.draw()  # Resolve the native projected label rotations first.
+        for name, axis in editable_axes:
+            axis.label.set_fontweight("normal")
+            position = [number(config.get("axes", {}).get(f"{name}Label{coordinate}", ""), "軸ラベル位置", minimum=-10, maximum=10, optional=True) for coordinate in ("X", "Y")]
+            if (position[0] is None) != (position[1] is None):
+                raise ValueError("軸ラベルのX・Y位置を両方指定してください。")
+            if position[0] is not None:
+                if preset == "Raman 3D":
+                    # 3D Axis overwrites its label transform, including after
+                    # Text.draw in newer Matplotlib. Keep the native typography
+                    # on a separate, stable 2D artist for manual placement.
+                    label = axis.label
+                    positioned_labels[name] = axes.text2D(*position, label.get_text(), transform=axes.transAxes,
+                        fontproperties=label.get_fontproperties(), color=label.get_color(),
+                        horizontalalignment=label.get_ha(), verticalalignment=label.get_va(),
+                        rotation=label.get_rotation(), visible=label.get_visible(), clip_on=False)
+                    label.set_visible(False)
+                else:
+                    axis.set_label_coords(*position)
+        return positioned_labels
+
+    @staticmethod
+    def _finish_background(figure, axes, values):
+        # Figure and plot-area backgrounds each have their own fill.
+        plot_utils.apply_plot_background_from_env(figure, [])
+        for target in figure.axes:
+            target.patch.set_facecolor("none")
+            target.patch.set_alpha(0)
+            if target.name == "3d":
+                for axis in (target.xaxis, target.yaxis, target.zaxis):
+                    axis.pane.set_fill(False)
+        axes.patch.set_facecolor(values["PLOT_AXES_BACKGROUND_COLOR"])
+        axes.patch.set_alpha(float(values["PLOT_AXES_BACKGROUND_ALPHA"]))
+
+    def _finish_legends(self, figure, annotation_axes, legend, config, diagnostics, preset):
+        legend, legend_records = self._web_legends(figure, legend, config, diagnostics, preset)
+        # Share the annotation drawing layer so ordering also works with
+        # two Y axes and the 2D annotation overlay of Raman 3D.
+        for record in legend_records:
+            artist = record['artist']
+            if artist.axes is not annotation_axes:
+                artist.remove()
+                annotation_axes.add_artist(artist)
+        return legend, legend_records
+
+    def _attach_annotations(self, figure, annotation_axes, annotations, config, values, warnings):
+        if not isinstance(annotations, list) or len(annotations) > 200:
+            raise ValueError("注釈は200個以内にしてください。")
+        native_annotations = json.loads(json.dumps(annotations))
+        for item in native_annotations:
+            if item.get("type") != "text" and item.get("coordinate_system") == "axes_fraction":
+                for suffix in ("1", "2"):
+                    xy = annotation_axes.transData.inverted().transform(annotation_axes.transAxes.transform((item[f"x{suffix}"], item[f"y{suffix}"])))
+                    item[f"x{suffix}"], item[f"y{suffix}"] = map(float, xy)
+                item["coordinate_system"] = "data"
+        collection = AnnotationCollection()
+        annotation_warnings = collection.load_list(native_annotations)
+        if annotation_warnings:
+            raise ValueError("注釈の設定を確認してください。")
+        for annotation in collection.items:
+            if annotation.type == "text":
+                if annotation.font_family == "Arial" and "Arial" not in self.font_families:
+                    annotation.font_family = values["PLOT_FONT_FAMILY"].split(",")[0]
+                annotation.font_family = [annotation.font_family, config.get("axes", {}).get("japaneseFontFamily", "Noto Sans JP"), "DejaVu Sans"]
+        manager = AnnotationManager(collection, logger=warnings.append)
+        manager.attach(figure, annotation_axes)
+        return collection, manager
+
+    @staticmethod
+    def _tag_annotations(collection, manager):
+        annotation_svg_ids = {}
+        for index, annotation in enumerate(collection.items):
+            artists = manager.artist_by_id.get(annotation.id)
+            artists = artists if isinstance(artists, list) else [artists] if artists is not None else []
+            annotation_svg_ids[annotation.id] = []
+            for part, artist in enumerate(artists):
+                gid = f"web-annotation-{index}-{part}"
+                artist.set_gid(gid)
+                annotation_svg_ids[annotation.id].append(gid)
+        return annotation_svg_ids
+
+    def _axis_geometry(self, geometry, figure, axes, right_axes, editable_axes, positioned_labels, preset, box, renderer, svg_box):
+        geometry["spines"] = [{"id": side, "paths": self._data_geometry([{"artists": [spine]}], axes, box, renderer)[0]["paths"]} for target in (axes, right_axes) if target is not None for side, spine in target.spines.items() if spine.get_visible() and preset != "Raman 3D"]
+        geometry["grid"] = self._data_geometry([{"part": "grid", "artists": [tick.gridline for axis in (axes.xaxis, axes.yaxis) for tick in [*axis.get_major_ticks(), *axis.get_minor_ticks()] if tick.gridline.get_visible()]}], axes, box, renderer)
+        geometry["tickLines"] = [{"axis": name, "boxes": [svg_box(line.get_window_extent(renderer)) for tick in [*axis.get_major_ticks(), *axis.get_minor_ticks()] for line in (tick.tick1line, tick.tick2line) if line.get_visible() and line.get_markersize() > 0 and line.get_markeredgewidth() > 0]} for name, axis in editable_axes] if preset != "Raman 3D" else []
+        if preset == "Raman 3D":
+            geometry["depth"] = [svg_box(label.get_window_extent(renderer)) for label in [axes.yaxis.label, *axes.yaxis.get_ticklabels()] if label.get_visible() and label.get_text()]
+        for name, axis in editable_axes:
+            label = positioned_labels.get(name, axis.label)
+            if label.get_visible() and label.get_text():
+                anchor = axes.transAxes.inverted().transform(label.get_transform().transform(label.get_position()))
+                geometry["axisLabels"].append({"id": f"axis-label-{name}", "svgIds": [label.get_gid()], "axis": name, "kind": "label", "box": svg_box(label.get_window_extent(renderer)), "anchor": list(map(float, anchor))})
+            for index, label in enumerate(axis.get_ticklabels()):
+                if label.get_visible() and label.get_text():
+                    geometry["tickLabels"].append({"id": f"axis-ticks-{name}-{index}", "axis": name, "kind": "ticks", "box": svg_box(label.get_window_extent(renderer))})
+
+    @staticmethod
+    def _annotation_geometry(collection, manager, annotation_axes, figure, box, renderer, svg_box, annotation_svg_ids):
+        from matplotlib.transforms import Bbox
+        result = []
+        for annotation in collection.items:
+            artists = manager.artist_by_id.get(annotation.id)
+            artists = artists if isinstance(artists, list) else [artists] if artists is not None else []
+            if not artists or not annotation.visible:
+                continue
+            entry = {"id": annotation.id, "svgIds": annotation_svg_ids[annotation.id],
+                "box": svg_box(Bbox.union([artist.get_window_extent(renderer) for artist in artists]))}
+            if annotation.type == "text":
+                point = artists[0].get_transform().transform(artists[0].get_position()) / figure.dpi
+                entry["anchor"] = [(point[0] - box.x0) / box.width, (box.y1 - point[1]) / box.height]
+            else:
+                points = annotation_axes.transData.transform([(annotation.x1, annotation.y1), (annotation.x2, annotation.y2)]) / figure.dpi
+                entry["points"] = [[(x - box.x0) / box.width, (box.y1 - y) / box.height] for x, y in points]
+            result.append(entry)
+        return result
+
+    @staticmethod
+    def _axis_metadata(editable_axes, config, prepared_values, categorical_x=False):
+        def tick_step(locations):
+            locations = np.sort(np.asarray(locations, dtype=float))
+            differences = np.diff(locations[np.isfinite(locations)])
+            positive = differences[differences > 0]
+            return float(np.min(positive)) if len(positive) else None
+        tick_steps = {name: {"major": tick_step(axis.get_majorticklocs()), "minor": tick_step(axis.get_minorticklocs())}
+                      for name, axis in editable_axes}
+        axis_info = {}
+        for name, axis in editable_axes:
+            low, high = sorted(axis.get_view_interval())
+            ticks = [abs(float(tick)) for tick in axis.get_majorticklocs() if math.isfinite(tick) and low - 1e-12 * max(1, abs(low)) <= tick <= high + 1e-12 * max(1, abs(high))]
+            prepared = prepared_values[name]
+            axis_info[name] = {"unit": prepared.get(f"PLOT_{'X' if name == 'x' else 'Y'}UNIT", ""), "tickMax": max(ticks, default=0),
+                "hidden": bool(config.get("axes", {}).get(f"hide{name.upper()}TickLabels", False)),
+                "categorical": name == "x" and categorical_x}
+        return tick_steps, axis_info
+
+    @staticmethod
+    def _secondary_axis_settings(settings):
+        result = dict(settings)
+        for suffix, default in (("Label", ""), ("Unit", "auto"), ("UnitScale", 1), ("Scale", "linear"), ("Min", ""), ("Max", ""), ("Step", ""), ("MinorStep", ""), ("LogFormat", "power"), ("LabelPad", 2), ("TickPad", 0)):
+            result[f"y{suffix}"] = settings.get(f"y2{suffix}", default)
+        for suffix in ("Label", "TickLabels", "Ticks", "MinorTicks"):
+            result[f"hideY{suffix}"] = settings.get(f"hideY2{suffix}", settings.get("hideMinorTicks", False) if suffix == "MinorTicks" else False)
+        result["yAxisRight"] = True
+        return result
+
+    def _prepare(self, config):
+        preset = config.get("plotType", "General")
+        if getattr(self,'multi_source',False) and preset in {'XPS Fit','Particle Histogram','bar_graph_general','Raman 3D'}:
+            raise ValueError('複数ファイルの重ね描きでは通常のXYグラフを選んでください。専用グラフは単一ファイルで使用できます。')
+        if preset not in self.presets:
+            raise ValueError("プロット種別を選び直してください。")
+        if self.frame is None:
+            raise ValueError("先にExcel/CSVファイルを読み込んでください。")
+        series = config.get("series", [])
+        corrected = any(item.get("detrend") or item.get("density") or item.get("normalization", "none") != "none" or float(item.get("yFactor", 1)) != 1 or float(item.get("xFactor", 1)) != 1 for item in series)
+        if corrected and preset in {"XPS Fit", "Particle Histogram", "bar_graph_general", "Raman 3D"}:
+            raise ValueError("この専用グラフではデータ補正を解除してください。通常のXYグラフで補正できます。")
+        options = config.get("options", {})
+        if not isinstance(options, dict):
+            raise ValueError("専用プロットの設定を確認してください。")
+        if preset in {"XPS Fit", "Particle Histogram"} and series:
+            first = series[0]
+            diameter = options.get("diameterColumn", min(2, len(self.frame.columns) - 1)) if self.frame is not None else 0
+            series = [{"x": first.get("x", 0) if preset == "XPS Fit" else diameter, "y": first.get("y", 1) if preset == "XPS Fit" else diameter, "name": first.get("name", "Raw"), "visible": first.get("visible", True)}]
+        if not 1 <= len(series) <= MAX_SERIES:
+            raise ValueError(f"系列を1〜{MAX_SERIES}個追加してください。")
+        count = len(self.frame.columns)
+        if count < 2:
+            raise ValueError("X列とY列が必要です。シートとヘッダー行を確認してください。")
+        axes = config.get("axes", {})
+        values, limits, family, requested_family = self._style_values(axes)
         frame = self.frame
         unit_scales = {axis: number(axes.get(f"{axis}UnitScale", 1), "単位の表示倍率", minimum=1e-30, maximum=1e30) for axis in ("x", "y")}
         afm_bases = options.get("afmSourceUnits", {}) if preset == "AFM Section" else {}
@@ -1692,11 +1894,7 @@ class PlotEngine:
                     else:
                         bases.pop("y", None)
                     result["options"] = {**config.get("options", {}), "afmSourceUnits": bases}
-                for suffix, default in (("Label", ""), ("Unit", "auto"), ("UnitScale", 1), ("Scale", "linear"), ("Min", ""), ("Max", ""), ("Step", ""), ("MinorStep", ""), ("LogFormat", "power"), ("LabelPad", 2), ("TickPad", 0)):
-                    result["axes"][f"y{suffix}"] = config.get("axes", {}).get(f"y2{suffix}", default)
-                for suffix in ("Label", "TickLabels", "Ticks", "MinorTicks"):
-                    result["axes"][f"hideY{suffix}"] = config.get("axes", {}).get(f"hideY2{suffix}", config.get("axes", {}).get("hideMinorTicks", False) if suffix == "MinorTicks" else False)
-                result["axes"]["yAxisRight"] = True
+                result["axes"] = self._secondary_axis_settings(config.get("axes", {}))
             elif dual:
                 result["axes"]["yAxisRight"] = False
             return result
@@ -1817,119 +2015,15 @@ class PlotEngine:
                     annotation_axes = overlay
                 else:
                     annotation_axes = axes
-                # Figure and plot-area backgrounds each have their own fill.
-                plot_utils.apply_plot_background_from_env(figure, [])
-                for target in figure.axes:
-                    target.patch.set_facecolor("none")
-                    target.patch.set_alpha(0)
-                    if target.name == "3d":
-                        for axis in (target.xaxis, target.yaxis, target.zaxis):
-                            axis.pane.set_fill(False)
-                axes.patch.set_facecolor(values["PLOT_AXES_BACKGROUND_COLOR"])
-                axes.patch.set_alpha(float(values["PLOT_AXES_BACKGROUND_ALPHA"]))
+                self._finish_background(figure, axes, values)
                 editable_axes = [("x", axes.xaxis), (primary_name, axes.zaxis if preset == "Raman 3D" else axes.yaxis)]
                 if dual:
                     editable_axes.append(("y2", right_axes.yaxis))
-                # Some presets reset minor locators after applying axis options.
-                # Apply per-axis visibility after all preset drawing is complete.
-                from matplotlib.ticker import NullLocator
-                for name, axis in editable_axes:
-                    for which, prefix, ticks in (("major", "Major", axis.get_major_ticks()), ("minor", "Minor", axis.get_minor_ticks())):
-                        width = number(config.get("axes", {}).get(f"{name}{prefix}TickWidth", 1), "目盛線の太さ（標準比）", minimum=0, maximum=5)
-                        length = number(config.get("axes", {}).get(f"{name}{prefix}TickLength", 1), "目盛線の長さ（標準比）", minimum=0, maximum=5)
-                        if ticks:
-                            base = ticks[0].tick1line
-                            axis.set_tick_params(which=which, width=base.get_markeredgewidth()*width, length=base.get_markersize()*length)
-                    if config.get("axes", {}).get(f"hide{name.upper()}MinorTicks", config.get("axes", {}).get("hideMinorTicks", False)):
-                        axis.set_minor_locator(NullLocator())
-                if preset != "Raman 3D":
-                    from matplotlib.ticker import AutoMinorLocator, LogLocator, MultipleLocator
-                    settings = config.get("axes", {})
-                    # Draw one horizontal grid against the primary Y axis,
-                    # including projects whose only plotted data use the right axis.
-                    for name, axis in editable_axes[:2]:
-                        direction = "x" if name == "x" else "y"
-                        minor = settings.get(f"{direction}MinorGrid", False)
-                        if minor and isinstance(axis.get_minor_locator(), NullLocator):
-                            step = number(settings.get(f"{name}MinorStep", ""), "副目盛り間隔", minimum=0, optional=True)
-                            axis.set_minor_locator(LogLocator(base=10, subs=range(2, 10)) if axis.get_scale() == "log" else MultipleLocator(step) if step else AutoMinorLocator())
-                            axis.set_minor_formatter(matplotlib.ticker.NullFormatter())
-                        if minor and settings.get(f"hide{name.upper()}MinorTicks", settings.get("hideMinorTicks", False)):
-                            axis.set_tick_params(which="minor", length=0)
-                        for which, enabled in (("major", settings.get(f"{direction}Grid", settings.get("grid", False))), ("minor", minor)):
-                            if enabled:
-                                axis.grid(True, which=which, **grid_styles[which])
-                            else:
-                                axis.grid(False, which=which)
-                for name, axis in editable_axes:
-                    if name == "x":
-                        continue
-                    color = str(config.get("axes", {}).get(f"{name}Color", "auto"))
-                    if color == "auto":
-                        if not right_indices:
-                            continue
-                        indices = right_indices if name == "y2" else left_indices
-                        color = str(original_series[indices[0]].get("color", "#1F8FE0")) if right_indices else values["PLOT_SPINE_COLOR"]
-                    if not is_color_like(color):
-                        raise ValueError("Y軸の色はautoまたは色を指定してください。")
-                    axis.axes.tick_params(axis="y", which="both", colors=color)
-                    axis.label.set_color(color)
-                    if axis is axis.axes.yaxis:
-                        axis.axes.spines[axis.get_label_position()].set_color(color)
-                positioned_labels = {}
-                if preset == "Raman 3D":
-                    # The displayed Y quantity is the 3D Z axis. Apply the
-                    # same padding as every 2D Y label before projection.
-                    axes.xaxis.labelpad = float(values["PLOT_XLABEL_PAD"])
-                    axes.zaxis.labelpad = float(values["PLOT_YLABEL_PAD"])
-                    figure.canvas.draw()  # Resolve the native projected label rotations first.
-                for name, axis in editable_axes:
-                    axis.label.set_fontweight("normal")
-                    position = [number(config.get("axes", {}).get(f"{name}Label{coordinate}", ""), "軸ラベル位置", minimum=-10, maximum=10, optional=True) for coordinate in ("X", "Y")]
-                    if (position[0] is None) != (position[1] is None):
-                        raise ValueError("軸ラベルのX・Y位置を両方指定してください。")
-                    if position[0] is not None:
-                        if preset == "Raman 3D":
-                            # 3D Axis overwrites its label transform, including after
-                            # Text.draw in newer Matplotlib. Keep the native typography
-                            # on a separate, stable 2D artist for manual placement.
-                            label = axis.label
-                            positioned_labels[name] = axes.text2D(*position, label.get_text(), transform=axes.transAxes,
-                                fontproperties=label.get_fontproperties(), color=label.get_color(),
-                                horizontalalignment=label.get_ha(), verticalalignment=label.get_va(),
-                                rotation=label.get_rotation(), visible=label.get_visible(), clip_on=False)
-                            label.set_visible(False)
-                        else:
-                            axis.set_label_coords(*position)
-                legend, legend_records = self._web_legends(figure, legend, config, diagnostics, preset)
-                # Share the annotation drawing layer so ordering also works with
-                # two Y axes and the 2D annotation overlay of Raman 3D.
-                for record in legend_records:
-                    artist = record['artist']
-                    if artist.axes is not annotation_axes:
-                        artist.remove()
-                        annotation_axes.add_artist(artist)
-                annotations = config.get("annotations", [])
-                if not isinstance(annotations, list) or len(annotations) > 200:
-                    raise ValueError("注釈は200個以内にしてください。")
-                native_annotations = json.loads(json.dumps(annotations))
-                for item in native_annotations:
-                    if item.get("type") != "text" and item.get("coordinate_system") == "axes_fraction":
-                        for suffix in ("1", "2"):
-                            xy = annotation_axes.transData.inverted().transform(annotation_axes.transAxes.transform((item[f"x{suffix}"], item[f"y{suffix}"])))
-                            item[f"x{suffix}"], item[f"y{suffix}"] = map(float, xy)
-                        item["coordinate_system"] = "data"
-                collection = AnnotationCollection()
-                annotation_warnings = collection.load_list(native_annotations)
-                if annotation_warnings:
-                    raise ValueError("注釈の設定を確認してください。")
-                for annotation in collection.items:
-                    if annotation.type == "text":
-                        if annotation.font_family == "Arial" and "Arial" not in self.font_families:
-                            annotation.font_family = values["PLOT_FONT_FAMILY"].split(",")[0]
-                        annotation.font_family = [annotation.font_family, config.get("axes", {}).get("japaneseFontFamily", "Noto Sans JP"), "DejaVu Sans"]
-                manager = AnnotationManager(collection, logger=warnings.append)
-                manager.attach(figure, annotation_axes)
+                auto_colors = {name: str(original_series[indices[0]].get("color", "#1F8FE0"))
+                    for name, indices in (("y", left_indices), ("y2", right_indices)) if right_indices and indices}
+                positioned_labels = self._finish_axes(figure, axes, editable_axes, config, values, preset, auto_colors)
+                legend, legend_records = self._finish_legends(figure, annotation_axes, legend, config, diagnostics, preset)
+                collection, manager = self._attach_annotations(figure, annotation_axes, config.get("annotations", []), config, values, warnings)
                 equation_artists = []
                 if equation_specs:
                     figure.canvas.draw()
@@ -1958,15 +2052,7 @@ class PlotEngine:
                         row["artist"].set_gid(f"web-legend-item-{index}")
                 for index, artist, _ in equation_artists:
                     artist.set_gid(f"web-trend-equation-{index}")
-                annotation_svg_ids = {}
-                for index, annotation in enumerate(collection.items):
-                    artists = manager.artist_by_id.get(annotation.id)
-                    artists = artists if isinstance(artists, list) else [artists] if artists is not None else []
-                    annotation_svg_ids[annotation.id] = []
-                    for part, artist in enumerate(artists):
-                        gid = f"web-annotation-{index}-{part}"
-                        artist.set_gid(gid)
-                        annotation_svg_ids[annotation.id].append(gid)
+                annotation_svg_ids = self._tag_annotations(collection, manager)
                 figure.canvas.draw()
                 # Hide off-screen log ticks before calculating the export box.
                 for axis in [item[1] for item in editable_axes]:
@@ -2001,32 +2087,8 @@ class PlotEngine:
                 geometry["series"] = self._data_geometry(series_groups, axes, box, renderer)
                 geometry["trendEquations"] = [{"id": f"trend-equation-{index}", "seriesIndex": index,
                     "svgIds": [artist.get_gid()], "box": svg_box(artist.get_window_extent(renderer)), "anchor": anchor} for index, artist, anchor in equation_artists]
-                geometry["spines"] = [{"id": side, "paths": self._data_geometry([{"artists": [spine]}], axes, box, renderer)[0]["paths"]} for target in (axes, right_axes) if target is not None for side, spine in target.spines.items() if spine.get_visible() and preset != "Raman 3D"]
-                geometry["grid"] = self._data_geometry([{"part": "grid", "artists": [tick.gridline for axis in (axes.xaxis, axes.yaxis) for tick in [*axis.get_major_ticks(), *axis.get_minor_ticks()] if tick.gridline.get_visible()]}], axes, box, renderer)
-                geometry["tickLines"] = [{"axis": name, "boxes": [svg_box(line.get_window_extent(renderer)) for tick in [*axis.get_major_ticks(), *axis.get_minor_ticks()] for line in (tick.tick1line, tick.tick2line) if line.get_visible() and line.get_markersize() > 0 and line.get_markeredgewidth() > 0]} for name, axis in editable_axes] if preset != "Raman 3D" else []
-                if preset == "Raman 3D":
-                    geometry["depth"] = [svg_box(label.get_window_extent(renderer)) for label in [axes.yaxis.label, *axes.yaxis.get_ticklabels()] if label.get_visible() and label.get_text()]
-                for name, axis in editable_axes:
-                    label = positioned_labels.get(name, axis.label)
-                    if label.get_visible() and label.get_text():
-                        anchor = axes.transAxes.inverted().transform(label.get_transform().transform(label.get_position()))
-                        geometry["axisLabels"].append({"id": f"axis-label-{name}", "svgIds": [label.get_gid()], "axis": name, "kind": "label", "box": svg_box(label.get_window_extent(renderer)), "anchor": list(map(float, anchor))})
-                    for index, label in enumerate(axis.get_ticklabels()):
-                        if label.get_visible() and label.get_text():
-                            geometry["tickLabels"].append({"id": f"axis-ticks-{name}-{index}", "axis": name, "kind": "ticks", "box": svg_box(label.get_window_extent(renderer))})
-                for annotation in collection.items:
-                    artist = manager.artist_by_id.get(annotation.id)
-                    if isinstance(artist, list):
-                        artist = artist[0]
-                    if artist is not None and annotation.visible:
-                        entry = {"id": annotation.id, "svgIds": annotation_svg_ids[annotation.id], "box": svg_box(artist.get_window_extent(renderer))}
-                        if annotation.type == "text":
-                            point = artist.get_transform().transform(artist.get_position()) / figure.dpi
-                            entry["anchor"] = [(point[0] - box.x0) / box.width, (box.y1 - point[1]) / box.height]
-                        if annotation.type != "text":
-                            points = annotation_axes.transData.transform([(annotation.x1, annotation.y1), (annotation.x2, annotation.y2)]) / figure.dpi
-                            entry["points"] = [[(x - box.x0) / box.width, (box.y1 - y) / box.height] for x, y in points]
-                        geometry["annotations"].append(entry)
+                self._axis_geometry(geometry, figure, axes, right_axes, editable_axes, positioned_labels, preset, box, renderer, svg_box)
+                geometry["annotations"] = self._annotation_geometry(collection, manager, annotation_axes, figure, box, renderer, svg_box, annotation_svg_ids)
                 figure.set_dpi(original_dpi)
             if self.figure is not None:
                 plt.close(self.figure)
@@ -2036,21 +2098,9 @@ class PlotEngine:
             self.transparent = False
             self.annotation_manager = manager
             self.export_extra_artists = extra_artists
-            def tick_step(locations):
-                locations = np.sort(np.asarray(locations, dtype=float))
-                differences = np.diff(locations[np.isfinite(locations)])
-                positive = differences[differences > 0]
-                return float(np.min(positive)) if len(positive) else None
-            tick_steps = {name: {"major": tick_step(axis.get_majorticklocs()), "minor": tick_step(axis.get_minorticklocs())}
-                          for name, axis in editable_axes}
-            axis_info = {}
-            for name, axis in editable_axes:
-                low, high = sorted(axis.get_view_interval())
-                ticks = [abs(float(tick)) for tick in axis.get_majorticklocs() if math.isfinite(tick) and low - 1e-12 * max(1, abs(low)) <= tick <= high + 1e-12 * max(1, abs(high))]
-                prepared = right_prepared[1] if name == "y2" and dual else values
-                axis_info[name] = {"unit": prepared.get(f"PLOT_{'X' if name == 'x' else 'Y'}UNIT", ""), "tickMax": max(ticks, default=0),
-                    "hidden": bool(config.get("axes", {}).get(f"hide{name.upper()}TickLabels", False)),
-                    "categorical": name == "x" and preset == "bar_graph_general" and not namespace.get("is_numeric_x", True)}
+            tick_steps, axis_info = self._axis_metadata(editable_axes, config,
+                {"x": values, primary_name: values, **({"y2": right_prepared[1]} if dual else {})},
+                preset == "bar_graph_general" and not namespace.get("is_numeric_x", True))
             return {"svg": image.getvalue().decode("utf-8"), "series": [item for item in diagnostics if item["visible"]], "seriesProcessing": [item.get("processing", {}) for item in diagnostics], "fits": sorted(fits, key=lambda item: item["index"]), "warnings": warnings, "statistics": statistics, "xRange": list(annotation_axes.get_xlim()), "xDataScale": annotation_axes.get_xscale(), "yRange": list(annotation_axes.get_ylim()), "y2Range": list((right_axes or axes).get_ylim()) if right_indices else None, "yDataScale": annotation_axes.get_yscale(), "tickSteps": tick_steps, "axisInfo": axis_info, "geometry": geometry, "fontFamily": values["PLOT_FONT_FAMILY"].split(",")[0]}
         except Exception:
             for figure_number in set(plt.get_fignums()) - previous_figures:
