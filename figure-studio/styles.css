@@ -85,3 +85,5 @@ html{height:100%;overflow:clip}.app-shell{position:fixed;inset:0}
 html[data-workspace-embedded="true"] .app-header>.brand{display:none}
 html[data-workspace-embedded="true"] .app-header{height:53px;gap:12px}
 html[data-workspace-embedded="true"] .document-title{border-left:0;padding-left:0}
+
+.save-source-option{display:flex;align-items:flex-start;gap:9px;padding:10px 12px;min-width:240px;max-width:300px;line-height:1.5;cursor:pointer;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.save-source-option input{width:14px;height:14px;flex:none;margin:3px 0 0;accent-color:var(--accent)}.save-source-option small{display:block;color:var(--muted);font-size:10px;font-weight:400;margin-top:3px}

@@ -1,28 +1,29 @@
+import {sourceSaveMessage} from './source-project-save.mjs?v=source-save-v0736-1';
 import {fitTextBox,naturalTextLines} from './text-fit.mjs?v=nested-groups-v0712-1';
 import {regroupObjects,ungroupObjects,remapGroupIds} from './groups.mjs?v=nested-groups-v0712-1';
-import {PT_PER_MM,mm,toMM,uid,clone,newDocument,makeObject,bounds,objectBounds,expandSelection,align,distribute,reorder,autoLayout,History,validateDocument,rotateOrFlip} from './model.mjs?v=panel-content-v0735-1';
+import {PT_PER_MM,mm,toMM,uid,clone,newDocument,makeObject,bounds,objectBounds,expandSelection,align,distribute,reorder,autoLayout,History,validateDocument,rotateOrFlip} from './model.mjs?v=source-save-v0736-1';
 import {isPathObject,pathData,objectFromPoints} from './paths.mjs?v=ribbon-v060-1';
 import {createPathDrawing} from './path-drawing.mjs?v=ribbon-v060-1';
-import {imageAsset,imagePhysicalSize,imageMiFiToBodySize,blobToDataURL,dataURLToBlob,download,sanitizeSVG} from './assets.mjs?v=panel-content-v0735-1';
-import {serializeOfficeSVG} from './svg-export.mjs?v=panel-content-v0735-1';
-import {preparePNG} from './png-export.mjs?v=panel-content-v0735-1';
-import {importedImageSize,replacedImageSize,replacedMiFiToImageSize,miFiToSizeCorrection,imageInsertionPoint} from './image-placement.mjs?v=panel-content-v0735-1';
+import {imageAsset,imagePhysicalSize,imageMiFiToBodySize,blobToDataURL,dataURLToBlob,download,sanitizeSVG} from './assets.mjs?v=source-save-v0736-1';
+import {serializeOfficeSVG} from './svg-export.mjs?v=source-save-v0736-1';
+import {preparePNG} from './png-export.mjs?v=source-save-v0736-1';
+import {importedImageSize,replacedImageSize,replacedMiFiToImageSize,miFiToSizeCorrection,imageInsertionPoint} from './image-placement.mjs?v=source-save-v0736-1';
 import {rasterResolution} from './image-resolution.mjs?v=image-quality-v066-1';
 import {saveDraft,loadDraft,saveProjectFileTarget,loadProjectFileTarget} from './storage.mjs?v=0.3.6-1';
-import {stageStudioUpdate,restoreStudioUpdate,isLegacyStudioUpdate,finishLegacyStudioUpdate} from './startup-session.mjs?v=panel-content-v0735-1';
-import {createDemo} from './demo.mjs?v=panel-content-v0735-1';
+import {stageStudioUpdate,restoreStudioUpdate,isLegacyStudioUpdate,finishLegacyStudioUpdate} from './startup-session.mjs?v=source-save-v0736-1';
+import {createDemo} from './demo.mjs?v=source-save-v0736-1';
 import {createShortcutHandler,shortcutLabel} from './shortcuts.mjs?v=nested-groups-v0712-1';
-import {installShortcutUI} from './shortcut-ui.mjs?v=panel-content-v0735-1';
-import {createRibbon} from './ribbon.mjs?v=panel-content-v0735-1';
-import {createPresentation} from './presentation.mjs?v=panel-content-v0735-1';
-import {installBrowserZoomGuard} from './browser-zoom.mjs?v=panel-content-v0735-1';
-import {imageArrayUnits,arrangeImageArray} from './image-array.mjs?v=panel-content-v0735-1';
-import {createImageArrayDialog} from './image-array-dialog.mjs?v=panel-content-v0735-1';
-import {writePanelLabelContent} from './panel-label-content.mjs?v=panel-content-v0735-1';
-import {createPanelLabelEditor} from './panel-label-editor.mjs?v=panel-content-v0735-1';
-import {applyPanelLabels} from './panel-labels.mjs?v=panel-content-v0735-1';
-import {plotPanelBounds} from './plot-frame.mjs?v=panel-content-v0735-1';
-import {createPanelLabelDialog} from './panel-label-dialog.mjs?v=panel-content-v0735-1';
+import {installShortcutUI} from './shortcut-ui.mjs?v=source-save-v0736-1';
+import {createRibbon} from './ribbon.mjs?v=source-save-v0736-1';
+import {createPresentation} from './presentation.mjs?v=source-save-v0736-1';
+import {installBrowserZoomGuard} from './browser-zoom.mjs?v=source-save-v0736-1';
+import {imageArrayUnits,arrangeImageArray} from './image-array.mjs?v=source-save-v0736-1';
+import {createImageArrayDialog} from './image-array-dialog.mjs?v=source-save-v0736-1';
+import {writePanelLabelContent} from './panel-label-content.mjs?v=source-save-v0736-1';
+import {createPanelLabelEditor} from './panel-label-editor.mjs?v=source-save-v0736-1';
+import {applyPanelLabels} from './panel-labels.mjs?v=source-save-v0736-1';
+import {plotPanelBounds} from './plot-frame.mjs?v=source-save-v0736-1';
+import {createPanelLabelDialog} from './panel-label-dialog.mjs?v=source-save-v0736-1';
 import {createColorPickers} from './colors.mjs?v=unified-palette-1';
 import {renderTextPaint} from './text-paint.mjs?v=tex-v061-1';
 import {createTexRenderer} from './tex.mjs?v=micro-v0711-2';
@@ -31,31 +32,31 @@ import {openSource,SOURCE_APPS,setupSourceDiscovery,closeSourceSessions} from '.
 import {createFigureSidebar} from './thumbnails.mjs?v=live-v062-1';
 import {setupTransferReceiver,getFigureWorkspace} from './integration/direct-transfer.mjs?v=studio-send-v0714-1';
 import {readMifitoIdentity} from './integration/mifito-sync.mjs?v=0.3.5-1';
-import {readPlotIdentity,resolvePlotImage,currentPlotImageId} from './integration/plot-sync.mjs?v=panel-content-v0735-1';
-import {planMiFiToSync} from './mifito-batch.mjs?v=panel-content-v0735-1';
-import {setupUpdateCheck} from './update-check.mjs?v=panel-content-v0735-1';
-import {installWorkspaceUpdater} from './workspace-update.mjs?v=panel-content-v0735-1';
-import {marqueeSelection,resolveObjectSelection,clickObjectSelection,selectionDescription} from './selection.mjs?v=panel-content-v0735-1';
-import {renderGroupLayers} from './group-layers.mjs?v=panel-content-v0735-1';
-import {drawSelectionFrames} from './selection-overlay.mjs?v=panel-content-v0735-1';
+import {readPlotIdentity,resolvePlotImage,currentPlotImageId} from './integration/plot-sync.mjs?v=source-save-v0736-1';
+import {planMiFiToSync} from './mifito-batch.mjs?v=source-save-v0736-1';
+import {setupUpdateCheck} from './update-check.mjs?v=source-save-v0736-1';
+import {installWorkspaceUpdater} from './workspace-update.mjs?v=source-save-v0736-1';
+import {marqueeSelection,resolveObjectSelection,clickObjectSelection,selectionDescription} from './selection.mjs?v=source-save-v0736-1';
+import {renderGroupLayers} from './group-layers.mjs?v=source-save-v0736-1';
+import {drawSelectionFrames} from './selection-overlay.mjs?v=source-save-v0736-1';
 import {ARROW_PROPERTIES,arrowEndpoint,arrowPropertyValue,setArrowProperty,arrowGeometry} from './arrowheads.mjs?v=0.3.0-1';
 
 import {createArrowPicker} from './arrow-picker.mjs?v=0.3.0-1';
 import {lineStrokeAttributes,lineStyleValue,setLineStyle,supportsLineStyle} from './line-styles.mjs?v=lines-v064-1';
 import {createLineStylePicker} from './line-style-picker.mjs?v=lines-v064-1';
-import {createPreviewQuality} from './preview-quality.mjs?v=panel-content-v0735-1';
-import {createSelectionWheelZoom,resetSelectionZoom} from './selection-zoom.mjs?v=panel-content-v0735-1';
+import {createPreviewQuality} from './preview-quality.mjs?v=source-save-v0736-1';
+import {createSelectionWheelZoom,resetSelectionZoom} from './selection-zoom.mjs?v=source-save-v0736-1';
 import {fontSizeForAction} from './text-format.mjs?v=annotation-input-v071-1';
-import {selectionPNG,writeSelectionImage,studioPasteObjects,matchesSelectionPNG} from './image-clipboard.mjs?v=panel-content-v0735-1';
+import {selectionPNG,writeSelectionImage,studioPasteObjects,matchesSelectionPNG} from './image-clipboard.mjs?v=source-save-v0736-1';
 import {reorderFigures} from './figure-order.mjs';
 import {renumberFigureNames} from './figure-names.mjs?v=0.3.3-1';
-import {deleteFigures,duplicateFigures} from './figure-commands.mjs?v=panel-content-v0735-1';
+import {deleteFigures,duplicateFigures} from './figure-commands.mjs?v=source-save-v0736-1';
 import {ProjectFileSession,projectFilePickerOptions} from './project-file.mjs?v=project-switch-v051-1';
-import {installWorkspacePersistence} from './workspace-session.mjs?v=panel-content-v0735-1';
+import {installWorkspacePersistence} from './workspace-session.mjs?v=source-save-v0736-1';
 import {decodeWorkspaceState} from './workspace-state.mjs?v=project-switch-v051-1';
-import {validateWorkspaceBinding} from './integration/bridge-host.mjs?v=panel-content-v0735-1';
+import {validateWorkspaceBinding} from './integration/bridge-host.mjs?v=source-save-v0736-1';
 
-const STUDIO_RELEASE={version:'0.7.35',build:'panel-content-v0735-1'};
+const STUDIO_RELEASE={version:'0.7.36',build:'source-save-v0736-1'};
 installBrowserZoomGuard();
 window.FigureAppRelease?.assertRunning(STUDIO_RELEASE);
 if(window.FigureAppRelease&&!await window.FigureAppRelease.startup())throw Error('最新版へ切り替えています。');
@@ -568,8 +569,13 @@ document.addEventListener('paste',async e=>{
 function assetIds(){syncFigure();return new Set(figures.flatMap(f=>f.objects.flatMap(o=>[o.assetId,o.source?.assetId])).filter(Boolean));}
 function packageProject(){const used={};for(const id of assetIds()){const a=assets.get(id);if(a){const {previewUrl,persisted,...rest}=a;used[id]=rest;}}return {...snapshot(),assets:used,...(preservedWorkspace?{workspace:preservedWorkspace}:{})};}
 function workspacePersistence(){const api=getFigureWorkspace(window);return api?installWorkspacePersistence(api,{windowRef:window.parent,documentRef:window.parent.document}):null;}
+const saveSourceOption=$('#saveSourceProjects');
+try{saveSourceOption.checked=localStorage.getItem('figure-studio-save-source-projects')!=='off';}catch{}
+saveSourceOption.addEventListener('change',()=>{try{localStorage.setItem('figure-studio-save-source-projects',saveSourceOption.checked?'on':'off');}catch{}});
 function updateProjectFileUI(){
  const target=projectFiles.target(bookId),busy=projectSaving||projectOpening,button=$('[data-action="save"]');
+ saveSourceOption.disabled=busy||!getFigureWorkspace(window);
+ saveSourceOption.title=getFigureWorkspace(window)?'通常の保存・上書き保存で、Studio内のPlot・MiFiToタブも保存します':'Studioの3タブ画面で利用できます';
  button.disabled=busy;$('[data-action="save-as"]').disabled=busy;$('[data-action="open"]').disabled=busy;
  $('#projectSaveLabel').textContent=projectSaving?'保存中…':target?.handle?'上書き保存':'保存';
  button.title=shortcutLabel(target?.handle?`${target.name} に上書き保存 (Ctrl+S)`:'保存先を選んでプロジェクトを保存 (Ctrl+S)');
@@ -579,7 +585,7 @@ function updateProjectFileUI(){
 async function saveProject(saveAs=false){
  if(projectSaving||projectOpening||updateReloading)return;
  if(gesture)endGesture(null,false);finishText();
- const capturedBook=bookId;
+ const capturedBook=bookId;let sourcePlan=null,savedSources=[],studioWritten=false,savingSources=false;
  try{
   projectSaving=true;updateProjectFileUI();
   const name=`${safeName(figures[0].name)}${figures.length>1?`_and_${figures.length}_figures`:''}.figurestudio`;
@@ -588,20 +594,26 @@ async function saveProject(saveAs=false){
   await transferQueue;
   if(bookId!==capturedBook)throw Error('保存先を選ぶ間にプロジェクトが変わりました。もう一度保存してください。');
   if(gesture)endGesture(null,false);finishText();
-  const capturedRevision=revision,packaged=packageProject(),workspace=workspacePersistence();
+  const workspace=workspacePersistence();
+  if(!saveAs&&saveSourceOption.checked&&workspace){
+   savingSources=true;sourcePlan=await workspace.prepareSourceProjectSaves({status:toast});
+   if(bookId!==capturedBook)throw Error('保存準備中にStudioのプロジェクトが変わりました。');
+   savedSources=await sourcePlan.write();
+  }
+  const capturedRevision=revision,packaged=packageProject();
   const captured=workspace?await workspace.captureWorkspace():null;
   if(bookId!==capturedBook||revision!==capturedRevision)throw Error('保存中にFigureの内容が変わりました。もう一度保存してください。');
   if(captured)packaged.workspace=captured.data;
   const blob=new Blob([JSON.stringify(packaged)],{type:'application/json'});
   if(blob.size>400*1024*1024)throw Error('全体の保存サイズが400 MBを超えています。不要なFigureや画像を減らしてください。');
-  const saved=await projectFiles.write(target,{revision:capturedRevision,blob});
+  const saved=await projectFiles.write(target,{revision:capturedRevision,blob});studioWritten=true;
   try{await saveProjectFileTarget(saved.bookId,{handle:saved.handle,name:saved.name});}catch{}
   const editorsUnchanged=captured?await workspace.markWorkspaceSaved(captured):true;
   if(bookId===saved.bookId)preservedWorkspace=packaged.workspace??null;
-  if(bookId===saved.bookId&&revision===saved.revision&&!editingId&&!gesture&&editorsUnchanged){dirty=false;manualSavedRevision=saved.revision;toast(`${saved.name} に${captured?'3タブの最新状態と未反映の編集':'配置・画像・元プロジェクト'}を保存しました`);}
+  if(bookId===saved.bookId&&revision===saved.revision&&!editingId&&!gesture&&editorsUnchanged){dirty=false;manualSavedRevision=saved.revision;toast(`${saved.name} に${captured?'3タブの最新状態と未反映の編集':'配置・画像・元プロジェクト'}を保存しました${savedSources.length?`。元プロジェクトも保存済み：${savedSources.map(item=>item.name).join('、')}`:''}`);}
   else{if(bookId===saved.bookId)dirty=true;toast(`${saved.name} を保存しました。保存開始後の編集は次の保存で反映されます`);}
- }catch(error){toast(error.name==='AbortError'?'保存をキャンセルしました':`保存できませんでした: ${error.message}`);}
- finally{projectSaving=false;updateProjectFileUI();if(!editingId&&!gesture&&document.activeElement?.closest('#projectSaveControls'))svg.focus();}
+ }catch(error){toast(studioWritten?`Studioのファイルは保存しましたが、保存後の処理を完了できませんでした：${error.message}`:sourceSaveMessage(error,savedSources));}
+ finally{sourcePlan?.cancel();projectSaving=false;updateProjectFileUI();const shell=savingSources?document.defaultView?.parent?.document:null;if(!editingId&&!gesture&&(document.activeElement?.closest('#projectSaveControls')||savingSources&&shell&&shell.activeElement===shell.body))svg.focus();}
 }
 
 async function openProject(){

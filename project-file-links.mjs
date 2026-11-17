@@ -59,36 +59,53 @@ export function createProjectFileLinks({app,identify,choose,host=globalThis,stor
     const options={mode:'readwrite'};
     if(handle.queryPermission&&await handle.queryPermission(options)!=='granted'&&(!handle.requestPermission||await handle.requestPermission(options)!=='granted'))throw new DOMException('元ファイルへの上書きが許可されていません。','NotAllowedError');
   }
-  async function prepare({projectId,name,link,handle=null,saveAs=false,knownSource=false,startIn,fallback}){
+  async function prepare({projectId,name,link,handle=null,saveAs=false,knownSource=false,startIn,fallback,host:pickerHost=host,choose:chooseAction=choose,requireFile=false}){
     if(!filename(name))throw Error('プロジェクトのファイル名を確認してください。');
     const extension=app==='plot'?'.plotproject':'.mifito',description=app==='plot'?'PlotLauncherプロジェクト':'MiFiToプロジェクト';
     const options={id:`${app}-source-project`,types:[{description,accept:{'application/octet-stream':[extension]}}]};
     link=portableFileLink(link);
     if(!saveAs&&!handle)handle=await resolve({projectId,name,link});
-    if(!host.showSaveFilePicker&&!handle)return {handle:null,name,saveAs,write:blob=>fallback(blob,name),remember:async()=>({link:null,remembered:false})};
+    if(!pickerHost.showSaveFilePicker&&(saveAs||!handle)){
+      if(requireFile)throw Error('このブラウザでは元プロジェクトへ一括保存できません。Chrome／Edgeで開くか、保存メニューの「元プロジェクトも保存」をオフにしてください。');
+      return {handle:null,name,saveAs,write:blob=>fallback(blob,name),remember:async()=>({link:null,remembered:false})};
+    }
     let baseline=link?.fingerprint||'',binding=false;
-    const saveCopy=()=>prepare({projectId,name,link,handle,saveAs:true,knownSource,startIn,fallback});
+    const saveCopy=()=>prepare({projectId,name,link,handle,saveAs:true,knownSource,startIn,fallback,host:pickerHost,choose:chooseAction,requireFile});
+    const permit=async target=>{
+      if(requireFile&&target.queryPermission&&await target.queryPermission({mode:'readwrite'})==='prompt'){
+        // A click inside Studio's iframe does not activate its sibling editors.
+        // The visible shell dialog provides the gesture for every same-origin child.
+        const answer=await chooseAction({kind:'permission',name:target.name});
+        if(answer==='saveAs')return false;if(answer!=='allow')cancel();
+      }
+      await permission(target);return true;
+    };
     if(!saveAs&&handle){
-      try{await permission(handle);await handle.getFile();}
+      try{if(!await permit(handle))return saveCopy();await handle.getFile();}
       catch(error){if(!['NotFoundError','NotAllowedError','SecurityError'].includes(error.name))throw error;handle=null;}
     }
     if(!saveAs&&!handle&&knownSource){
-      const answer=await choose({kind:'missing',name,canBind:!!host.showOpenFilePicker});
+      const answer=await chooseAction({kind:'missing',name,canBind:!!pickerHost.showOpenFilePicker});
       if(answer==='saveAs')return saveCopy();if(answer!=='bind')cancel();
-      [handle]=await host.showOpenFilePicker({...options,multiple:false,...(startIn?{startIn}:{})});
+      [handle]=await pickerHost.showOpenFilePicker({...options,multiple:false,...(startIn?{startIn}:{})});
       binding=true;
     }
     if(saveAs||!handle){
-      handle=await host.showSaveFilePicker({...options,suggestedName:name,...(startIn?{startIn}:{})});saveAs=true;
+      if(requireFile&&pickerHost.navigator?.userActivation?.isActive===false){
+        if(await chooseAction({kind:'new',name})!=='saveAs')cancel();
+      }
+      handle=await pickerHost.showSaveFilePicker({...options,suggestedName:name,...(startIn?{startIn}:{})});
       baseline=await digest(await handle.getFile());
     }else{
-      await permission(handle);
+      if(!await permit(handle))return saveCopy();
       const file=await handle.getFile(),current=await digest(file);
       if(binding||!baseline||baseline!==current){
-        const identity=await identify(file);
+        // Picker handles can belong to Studio's parent realm. Give validators
+        // a File from the editor realm (notably MiFiTo's Blob brand check).
+        const identity=await identify(new File([file],file.name,{type:file.type,lastModified:file.lastModified}));
         if(identity.projectId!==projectId||file.name.normalize('NFC')!==name.normalize('NFC'))throw Error('選択したファイルは元のプロジェクトと一致しません。元ファイルを選ぶか、「名前を付けて保存」を使ってください。');
         if(!baseline||baseline!==current){
-          const answer=await choose({kind:baseline?'changed':'unknown',name:file.name});
+          const answer=await chooseAction({kind:baseline?'changed':'unknown',name:file.name});
           if(answer==='saveAs')return saveCopy();if(answer!=='overwrite')cancel();
         }
       }

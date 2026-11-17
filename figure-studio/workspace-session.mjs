@@ -1,4 +1,6 @@
 import {encodeWorkspaceState,decodeWorkspaceState} from './workspace-state.mjs?v=project-switch-v051-1';
+import {prepareSourceProjectSaves} from './source-project-save.mjs?v=source-save-v0736-1';
+import {chooseProjectFileAction} from '../project-file-dialog.mjs?v=d65153020e44';
 
 const APPS=['plot','mifito'];
 const empty=()=>({format:'figure-studio-workspace',version:1,active:'studio',editors:{plot:null,mifito:null}});
@@ -30,6 +32,16 @@ export function createWorkspaceSession({editor,active=()=> 'studio',show=()=>{},
  async function hasChanges(){
   for(const app of APPS){const api=await editor(app,false);if(api&&api.hasWork()&&signature(api)!==savedSignatures.get(app))return true;}
   return false;
+ }
+ async function prepareSourceSaves(options={}){
+  if(busy)throw Error('保存・復元が完了してから、もう一度保存してください。');
+  busy=true;lock(true);let released=false;
+  const release=()=>{if(released)return;released=true;busy=false;lock(false);};
+  try{
+   const editors=[];
+   for(const app of APPS){const api=await editor(app,false);if(api)editors.push({app,api});}
+   return await prepareSourceProjectSaves({...options,editors,release});
+  }catch(error){release();throw error;}
  }
  async function prepareRestore(value){
   if(busy)throw Error('作業内容の保存・復元が完了してから開いてください。');
@@ -68,12 +80,12 @@ export function createWorkspaceSession({editor,active=()=> 'studio',show=()=>{},
    async cancel(){if(completed)return;if(applied)await rollbackAll();else{release();show(previousActive);}}
   };
  }
- return {capture,markSaved,hasChanges,prepareRestore,get busy(){return busy;}};
+ return {capture,markSaved,hasChanges,prepareRestore,prepareSourceSaves,get busy(){return busy;}};
 }
 
 /** Also upgrades a still-open v0.4 shell after its Studio document is updated. */
 export function installWorkspacePersistence(api,{windowRef=window,documentRef=windowRef.document}={}){
- if(api.captureWorkspace&&api.prepareWorkspaceRestore)return api;
+ if(api.captureWorkspace&&api.prepareWorkspaceRestore&&api.prepareSourceProjectSaves)return api;
  const active=()=>documentRef.querySelector('[role="tab"][aria-selected="true"]')?.dataset.app||'studio';
  const editor=async(app,create)=>{
   let frame=documentRef.getElementById(`${app}-frame`);
@@ -98,5 +110,6 @@ export function installWorkspacePersistence(api,{windowRef=window,documentRef=wi
  const originalShow=api.show.bind(api);
  api.show=app=>{const child=originalShow(app);windowRef.requestAnimationFrame?.(()=>{try{child?.FigureStudioWorkspaceState?.finishRestore?.();}catch{}});return child;};
  api.captureWorkspace=()=>session.capture();api.markWorkspaceSaved=captured=>session.markSaved(captured);api.hasWorkspaceChanges=()=>session.hasChanges();api.prepareWorkspaceRestore=value=>session.prepareRestore(value);
+ api.prepareSourceProjectSaves=options=>session.prepareSourceSaves({host:windowRef,choose:info=>chooseProjectFileAction(info,documentRef),...options});
  return api;
 }

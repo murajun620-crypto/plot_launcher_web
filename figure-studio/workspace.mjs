@@ -1,7 +1,7 @@
 import {SOURCE_APPS} from './integration/bridge-client.mjs?v=force-switch-v072-1';
-import {installWorkspacePersistence} from './workspace-session.mjs?v=panel-labels-v0723-1';
+import {installWorkspacePersistence} from './workspace-session.mjs?v=source-save-v0736-1';
 import {installWorkspaceUpdater} from './workspace-update.mjs?v=panel-labels-v0723-1';
-import {installBrowserZoomGuard} from './browser-zoom.mjs?v=panel-content-v0735-1';
+import {installBrowserZoomGuard} from './browser-zoom.mjs?v=source-save-v0736-1';
 
 const APPS=['studio','plot','mifito'];
 

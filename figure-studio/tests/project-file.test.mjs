@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {sourceSaveMessage} from '../source-project-save.mjs';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import {ProjectFileSession,projectFilePickerOptions} from '../project-file.mjs';
@@ -58,7 +59,7 @@ test('unsupported browsers download and retain a name without a writable handle'
 const app=fs.readFileSync(new URL('../app.js',import.meta.url),'utf8');
 function saveUI(files){
   const state={projectFiles:files,projectSaving:false,projectOpening:false,updateReloading:false,gesture:null,editingId:null,bookId:'book',revision:5,dirty:true,manualSavedRevision:-1,figures:[{name:'Figure 1'}],Blob,
-    transferQueue:Promise.resolve(),preservedWorkspace:null,workspacePersistence:()=>null,
+    transferQueue:Promise.resolve(),preservedWorkspace:null,workspacePersistence:()=>null,saveSourceOption:{checked:false},sourceSaveMessage,
     finishText(){},updateProjectFileUI(){},async saveProjectFileTarget(){},safeName:name=>name,packageProject:()=>({id:state.bookId,revision:state.revision}),toast(){},document:{activeElement:null},svg:{focus(){}}};
   vm.createContext(state);vm.runInContext(app.slice(app.indexOf('async function saveProject('),app.indexOf('async function openProject(')),state);return state;
 }

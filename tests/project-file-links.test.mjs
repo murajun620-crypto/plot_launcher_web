@@ -126,6 +126,33 @@ test('unsupported browsers download and never claim a writable target',async()=>
   const target=await f.api.prepare({projectId,name:f.name,knownSource:true,fallback:(blob,name)=>downloads.push([blob,name])});await target.write(new Blob(['backup']));
   assert.equal(target.handle,null);assert.equal((await target.remember(projectId)).link,null);assert.equal(downloads.length,1);assert.equal(f.prompts.length,0);
 });
+test('bulk source saves never substitute downloads for real original files',async()=>{
+  const f=setup('plot',{host:{showOpenFilePicker:undefined,showSaveFilePicker:undefined}});let downloaded=false;
+  await assert.rejects(f.api.prepare({projectId,name:f.name,knownSource:true,requireFile:true,fallback:()=>downloaded=true}),/一括保存できません/);assert.equal(downloaded,false);
+});
+test('hidden editor saves delegate target selection and confirmations to the visible Studio window',async()=>{
+  const f=setup('plot'),original=fileHandle(f.name),opened=await f.api.opened({file:await original.getFile(),projectId}),events=[];
+  const parentHost={async showOpenFilePicker(){events.push('parent-picker');return [original];},async showSaveFilePicker(){assert.fail('unexpected Save As');}},parentChoose=async info=>{events.push('parent-dialog:'+info.kind);return 'bind';};
+  const target=await f.api.prepare({projectId,name:f.name,link:opened.link,knownSource:true,requireFile:true,host:parentHost,choose:parentChoose});await target.write(new Blob(['new source bytes']));
+  assert.deepEqual(events,['parent-dialog:missing','parent-picker']);assert.equal(f.picker.opens,0);assert.equal(f.prompts.length,0);assert.equal(original.state().bytes,'new source bytes');
+});
+test('parent picker files enter project validators as editor-realm Files with unchanged bytes and metadata',async()=>{
+  class ParentFile extends File{}
+  const name='images.mifito',original=fileHandle(name),file=await original.getFile(),foreign=new ParentFile([file],name,{type:'application/octet-stream',lastModified:123});original.getFile=async()=>foreign;
+  let checked=false;const api=createProjectFileLinks({app:'mifito',store:memoryStore(),host:{async showSaveFilePicker(){},async showOpenFilePicker(){return [original];}},choose:async()=> 'bind',identify:async local=>{assert.equal(local.constructor,File);assert.equal(local.name,name);assert.equal(local.lastModified,123);assert.equal(await local.text(),await foreign.text());checked=true;return {projectId};}});
+  const opened=await api.opened({file:foreign,projectId}),target=await api.prepare({projectId,name,link:opened.link,knownSource:true,requireFile:true});assert.equal(checked,true);assert.equal(target.handle,original);
+});
+test('permissions for inactive sibling editors use a fresh gesture in the visible Studio dialog',async()=>{
+  const f=setup('plot'),original=fileHandle(f.name),opened=await f.api.opened({file:await original.getFile(),projectId,handle:original}),events=[];original.permission='prompt';let active=false;
+  original.requestPermission=async()=>{assert.equal(active,true);original.permission='granted';events.push('native-permission');return 'granted';};
+  const target=await f.api.prepare({projectId,name:f.name,handle:original,link:opened.link,requireFile:true,choose:async info=>{assert.equal(info.kind,'permission');events.push('Studio-dialog');active=true;return 'allow';}});
+  await target.write(new Blob(['approved bulk contents']));assert.deepEqual(events,['Studio-dialog','native-permission']);assert.equal(original.state().writes,1);
+});
+test('a long first save cannot exhaust the gesture needed for the next new file picker',async()=>{
+  const f=setup('plot'),copy=fileHandle('new.plotproject'),activation={isActive:false},events=[];
+  const target=await f.api.prepare({projectId,name:f.name,requireFile:true,host:{navigator:{userActivation:activation},async showSaveFilePicker(){assert.equal(activation.isActive,true);events.push('picker');return copy;}},choose:async info=>{assert.equal(info.kind,'new');events.push('Studio-dialog');activation.isActive=true;return 'saveAs';}});
+  assert.equal(target.handle,copy);assert.equal(target.saveAs,false);assert.equal(copy.state().writes,0);assert.deepEqual(events,['Studio-dialog','picker']);
+});
 test('portable descriptors strip all file access data and reject invalid fingerprints',()=>{
   const descriptor={token:crypto.randomUUID(),fingerprint:'a'.repeat(64),path:'C:\\OneDrive\\private',handle:{kind:'file'}};
   assert.deepEqual(portableFileLink(descriptor),{token:descriptor.token,fingerprint:descriptor.fingerprint});assert.equal(portableFileLink({...descriptor,fingerprint:'invalid'}),null);assert.equal(portableFileLink({...descriptor,token:'../else'}),null);
