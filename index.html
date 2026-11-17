@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Excel・CSV・TXTの測定データから研究用グラフを作成。ブラウザ内で処理し、SVG・PNG・PDFで保存できます。">
   <title>PlotLauncher Web</title>
-  <link rel="stylesheet" href="./matrix-editor.css?v=b07ea6767a64">
+  <link rel="stylesheet" href="./matrix-editor.css?v=9f854dcf3d6f">
   <link rel="stylesheet" href="./file-progress.css?v=file-open-1">
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=baaeeccc3ee1">
+  <link rel="stylesheet" href="./style.css?v=9f854dcf3d6f">
   <link rel="stylesheet" href="./colors.css?v=unified-palette-1">
-  <script type="module" src="./release-loader.mjs?v=release-gate-1" data-release-app="plot" data-release-version="2.5.12" data-release-build="b07ea6767a64" data-release-entry="./app.js?v=b07ea6767a64"></script>
+  <script type="module" src="./release-loader.mjs?v=release-gate-1" data-release-app="plot" data-release-version="2.5.13" data-release-build="9f854dcf3d6f" data-release-entry="./app.js?v=9f854dcf3d6f"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -175,7 +175,7 @@
       <div class="figure-options"><span id="preview-state" class="preview-state">準備中</span><span class="toolbar-divider"></span><span id="figure-size">軸領域 40 × 30 mm</span><div class="save-options"><label title="PNG保存と画像コピーに共通で使用します">解像度<select id="png-dpi" aria-label="保存とコピーの解像度"><option value="150">150 dpi</option><option value="300">300 dpi</option><option value="600">600 dpi</option><option value="1200" selected>1200 dpi</option></select></label></div></div>
       <section id="unit-suggestion" class="unit-suggestion" role="status" aria-live="polite" hidden><span id="unit-suggestion-text"></span><div><button id="apply-unit-suggestion" type="button" class="button primary">はい</button><button id="dismiss-unit-suggestion" type="button" class="button">いいえ</button></div></section>
       <div id="figure-stage" class="figure-stage" aria-busy="true">
-        <div class="preview-tools" title="Ctrl/Cmd＋ホイールで拡大・縮小。余白をドラッグで移動します。"><button type="button" class="button quiet" id="undo">元に戻す</button><button type="button" class="button quiet" id="redo">やり直す</button><button type="button" class="button quiet" id="zoom-out" aria-label="プレビューを縮小">−</button><output id="zoom-level">100%</output><button type="button" class="button quiet" id="zoom-in" aria-label="プレビューを拡大">＋</button><button type="button" class="button quiet" id="zoom-reset">画面に合わせる</button><button type="button" class="button quiet" id="open-object-layout" data-open-layout disabled title="凡例・注釈の整列、均等配置、重なり順を設定します。">整列・重なり</button><label class="panel-label-toggle" title="パネルラベルの表示を切り替えます。文字や位置はラベルをダブルクリックして設定できます。"><input type="checkbox" disabled id="preview-panel-label">パネルラベルを表示</label></div>
+        <div class="preview-tools" title="Ctrl/Cmd＋ホイールで拡大・縮小。余白をドラッグで移動します。"><button type="button" class="button quiet" id="undo">元に戻す</button><button type="button" class="button quiet" id="redo">やり直す</button><button type="button" class="button quiet" id="zoom-out" aria-label="プレビューを縮小">−</button><output id="zoom-level">100%</output><button type="button" class="button quiet" id="zoom-in" aria-label="プレビューを拡大">＋</button><button type="button" class="button quiet" id="zoom-reset">画面に合わせる</button><button type="button" class="button quiet" id="open-object-layout" data-open-layout disabled title="凡例・注釈の整列、均等配置、重なり順を設定します。">整列・重なり</button><button type="button" class="button quiet" id="format-selected-annotations" disabled title="Shift＋クリックで文字・線・矢印を複数選択し、書式をまとめて設定します。">注釈の設定</button><label class="panel-label-toggle" title="パネルラベルの表示を切り替えます。文字や位置はラベルをダブルクリックして設定できます。"><input type="checkbox" disabled id="preview-panel-label">パネルラベルを表示</label></div>
         <div class="paper" id="figure-paper" title="枠外をダブルクリックすると図全体の背景色を設定できます。Ctrl／⌘＋ホイールで拡大・縮小。">
           <div id="figure-content">
           <img id="figure-image" alt="作成したグラフのプレビュー" hidden>
@@ -312,6 +312,25 @@
   <dialog id="element-editor" class="plot-dialog" aria-labelledby="element-editor-title">
     <div class="dialog-heading"><strong id="element-editor-title"></strong><button type="button" class="button quiet" id="close-element-editor">閉じる</button></div>
     <div id="element-editor-fields"></div>
+  </dialog>
+  <dialog id="annotation-format-dialog" class="plot-dialog" aria-labelledby="annotation-format-title">
+    <form novalidate>
+      <div class="dialog-heading"><strong id="annotation-format-title">選択した注釈の設定</strong><button type="button" class="button quiet" data-format-close>閉じる</button></div>
+      <p class="field-note" data-format-summary></p>
+      <div class="field-grid"><label>色<input type="color" data-format-field="color" value="#222222"></label><label>角度 (度)<input type="number" data-format-field="angle" min="-360" max="360" step="1"></label></div>
+      <label class="opacity-control"><span class="opacity-caption">不透明度<output data-format-opacity></output></span><input type="range" data-format-field="opacity" min="0" max="1" step="0.01" value="1"></label>
+      <div class="check-options"><label><input type="checkbox" data-format-field="visible">表示</label></div>
+      <fieldset data-format-kind="text"><legend>文字</legend>
+        <div class="field-grid"><label>フォント<select data-format-field="font_family"></select></label><label>フォントサイズ (pt)<input type="number" data-format-field="font_size" min="1" max="200" step="0.1"></label></div>
+        <div class="check-options"><label><input type="checkbox" data-format-field="bold">太字</label><label><input type="checkbox" data-format-field="italic">斜体</label><label><input type="checkbox" data-format-field="underline">下線</label></div>
+        <details class="settings-panel"><summary>文字の揃え</summary><div class="field-grid"><label>横揃え<select data-format-field="text_align"><option value="left">左</option><option value="center">中央</option><option value="right">右</option><option value="justify">両端</option></select></label><label>縦揃え<select data-format-field="vertical_alignment"><option value="baseline">基準線</option><option value="center">中央</option><option value="top">上</option><option value="bottom">下</option></select></label></div></details>
+      </fieldset>
+      <fieldset data-format-kind="line"><legend>線・矢印</legend><div class="field-grid"><label>太さ (pt)<input type="number" data-format-field="line_width" min="0.1" max="20" step="0.1"></label><label>線種<select data-format-field="line_style"><option value="-">実線</option><option value="--">破線</option><option value="-.">一点鎖線</option><option value=":">点線</option></select></label></div></fieldset>
+      <details class="settings-panel" data-format-kind="arrow"><summary>矢印の先端</summary><div class="field-grid"><label>形<select data-format-field="arrow_style"><option value="-&gt;">片矢印</option><option value="&lt;-&gt;">両矢印</option><option value="-|&gt;">塗り矢印</option></select></label><label>サイズ (pt)<input type="number" data-format-field="arrow_size" min="1" max="100" step="0.1"></label></div></details>
+      <p class="field-note">Shift＋クリックで複数選択できます。文字列は個別に保持し、文字用の設定は文字だけ、線・矢印用の設定は対応する注釈だけに適用します。角度は線の中心・長さを保って変更します。固定した注釈は除きます。</p>
+      <p class="preset-message" role="alert" data-format-error hidden></p>
+      <div class="update-actions"><button type="button" class="button" data-format-close>キャンセル</button><button type="submit" class="button primary" disabled>選択した注釈に適用</button></div>
+    </form>
   </dialog>
   <dialog id="font-load-dialog" class="plot-dialog font-load-dialog" aria-labelledby="font-load-title">
     <div class="dialog-heading"><strong id="font-load-title">フォントの詳細設定</strong><button id="close-font-load" type="button" class="button quiet">閉じる</button></div>

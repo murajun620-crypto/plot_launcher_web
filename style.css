@@ -537,3 +537,5 @@ button.drop-zone:not(:disabled):hover{background:#164c92;border-color:var(--blue
 
 .app-header:has(#send-to-figure-studio){height:auto;min-height:72px;padding-block:8px}
 .header-actions:has(#send-to-figure-studio){flex-wrap:wrap;justify-content:flex-end;row-gap:6px}
+
+#annotation-format-dialog{width:min(480px,calc(100vw - 24px))}#annotation-format-dialog fieldset{border:1px solid #e1e7ef;border-radius:6px;margin:16px 0;padding:12px}#annotation-format-dialog legend{font-size:12px;color:#43556d;padding:0 6px}#annotation-format-dialog [data-format-field][data-mixed="true"]{outline:1px dashed #b0bbc9;outline-offset:2px}

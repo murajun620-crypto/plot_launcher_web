@@ -266,6 +266,41 @@ def expand_micro(text, *, plain=False):
     return "".join(parts)
 
 
+def expand_textit(text):
+    """Accept the text-italic spelling while retaining the saved TeX input."""
+    if not isinstance(text, str) or r"\textit" not in text:
+        return text
+    parts = re.split(r"(?<!\\)(\$)", text)
+    in_math = False
+    balanced_math = ((len(parts)-1)//2) % 2 == 0
+    for index, part in enumerate(parts):
+        if part == "$":
+            if balanced_math:
+                in_math = not in_math
+            continue
+        if in_math:
+            parts[index] = re.sub(r"(?<!\\)\\textit(?=\s*\{)", lambda _: r"\mathit", part)
+            continue
+        # An inline \textit{...} also works outside a $...$ span.
+        pieces, cursor = [], 0
+        while match := re.search(r"(?<!\\)\\textit\s*\{", part[cursor:]):
+            start, body_start = cursor+match.start(), cursor+match.end()
+            depth, end = 1, body_start
+            while end < len(part) and depth:
+                if part[end] == "\\":
+                    end += 2
+                    continue
+                depth += (part[end] == "{") - (part[end] == "}")
+                end += 1
+            if depth:
+                break
+            body = re.sub(r"(?<!\\)\\textit(?=\s*\{)", lambda _: r"\mathit", part[body_start:end-1])
+            pieces.extend([part[cursor:start], r"$\mathit{"+body+"}$"])
+            cursor = end
+        parts[index] = "".join(pieces)+part[cursor:]
+    return "".join(parts)
+
+
 @contextmanager
 def micro_text_rendering():
     # All presets create Matplotlib text through this method, including auto
@@ -274,7 +309,7 @@ def micro_text_rendering():
     from matplotlib.text import Text
     original = Text.set_text
     def set_text(artist, text):
-        return original(artist, expand_micro(text))
+        return original(artist, expand_textit(expand_micro(text)))
     Text.set_text = set_text
     try:
         yield
@@ -350,6 +385,23 @@ def mathtext_glyph_layout():
         _mathtext.TruetypeFonts.get_xheight = original_xheight
 
 
+def math_font_pattern(families, *, style="normal", weight="normal"):
+    # findfont() accepts the regular face of the first family even when an
+    # italic face exists in a fallback family. Require the requested face so
+    # projects containing only a regular font still get real italic/bold math.
+    for family in dict.fromkeys([*families[:1], "Liberation Sans", *families[1:], "DejaVu Sans"]):
+        props = font_manager.FontProperties(family=[family], style=style, weight=weight)
+        try:
+            face = font_manager.get_font(font_manager.findfont(props, fallback_to_default=False))
+        except ValueError:
+            continue
+        flags = getattr(face.style_flags, "value", face.style_flags)
+        italic, bold = bool(flags & 1), bool(flags & 2)
+        if italic == (style == "italic") and bold == (weight == "bold"):
+            return props.get_fontconfig_pattern()
+    return font_manager.FontProperties(family=["DejaVu Sans"], style=style, weight=weight).get_fontconfig_pattern()
+
+
 @contextmanager
 def plot_environment(values, frame, sheet_name, filename):
     original_env = {key: value for key, value in os.environ.items() if key.startswith("PLOT_")}
@@ -376,11 +428,11 @@ def plot_environment(values, frame, sheet_name, filename):
         families = matplotlib.rcParams["font.family"]
         matplotlib.rcParams.update({
             "mathtext.fontset": "custom",
-            "mathtext.rm": font_manager.FontProperties(family=families).get_fontconfig_pattern(),
-            "mathtext.sf": font_manager.FontProperties(family=families).get_fontconfig_pattern(),
-            "mathtext.it": font_manager.FontProperties(family=families, style="italic").get_fontconfig_pattern(),
-            "mathtext.bf": font_manager.FontProperties(family=families, weight="bold").get_fontconfig_pattern(),
-            "mathtext.bfit": font_manager.FontProperties(family=families, style="italic", weight="bold").get_fontconfig_pattern(),
+            "mathtext.rm": math_font_pattern(families),
+            "mathtext.sf": math_font_pattern(families),
+            "mathtext.it": math_font_pattern(families, style="italic"),
+            "mathtext.bf": math_font_pattern(families, weight="bold"),
+            "mathtext.bfit": math_font_pattern(families, style="italic", weight="bold"),
             "mathtext.fallback": "stixsans",
         })
     plot_utils.configure_plot_fonts = browser_fonts
@@ -1094,7 +1146,13 @@ class PlotEngine:
             if annotation.type == "text":
                 if annotation.font_family == "Arial" and "Arial" not in self.font_families:
                     annotation.font_family = values["PLOT_FONT_FAMILY"].split(",")[0]
-                annotation.font_family = [annotation.font_family, config.get("axes", {}).get("japaneseFontFamily", "Noto Sans JP"), "DejaVu Sans"]
+                families = [annotation.font_family, config.get("axes", {}).get("japaneseFontFamily", "Noto Sans JP"), "DejaVu Sans"]
+                style = "italic" if annotation.italic or annotation.font_style in {"italic", "oblique"} else "normal"
+                weight = "bold" if annotation.bold else "normal"
+                if style != "normal" or weight != "normal":
+                    chosen = font_manager.FontProperties(math_font_pattern(families, style=style, weight=weight)).get_family()
+                    families = list(dict.fromkeys([*chosen, *families]))
+                annotation.font_family = families
         manager = AnnotationManager(collection, logger=warnings.append)
         manager.attach(figure, annotation_axes)
         return collection, manager

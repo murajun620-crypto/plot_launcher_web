@@ -1,17 +1,20 @@
-import {primarySeriesColor,seriesFaceColor,setSeriesColor,applySeriesPalette} from './series-colors.mjs?v=b07ea6767a64';
-import {statisticNumber,statisticAvailable,statisticFormat,defaultStatisticFormat,patchStatisticFormat,applyStatisticFormat,addStatisticAnnotation,syncStatisticAnnotationTexts,detachStatisticText,distributionCSV} from './matrix-statistics.mjs?v=b07ea6767a64';
-import {createMatrixEditor} from './matrix-editor.mjs?v=b07ea6767a64';
-import {isMatrixPlot,isCombinedHistogram,matrixColorbarVisible} from './matrix-model.mjs?v=b07ea6767a64';
+import {createAnnotationFormatDialog} from './annotation-format-dialog.mjs?v=9f854dcf3d6f';
+import {formatTargets,applyAnnotationFormat} from './annotation-format.mjs?v=9f854dcf3d6f';
+import {localFontFaces} from './local-font-faces.mjs?v=9f854dcf3d6f';
+import {primarySeriesColor,seriesFaceColor,setSeriesColor,applySeriesPalette} from './series-colors.mjs?v=9f854dcf3d6f';
+import {statisticNumber,statisticAvailable,statisticFormat,defaultStatisticFormat,patchStatisticFormat,applyStatisticFormat,addStatisticAnnotation,syncStatisticAnnotationTexts,detachStatisticText,distributionCSV} from './matrix-statistics.mjs?v=9f854dcf3d6f';
+import {createMatrixEditor} from './matrix-editor.mjs?v=9f854dcf3d6f';
+import {isMatrixPlot,isCombinedHistogram,matrixColorbarVisible} from './matrix-model.mjs?v=9f854dcf3d6f';
 import {createFileProgress} from './file-progress.mjs?v=file-open-1';
-import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=b07ea6767a64';
+import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=9f854dcf3d6f';
 import {setupDirectSendButton,getFigureWorkspace} from './direct-transfer.mjs?v=baaeeccc3ee1';
-import {identifyPlotProject,openedPlotIdentity,plotSheetIndex,currentPlotImageId,resolvePlotImage,savedPlotProjectId,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=b07ea6767a64';
+import {identifyPlotProject,openedPlotIdentity,plotSheetIndex,currentPlotImageId,resolvePlotImage,savedPlotProjectId,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=9f854dcf3d6f';
 import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=9127ec4c4f31";
 import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=9127ec4c4f31";
 import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9127ec4c4f31";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=b07ea6767a64";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=b07ea6767a64";
-import { APP_VERSION, COLORS, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=b07ea6767a64";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=9f854dcf3d6f";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=9f854dcf3d6f";
+import { APP_VERSION, COLORS, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=9f854dcf3d6f";
 
 import {alignmentOffsets} from './object-layout.mjs?v=27ae7675c457';
 import {createDataEditor} from './data-editor.mjs?v=27ae7675c457';
@@ -21,10 +24,11 @@ import {createShortcutHandler} from './shortcuts.mjs?v=61d158587773';
 import {formatText,TEXT_FORMAT_ACTIONS} from './text-format.mjs?v=61d158587773';
 import {createColorPanel} from './colors.mjs?v=unified-palette-1';
 import {createXRangePicker} from './x-range-picker.mjs?v=normalization-range-1';
+let annotationFormatDialog=null;
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 const fileProgress=createFileProgress();
-const APP_BUILD = 'b07ea6767a64';
+const APP_BUILD = '9f854dcf3d6f';
 window.FigureAppRelease?.assertRunning({version:APP_VERSION,build:APP_BUILD});
 function makeProject(settings,data,fonts,workspace={}){
   const live=sourceData&&data.filename===sourceData.filename&&(data.bytes===sourceData.bytes||data.files&&data.files===sourceData.files);
@@ -354,6 +358,7 @@ function status(text, kind = "working") {
 }
 
 function updateButtons() {
+  annotationFormatDialog?.sync();
   if(normalizationRangePicker.active&&(loading||exporting))normalizationRangePicker.cancel({notify:false});
   figureStudioDirectSender?.sync();
   syncStudioContentControl();
@@ -473,7 +478,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=b07ea6767a64", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=9f854dcf3d6f", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") {
       if(data.id)requests.get(data.id)?.progressTask?.stage(data.text,{completed:data.completed,total:data.total,unit:data.unit||''});
@@ -573,7 +578,7 @@ function chooseColor(value) {
   if (!colorTarget?.isConnected || colorTarget.matches(':disabled') || loading || exporting) {colorPanel.close();return;}
   if (!/^#[0-9a-f]{6}$/i.test(value) && !(colorTarget.type!=='color'&&['none','auto'].includes(value))) return;
   colorTarget.value=value;
-  if(colorTarget.closest('#matrix-editor'))colorTarget.dispatchEvent(new Event('change',{bubbles:true}));else applyControlInput({target:colorTarget});
+  if(colorTarget.closest('#matrix-editor,#annotation-format-dialog'))colorTarget.dispatchEvent(new Event('change',{bubbles:true}));else applyControlInput({target:colorTarget});
   syncColorIcons();
 }
 enhanceColorInputs();
@@ -1780,6 +1785,7 @@ function movePlotObjects(offsets,objects=plotObjects()) {
   for(const {entry,values}of changes)Object.assign(objectState(entry),values);
 }
 function syncObjectLayout() {
+  annotationFormatDialog?.sync();
   const objects=plotObjects(),items=objects.filter(item=>selected.has(item.id)&&!item.locked);
   const busy=!engineReady||loading||exporting||renderRunning||renderedRevision!==revision||!!dragging;
   $$('[data-layout-count]').forEach(node=>node.textContent=`選択中：凡例 ${items.filter(item=>item.kind==='legend').length} 個・注釈 ${items.filter(item=>item.kind==='annotation').length} 個`);
@@ -2890,18 +2896,20 @@ async function registerFontFile(file, automatic = false) {
   loadedFonts.add(result.family);
   return result.family;
 }
+const localFontFilename=font=>`local-${safeStem(font.postscriptName || font.fullName || font.family)}.ttf`;
+function pendingLocalFontFaces(family){return localFontFaces(localFontChoices,family).filter(font=>!importedFonts.has(localFontFilename(font)));}
 async function loadLocalFontFamilies(families) {
   if (!engineReady || loading || exporting) return false;
-  const pending=[...new Set(families)].filter(family=>!loadedFonts.has(family) && !localFontAliases.has(family) && localFontChoices.some(font=>font.family===family));
+  const pending=[...new Set(families)].filter(family=>pendingLocalFontFaces(family).length);
   if (!pending.length) return true;
   loading=true; fontAccessMessage='フォントを読み込んでいます…'; updateButtons();
   try {
     for (const family of pending) {
-      const faces=localFontChoices.filter(font=>font.family===family);
-      // Ordinary labels use the regular face; additional faces remain in advanced settings.
-      const font=faces.find(font=>/^(regular|normal|book|roman|標準)$/i.test(font.style || 'Regular')) || faces[0];
-      const blob=await font.blob();
-      const actual=await registerFontFile(new File([blob],`local-${safeStem(font.postscriptName || font.fullName || family)}.ttf`,{type:'font/ttf'}),true);
+      let actual=localFontAliases.get(family)||family;
+      for(const font of pendingLocalFontFaces(family)){
+        const blob=await font.blob();
+        actual=await registerFontFile(new File([blob],localFontFilename(font),{type:'font/ttf'}),true);
+      }
       localFontAliases.set(family,actual); failedLocalFonts.delete(family);
     }
     fontAccessMessage=''; return true;
@@ -2913,7 +2921,7 @@ async function loadLocalFontFamilies(families) {
 }
 async function loadCurrentLocalFonts() {
   const families=[config.axes.fontFamily,config.axes.japaneseFontFamily,...(config.annotations || []).filter(item=>item.type==='text' && item.visible!==false).map(item=>item.font_family)];
-  const missing=[...new Set(families)].filter(family=>family && !loadedFonts.has(family) && !failedLocalFonts.has(family) && localFontChoices.some(font=>font.family===family));
+  const missing=[...new Set(families)].filter(family=>family && !failedLocalFonts.has(family) && pendingLocalFontFaces(family).length);
   if (!missing.length || loading || exporting) return;
   const current=config, before=importedFonts.size;
   await loadLocalFontFamilies(missing);
@@ -2927,7 +2935,7 @@ async function selectLocalFont(input) {
   const key=input.dataset.axis, previous=config.axes[key], requested=input.value;
   if(loading || exporting){input.value=previous;return;}
   failedLocalFonts.delete(requested);
-  if (!loadedFonts.has(requested) && !await loadLocalFontFamilies([requested])) {input.value=previous;return;}
+  if (!await loadLocalFontFamilies([requested])) {input.value=previous;return;}
   config.axes[key]=localFontAliases.get(requested) || requested;
   drawControls();changed();
 }
@@ -2997,11 +3005,20 @@ async function loadFontFiles(files) {
   finally { loading = false; updateButtons(); if (renderWanted) renderPreview(); }
 }
 const plotTextEditor=createAnnotationTextEditor();let plotFormatClipboard=null;
+annotationFormatDialog=createAnnotationFormatDialog({root:$('#annotation-format-dialog'),button:$('#format-selected-annotations'),
+ getAnnotations:()=>config.annotations,getSelected:()=>selected,getIdentity:()=>({source:sourceData,sheet:metadata?.sheetIndex}),
+ getFonts:()=>[...new Set([...loadedFonts,...localFontChoices.map(font=>font.family)])],
+ getContext:()=>{const [,,aw,ah]=figureResult.geometry.axes,box=$('#figure-image').getBoundingClientRect();return {width:aw*box.width,height:ah*box.height,xRange:figureResult.xRange,yRange:figureResult.yRange,xScale:figureResult.xDataScale||config.axes.xScale,yScale:figureResult.yDataScale||config.axes.yScale};},
+ isBusy:()=>!metadata||loading||exporting||projectVersionChecking||renderRunning||renderedRevision!==revision,
+ onOpen:()=>{plotTextEditor.finish(false,{focus:false});if($('#element-editor').open)$('#element-editor').close();},
+ onApply:(ids,patch,context)=>{applyAnnotationFormat(config.annotations,ids,patch,context);drawAnnotations();changed(0);},
+ onShow:()=>enhanceColorInputs(),onClose:()=>$('#figure-interactions').focus({preventScroll:true})});
 function plotTextValue(item){return {text:item.text,fontSize:item.font_size,fontFamily:item.font_family,bold:item.bold,italic:item.italic,underline:item.underline,textAlign:item.text_align||item.horizontal_alignment};}
 function plotTextPatch(item,value){detachStatisticText(item,value.text);Object.assign(item,{text:value.text,font_size:value.fontSize,font_family:value.fontFamily,bold:value.bold,italic:value.italic,underline:value.underline,text_align:value.textAlign,horizontal_alignment:value.textAlign==='justify'?'left':value.textAlign,font_weight:value.bold?'bold':'normal',font_style:value.italic?'italic':'normal'});}
 function previewAnnotationChange(){const previous=restoring;restoring=true;try{changed(180);}finally{restoring=previous;}}
 function beginPlotAnnotationText(id){
- if(loading||exporting)return;plotTextEditor.finish(false,{focus:false});const item=config.annotations?.find(a=>a.id===id);if(!item||item.type!=='text'||item.locked)return;
+ if(loading||exporting)return;
+ if(selected.has(id)&&formatTargets(config.annotations,selected).length>1){annotationFormatDialog.show();return;}plotTextEditor.finish(false,{focus:false});const item=config.annotations?.find(a=>a.id===id);if(!item||item.type!=='text'||item.locked)return;
  if($('#element-editor').open)$('#element-editor').close();selected=new Set([id]);const before=structuredClone(config),source=sourceData,sheet=metadata.sheetIndex;
  plotTextEditor.open({value:plotTextValue(item),fonts:[...loadedFonts],maxLength:10000,anchor:()=>$('#figure-interactions [data-drag-id="'+CSS.escape(id)+'"]')?.getBoundingClientRect()||$('#figure-image').getBoundingClientRect(),focus:()=>$('#figure-interactions').focus({preventScroll:true}),onSave:()=>$('#save-project').click(),onDetails:()=>openElementEditor('annotation',config.annotations.findIndex(a=>a.id===id)),
   onInput:value=>{if(sourceData!==source||metadata?.sheetIndex!==sheet)return;const target=config.annotations?.find(a=>a.id===id);if(target){plotTextPatch(target,value);previewAnnotationChange();}},
@@ -3046,6 +3063,7 @@ $("#annotation-list").addEventListener("click", event => {
 function openElementEditor(part,index=0,{allowUnrendered=false}={}) {
   const switchingSeries=$('#element-editor').open && ['series','seriesAll'].includes(part);
   if(!metadata || loading || exporting || (renderRunning || renderedRevision!==revision) && !allowUnrendered&&!switchingSeries&&!figureWorkspaceRestoring&&part!=='annotation')return;
+  if(part==='annotation'&&selected.has(config.annotations?.[index]?.id)&&formatTargets(config.annotations,selected).length>1){annotationFormatDialog.show();return;}
   const fields=$('#element-editor-fields');fields.dataset.workspacePart=part;fields.dataset.workspaceIndex=String(index);let sources=[],title='';
   if(isMatrixPlot(config.plotType)&&['series','seriesAll','preset'].includes(part)){void openMatrixEditor();return;}
   if(part==='seriesAll') {
@@ -3550,7 +3568,7 @@ for(const name of ['pointerout','focusout'])$('#figure-interactions').addEventLi
 window.addEventListener('keydown',event=>{
   if(event.defaultPrevented||event.isComposing||event.keyCode===229||event.getModifierState?.('AltGraph'))return;
   if($('#figure-studio-switch-confirm')?.open)return;
-  if($('#object-layout-dialog').open || $('#color-panel').open || $('#axis-editor').open || $('#element-editor').open || $('#save-dialog').open || $('#paste-dialog').open || $('#data-import-dialog').open)return;
+  if($('#annotation-format-dialog').open || $('#object-layout-dialog').open || $('#color-panel').open || $('#axis-editor').open || $('#element-editor').open || $('#save-dialog').open || $('#paste-dialog').open || $('#data-import-dialog').open)return;
   if(event.target.matches('input,textarea,select') || event.target.isContentEditable)return;
   if(!loading&&!exporting&&metadata&&(event.target===document.body||event.target.closest('#figure-paper,#annotation-list,[data-add-annotation]'))&&annotationShortcut(event))return;
   const control=event.ctrlKey||event.metaKey,key=event.key.toLowerCase();
@@ -3573,7 +3591,7 @@ catch (error) { fatal(`描画機能を開始できませんでした。ブラウ
 
 // Figure Studio bridge: included in the source application's module scope.
 let figureBridgeBaseline=null,figureBridgePreservedOnReconnect=false;
-const figureBridgePendingInput=()=>normalizationRangePicker.active||dataEditor?.hasDraft()||dataEditor?.busy||plotTextEditor.active||$$('[data-axis],[data-option],[data-series-field],[data-annotation-field],[data-matrix-stat-annotation],[data-matrix-stat-default],[data-legend-field],[data-fill]').some(input=>!input.disabled&&input.getClientRects().length>0&&incompleteNumberInput(input));
+const figureBridgePendingInput=()=>annotationFormatDialog?.dirty||normalizationRangePicker.active||dataEditor?.hasDraft()||dataEditor?.busy||plotTextEditor.active||$$('[data-axis],[data-option],[data-series-field],[data-annotation-field],[data-matrix-stat-annotation],[data-matrix-stat-default],[data-legend-field],[data-fill]').some(input=>!input.disabled&&input.getClientRects().length>0&&incompleteNumberInput(input));
 async function figureBridgeIsDirty(){
   if(loading||exporting||renderRunning||renderedRevision!==revision||dragging||colormapApplying||pendingDataFiles||figureBridgePendingInput())return true;
   try{return !samePlotCheckpoint(figureBridgeBaseline,(await collectPlotGraphs()).checkpoint);}catch{return true;}
@@ -3820,7 +3838,7 @@ function figureWorkspaceFieldValue(input){return isAxisSize(input.dataset.axis)?
 function figureWorkspaceUI({rejectInvalid=false}={}){
  const locators=new Map(),ordinals=new Map();
  const fields=figureWorkspaceFields().map(input=>{if(rejectInvalid&&input.validity?.badInput)throw Error(`「${input.getAttribute('aria-label')||input.closest('label')?.textContent?.trim().slice(0,60)||input.dataset.axis||input.id||'数値欄'}」の入力を確定してから保存してください。`);const locator=figureWorkspaceBaseLocator(input),key=figureWorkspaceLocatorKey(locator);locator.ordinal=ordinals.get(key)||0;ordinals.set(key,locator.ordinal+1);locators.set(input,locator);return {locator,value:figureWorkspaceFieldValue(input),checked:!!input.checked,indeterminate:!!input.indeterminate,badInput:!!input.validity?.badInput};});
- const dialogs=$$('dialog[open]').filter(dialog=>!['data-editor','reload-edited-confirm'].includes(dialog.id)).map(dialog=>({id:dialog.id,left:dialog.style.left||'',top:dialog.style.top||''}));
+ const dialogs=$$('dialog[open]').filter(dialog=>!['data-editor','reload-edited-confirm','annotation-format-dialog'].includes(dialog.id)).map(dialog=>({id:dialog.id,left:dialog.style.left||'',top:dialog.style.top||''}));
  return {fields,dialogs,details:$$('details').filter(node=>!node.closest('dialog')||node.closest('dialog').open).map(node=>{const scope=node.closest('dialog')?.id||'',root=scope?document.getElementById(scope):document;return {scope,index:[...root.querySelectorAll('details')].filter(item=>(item.closest('dialog')?.id||'')===scope).indexOf(node),open:node.open};}),
   axis:$('#axis-editor').open?{axis:$('#axis-editor-fields').dataset.axisName,kind:$('#axis-editor-fields').dataset.workspaceKind||($('#axis-editor-fields').querySelector('[data-axis$="Label"]')?'label':'ticks')}:null,
   element:$('#element-editor').open?{part:$('#element-editor-fields').dataset.workspacePart,index:$('#element-editor-fields').dataset.workspaceIndex||'0',origin:$('#element-editor-fields').dataset.seriesEditorOrigin||''}:null,
