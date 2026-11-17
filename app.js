@@ -1,17 +1,17 @@
-import {primarySeriesColor,seriesFaceColor,setSeriesColor,applySeriesPalette} from './series-colors.mjs?v=f79e0bef9fc5';
-import {statisticNumber,statisticAvailable,statisticFormat,defaultStatisticFormat,patchStatisticFormat,applyStatisticFormat,addStatisticAnnotation,syncStatisticAnnotationTexts,detachStatisticText,distributionCSV} from './matrix-statistics.mjs?v=f79e0bef9fc5';
-import {createMatrixEditor} from './matrix-editor.mjs?v=f79e0bef9fc5';
-import {isMatrixPlot,isCombinedHistogram,matrixColorbarVisible} from './matrix-model.mjs?v=f79e0bef9fc5';
+import {primarySeriesColor,seriesFaceColor,setSeriesColor,applySeriesPalette} from './series-colors.mjs?v=b07ea6767a64';
+import {statisticNumber,statisticAvailable,statisticFormat,defaultStatisticFormat,patchStatisticFormat,applyStatisticFormat,addStatisticAnnotation,syncStatisticAnnotationTexts,detachStatisticText,distributionCSV} from './matrix-statistics.mjs?v=b07ea6767a64';
+import {createMatrixEditor} from './matrix-editor.mjs?v=b07ea6767a64';
+import {isMatrixPlot,isCombinedHistogram,matrixColorbarVisible} from './matrix-model.mjs?v=b07ea6767a64';
 import {createFileProgress} from './file-progress.mjs?v=file-open-1';
-import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=f79e0bef9fc5';
+import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=b07ea6767a64';
 import {setupDirectSendButton,getFigureWorkspace} from './direct-transfer.mjs?v=baaeeccc3ee1';
-import {identifyPlotProject,openedPlotIdentity,plotSheetIndex,currentPlotImageId,resolvePlotImage,savedPlotProjectId,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=f79e0bef9fc5';
+import {identifyPlotProject,openedPlotIdentity,plotSheetIndex,currentPlotImageId,resolvePlotImage,savedPlotProjectId,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=b07ea6767a64';
 import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=9127ec4c4f31";
 import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=9127ec4c4f31";
 import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9127ec4c4f31";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=f79e0bef9fc5";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=f79e0bef9fc5";
-import { APP_VERSION, COLORS, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=f79e0bef9fc5";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=b07ea6767a64";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=b07ea6767a64";
+import { APP_VERSION, COLORS, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=b07ea6767a64";
 
 import {alignmentOffsets} from './object-layout.mjs?v=27ae7675c457';
 import {createDataEditor} from './data-editor.mjs?v=27ae7675c457';
@@ -24,7 +24,7 @@ import {createXRangePicker} from './x-range-picker.mjs?v=normalization-range-1';
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 const fileProgress=createFileProgress();
-const APP_BUILD = 'f79e0bef9fc5';
+const APP_BUILD = 'b07ea6767a64';
 window.FigureAppRelease?.assertRunning({version:APP_VERSION,build:APP_BUILD});
 function makeProject(settings,data,fonts,workspace={}){
   const live=sourceData&&data.filename===sourceData.filename&&(data.bytes===sourceData.bytes||data.files&&data.files===sourceData.files);
@@ -473,7 +473,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=f79e0bef9fc5", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=b07ea6767a64", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") {
       if(data.id)requests.get(data.id)?.progressTask?.stage(data.text,{completed:data.completed,total:data.total,unit:data.unit||''});
@@ -605,12 +605,14 @@ function openAxisEditor(axis, kind) {
       `<div class="field-grid">${label(`${axis}LabelPad`,'ラベル追加余白 (pt)','number',`min="${-100-LABEL_PADDING_BASE}" max="${100-LABEL_PADDING_BASE}" step="0.1"`)}${label('labelFontScale','フォントサイズ (pt)','number',`min="${axisControlValue('labelFontScale',.2)}" max="${axisControlValue('labelFontScale',3)}" step="0.1"`)}</div>` +
       `<button type="button" class="button quiet" data-reset-label>標準位置に戻す</button>`;
   } else {
-    html = `<div class="field-grid"><label>軸の種類<select data-axis="${axis}Scale">${choiceOptions([['linear','線形'],['log','対数']],config.axes[`${axis}Scale`])}</select></label>${label('tickFontScale','フォントサイズ (pt)','number',`min="${axisControlValue('tickFontScale',.2)}" max="${axisControlValue('tickFontScale',3)}" step="0.1"`)}</div>` + tickLineControls(axis) +
-      `<details class="settings-panel"><summary>範囲・目盛り間隔</summary><label class="log-format-field" data-log-format-for="${axis}">目盛りの表記<select data-axis="${axis}LogFormat" aria-label="${axisName(axis)}軸の対数目盛り表記">${choiceOptions([['power','累乗（10ⁿ）'],['decimal','数値（0.1、1、10）']],config.axes[`${axis}LogFormat`])}</select></label>` +
+    html = `<details class="settings-panel" open><summary>範囲・目盛り間隔</summary>` +
+      `<div class="field-grid"><label>軸の種類<select data-axis="${axis}Scale">${choiceOptions([['linear','線形'],['log','対数']],config.axes[`${axis}Scale`])}</select></label>${label('tickFontScale','フォントサイズ (pt)','number',`min="${axisControlValue('tickFontScale',.2)}" max="${axisControlValue('tickFontScale',3)}" step="0.1"`)}</div>` +
+      `<label class="log-format-field" data-log-format-for="${axis}">目盛りの表記<select data-axis="${axis}LogFormat" aria-label="${axisName(axis)}軸の対数目盛り表記">${choiceOptions([['power','累乗（10ⁿ）'],['decimal','数値（0.1、1、10）']],config.axes[`${axis}LogFormat`])}</select></label>` +
       `<p class="field-note">空欄はAuto。数値を入力すると、その値を使用します。</p><div class="field-grid">${label(`${axis}Min`,'最小','number','step="any" placeholder="Auto"')}${label(`${axis}Max`,'最大','number','step="any" placeholder="Auto"')}</div>` +
       `<label title="${axis==='x'?'両端をデータ範囲に合わせます。':'線形軸は下端を0（負の値がある場合は最小値）に合わせ、上端にデータ幅の5%の余裕を付けます。対数軸は正のデータ範囲と対数幅を使います。'}誤差棒・近似線を含みます。オンで最小・最大の指定を解除し、その後の手動指定は優先します。"><input type="checkbox" data-axis="${axis}FitData" ${config.axes[`${axis}FitData`]?'checked':''}>データ範囲にフィット</label>` +
       label(`${axis}Step`,'主目盛り間隔','number','step="any" placeholder="Auto"') +
       label(`${axis}MinorStep`,'副目盛り間隔','number','step="any" placeholder="Auto"') + '</details>' +
+      `<details class="settings-panel"><summary>目盛線の太さ・長さ</summary>${tickLineControls(axis)}</details>` +
       `<details class="settings-panel"><summary>表示・色・余白</summary>` +
       `<label><input type="checkbox" data-axis="hide${axis === 'x' ? 'X' : axis === 'y2' ? 'Y2' : 'Y'}MinorTicks" data-invert="true" ${config.axes[`hide${axis === 'x' ? 'X' : axis === 'y2' ? 'Y2' : 'Y'}MinorTicks`]?'':'checked'}>副目盛線を表示</label>` +
       label(`${axis}TickPad`,'目盛り追加余白 (pt)','number','min="-100" max="100" step="0.1"');
