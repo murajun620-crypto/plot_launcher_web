@@ -1,0 +1,43 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {makeProject as encodePlotProject,parseProject,safeStem,PROJECT_MAX_SIZE} from '../state.js';
+import {identifyPlotProject,openedPlotIdentity,savedPlotProjectId} from '../plot-sync.mjs';
+import {createProjectFileLinks,portableFileLink} from '../project-file-links.mjs';
+
+const source=await readFile(new URL('../app.js',import.meta.url),'utf8');
+const section=(start,end)=>source.slice(source.indexOf(start),source.indexOf(end,source.indexOf(start)));
+const saver=section('async function saveProject({','$("#save-project").addEventListener');
+const maker=section('function makeProject(','function positionDialog(');
+const original=JSON.parse(await readFile(new URL('../samples/general.plotproject',import.meta.url),'utf8'));
+original.workspace.figureStudioProjectId='test-source-project-000001';original.workspace.projectFileName='source.plotproject';
+function handle(name,blob){let bytes=blob;return {name,kind:'file',fail:false,async getFile(){return new File([bytes],name);},async queryPermission(){return 'granted';},async isSameEntry(other){return this===other;},async createWritable(){let pending;const h=this;return {async write(blob){if(h.fail)throw Error('disk full');pending=blob;},async close(){bytes=pending;},async abort(){}};}};}
+async function fixture({saveAs=false,fail=false,cancel=false}={}){
+  const project=parseProject(original),native=handle('source.plotproject',new Blob([JSON.stringify(original)])),copy=handle('copy.plotproject',new Blob());copy.fail=fail;native.fail=fail;
+  const records=new Map(),store={async get(key){return records.get(key);},async list(key){return [...records.values()].filter(r=>r.project===key);},async put(record){records.set(record.token,record);}};
+  const projectFiles=createProjectFileLinks({app:'plot',store,host:{async showSaveFilePicker(){if(cancel)throw new DOMException('cancelled','AbortError');return copy;}},choose:()=>assert.fail('Unexpected confirmation'),identify:async file=>openedPlotIdentity(await identifyPlotProject(JSON.parse(await file.text())),file.name)});
+  const opened=await projectFiles.opened({file:await native.getFile(),projectId:original.workspace.figureStudioProjectId,handle:native});
+  const data={...project.data,figureStudioProjectId:original.workspace.figureStudioProjectId,figureStudioProjectFileName:'source.plotproject'};
+  const events=[],nodes=new Map([['#save-name',{value:'figure'}],['#png-dpi',{value:'600'}]]);
+  const env={engineReady:true,loading:false,exporting:false,sourceData:data,metadata:{sheetIndex:project.data.sheetIndex},config:{series:[{}]},updateButtons(){},safeStem,projectFilename:'source.plotproject',projectFileLink:opened.link,projectHandle:native,projectFiles,saveDirectory:null,sourceDirectory:null,sourceHandle:null,download(){assert.fail('Unexpected download');},figureStudioBridge:{async captureWorkspaceBinding(){},resetWorkspaceBinding(){events.push('detach');}},projectEditState:()=>({source:data,fonts:[],content:'saved'}),savedPlotProjectId,makeSettings:()=>project.settings,loadedHeader:1,sample:false,importedFonts:new Map(),$:id=>nodes.get(id),$$:()=>[],view:project.workspace.view,projectSheetSettings:()=>[],sheetMode:'individual',sharedSettings:null,currentSharedSettings:()=>null,PROJECT_MAX_SIZE,figureBridgeBaseline:{source:data},figureBridgePreservedOnReconnect:true,plotCollectionCache:{},savedProjectState:null,status:(message,kind)=>events.push({message,kind}),renderWanted:false,renderPreview(){},encodePlotProject,portableFileLink};
+  const keys=Object.keys(env),api=Function(...keys,maker+saver+'return {save:saveProject,make:makeProject,state:()=>({projectHandle,projectFilename,projectFileLink,sourceData,savedProjectState,exporting,plotCollectionCache})};')(...keys.map(key=>env[key]));
+  return {api,native,copy,opened,events,records,saveAs};
+}
+test('actual Plot save writes a reopenable project, keeps original identity and refreshes its portable version',async()=>{
+  const f=await fixture();await f.api.save();const state=f.api.state(),raw=JSON.parse(await (await f.native.getFile()).text());
+  assert.equal(raw.workspace.figureStudioProjectId,original.workspace.figureStudioProjectId);assert.equal(raw.workspace.sourceFileLink,undefined);assert.ok(parseProject(raw));assert.equal(state.projectHandle,f.native);assert.equal(state.exporting,false);assert.equal(state.savedProjectState.source,state.sourceData);assert.equal(state.plotCollectionCache,null);assert.notEqual(state.projectFileLink.fingerprint,f.opened.link.fingerprint);assert.equal(state.projectFileLink.token,f.opened.link.token);
+  const snapshot=f.api.make(raw.settings,{...state.sourceData},[],raw.workspace);assert.deepEqual(snapshot.workspace.sourceFileLink,state.projectFileLink);assert.equal(snapshot.workspace.projectFileName,'source.plotproject');assert.equal(f.events.includes('detach'),false);
+});
+test('actual Plot Save As creates an independent identity and retains the original target registration',async()=>{
+  const f=await fixture(),before=await (await f.native.getFile()).text();await f.api.save({saveAs:true});const state=f.api.state(),raw=JSON.parse(await (await f.copy.getFile()).text());
+  assert.notEqual(raw.workspace.figureStudioProjectId,original.workspace.figureStudioProjectId);assert.equal(state.sourceData.figureStudioProjectId,raw.workspace.figureStudioProjectId);assert.equal(state.projectFilename,'copy.plotproject');assert.equal(state.projectHandle,f.copy);assert.equal(await (await f.native.getFile()).text(),before);assert.equal(f.records.size,2);assert.ok(f.events.includes('detach'));assert.equal(raw.workspace.sourceFileLink,undefined);
+});
+test('actual Plot failed save leaves handle, identity, saved checkpoint and version unchanged',async()=>{
+  for(const saveAs of [false,true]){const f=await fixture({fail:true}),before=await (await f.native.getFile()).text();await f.api.save({saveAs});const state=f.api.state();
+    assert.equal(state.projectHandle,f.native);assert.equal(state.sourceData.figureStudioProjectId,original.workspace.figureStudioProjectId);assert.deepEqual(state.projectFileLink,f.opened.link);assert.equal(state.savedProjectState,null);assert.equal(state.exporting,false);assert.equal(await (await f.native.getFile()).text(),before);assert.equal(f.records.size,1);assert.equal(f.events.includes('detach'),false);assert.ok(f.events.some(e=>e.kind==='error'&&e.message.includes('disk full')));
+  }
+});
+test('cancelling Plot Save As preserves the original writable binding',async()=>{
+  const f=await fixture({cancel:true}),before=await (await f.native.getFile()).text();await f.api.save({saveAs:true});const state=f.api.state();
+  assert.equal(state.projectHandle,f.native);assert.equal(state.sourceData.figureStudioProjectId,original.workspace.figureStudioProjectId);assert.deepEqual(state.projectFileLink,f.opened.link);assert.equal(state.savedProjectState,null);assert.equal(await (await f.native.getFile()).text(),before);assert.equal(f.records.size,1);
+});

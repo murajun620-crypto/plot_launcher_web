@@ -1,20 +1,22 @@
-import {createAnnotationFormatDialog} from './annotation-format-dialog.mjs?v=9f854dcf3d6f';
-import {formatTargets,applyAnnotationFormat} from './annotation-format.mjs?v=9f854dcf3d6f';
-import {localFontFaces} from './local-font-faces.mjs?v=9f854dcf3d6f';
-import {primarySeriesColor,seriesFaceColor,setSeriesColor,applySeriesPalette} from './series-colors.mjs?v=9f854dcf3d6f';
-import {statisticNumber,statisticAvailable,statisticFormat,defaultStatisticFormat,patchStatisticFormat,applyStatisticFormat,addStatisticAnnotation,syncStatisticAnnotationTexts,detachStatisticText,distributionCSV} from './matrix-statistics.mjs?v=9f854dcf3d6f';
-import {createMatrixEditor} from './matrix-editor.mjs?v=9f854dcf3d6f';
-import {isMatrixPlot,isCombinedHistogram,matrixColorbarVisible} from './matrix-model.mjs?v=9f854dcf3d6f';
+import {createProjectFileLinks,portableFileLink} from './project-file-links.mjs?v=c19b474b30bc';
+import {chooseProjectFileAction} from './project-file-dialog.mjs?v=c19b474b30bc';
+import {createAnnotationFormatDialog} from './annotation-format-dialog.mjs?v=c19b474b30bc';
+import {formatTargets,applyAnnotationFormat} from './annotation-format.mjs?v=c19b474b30bc';
+import {localFontFaces} from './local-font-faces.mjs?v=c19b474b30bc';
+import {primarySeriesColor,seriesFaceColor,setSeriesColor,applySeriesPalette} from './series-colors.mjs?v=c19b474b30bc';
+import {statisticNumber,statisticAvailable,statisticFormat,defaultStatisticFormat,patchStatisticFormat,applyStatisticFormat,addStatisticAnnotation,syncStatisticAnnotationTexts,detachStatisticText,distributionCSV} from './matrix-statistics.mjs?v=c19b474b30bc';
+import {createMatrixEditor} from './matrix-editor.mjs?v=c19b474b30bc';
+import {isMatrixPlot,isCombinedHistogram,matrixColorbarVisible} from './matrix-model.mjs?v=c19b474b30bc';
 import {createFileProgress} from './file-progress.mjs?v=file-open-1';
-import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=9f854dcf3d6f';
+import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=c19b474b30bc';
 import {setupDirectSendButton,getFigureWorkspace} from './direct-transfer.mjs?v=baaeeccc3ee1';
-import {identifyPlotProject,openedPlotIdentity,plotSheetIndex,currentPlotImageId,resolvePlotImage,savedPlotProjectId,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=9f854dcf3d6f';
+import {identifyPlotProject,openedPlotIdentity,plotSheetIndex,currentPlotImageId,resolvePlotImage,savedPlotProjectId,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=c19b474b30bc';
 import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=9127ec4c4f31";
 import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=9127ec4c4f31";
 import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9127ec4c4f31";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=9f854dcf3d6f";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=9f854dcf3d6f";
-import { APP_VERSION, COLORS, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=9f854dcf3d6f";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=c19b474b30bc";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=c19b474b30bc";
+import { APP_VERSION, COLORS, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=c19b474b30bc";
 
 import {alignmentOffsets} from './object-layout.mjs?v=27ae7675c457';
 import {createDataEditor} from './data-editor.mjs?v=27ae7675c457';
@@ -28,15 +30,16 @@ let annotationFormatDialog=null;
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 const fileProgress=createFileProgress();
-const APP_BUILD = '9f854dcf3d6f';
+const APP_BUILD = 'c19b474b30bc';
 window.FigureAppRelease?.assertRunning({version:APP_VERSION,build:APP_BUILD});
 function makeProject(settings,data,fonts,workspace={}){
   const live=sourceData&&data.filename===sourceData.filename&&(data.bytes===sourceData.bytes||data.files&&data.files===sourceData.files);
   const projectId=workspace.figureStudioProjectId||data.figureStudioProjectId||(live?(sourceData.figureStudioProjectId||=crypto.randomUUID()):crypto.randomUUID());
-  const {figureStudioLegacyProjectId:legacyOverride,...rest}=workspace;
+  const {figureStudioLegacyProjectId:legacyOverride,sourceFileLink:linkOverride,...rest}=workspace;
+  const fileLink=Object.hasOwn(workspace,'sourceFileLink')?portableFileLink(linkOverride):live?portableFileLink(projectFileLink):null;
   const legacy=Object.hasOwn(workspace,'figureStudioLegacyProjectId')?legacyOverride:data.figureStudioLegacyProjectId||(live?sourceData.figureStudioLegacyProjectId:null);
   const fileName=workspace.projectFileName||data.figureStudioProjectFileName||(live?(sourceData.figureStudioProjectFileName||projectFilename||`${safeStem(workspace.saveName||'figure')}.plotproject`):'');
-  return encodePlotProject(settings,data,fonts,{...rest,figureStudioProjectId:projectId,figureStudioContent:workspace.figureStudioContent||data.figureStudioContent||(live?sourceData.figureStudioContent:null)||'figure',...(fileName?{projectFileName:fileName}:{}),...(legacy&&legacy!==projectId?{figureStudioLegacyProjectId:legacy}:{})});
+  return encodePlotProject(settings,data,fonts,{...rest,...(fileLink?{sourceFileLink:fileLink}:{}),figureStudioProjectId:projectId,figureStudioContent:workspace.figureStudioContent||data.figureStudioContent||(live?sourceData.figureStudioContent:null)||'figure',...(fileName?{projectFileName:fileName}:{}),...(legacy&&legacy!==projectId?{figureStudioLegacyProjectId:legacy}:{})});
 }
 
 function positionDialog(dialog, left, top) {
@@ -143,7 +146,8 @@ let dataFileHandles = [];
 const folderSupported = typeof window.showDirectoryPicker === 'function';
 const importedFonts = new Map();
 let savedProjectState = null;
-let projectHandle=null, projectFilename='';
+let projectHandle=null, projectFilename='',projectFileLink=null;
+const projectFiles=createProjectFileLinks({app:'plot',choose:chooseProjectFileAction,identify:async file=>openedPlotIdentity(await identifyPlotProject(JSON.parse(await file.text())),file.name)});
 let updateChecking=false, updateReloading=false, availableUpdate=null, updateRecovery=null,projectVersionChecking=false;
 let pendingDataFiles = null;
 let sampleCatalog = null, sampleCatalogPromise = null, sampleGroup = 'all', pendingSampleId = null;
@@ -478,7 +482,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=9f854dcf3d6f", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=c19b474b30bc", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") {
       if(data.id)requests.get(data.id)?.progressTask?.stage(data.text,{completed:data.completed,total:data.total,unit:data.unit||''});
@@ -1396,7 +1400,7 @@ async function loadDataFiles(files, append=false, selection=null) {
     config=combinedConfig(data,append || selection?oldMetadata:null,oldConfig);metadata=data;loadedHeader=1;
     sourceData={filename,...((append||selection)&&sourceData?.tableEdits?{tableEdits:sourceData.tableEdits}:{}),files:originals.map((file,index)=>({...file,sheetIndex:data.sources[index].sheetIndex,headerRow:data.sources[index].headerRow})),...((append||selection)&&sourceData?.figureStudioProjectId?{figureStudioProjectId:sourceData.figureStudioProjectId,figureStudioContent:sourceData.figureStudioContent,figureStudioProjectFileName:sourceData.figureStudioProjectFileName,figureStudioLegacyProjectId:sourceData.figureStudioLegacyProjectId}:{})};
     dataFileHandles=nextHandles;
-    if(!append && !selection){projectHandle=null;projectFilename='';sourceHandle=sourceHandles.get(files[0]) || null;sourceDirectory=null;$('#save-destination').value=folderSupported?'source':'download';}
+    if(!append && !selection){projectHandle=null;projectFilename='';projectFileLink=null;sourceHandle=sourceHandles.get(files[0]) || null;sourceDirectory=null;$('#save-destination').value=folderSupported?'source':'download';}
     sample=false;sheetMode='shared';sharedSettings=null;sheetSettings.clear();
     if(config.series.length){sharedSettings=makeSettings(config,metadata,1);sheetSettings.set(0,sharedSettings);}
     selected.clear();history=[];future=[];lastState=structuredClone(config);view={zoom:1,x:0,y:0};
@@ -1547,7 +1551,7 @@ async function loadFile(file, isSample = false, reload = false, fromClipboard = 
     loadedHeader = metadata.headerRow || headerRow;
     sheetSettings = nextSheets;
     if (!reload) {
-      projectHandle=null;projectFilename='';
+      projectHandle=null;projectFilename='';projectFileLink=null;
       sheetSettings.clear();
       sheetMode = 'shared'; sharedSettings = null;
       sourceData = sourceWithSheetSelection({filename, bytes:originalBytes},chosenSheets||metadata.sheets.map((_,index)=>index),metadata.sheets.length);
@@ -2357,32 +2361,29 @@ $("#project-file").addEventListener("change", event => {
 });
 async function saveProject({saveAs=false}={}) {
   if(!engineReady || loading || exporting || !sourceData || !metadata || !config.series.length)return;
-  exporting=true;updateButtons();
+  exporting=true;updateButtons();status('元ファイルと保存先を確認しています…');
   try {
     const name=projectFilename || `${safeStem($("#save-name").value)}.plotproject`;
-    let saveFile;
-    if(projectHandle && !saveAs) {
-      const permission={mode:'readwrite'};
-      if(projectHandle.queryPermission && await projectHandle.queryPermission(permission)!=='granted' && (!projectHandle.requestPermission || await projectHandle.requestPermission(permission)!=='granted'))throw new Error('このファイルへの上書きが許可されていません。「名前を付けて保存」から保存先を選んでください。');
-      saveFile=await documentSaver({name,handle:projectHandle});
-    } else saveFile=await prepareDocumentSaver(name,"PlotLauncherプロジェクト",".plotproject",projectHandle || undefined);
-    if(saveAs)await figureStudioBridge?.captureWorkspaceBinding();
+    const target=await projectFiles.prepare({projectId:sourceData.figureStudioProjectId,name,link:projectFileLink,handle:projectHandle,saveAs,knownSource:!!projectFilename,startIn:projectHandle||saveDirectory||sourceDirectory||sourceHandle,fallback:async(blob,filename)=>{download(blob,filename);return filename;}});
+    if(target.saveAs)await figureStudioBridge?.captureWorkspaceBinding();
     const savedState=projectEditState(),savingSource=sourceData;
     const currentId=sourceData.figureStudioProjectId||crypto.randomUUID();
-    const savedId=await savedPlotProjectId(currentId,projectHandle,saveFile.handle,{saveAs});
-    const savedFileName=saveFile.handle?.name||name;
+    const savedId=await savedPlotProjectId(currentId,projectHandle,target.handle,{saveAs:target.saveAs});
+    const savedFileName=target.name;
     const project=makeProject(makeSettings(config,metadata,loadedHeader), {...sourceData,sheetIndex:metadata.sheetIndex,headerRow:loadedHeader,sample}, [...importedFonts.values()], {
-      figureStudioProjectId:savedId,projectFileName:savedFileName,figureStudioLegacyProjectId:savedId===currentId?sourceData.figureStudioLegacyProjectId:null,saveName:$("#save-name").value,pngDpi:Number($("#png-dpi").value),view:{...view},sections:$$('#controls-panel .control-section').map(section=>section.open),sheetSettings:projectSheetSettings(),sheetMode,sharedSettings:sheetMode === 'shared' ? currentSharedSettings() : sharedSettings
+      sourceFileLink:null,figureStudioProjectId:savedId,projectFileName:savedFileName,figureStudioLegacyProjectId:savedId===currentId?sourceData.figureStudioLegacyProjectId:null,saveName:$("#save-name").value,pngDpi:Number($("#png-dpi").value),view:{...view},sections:$$('#controls-panel .control-section').map(section=>section.open),sheetSettings:projectSheetSettings(),sheetMode,sharedSettings:sheetMode === 'shared' ? currentSharedSettings() : sharedSettings
     });
     const blob=new Blob([JSON.stringify(project)],{type:'application/json'});
     if(blob.size>PROJECT_MAX_SIZE)throw new Error('プロジェクトは130 MB以内にしてください。');
-    const savedName=await saveFile(blob,name);
+    const hash=await target.write(blob);
+    const savedName=target.name,remembered=await target.remember(savedId,hash);
     if(sourceData===savingSource&&(savedId!==sourceData.figureStudioProjectId||savedFileName!==sourceData.figureStudioProjectFileName)){
       sourceData={...sourceData,figureStudioProjectId:savedId,figureStudioProjectFileName:savedFileName};savedState.source=sourceData;
       if(savedId!==currentId){delete sourceData.figureStudioLegacyProjectId;figureBridgeBaseline=null;figureBridgePreservedOnReconnect=false;figureStudioBridge?.resetWorkspaceBinding();}
       else if(figureBridgeBaseline?.source===savingSource)figureBridgeBaseline={...figureBridgeBaseline,source:sourceData};
     }
-    projectHandle=saveFile.handle || null;projectFilename=savedName; savedProjectState=savedState; status(`${savedName} を保存しました。データと設定をまとめて再開できます。`,'ready');
+    projectHandle=target.handle || null;projectFilename=savedName;projectFileLink=remembered.link;plotCollectionCache=null;savedProjectState=savedState;
+    status(target.handle?`${savedName} を保存しました。${remembered.remembered?'元ファイルへの保存先をこのブラウザに記憶しました。':'保存先をブラウザに記憶できなかったため、Studioから開き直す際は元ファイルを選び直してください。'}`:'プロジェクトをダウンロードしました。このブラウザではファイルへ直接上書きできません。','ready');
   } catch(error){status(error.name==='AbortError'?'保存をキャンセルしました。':`プロジェクトを保存できませんでした: ${error.message}`,error.name==='AbortError'?'ready':'error');}
   finally{exporting=false;updateButtons();if(renderWanted)renderPreview();}
 }
@@ -2422,7 +2423,7 @@ function captureUpdateSession(target) {
     config,sourceData,metadata,fonts:[...importedFonts.values()],fontFamilies:[...loadedFonts],fontAliases:[...localFontAliases],
     savedProjectState,loadedHeader,sample,sheetSettings:[...sheetSettings],sheetMode,sharedSettings,
     history,future,lastState,selected:[...selected],clipboard,
-    handles:{projectHandle,projectFilename,sourceHandle,sourceDirectory,saveDirectory,dataFileHandles},
+    projectFileLink,handles:{projectHandle,projectFilename,sourceHandle,sourceDirectory,saveDirectory,dataFileHandles},
     workspace:{saveName:$('#save-name').value,pngDpi:$('#png-dpi').value,saveDestination:$('#save-destination').value,
       view,tableHidden:$('#series-table-content').hidden,tableDetails:$('#series-table-details').checked,
       details:$$('#controls-panel details').map(node=>({id:node.id,open:node.open})),
@@ -2500,7 +2501,7 @@ async function restoreUpdateSession() {
     savedProjectState=record.savedProjectState;loadedHeader=record.loadedHeader;sample=record.sample;
     sheetSettings=new Map(record.sheetSettings);sheetMode=record.sheetMode;sharedSettings=record.sharedSettings;
     history=record.history;future=record.future;lastState=record.lastState;selected=new Set(record.selected);clipboard=record.clipboard;
-    ({projectHandle,projectFilename,sourceHandle,sourceDirectory,saveDirectory,dataFileHandles}=record.handles);
+    ({projectHandle,projectFilename,sourceHandle,sourceDirectory,saveDirectory,dataFileHandles}=record.handles);projectFileLink=portableFileLink(record.projectFileLink);
     const workspace=record.workspace;view=workspace.view;
     $('#save-name').value=workspace.saveName;$('#png-dpi').value=workspace.pngDpi;$('#save-destination').value=workspace.saveDestination;
     clearTimeout(renderTimer);++revision;
@@ -2584,6 +2585,7 @@ async function readProject(file, saved, options={}) {
     await checkFigureStudioProjectReplacement(options);
     opening.stage('データとフォントを復元しています…');
     const result=await request('project',{filename:project.data.filename,selectedSheets:project.data.selectedSheets,tableEdits:project.data.tableEdits,bytes:project.data.bytes,...(project.data.files?{files:project.data.files}:{}),sheetIndex:project.data.sheetIndex,headerRow:project.data.headerRow,settings:project.settings,fonts:project.fonts,sheetSettings:project.workspace.sheetSettings || [],sharedSettings:project.workspace.sharedSettings});
+    const fileTarget=await projectFiles.opened({file,projectId:identity.projectId,handle:sourceHandles.get(file)||null,embedded:!!options.fromBridge,link:project.workspace.sourceFileLink});
     prepareFigureStudioProjectReplacement(options);
     opening.stage('グラフ設定を復元しています…');await opening.paint();
     metadata=result.metadata; config=result.config; sourceData=retainedData; sample=project.data.sample; dataFileHandles=[];
@@ -2591,7 +2593,7 @@ async function readProject(file, saved, options={}) {
     // Older projects may contain distinct sheet styles; keep those individual.
     sheetMode=project.workspace.sheetMode || 'individual'; sharedSettings=project.workspace.sharedSettings || null;
     sourceHandle=sourceHandles.get(file) || null; sourceDirectory=null;
-    projectHandle=sourceHandle;projectFilename=file.name;
+    projectHandle=fileTarget.handle;projectFilename=file.name;projectFileLink=fileTarget.link;
     $('#save-destination').value=folderSupported?'source':'download'; refreshSaveDestination(); loadedHeader=metadata.headerRow;
     importedFonts.clear(); retainedFonts.forEach(font=>importedFonts.set(font.name,font));
     loadedFonts.clear(); ['Liberation Sans','Noto Sans JP','DejaVu Sans',...result.families].forEach(family=>loadedFonts.add(family));
@@ -3791,6 +3793,7 @@ function validateFigureWorkspaceState(snapshot){
  if(snapshot==null)return true;validateFigureWorkspaceGraph(snapshot);
  if(snapshot.version!==1||snapshot.app!=='plot'||!Object.hasOwn(snapshot,'state'))throw Error('PlotLauncherの作業状態ではありません。');
  const state=snapshot.state;if(state===null)return true;
+ if(state?.projectFileLink!=null&&!portableFileLink(state.projectFileLink))throw Error('元ファイルの対応情報を確認してください。');
  const fail=()=>{throw Error('PlotLauncherの作業状態を確認してください。');};
  const string=(value,max=1000)=>typeof value==='string'&&value.length<=max;
  const list=(value,max)=>Array.isArray(value)&&value.length<=max;
@@ -3887,7 +3890,8 @@ async function restoreFigureWorkspace(snapshot){
   if(sourceData)figureWorkspaceTokens.set(sourceData,record.sourceToken);record.fonts.forEach((font,index)=>figureWorkspaceTokens.set(font,record.fontTokens[index]));
   savedProjectState=record.savedProjectState;figureBridgeBaseline=record.bridgeBaseline;figureBridgePreservedOnReconnect=false;loadedHeader=record.loadedHeader;sample=record.sample;
   sheetSettings=new Map(record.sheetSettings);sheetMode=record.sheetMode;sharedSettings=record.sharedSettings;history=record.history;future=record.future;lastState=record.lastState;selected=new Set(record.selected);clipboard=record.clipboard;
-  sourceHandle=sourceDirectory=saveDirectory=projectHandle=null;dataFileHandles=[];projectFilename=record.projectFilename;
+  sourceHandle=sourceDirectory=saveDirectory=projectHandle=null;dataFileHandles=[];projectFilename=record.projectFilename;projectFileLink=portableFileLink(record.projectFileLink);
+  if(sourceData&&projectFilename)projectHandle=await projectFiles.resolve({projectId:sourceData.figureStudioProjectId,name:projectFilename,link:projectFileLink});
   pendingDataFiles=record.pendingDataFiles;pastedTable=record.pastedTable;pasteHeaderAutomatic=record.pasteHeaderAutomatic;colorPanel.replaceRecentColors(record.recentColors||[]);
   const workspace=record.workspace;view=workspace.view;$('#save-name').value=workspace.saveName;$('#png-dpi').value=workspace.pngDpi;$('#save-destination').value='download';
   clearTimeout(renderTimer);++revision;resetPreview();if(metadata)drawMetadata();else{$('#data-preview').hidden=true;$('#initial-message strong').textContent='データを選んでください';$('#preview-state').textContent='データ未選択';}
