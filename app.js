@@ -1,22 +1,22 @@
-import {createProjectFileLinks,portableFileLink} from './project-file-links.mjs?v=c19b474b30bc';
-import {chooseProjectFileAction} from './project-file-dialog.mjs?v=c19b474b30bc';
-import {createAnnotationFormatDialog} from './annotation-format-dialog.mjs?v=c19b474b30bc';
-import {formatTargets,applyAnnotationFormat} from './annotation-format.mjs?v=c19b474b30bc';
-import {localFontFaces} from './local-font-faces.mjs?v=c19b474b30bc';
-import {primarySeriesColor,seriesFaceColor,setSeriesColor,applySeriesPalette} from './series-colors.mjs?v=c19b474b30bc';
-import {statisticNumber,statisticAvailable,statisticFormat,defaultStatisticFormat,patchStatisticFormat,applyStatisticFormat,addStatisticAnnotation,syncStatisticAnnotationTexts,detachStatisticText,distributionCSV} from './matrix-statistics.mjs?v=c19b474b30bc';
-import {createMatrixEditor} from './matrix-editor.mjs?v=c19b474b30bc';
-import {isMatrixPlot,isCombinedHistogram,matrixColorbarVisible} from './matrix-model.mjs?v=c19b474b30bc';
+import {createProjectFileLinks,portableFileLink} from './project-file-links.mjs?v=699db174eecd';
+import {chooseProjectFileAction} from './project-file-dialog.mjs?v=699db174eecd';
+import {createAnnotationFormatDialog} from './annotation-format-dialog.mjs?v=699db174eecd';
+import {formatTargets,applyAnnotationFormat} from './annotation-format.mjs?v=699db174eecd';
+import {localFontFaces} from './local-font-faces.mjs?v=699db174eecd';
+import {primarySeriesColor,seriesFaceColor,setSeriesColor,applySeriesPalette} from './series-colors.mjs?v=699db174eecd';
+import {statisticNumber,statisticAvailable,statisticFormat,defaultStatisticFormat,patchStatisticFormat,applyStatisticFormat,addStatisticAnnotation,syncStatisticAnnotationTexts,detachStatisticText,distributionCSV} from './matrix-statistics.mjs?v=699db174eecd';
+import {createMatrixEditor} from './matrix-editor.mjs?v=699db174eecd';
+import {isMatrixPlot,isCombinedHistogram,matrixColorbarVisible} from './matrix-model.mjs?v=699db174eecd';
 import {createFileProgress} from './file-progress.mjs?v=file-open-1';
-import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=c19b474b30bc';
+import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=699db174eecd';
 import {setupDirectSendButton,getFigureWorkspace} from './direct-transfer.mjs?v=baaeeccc3ee1';
-import {identifyPlotProject,openedPlotIdentity,plotSheetIndex,currentPlotImageId,resolvePlotImage,savedPlotProjectId,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=c19b474b30bc';
+import {identifyPlotProject,openedPlotIdentity,plotSheetIndex,currentPlotImageId,resolvePlotImage,savedPlotProjectId,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=699db174eecd';
 import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=9127ec4c4f31";
 import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=9127ec4c4f31";
 import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9127ec4c4f31";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=c19b474b30bc";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=c19b474b30bc";
-import { APP_VERSION, COLORS, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=c19b474b30bc";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=699db174eecd";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=699db174eecd";
+import { APP_VERSION, COLORS, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=699db174eecd";
 
 import {alignmentOffsets} from './object-layout.mjs?v=27ae7675c457';
 import {createDataEditor} from './data-editor.mjs?v=27ae7675c457';
@@ -30,7 +30,7 @@ let annotationFormatDialog=null;
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 const fileProgress=createFileProgress();
-const APP_BUILD = 'c19b474b30bc';
+const APP_BUILD = '699db174eecd';
 window.FigureAppRelease?.assertRunning({version:APP_VERSION,build:APP_BUILD});
 function makeProject(settings,data,fonts,workspace={}){
   const live=sourceData&&data.filename===sourceData.filename&&(data.bytes===sourceData.bytes||data.files&&data.files===sourceData.files);
@@ -482,7 +482,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=c19b474b30bc", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=699db174eecd", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") {
       if(data.id)requests.get(data.id)?.progressTask?.stage(data.text,{completed:data.completed,total:data.total,unit:data.unit||''});

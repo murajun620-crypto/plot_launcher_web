@@ -49,9 +49,10 @@ for(const app of ['plot','mifito']){
     assert.notEqual(a.link.token,b.link.token);assert.equal(await f.api.resolve({projectId,name:f.name,link:a.link}),one);assert.equal(await f.api.resolve({projectId,name:f.name,link:b.link}),two);
     const legacy=await f.api.opened({file:await one.getFile(),projectId,embedded:true});assert.equal(legacy.handle,null);
   });
-  test(`${app}: an unchanged raw project already registered locally reconnects without guessing`,async()=>{
+  test(`${app}: raw legacy files never guess a target from identical name, ID and bytes`,async()=>{
     const f=setup(app),original=fileHandle(f.name);await f.api.opened({file:await original.getFile(),projectId,handle:original});
-    assert.equal((await f.api.opened({file:await original.getFile(),projectId,embedded:true})).handle,original);
+    assert.equal((await f.api.opened({file:await original.getFile(),projectId,embedded:true})).handle,null);
+    const unknownCopy=fileHandle(f.name);assert.equal((await f.api.opened({file:await unknownCopy.getFile(),projectId})).handle,null);
     assert.equal((await f.api.opened({file:new File(['generated legacy snapshot'],f.name),projectId,embedded:true})).handle,null);
   });
   test(`${app}: old Studio version detects newer native saves even if the registry has the new hash`,async()=>{

@@ -51,13 +51,9 @@ export function createProjectFileLinks({app,identify,choose,host=globalThis,stor
     if(embedded&&portable)return {link:portable,handle:await resolve({projectId,name,link:portable})};
     const hash=await digest(file);
     if(handle){const result=await remember({projectId,name,handle,fingerprint:hash});return {...result,handle};}
-    const candidates=[];
-    for(const record of await records(projectId,name))if(matching(record,projectId,name)&&record.fingerprint===hash){
-      let duplicate=false;for(const other of candidates)if(await sameFile(record.handle,other.handle)){duplicate=true;break;}
-      if(!duplicate)candidates.push(record);
-    }
-    // Two identical files in different folders are still different save targets.
-    return candidates.length===1?{link:{token:candidates[0].token,fingerprint:hash},handle:candidates[0].handle}:{link:{token:'',fingerprint:hash},handle:null};
+    // Even identical bytes/name/ID cannot identify a folder. Legacy snapshots
+    // without an opaque link require explicit selection of the original file.
+    return {link:{token:'',fingerprint:hash},handle:null};
   }
   async function permission(handle){
     const options={mode:'readwrite'};
