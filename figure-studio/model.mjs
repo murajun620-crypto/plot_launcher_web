@@ -1,3 +1,4 @@
+import {validPanelLabelContent} from './panel-label-content.mjs?v=panel-content-v0735-1';
 import {ARROW_PROPERTIES} from './arrowheads.mjs';
 import {isPathObject,validatePathObject} from './paths.mjs';
 import {isLineStyle} from './line-styles.mjs';
@@ -78,6 +79,7 @@ export function validateDocument(input){
   if(isPathObject(o))validatePathObject(o);
   if(o.rotation!==undefined&&!finite(o.rotation,-1e6,1e6))throw Error('角度が不正です。');
   if(o.type==='text'&&(typeof o.text!=='string'||o.text.length>100000||!finite(o.fontSize,1,1000)||(o.fontFamily!==undefined&&(typeof o.fontFamily!=='string'||o.fontFamily.length>500))||(o.textAlign!==undefined&&!['left','center','right','justify'].includes(o.textAlign))))throw Error('テキストが不正です。');
+  if(o.panelLabelContent!==undefined&&(o.type!=='text'||!validPanelLabelContent(o.panelLabelContent)))throw Error('パネルラベルの文字列を確認してください。');
   if(o.textMode!==undefined&&!TEXT_MODES.includes(o.textMode))throw Error('文字の入力形式が不正です。');
   if(!finite(o.opacity??1,0,1)||!finite(o.strokeWidth??1,0,1000))throw Error('書式が不正です。');
   if(o.dashStyle!==undefined&&!isLineStyle(o.dashStyle)||o.dashed!==undefined&&typeof o.dashed!=='boolean')throw Error('線種が不正です。');

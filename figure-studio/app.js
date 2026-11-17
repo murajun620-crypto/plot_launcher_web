@@ -1,26 +1,28 @@
 import {fitTextBox,naturalTextLines} from './text-fit.mjs?v=nested-groups-v0712-1';
 import {regroupObjects,ungroupObjects,remapGroupIds} from './groups.mjs?v=nested-groups-v0712-1';
-import {PT_PER_MM,mm,toMM,uid,clone,newDocument,makeObject,bounds,objectBounds,expandSelection,align,distribute,reorder,autoLayout,History,validateDocument,rotateOrFlip} from './model.mjs?v=nested-groups-v0712-1';
+import {PT_PER_MM,mm,toMM,uid,clone,newDocument,makeObject,bounds,objectBounds,expandSelection,align,distribute,reorder,autoLayout,History,validateDocument,rotateOrFlip} from './model.mjs?v=panel-content-v0735-1';
 import {isPathObject,pathData,objectFromPoints} from './paths.mjs?v=ribbon-v060-1';
 import {createPathDrawing} from './path-drawing.mjs?v=ribbon-v060-1';
-import {imageAsset,imagePhysicalSize,imageMiFiToBodySize,blobToDataURL,dataURLToBlob,download,sanitizeSVG} from './assets.mjs?v=nested-groups-v0712-1';
-import {serializeOfficeSVG} from './svg-export.mjs?v=project-copies-v0734-1';
-import {preparePNG} from './png-export.mjs?v=project-copies-v0734-1';
-import {importedImageSize,replacedImageSize,replacedMiFiToImageSize,miFiToSizeCorrection,imageInsertionPoint} from './image-placement.mjs?v=nested-groups-v0712-1';
+import {imageAsset,imagePhysicalSize,imageMiFiToBodySize,blobToDataURL,dataURLToBlob,download,sanitizeSVG} from './assets.mjs?v=panel-content-v0735-1';
+import {serializeOfficeSVG} from './svg-export.mjs?v=panel-content-v0735-1';
+import {preparePNG} from './png-export.mjs?v=panel-content-v0735-1';
+import {importedImageSize,replacedImageSize,replacedMiFiToImageSize,miFiToSizeCorrection,imageInsertionPoint} from './image-placement.mjs?v=panel-content-v0735-1';
 import {rasterResolution} from './image-resolution.mjs?v=image-quality-v066-1';
 import {saveDraft,loadDraft,saveProjectFileTarget,loadProjectFileTarget} from './storage.mjs?v=0.3.6-1';
-import {stageStudioUpdate,restoreStudioUpdate,isLegacyStudioUpdate,finishLegacyStudioUpdate} from './startup-session.mjs?v=project-copies-v0734-1';
-import {createDemo} from './demo.mjs?v=project-copies-v0734-1';
+import {stageStudioUpdate,restoreStudioUpdate,isLegacyStudioUpdate,finishLegacyStudioUpdate} from './startup-session.mjs?v=panel-content-v0735-1';
+import {createDemo} from './demo.mjs?v=panel-content-v0735-1';
 import {createShortcutHandler,shortcutLabel} from './shortcuts.mjs?v=nested-groups-v0712-1';
-import {installShortcutUI} from './shortcut-ui.mjs?v=project-copies-v0734-1';
-import {createRibbon} from './ribbon.mjs?v=project-copies-v0734-1';
-import {createPresentation} from './presentation.mjs?v=project-copies-v0734-1';
-import {installBrowserZoomGuard} from './browser-zoom.mjs?v=project-copies-v0734-1';
-import {imageArrayUnits,arrangeImageArray} from './image-array.mjs?v=nested-groups-v0712-1';
-import {createImageArrayDialog} from './image-array-dialog.mjs?v=nested-groups-v0712-1';
-import {applyPanelLabels} from './panel-labels.mjs?v=project-copies-v0734-1';
-import {plotPanelBounds} from './plot-frame.mjs?v=project-copies-v0734-1';
-import {createPanelLabelDialog} from './panel-label-dialog.mjs?v=project-copies-v0734-1';
+import {installShortcutUI} from './shortcut-ui.mjs?v=panel-content-v0735-1';
+import {createRibbon} from './ribbon.mjs?v=panel-content-v0735-1';
+import {createPresentation} from './presentation.mjs?v=panel-content-v0735-1';
+import {installBrowserZoomGuard} from './browser-zoom.mjs?v=panel-content-v0735-1';
+import {imageArrayUnits,arrangeImageArray} from './image-array.mjs?v=panel-content-v0735-1';
+import {createImageArrayDialog} from './image-array-dialog.mjs?v=panel-content-v0735-1';
+import {writePanelLabelContent} from './panel-label-content.mjs?v=panel-content-v0735-1';
+import {createPanelLabelEditor} from './panel-label-editor.mjs?v=panel-content-v0735-1';
+import {applyPanelLabels} from './panel-labels.mjs?v=panel-content-v0735-1';
+import {plotPanelBounds} from './plot-frame.mjs?v=panel-content-v0735-1';
+import {createPanelLabelDialog} from './panel-label-dialog.mjs?v=panel-content-v0735-1';
 import {createColorPickers} from './colors.mjs?v=unified-palette-1';
 import {renderTextPaint} from './text-paint.mjs?v=tex-v061-1';
 import {createTexRenderer} from './tex.mjs?v=micro-v0711-2';
@@ -29,31 +31,31 @@ import {openSource,SOURCE_APPS,setupSourceDiscovery,closeSourceSessions} from '.
 import {createFigureSidebar} from './thumbnails.mjs?v=live-v062-1';
 import {setupTransferReceiver,getFigureWorkspace} from './integration/direct-transfer.mjs?v=studio-send-v0714-1';
 import {readMifitoIdentity} from './integration/mifito-sync.mjs?v=0.3.5-1';
-import {readPlotIdentity,resolvePlotImage,currentPlotImageId} from './integration/plot-sync.mjs?v=project-copies-v0734-1';
-import {planMiFiToSync} from './mifito-batch.mjs?v=project-copies-v0734-1';
-import {setupUpdateCheck} from './update-check.mjs?v=project-copies-v0734-1';
-import {installWorkspaceUpdater} from './workspace-update.mjs?v=project-copies-v0734-1';
-import {marqueeSelection,resolveObjectSelection,clickObjectSelection,selectionDescription} from './selection.mjs?v=nested-groups-v0712-1';
-import {renderGroupLayers} from './group-layers.mjs?v=nested-groups-v0712-1';
-import {drawSelectionFrames} from './selection-overlay.mjs?v=studio-send-v0714-1';
+import {readPlotIdentity,resolvePlotImage,currentPlotImageId} from './integration/plot-sync.mjs?v=panel-content-v0735-1';
+import {planMiFiToSync} from './mifito-batch.mjs?v=panel-content-v0735-1';
+import {setupUpdateCheck} from './update-check.mjs?v=panel-content-v0735-1';
+import {installWorkspaceUpdater} from './workspace-update.mjs?v=panel-content-v0735-1';
+import {marqueeSelection,resolveObjectSelection,clickObjectSelection,selectionDescription} from './selection.mjs?v=panel-content-v0735-1';
+import {renderGroupLayers} from './group-layers.mjs?v=panel-content-v0735-1';
+import {drawSelectionFrames} from './selection-overlay.mjs?v=panel-content-v0735-1';
 import {ARROW_PROPERTIES,arrowEndpoint,arrowPropertyValue,setArrowProperty,arrowGeometry} from './arrowheads.mjs?v=0.3.0-1';
 
 import {createArrowPicker} from './arrow-picker.mjs?v=0.3.0-1';
 import {lineStrokeAttributes,lineStyleValue,setLineStyle,supportsLineStyle} from './line-styles.mjs?v=lines-v064-1';
 import {createLineStylePicker} from './line-style-picker.mjs?v=lines-v064-1';
-import {createPreviewQuality} from './preview-quality.mjs?v=nested-groups-v0712-1';
-import {createSelectionWheelZoom,resetSelectionZoom} from './selection-zoom.mjs?v=nested-groups-v0712-1';
+import {createPreviewQuality} from './preview-quality.mjs?v=panel-content-v0735-1';
+import {createSelectionWheelZoom,resetSelectionZoom} from './selection-zoom.mjs?v=panel-content-v0735-1';
 import {fontSizeForAction} from './text-format.mjs?v=annotation-input-v071-1';
-import {selectionPNG,writeSelectionImage,studioPasteObjects,matchesSelectionPNG} from './image-clipboard.mjs?v=nested-groups-v0712-1';
+import {selectionPNG,writeSelectionImage,studioPasteObjects,matchesSelectionPNG} from './image-clipboard.mjs?v=panel-content-v0735-1';
 import {reorderFigures} from './figure-order.mjs';
 import {renumberFigureNames} from './figure-names.mjs?v=0.3.3-1';
-import {deleteFigures,duplicateFigures} from './figure-commands.mjs?v=nested-groups-v0712-1';
+import {deleteFigures,duplicateFigures} from './figure-commands.mjs?v=panel-content-v0735-1';
 import {ProjectFileSession,projectFilePickerOptions} from './project-file.mjs?v=project-switch-v051-1';
-import {installWorkspacePersistence} from './workspace-session.mjs?v=project-copies-v0734-1';
+import {installWorkspacePersistence} from './workspace-session.mjs?v=panel-content-v0735-1';
 import {decodeWorkspaceState} from './workspace-state.mjs?v=project-switch-v051-1';
-import {validateWorkspaceBinding} from './integration/bridge-host.mjs?v=project-copies-v0734-1';
+import {validateWorkspaceBinding} from './integration/bridge-host.mjs?v=panel-content-v0735-1';
 
-const STUDIO_RELEASE={version:'0.7.34',build:'project-copies-v0734-1'};
+const STUDIO_RELEASE={version:'0.7.35',build:'panel-content-v0735-1'};
 installBrowserZoomGuard();
 window.FigureAppRelease?.assertRunning(STUDIO_RELEASE);
 if(window.FigureAppRelease&&!await window.FigureAppRelease.startup())throw Error('最新版へ切り替えています。');
@@ -86,6 +88,14 @@ svg.setAttribute('tabindex','0');svg.setAttribute('role','application');svg.setA
 const ribbon=createRibbon({onResize:()=>{renderOverlay();positionEditor();},onFocusCanvas:()=>svg.focus({preventScroll:true})});
 const imageArrayDialog=createImageArrayDialog({root:$('#imageArrayDialog'),getDocument:()=>doc,getSelection:()=>selection,getSelectionOptions:()=>({individual:!!groupScope}),onApply:(ids,gaps)=>{let result;change(()=>{result=arrangeImageArray(doc,ids,gaps);});toast(`${result.rows}行 × ${result.columns}列に配列しました · Ctrl+Zで戻せます`);},onClose:()=>svg.focus({preventScroll:true})});
 const panelLabelDialog=createPanelLabelDialog({root:$('#panelLabelDialog'),getDocument:()=>doc,getSelection:()=>selection,onApply:(ids,options)=>{let result;change(()=>{result=applyPanelLabels(doc,ids,options,fitText,(text,object)=>{measure.font=font(object);return measure.measureText(text);},object=>plotPanelBounds(object,assets.get(object.assetId)));});setSelection(result.ids,{focus:false});toast(`${result.count}パネルにラベルを付けました · Ctrl+Zで戻せます`);},onClose:()=>svg.focus({preventScroll:true})});
+const panelLabelEditor=createPanelLabelEditor({root:$('#panelLabelEditor'),getDocument:()=>doc,onApply:(id,options)=>{
+ change(()=>{const object=doc.objects.find(object=>object.id===id),oldHeight=object.h;
+  const panels=doc.objects.filter(other=>other.type==='image'&&object.groupId&&other.groupId===object.groupId);
+  const outside=!(object.rotation||0)&&panels.length&&object.y<Math.min(...panels.map(image=>(plotPanelBounds(image,assets.get(image.assetId))||objectBounds(image)).y));
+  writePanelLabelContent(object,options.content);object.textMode=options.textMode;object.fontSize=options.fontSize;fitText(object);
+  if(outside)object.y+=oldHeight-object.h;
+ });
+},onClose:()=>svg.focus({preventScroll:true})});
 const colorPickers=createColorPickers();
 pathDrawing=createPathDrawing({svg,point:svgPoint,scale:()=>scale,onDraft:draft=>{pathDraft=draft;if(!pathPreviewFrame)pathPreviewFrame=requestAnimationFrame(()=>{pathPreviewFrame=0;renderOverlay();});},onCommit:commitDrawnPath,onCancel:()=>{if(!pathToolTransition)setTool('select');},onHint:message=>{if(message)$('#statusText').textContent=message;}});
 const measure=document.createElement('canvas').getContext('2d');
@@ -273,7 +283,7 @@ function drawPathDraft(){
 function commitDrawnPath({type,points,closed}){
  const props=objectFromPoints(type,points,{closed}),object=makeObject(type,{...props,name:type==='curve'?'曲線':'フリーフォーム'});pathDraft=null;const before=snapshot();doc.objects.push(object);selection=[object.id];record(before);setTool('select');
 }
-function beginText(o){if(o.locked||o.groupId&&doc.objects.some(object=>object.groupId===o.groupId&&object.locked))return;finishText();if(o.groupId)setSelection([o.id],{scope:o.groupId,focus:false});editingId=o.id;textBefore=snapshot();editor.value=o.text;editor.hidden=false;editingTexSession=texRenderer.hasMath(o);positionEditor();textCaret=null;editor.focus();editor.select();}
+function beginText(o){if(o.panelLabel){finishText();if(o.groupId)setSelection([o.id],{scope:o.groupId,focus:false});panelLabelEditor.show(o);return;}if(o.locked||o.groupId&&doc.objects.some(object=>object.groupId===o.groupId&&object.locked))return;finishText();if(o.groupId)setSelection([o.id],{scope:o.groupId,focus:false});editingId=o.id;textBefore=snapshot();editor.value=o.text;editor.hidden=false;editingTexSession=texRenderer.hasMath(o);positionEditor();textCaret=null;editor.focus();editor.select();}
 function placeTexSource(){
  const preview=$('#texPreviewPanel'),host=livePreview.source==='ribbon'&&!$('#ribbonSelectionPane').hidden?$('#sidebarPreviewSlot'):document.body;
  if(preview.parentElement!==host)host.append(preview);

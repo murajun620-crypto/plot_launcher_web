@@ -1,4 +1,4 @@
-import {sanitizeSVG} from './assets.mjs?v=nested-groups-v0712-1';
+import {sanitizeSVG} from './assets.mjs?v=panel-content-v0735-1';
 
 const SVG='http://www.w3.org/2000/svg',XLINK='http://www.w3.org/1999/xlink';
 const href=node=>node.getAttribute('href')||node.getAttributeNS(XLINK,'href')||'';

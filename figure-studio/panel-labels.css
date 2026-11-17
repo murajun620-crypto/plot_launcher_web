@@ -1,8 +1,8 @@
-#panelLabelDialog{width:min(480px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;padding:24px}
-#panelLabelDialog h2{margin:0;font-size:19px}
+:is(#panelLabelDialog,#panelLabelEditor){width:min(480px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;padding:24px}
+:is(#panelLabelDialog,#panelLabelEditor) h2{margin:0;font-size:19px}
 .panel-label-fields{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:20px 0}
 .panel-label-fields label{display:flex;flex-direction:column;gap:7px;font-size:12px;font-weight:600}
-.panel-label-fields input,.panel-label-fields select{width:100%;padding:9px;font-size:14px}
+.panel-label-fields input,.panel-label-fields select,.panel-label-fields textarea{width:100%;padding:9px;font-size:14px}
 .panel-label-wide{grid-column:1/-1}
 .panel-label-preview{font:400 22px Arial,sans-serif;letter-spacing:.02em;padding:15px 16px;background:#f3f6f5;border:1px solid var(--line);border-radius:6px;margin:0 0 18px;color:#000}
 .panel-label-advanced{border-top:1px solid var(--line);padding-top:12px}
@@ -11,4 +11,6 @@
 .panel-label-advanced[open]>summary::before{content:'− '}
 .panel-label-advanced .panel-label-fields{margin-bottom:12px}
 
-#panelLabelDialog .panel-label-fields .image-array-separate{flex-direction:row;align-items:center}#panelLabelDialog .image-array-separate input{width:auto}
+:is(#panelLabelDialog,#panelLabelEditor) .panel-label-fields .image-array-separate{flex-direction:row;align-items:center}:is(#panelLabelDialog,#panelLabelEditor) .image-array-separate input{width:auto}
+
+.panel-label-fields textarea{resize:vertical;min-height:58px;font:14px Arial,sans-serif;line-height:1.4;box-sizing:border-box}.panel-label-preview{white-space:pre-wrap;overflow-wrap:anywhere}

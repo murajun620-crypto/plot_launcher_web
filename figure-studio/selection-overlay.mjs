@@ -1,5 +1,5 @@
-import {bounds,objectBounds} from './model.mjs?v=nested-groups-v0712-1';
-import {selectionDescription} from './selection.mjs?v=nested-groups-v0712-1';
+import {bounds,objectBounds} from './model.mjs?v=panel-content-v0735-1';
+import {selectionDescription} from './selection.mjs?v=panel-content-v0735-1';
 
 export function drawSelectionFrames({root,doc,ids,groupId=null,scale,editableIds,draggable=false,el}){
  const set=new Set(ids),all=doc.objects.filter(object=>set.has(object.id)),box=bounds(all),u=1/scale;

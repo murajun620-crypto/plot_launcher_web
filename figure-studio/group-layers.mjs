@@ -1,4 +1,4 @@
-import {objectSelectionLabel} from './selection.mjs?v=nested-groups-v0712-1';
+import {objectSelectionLabel} from './selection.mjs?v=panel-content-v0735-1';
 
 const icons={image:'▧',text:'T',line:'╱',arrow:'↗',rect:'□',ellipse:'○',curve:'∿',freeform:'⌁',arc:'⌒'};
 export function renderGroupLayers({root,doc,ids,groupId=null,onSelect}){

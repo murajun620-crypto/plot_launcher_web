@@ -1,5 +1,6 @@
-import {bounds,objectBounds,selectionUnits,makeObject,mm,uid,clone} from './model.mjs?v=nested-groups-v0712-1';
+import {bounds,objectBounds,selectionUnits,makeObject,mm,uid,clone} from './model.mjs?v=panel-content-v0735-1';
 
+import {readPanelLabelContent,writePanelLabelContent} from './panel-label-content.mjs?v=panel-content-v0735-1';
 import {panelNumbering,numberedLabel} from './panel-numbering.mjs?v=panel-labels-v0723-1';
 export const PANEL_LABEL_STYLES=['alpha','branch-number','branch-roman','number','custom','none'];
 export function panelLabelText(index,style='alpha',values={}){return numberedLabel(index-1,panelNumbering(style,values));}
@@ -23,8 +24,9 @@ export function panelLabelUnits(doc,ids,{scope='selection',getFrame=()=>null}={}
 }
 
 /** Labels are ordinary editable text; group membership makes them travel with panels. */
-export function applyPanelLabels(doc,ids,{scope='selection',style='alpha',start=1,numbering={},fontSize=9,bold=false,gap=0,position='outside'}={},fitText=()=>{},measureText=()=>null,getFrame=()=>null){
+export function applyPanelLabels(doc,ids,{scope='selection',style='alpha',start=1,numbering={},subtext,fontSize=9,bold=false,gap=0,position='outside'}={},fitText=()=>{},measureText=()=>null,getFrame=()=>null){
  if(!PANEL_LABEL_STYLES.includes(style)||!Number.isSafeInteger(start)||start<1||start>9999||!Number.isFinite(fontSize)||fontSize<1||fontSize>1000||!Number.isFinite(gap)||gap<0||gap>mm(100)||!['outside','inside'].includes(position))throw Error('ラベルの設定を確認してください。');
+ if(subtext!==undefined&&(typeof subtext!=='string'||subtext.length>100000))throw Error('補足テキストを確認してください。');
  const targets=panelLabelUnits(doc,ids,{scope,getFrame});
  if(!targets.length)throw Error('固定されていない画像または画像グループを選択してください。');
  const removed=new Set(),plans=targets.map(({unit,box},index)=>{
@@ -35,6 +37,7 @@ export function applyPanelLabels(doc,ids,{scope='selection',style='alpha',start=
   const label=previous.length?clone(previous.find(object=>!object.groupStack?.length)||previous[0]):makeObject('text');
   Object.assign(label,{panelLabel:true,groupId,x:box.x,y:box.y,w:mm(9),h:fontSize*1.25+2,rotation:0,flipX:false,flipY:false,text,textMode:'plain',fontSize,bold,textAlign:'left',name:`パネルラベル ${text}`,locked:false});
   delete label.groupStack;
+  writePanelLabelContent(label,{text,subtext:subtext??(previous.length?readPanelLabelContent(previous[0]).subtext:''),parentheses:text.startsWith('(')&&text.endsWith(')')});
   if(!previous.length)Object.assign(label,{fill:'#000000',stroke:'none',fontFamily:'Arial'});
   fitText(label);
   label.x=box.x+(position==='inside'?gap:0);
@@ -42,10 +45,11 @@ export function applyPanelLabels(doc,ids,{scope='selection',style='alpha',start=
   else{
    // MiFiTo uses a tight glyph box with a one-em text allocation and a
    // small image-relative clearance, rather than Studio's padded edit box.
-   const metrics=measureText(text,label);
+   const lines=label.text.replace(/\r\n?/g,'\n').split('\n');
+   const metrics=measureText(lines.at(-1),label);
    const ascent=Number.isFinite(metrics?.actualBoundingBoxAscent)?metrics.actualBoundingBoxAscent:fontSize*.75;
    const descent=Number.isFinite(metrics?.actualBoundingBoxDescent)?metrics.actualBoundingBoxDescent:fontSize*.2;
-   const bottom=fontSize*.95+descent+Math.max(0,fontSize-ascent-descent);
+   const bottom=fontSize*.95+descent+Math.max(0,fontSize-ascent-descent)+(lines.length-1)*fontSize*1.25;
    label.y=box.y-bottom-Math.min(box.w,box.h)*.003-gap;
   }
   if(!Number.isFinite(label.x)||!Number.isFinite(label.y)||Math.abs(label.x)>1e6||Math.abs(label.y)>1e6)throw Error('ラベルを配置できる範囲を超えています。');

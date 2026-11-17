@@ -1,4 +1,4 @@
-import {clone,newDocument,uid} from './model.mjs?v=nested-groups-v0712-1';
+import {clone,newDocument,uid} from './model.mjs?v=panel-content-v0735-1';
 import {remapGroupIds} from './groups.mjs?v=nested-groups-v0712-1';
 
 // Book operations keep shared image/source assets intact and form one undo step.

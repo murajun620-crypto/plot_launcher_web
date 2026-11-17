@@ -1,4 +1,4 @@
-import {bounds} from './model.mjs?v=nested-groups-v0712-1';
+import {bounds} from './model.mjs?v=panel-content-v0735-1';
 
 /** Leave enough scrollable space to center even a panel at a page edge. */
 export function centerSelectionInViewport(viewport,paper,point,scale){
