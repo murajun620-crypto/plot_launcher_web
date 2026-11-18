@@ -1,7 +1,7 @@
-import {validateMatrixOptions} from './matrix-model.mjs?v=d65153020e44';
+import {validateMatrixOptions} from './matrix-model.mjs?v=d08c8b9af140';
 import { resetPresetUnitScales, unitConversion, configureAFMUnits } from "./units.js?v=9127ec4c4f31";
 import { validateTableEdits } from './table-edits.mjs?v=27ae7675c457';
-export const APP_VERSION = '2.5.15';
+export const APP_VERSION = '2.5.16';
 
 // Accept one numeric value or fraction without evaluating JavaScript expressions.
 export function parseCoefficient(value) {
@@ -51,6 +51,16 @@ export function applyPreset(config, preset, metadata) {
   const spectrum = ["EDX", "XPS Survey", "XPS Core", "XPS Fit", "XAFS", "Raman Spectrum"].includes(preset.id);
   Object.assign(config.axes, {hideYTickLabels: spectrum, hideYTicks: spectrum, xScale: "linear", yScale: ['Roughness','Waviness'].includes(preset.id) ? "log" : "linear", grid: preset.id === "Raman 3D"});
   Object.assign(config.axes, {xGrid: false, yGrid: false, xMinorGrid: false, yMinorGrid: false});
+  if (['XPS Core','XPS Fit'].includes(preset.id)) {
+    // Applying either XPS preset restores the same axis layout, including when
+    // switching from a larger map/histogram or a graph with a moved/hidden axis.
+    // Project restoration does not apply presets, so saved custom axes survive.
+    const defaults = defaultAxes();
+    for (const key of ['width','height','hideXLabel','hideYLabel','hideXTickLabels','hideXTicks','hideMinorTicks','hideXMinorTicks','hideYMinorTicks',
+      'spineLeft','spineRight','spineTop','spineBottom','yAxisRight','xAxisTop',
+      'xLabelX','xLabelY','yLabelX','yLabelY','xLabelPad','yLabelPad','xTickPad','yTickPad']) config.axes[key] = defaults[key];
+    Object.assign(config.axes, {hideYTickLabels:true,hideYTicks:true});
+  }
   if (['Roughness','Waviness'].includes(preset.id)) config.series.forEach(series => series.mode = "line+scatter");
   if (preset.id === 'Waviness') Object.assign(config.axes, {yMin: '', yMax: '', yStep: '', yMinorStep: '', yLogFormat: 'power', legendPosition: 'best', legendX: '', legendY: ''});
   if (preset.id === "Polishing Rate") {
