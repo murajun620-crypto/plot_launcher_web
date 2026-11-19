@@ -28,6 +28,7 @@ export function createPanelLabelDialog({root,getDocument,getSelection,onApply,on
   const selected=panelLabelUnits(openedDocument,ids).length;
   field('scope').querySelector('[value="selection"]').disabled=!selected;
   field('scope').value=selected?'selection':'all';
+  field('textMode').value='auto';
   sync();root.showModal();field('scope').focus();
  }
  form.addEventListener('input',sync);form.addEventListener('change',sync);

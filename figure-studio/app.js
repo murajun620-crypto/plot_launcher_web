@@ -23,7 +23,7 @@ import {writePanelLabelContent} from './panel-label-content.mjs?v=source-save-v0
 import {createPanelLabelEditor} from './panel-label-editor.mjs?v=panel-label-tex-v0737-1';
 import {applyPanelLabels} from './panel-labels.mjs?v=panel-label-tex-v0737-1';
 import {plotPanelBounds} from './plot-frame.mjs?v=source-save-v0736-1';
-import {createPanelLabelDialog} from './panel-label-dialog.mjs?v=panel-label-tex-v0737-1';
+import {createPanelLabelDialog} from './panel-label-dialog.mjs?v=tex-spacing-v0738-1';
 import {createColorPickers} from './colors.mjs?v=unified-palette-1';
 import {renderTextPaint} from './text-paint.mjs?v=tex-v061-1';
 import {createTexRenderer} from './tex.mjs?v=panel-label-tex-v0737-1';
@@ -56,7 +56,7 @@ import {installWorkspacePersistence} from './workspace-session.mjs?v=source-save
 import {decodeWorkspaceState} from './workspace-state.mjs?v=project-switch-v051-1';
 import {validateWorkspaceBinding} from './integration/bridge-host.mjs?v=source-save-v0736-1';
 
-const STUDIO_RELEASE={version:'0.7.37',build:'panel-label-tex-v0737-1'};
+const STUDIO_RELEASE={version:'0.7.38',build:'tex-spacing-v0738-1'};
 installBrowserZoomGuard();
 window.FigureAppRelease?.assertRunning(STUDIO_RELEASE);
 if(window.FigureAppRelease&&!await window.FigureAppRelease.startup())throw Error('最新版へ切り替えています。');
@@ -64,7 +64,16 @@ const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 setupSourceDiscovery();
 installShortcutUI();
 const ns='http://www.w3.org/2000/svg';
-const el=(tag,attrs={},text)=>{const n=document.createElementNS(ns,tag);for(const[k,v]of Object.entries(attrs))if(v!==undefined)n.setAttribute(k,v);if(text!==undefined)n.textContent=text;return n;};
+const el=(tag,attrs={},text)=>{
+ const node=document.createElementNS(ns,tag);
+ for(const [name,value] of Object.entries(attrs)){
+  if(value===undefined)continue;
+  if(name==='xml:space')node.setAttributeNS('http://www.w3.org/XML/1998/namespace',name,value);
+  else node.setAttribute(name,value);
+ }
+ if(text!==undefined)node.textContent=text;
+ return node;
+};
 let doc=newDocument(),assets=new Map(),selection=[],tool='select',scale=1.5,history=new History(),gesture=null,textBefore=null,editingId=null,dirty=false,saveTimer,revision=0,clipboard=null,formatClipboard=null,frame=0,spaceDown=false,manualSavedRevision=-1,bridge=null;
 let groupScope=null;
 let figures=[doc],bookId=uid(),initialDemo=false,transferQueue=Promise.resolve(),updateReloading=false;

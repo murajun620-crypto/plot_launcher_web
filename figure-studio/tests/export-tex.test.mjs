@@ -6,6 +6,7 @@ import {makeObject,newDocument,toMM,validateDocument} from '../model.mjs';
 import {createTexRenderer,makeTexLayout} from '../tex.mjs';
 import {renderTextPaint} from '../text-paint.mjs';
 
+const XML_NAMESPACE='http://www.w3.org/XML/1998/namespace';
 const source=await readFile(new URL('../app.js',import.meta.url),'utf8');
 function section(start,end){const at=source.indexOf(start),until=source.indexOf(end,at);assert.ok(at>=0&&until>at,start);return source.slice(at,until);}
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
@@ -14,13 +15,16 @@ const measure=(text,object)=>[...text].length*object.fontSize*.5;
 const geometry={viewBox:[0,-800,1000,1000],nodes:[{tag:'g',attrs:{transform:'scale(1,-1)'},children:[{tag:'path',attrs:{d:'M0 0L1000 0L500 800Z'},children:[]}]}]};
 const text=props=>makeObject('text',{text:'速度 $v_0$ = 3',fontSize:20,w:160,h:30,...props});
 class Node{
- constructor(tag){this.tag=tag;this.attributes=new Map();this.children=[];this.style={};this.textContent='';}
+ constructor(tag){this.tag=tag;this.attributes=new Map();this.attributeNamespaces=new Map();this.children=[];this.style={};this.textContent='';}
  setAttribute(name,value){this.attributes.set(name,String(value));}getAttribute(name){return this.attributes.get(name)??null;}
- removeAttribute(name){this.attributes.delete(name);}
+ setAttributeNS(namespace,name,value){this.attributeNamespaces.set(name,namespace);this.setAttribute(name,value);}
+ getAttributeNS(namespace,name){return this.attributeNamespaces.get(name)===namespace?this.getAttribute(name):null;}
+ removeAttribute(name){this.attributes.delete(name);this.attributeNamespaces.delete(name);}
  append(...nodes){this.children.push(...nodes);}prepend(...nodes){this.children.unshift(...nodes);}
  replaceChildren(...nodes){this.children=[...nodes];}
 }
-function el(tag,attributes={},content=''){const node=new Node(tag);node.textContent=content;for(const[name,value]of Object.entries(attributes))if(value!==undefined)node.setAttribute(name,value);return node;}
+const document={createElementNS:(_namespace,tag)=>new Node(tag)};
+const el=Function('document',`const ns='http://www.w3.org/2000/svg';`+section('const el=','let doc=')+'return el;')(document);
 const escape=value=>String(value).replaceAll('&','&amp;').replaceAll('"','&quot;').replaceAll('<','&lt;');
 const serialize=node=>`<${node.tag}${[...node.attributes].map(([name,value])=>` ${name}="${escape(value)}"`).join('')}>${escape(node.textContent)}${node.children.map(serialize).join('')}</${node.tag}>`;
 const flatten=nodes=>nodes.flatMap(node=>[node,...flatten(node.children)]);
@@ -52,6 +56,17 @@ test('SVG export waits for pending math and emits vectors after finishing text i
  const svg=await app.downloads[0].blob.text();assert.match(svg,/<path\b/);assert.doesNotMatch(svg,/<(?:image|foreignObject)\b|data-hit=|NaN|Infinity/);
  const visibleText=flatten([app.exported]).filter(node=>['text','tspan'].includes(node.tag)).map(node=>node.textContent).join('');
  assert.equal(visibleText,'速度  = 3');assert.ok(renderer.getLayout(object));assert.equal(app.api.finished,2);
+});
+
+test('text boxes and panel labels preserve literal spaces after inline TeX in SVG',async()=>{
+ const raw='Si 2$p$ (Step 1)',objects=[text({text:raw}),text({text:raw,panelLabel:true})];
+ const renderer=createTexRenderer({measure,convert:async()=>geometry}),app=harness(objects,renderer);
+ await app.api.exportSVG();
+ assert.equal(app.downloads.length,1);
+ const suffixes=flatten([app.exported]).filter(node=>node.tag==='text'&&node.textContent===' (Step 1)');
+ assert.equal(suffixes.length,2);
+ for(const suffix of suffixes)assert.equal(suffix.getAttributeNS(XML_NAMESPACE,'xml:space'),'preserve');
+ assert.deepEqual(objects.map(object=>object.text),[raw,raw]);
 });
 
 test('invalid TeX rejects preparation and prevents a misleading SVG download',async()=>{

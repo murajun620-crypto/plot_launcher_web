@@ -4,6 +4,7 @@ import {makeObject,newDocument,validateDocument,clone,History} from '../model.mj
 import {applyPanelLabels} from '../panel-labels.mjs';
 import {panelLabelDisplay,readPanelLabelContent,writePanelLabelContent} from '../panel-label-content.mjs';
 import {createPanelLabelEditor} from '../panel-label-editor.mjs';
+import {createPanelLabelDialog} from '../panel-label-dialog.mjs';
 import {fitTextBox} from '../text-fit.mjs';
 import {createTexRenderer} from '../tex.mjs';
 
@@ -86,6 +87,28 @@ test('panel content survives save, undo and redo with ordinary text attributes',
  history.push(before,doc);const saved=validateDocument(JSON.parse(JSON.stringify(doc)));
  assert.equal(saved.objects[0].text,'(b-2) Revised\ncaption');assert.equal(saved.objects[0].groupId,'panel');
  const undone=history.undo(doc);assert.deepEqual(undone,before);assert.deepEqual(history.redo(undone),doc);
+});
+
+test('new panel label operations start in auto mode even after applying plain mode',()=>{
+ const doc=scene(image('panel')),fields=Object.fromEntries(
+  Object.entries({scope:'',start:'1',style:'alpha',parent:'a',mode:'letter',startLetter:'a',prefix:'',separator:'-',subtext:'',textMode:'plain',fontSize:'9',gap:'0',position:'outside'}).map(([name,value])=>[name,{value}])
+ );
+ Object.assign(fields.scope,{focus(){},querySelector:()=>({})});
+ for(const name of ['bold','uppercase','parentheses'])fields[name]={checked:false};
+ const form=new EventTarget(),root=new EventTarget(),applied=[];
+ form.elements={namedItem:name=>fields[name]};form.reportValidity=()=>true;
+ const nodes=new Map();
+ root.querySelector=selector=>{
+  if(selector==='form')return form;
+  if(!nodes.has(selector))nodes.set(selector,{style:{}});
+  return nodes.get(selector);
+ };
+ root.querySelectorAll=()=>[];root.showModal=()=>{};root.close=()=>root.dispatchEvent(new Event('close'));
+ const dialog=createPanelLabelDialog({root,getDocument:()=>doc,getSelection:()=>[],onApply:(_ids,options)=>applied.push(options)});
+ dialog.show();assert.equal(fields.textMode.value,'auto');
+ fields.textMode.value='plain';form.dispatchEvent(new Event('submit',{cancelable:true}));
+ assert.equal(applied[0].textMode,'plain');
+ dialog.show();assert.equal(fields.textMode.value,'auto');
 });
 
 function editorHarness(doc,mathPreview){
