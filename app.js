@@ -1,3 +1,4 @@
+import {MAX_SHEET_SOURCES,groupSheetSources,copySheetSources} from './sheet-sources.mjs?v=5d107be1dfb1';
 import {createProjectFileLinks,portableFileLink} from './project-file-links.mjs?v=d08c8b9af140';
 import {chooseProjectFileAction} from './project-file-dialog.mjs?v=d08c8b9af140';
 import {createAnnotationFormatDialog} from './annotation-format-dialog.mjs?v=d08c8b9af140';
@@ -14,9 +15,9 @@ import {identifyPlotProject,openedPlotIdentity,plotSheetIndex,currentPlotImageId
 import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=9127ec4c4f31";
 import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=9127ec4c4f31";
 import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9127ec4c4f31";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=2b75f4a536bd";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=2b75f4a536bd";
-import { APP_VERSION, COLORS, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=2b75f4a536bd";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=5d107be1dfb1";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=5d107be1dfb1";
+import { APP_VERSION, COLORS, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, initialCombinedSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=5d107be1dfb1";
 
 import {alignmentOffsets} from './object-layout.mjs?v=27ae7675c457';
 import {createDataEditor} from './data-editor.mjs?v=27ae7675c457';
@@ -30,7 +31,7 @@ let annotationFormatDialog=null;
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 const fileProgress=createFileProgress();
-const APP_BUILD = '2b75f4a536bd';
+const APP_BUILD = '5d107be1dfb1';
 window.FigureAppRelease?.assertRunning({version:APP_VERSION,build:APP_BUILD});
 function makeProject(settings,data,fonts,workspace={}){
   const live=sourceData&&data.filename===sourceData.filename&&(data.bytes===sourceData.bytes||data.files&&data.files===sourceData.files);
@@ -182,26 +183,35 @@ function sourceWithSheetSelection(data,indices,count){
 function updateSheetPickerCount(){
   const count=$$('#sheet-picker-list input:checked').length,total=$$('#sheet-picker-list input').length;
   $('#sheet-picker-count').textContent=`${count} / ${total} シートを選択`;
-  $('#sheet-picker-apply').disabled=count===0;
+  const overflow=$('#sheet-picker-layout').value==='overlay'&&count>MAX_SHEET_SOURCES;
+  $('#sheet-picker-limit').hidden=!overflow;
+  $('#sheet-picker-apply').disabled=count===0||overflow;
 }
-async function chooseWorkbookSheets(names,filename,initial=null){
+async function chooseWorkbookSheets(names,filename,initial=null,{allowOverlay=false}={}){
   const dialog=$('#sheet-picker'),selected=initial?new Set(initial):null;
   $('#sheet-picker-file').textContent=filename;
+  $('#sheet-picker-layout-field').hidden=!allowOverlay;
+  $('#sheet-picker-layout').value='separate';
   $('#sheet-picker-list').replaceChildren(...names.map((name,index)=>{
     const label=document.createElement('label'),input=document.createElement('input');
     input.type='checkbox';input.value=String(index);input.checked=!selected||selected.has(index);
     label.append(input,document.createTextNode(name));return label;
   }));
   updateSheetPickerCount();dialog.returnValue='';
-  const answer=new Promise(resolve=>dialog.addEventListener('close',()=>resolve(dialog.returnValue==='apply'?$$('#sheet-picker-list input:checked').map(input=>Number(input.value)):null),{once:true}));
+  const answer=new Promise(resolve=>dialog.addEventListener('close',()=>{
+    const sheets=$$('#sheet-picker-list input:checked').map(input=>Number(input.value));
+    const overlay=allowOverlay&&$('#sheet-picker-layout').value==='overlay';
+    resolve(dialog.returnValue==='apply'&&sheets.length&&(!overlay||sheets.length<=MAX_SHEET_SOURCES)?{sheets,overlay}:null);
+  },{once:true}));
   showDialog('#sheet-picker');return answer;
 }
 $('#sheet-picker-list').addEventListener('change',updateSheetPickerCount);
+$('#sheet-picker-layout').addEventListener('change',updateSheetPickerCount);
 for(const [id,checked]of [['#sheet-picker-all',true],['#sheet-picker-none',false]])$(id).addEventListener('click',()=>{$$('#sheet-picker-list input').forEach(input=>input.checked=checked);updateSheetPickerCount();});
 $('#choose-sheets').addEventListener('click',async()=>{
   if(loading||exporting||!metadata||sourceData?.files)return;
   let indices;loading=true;updateButtons();
-  try{indices=await chooseWorkbookSheets(metadata.sheets,metadata.filename,selectedSheetIndices());}
+  try{indices=(await chooseWorkbookSheets(metadata.sheets,metadata.filename,selectedSheetIndices()))?.sheets;}
   finally{loading=false;updateButtons();}
   if(!indices?.length)return;
   if(JSON.stringify(indices)===JSON.stringify(selectedSheetIndices()))return;
@@ -482,7 +492,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=2b75f4a536bd", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=5d107be1dfb1", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") {
       if(data.id)requests.get(data.id)?.progressTask?.stage(data.text,{completed:data.completed,total:data.total,unit:data.unit||''});
@@ -1311,7 +1321,13 @@ function initialSheetConfig(data) {
   if (inferred==='Roughness') result.series.forEach(item=>item.mode='line+scatter');
   if (inferred==='Particle Histogram') result.options.diameterColumn=Math.min(2,data.columns.length-1);
   if(data.groups){
-    result.series=data.groups.flatMap(group=>initialSeries(group.columns.map(column=>({...column,name:column.originalName})),editableXY(group.plotType)?group.plotType:'General').map(item=>({...item,name:`${safeStem(group.filename)} · ${item.name}`}))).slice(0,32);
+    result.series=data.groups.flatMap((group,index)=>{
+      const source=data.sources[index];
+      const repeated=data.sources.some((other,i)=>i!==index&&other.filename===group.filename);
+      const name=repeated?source.sheets[source.sheetIndex]:safeStem(group.filename);
+      return initialCombinedSeries(group)
+        .map(item=>({...item,name:`${name} · ${item.name}`.slice(0,200)}));
+    }).slice(0,32);
     for(const [i,item] of result.series.entries())item.color=COLORS[i%COLORS.length];
     const first=result.series[0];
     if(first)for(const axis of ['x','y']){
@@ -1382,34 +1398,39 @@ async function loadDataFiles(files, append=false, selection=null) {
   const oldMetadata=metadata,oldConfig=structuredClone(config);
   const nextHandles=selection?dataFileHandles:[...(append?dataFileHandles:[]),...files.map(file=>sourceHandles.get(file) || null)];
   const existing=append && sourceData?(sourceData.files || [{...sourceData,sheetIndex:metadata.sheetIndex,headerRow:loadedHeader}]):[];
-  if(!selection && (files.length+existing.length>16 || files.some(file=>!/\.(xlsx|xlsm|xls|csv|txt)$/i.test(file.name)) || files.reduce((sum,file)=>sum+file.size,0)+existing.reduce((sum,file)=>sum+file.bytes.byteLength,0)>30*1024*1024)){status('Excel / CSV / TXTは16ファイル・合計30 MB以内で選んでください。','error');return;}
+  if(!selection && (files.length+existing.length>16 || files.some(file=>!/\.(xlsx|xlsm|xls|csv|txt)$/i.test(file.name)) || files.reduce((sum,file)=>sum+file.size,0)+groupSheetSources(existing).sources.reduce((sum,file)=>sum+file.bytes.byteLength,0)>30*1024*1024)){status('Excel / CSV / TXTは16ファイル・合計30 MB以内で選んでください。','error');return;}
   const opening=fileProgress.begin(selection?sourceData.files.map(file=>({name:file.filename})):files);
   loading=true;updateButtons();await opening.paint();
   let originals;
   try{originals=selection?sourceData.files:[...existing,...await Promise.all(files.map(async file=>({filename:file.name,bytes:await opening.read(file),sheetIndex:0,headerRow:1})))];}
   catch(error){opening.fail(error);loading=false;updateButtons();status(`ファイルを読み込めませんでした: ${error.message}`,'error');return false;}
-  if(!originals.length || originals.length>16 || originals.some(file=>!/\.(xlsx|xlsm|xls|csv|txt)$/i.test(file.filename)) || originals.reduce((sum,file)=>sum+file.bytes.byteLength,0)>30*1024*1024){opening.cancel();loading=false;updateButtons();status('Excel / CSV / TXTは16ファイル・合計30 MB以内で選んでください。','error');return;}
-  const filename=selection?sourceData.filename:`${safeStem(originals[0].filename).slice(0,80)}_combined.csv`;
-  clearTimeout(renderTimer);++revision;updateButtons();opening.stage('複数ファイルのデータを解析しています…');status('複数ファイルを読み込んでいます…');
-  try{
-    const args={filename,tableEdits:(append||selection)?sourceData?.tableEdits:undefined,...(selection?{sources:selection}:{files:originals.map(file=>({...file,bytes:file.bytes.slice(0)}))})};
-    if(!append&&!selection)await checkFigureStudioProjectReplacement();
-    const data=await request('load-many',args);
-    opening.stage('グラフ設定を準備しています…');await opening.paint();
-    if(!append&&!selection)prepareFigureStudioProjectReplacement();
-    config=combinedConfig(data,append || selection?oldMetadata:null,oldConfig);metadata=data;loadedHeader=1;
-    sourceData={filename,...((append||selection)&&sourceData?.tableEdits?{tableEdits:sourceData.tableEdits}:{}),files:originals.map((file,index)=>({...file,sheetIndex:data.sources[index].sheetIndex,headerRow:data.sources[index].headerRow})),...((append||selection)&&sourceData?.figureStudioProjectId?{figureStudioProjectId:sourceData.figureStudioProjectId,figureStudioContent:sourceData.figureStudioContent,figureStudioProjectFileName:sourceData.figureStudioProjectFileName,figureStudioLegacyProjectId:sourceData.figureStudioLegacyProjectId}:{})};
-    dataFileHandles=nextHandles;
-    if(!append && !selection){projectHandle=null;projectFilename='';projectFileLink=null;sourceHandle=sourceHandles.get(files[0]) || null;sourceDirectory=null;$('#save-destination').value=folderSupported?'source':'download';}
-    sample=false;sheetMode='shared';sharedSettings=null;sheetSettings.clear();
-    if(config.series.length){sharedSettings=makeSettings(config,metadata,1);sheetSettings.set(0,sharedSettings);}
-    selected.clear();history=[];future=[];lastState=structuredClone(config);view={zoom:1,x:0,y:0};
-    $('#save-name').value=safeStem(filename);resetPreview();drawMetadata();drawControls();refreshSaveDestination();renderWanted=!!config.series.length;
-    if(!renderWanted)status('描画できる列がありません。各ファイルのシート・ヘッダー行を選んでください。','error');
-    if(renderWanted)opening.waitForRender(revision);else opening.finish();
-    return true;
-  }catch(error){opening.fail(error);status(`読み込みに失敗しました: ${error.message}`,'error');drawSources();renderWanted=!!config.series.length;return false;}
+  if(!originals.length || originals.length>16 || originals.some(file=>!/\.(xlsx|xlsm|xls|csv|txt)$/i.test(file.filename)) || groupSheetSources(originals).sources.reduce((sum,file)=>sum+file.bytes.byteLength,0)>30*1024*1024){opening.cancel();loading=false;updateButtons();status('Excel / CSV / TXTは16ファイル・合計30 MB以内で選んでください。','error');return;}
+  try{return await loadCombinedData(originals,nextHandles,opening,{append,selection,oldMetadata,oldConfig});}
+  catch(error){opening.fail(error);status(`読み込みに失敗しました: ${error.message}`,'error');drawSources();renderWanted=!!config.series.length;return false;}
   finally{opening.release();loading=false;updateButtons();if(renderWanted)renderPreview();}
+}
+
+async function loadCombinedData(originals,nextHandles,opening,{append=false,selection=null,oldMetadata=metadata,oldConfig=config,overlay=false}={}) {
+  const filename=selection?sourceData.filename:`${safeStem(originals[0].filename).slice(0,80)}_combined.csv`;
+  clearTimeout(renderTimer);++revision;updateButtons();
+  const message=overlay?'選択したシートを重ねています…':'複数ファイルのデータを解析しています…';
+  opening.stage(message);status(message);
+  const args={filename,tableEdits:(append||selection)?sourceData?.tableEdits:undefined,...(selection?{sources:selection}:{files:copySheetSources(originals),requirePlottableSheets:overlay})};
+  if(!append&&!selection)await checkFigureStudioProjectReplacement();
+  const data=await request('load-many',args);
+  opening.stage('グラフ設定を準備しています…');await opening.paint();
+  if(!append&&!selection)prepareFigureStudioProjectReplacement();
+  config=combinedConfig(data,append || selection?oldMetadata:null,oldConfig);metadata=data;loadedHeader=1;
+  sourceData={filename,...((append||selection)&&sourceData?.tableEdits?{tableEdits:sourceData.tableEdits}:{}),files:originals.map((file,index)=>({...file,sheetIndex:data.sources[index].sheetIndex,headerRow:data.sources[index].headerRow})),...((append||selection)&&sourceData?.figureStudioProjectId?{figureStudioProjectId:sourceData.figureStudioProjectId,figureStudioContent:sourceData.figureStudioContent,figureStudioProjectFileName:sourceData.figureStudioProjectFileName,figureStudioLegacyProjectId:sourceData.figureStudioLegacyProjectId}:{})};
+  dataFileHandles=nextHandles;
+  if(!append && !selection){projectHandle=null;projectFilename='';projectFileLink=null;sourceHandle=nextHandles[0] || null;sourceDirectory=null;$('#save-destination').value=folderSupported?'source':'download';}
+  sample=false;sheetMode='shared';sharedSettings=null;sheetSettings.clear();
+  if(config.series.length){sharedSettings=makeSettings(config,metadata,1);sheetSettings.set(0,sharedSettings);}
+  selected.clear();history=[];future=[];lastState=structuredClone(config);view={zoom:1,x:0,y:0};
+  $('#save-name').value=safeStem(filename);resetPreview();drawMetadata();drawControls();refreshSaveDestination();renderWanted=!!config.series.length;
+  if(!renderWanted)status('描画できる列がありません。各ファイルのシート・ヘッダー行を選んでください。','error');
+  if(renderWanted)opening.waitForRender(revision);else opening.finish();
+  return true;
 }
 
 let pendingEditedReload = null;
@@ -1419,8 +1440,9 @@ $('#reload-edited-continue').addEventListener('click',()=>{const pending=pending
 async function reloadSourceData(chosenFiles=null,{fromFolder=false,discardEdits=false}={}) {
   if(!engineReady || loading || exporting || projectVersionChecking || !sourceData || !metadata)return false;
   if(sourceData.tableEdits?.length&&!discardEdits){pendingEditedReload={files:chosenFiles,fromFolder,source:sourceData};showDialog('#reload-edited-confirm');return false;}
-  const originals=sourceData.files || [{filename:sourceData.filename,sheetIndex:metadata.sheetIndex,headerRow:loadedHeader}];
-  const opening=fileProgress.begin(originals.map(file=>({name:file.filename})),{label:'データを再読み込みしています'});
+  const originals=sourceData.files || [{filename:sourceData.filename,bytes:sourceData.bytes,sheetIndex:metadata.sheetIndex,headerRow:loadedHeader}];
+  const {sources:physicalFiles,sourceIndexes}=groupSheetSources(originals);
+  const opening=fileProgress.begin(physicalFiles.map(file=>({name:file.filename})),{label:'データを再読み込みしています'});
   loading=true;clearTimeout(renderTimer);updateButtons();status('データを再読み込みしています…');
   try {
     await opening.paint();
@@ -1428,16 +1450,16 @@ async function reloadSourceData(chosenFiles=null,{fromFolder=false,discardEdits=
     if(chosenFiles){files=[...chosenFiles];handles=files.map(file=>sourceHandles.get(file) || null);}
     else if(fromFolder){
       if(!folderSupported)throw new Error('このブラウザではフォルダーからの読み込みに対応していません。ChromeまたはEdgeを使用してください。');
-      if(new Set(originals.map(item=>item.filename)).size!==originals.length)throw new Error('別フォルダーにある同名ファイルは、この方法では判別できません。ファイルを個別に読み直してください。');
+      if(new Set(physicalFiles.map(item=>item.filename)).size!==physicalFiles.length)throw new Error('別フォルダーにある同名ファイルは、この方法では判別できません。ファイルを個別に読み直してください。');
       directory=await window.showDirectoryPicker({...directoryOptions(sourceDirectory||sourceHandle||saveDirectory),mode:'read'});
-      handles=await Promise.all(originals.map(async item=>{
+      handles=await Promise.all(physicalFiles.map(async item=>{
         try{return await directory.getFileHandle(item.filename,{create:false});}
         catch(error){if(error.name==='NotFoundError')throw new Error(`選択したフォルダーに「${item.filename}」がありません。元ファイルのあるフォルダーを選んでください。`);throw error;}
       }));
       files=await Promise.all(handles.map(handle=>handle.getFile()));direct=true;
     }
     else if(dataFileHandles.length===originals.length && dataFileHandles.every(Boolean)){
-      handles=dataFileHandles;
+      handles=physicalFiles.map((_,index)=>dataFileHandles[sourceIndexes.indexOf(index)]);
       direct=true;
       try {
         files=await Promise.all(handles.map(async handle=>{
@@ -1449,27 +1471,28 @@ async function reloadSourceData(chosenFiles=null,{fromFolder=false,discardEdits=
         throw new Error(folderSupported?'元ファイルを直接読み込めませんでした。再読み込みの▽から「フォルダーから再読み込み」を選んでください。':'元ファイルを直接読み込めませんでした。もう一度「再読み込み」を押し、元ファイルを選び直してください。');
       }
     } else {
-      handles=await window.showOpenFilePicker({...filePickerOptions('plotlauncher-files','再読み込みする元ファイル',{'application/octet-stream':['.xlsx','.xlsm','.xls','.csv','.txt']},saveDirectory||sourceDirectory||sourceHandle),multiple:originals.length>1});
+      handles=await window.showOpenFilePicker({...filePickerOptions('plotlauncher-files','再読み込みする元ファイル',{'application/octet-stream':['.xlsx','.xlsm','.xls','.csv','.txt']},saveDirectory||sourceDirectory||sourceHandle),multiple:physicalFiles.length>1});
       files=await Promise.all(handles.map(handle=>handle.getFile()));
     }
-    if(files.length!==originals.length || !direct && new Set(originals.map(item=>item.filename)).size!==originals.length)throw new Error('元ファイルと同じ名前・数のファイルを選んでください。同名のファイルが複数ある場合は「データを開く」から読み直してください。');
-    const ordered=originals.map((item,index)=>direct?index:files.findIndex(file=>file.name===item.filename));
+    if(files.length!==physicalFiles.length || !direct && new Set(physicalFiles.map(item=>item.filename)).size!==physicalFiles.length)throw new Error('元ファイルと同じ名前・数のファイルを選んでください。同名のファイルが複数ある場合は「データを開く」から読み直してください。');
+    const ordered=physicalFiles.map((item,index)=>direct?index:files.findIndex(file=>file.name===item.filename));
     if(ordered.some(index=>index<0))throw new Error('元ファイルと同じ名前のファイルを選んでください。');
     const selectedFiles=ordered.map(index=>files[index]);
     if(selectedFiles.some(file=>!/\.(xlsx|xlsm|xls|csv|txt)$/i.test(file.name)) || selectedFiles.reduce((sum,file)=>sum+file.size,0)>30*1024*1024)throw new Error('Excel / CSV / TXTは合計30 MB以内で選んでください。');
     opening.setReadFiles(selectedFiles);
-    const refreshed=await Promise.all(selectedFiles.map(async(file,index)=>({...originals[index],bytes:await opening.read(file)})));
+    const buffers=await Promise.all(selectedFiles.map(file=>opening.read(file)));
+    const refreshed=originals.map((file,index)=>({...file,bytes:buffers[sourceIndexes[index]]}));
     const selectionNames=sourceData.selectedSheets?.map(index=>metadata.sheets[index]);
     const settings=makeSettings(config,metadata,loadedHeader);
     // The project loader validates settings and rolls back the worker if a
     // used column/sheet disappeared. No original file or font is overwritten.
     opening.stage('データとグラフ設定を復元しています…');
-    const result=await request('project',{filename:sourceData.filename,remapColumns:!!sourceData.tableEdits?.length,...(sourceData.files?{files:refreshed.map(file=>({...file,bytes:file.bytes.slice(0)}))}:{bytes:refreshed[0].bytes.slice(0)}),sheetIndex:metadata.sheetIndex,headerRow:loadedHeader,settings,fonts:[],sheetSettings:projectSheetSettings(),sharedSettings});
+    const result=await request('project',{filename:sourceData.filename,remapColumns:!!sourceData.tableEdits?.length,...(sourceData.files?{files:copySheetSources(refreshed)}:{bytes:refreshed[0].bytes.slice(0)}),sheetIndex:metadata.sheetIndex,headerRow:loadedHeader,settings,fonts:[],sheetSettings:projectSheetSettings(),sharedSettings});
     ++revision;metadata=result.metadata;config=result.config;
     const currentSettings=makeSettings(config,metadata,loadedHeader);sheetSettings.set(metadata.sheetIndex,currentSettings);if(sheetMode==='shared')sharedSettings=currentSettings;
     sourceData=sourceData.files?{filename:sourceData.filename,files:refreshed,figureStudioProjectId:sourceData.figureStudioProjectId,figureStudioContent:sourceData.figureStudioContent,figureStudioProjectFileName:sourceData.figureStudioProjectFileName,figureStudioLegacyProjectId:sourceData.figureStudioLegacyProjectId}:{filename:sourceData.filename,bytes:refreshed[0].bytes,figureStudioProjectId:sourceData.figureStudioProjectId,figureStudioContent:sourceData.figureStudioContent,figureStudioProjectFileName:sourceData.figureStudioProjectFileName,figureStudioLegacyProjectId:sourceData.figureStudioLegacyProjectId};
     if(selectionNames)sourceData=sourceWithSheetSelection(sourceData,[...new Set([...selectionNames.map(name=>metadata.sheets.indexOf(name)).filter(index=>index>=0),metadata.sheetIndex])].sort((a,b)=>a-b),metadata.sheets.length);
-    dataFileHandles=ordered.map(index=>handles[index]);
+    dataFileHandles=sourceIndexes.map(index=>handles[ordered[index]]);
     if(dataFileHandles[0] && sourceHandle!==dataFileHandles[0]){sourceHandle=dataFileHandles[0];sourceDirectory=null;refreshSaveDestination();}
     if(directory){sourceDirectory=directory;refreshSaveDestination();}
     selected.clear();history=[];future=[];lastState=structuredClone(config);
@@ -1503,6 +1526,7 @@ async function loadFile(file, isSample = false, reload = false, fromClipboard = 
     status("30 MB以内のExcel（.xlsx / .xlsm / .xls）、CSVまたはTXTを選んでください。", "error");
     return;
   }
+  let overlay=false;
   let sheetIndex = reload ? Number($('#sheet-select').value) : 0;
   if(reload&&!selectedSheetIndices().includes(sheetIndex))return false;
   const switchingSheet = reload && sheetIndex !== metadata.sheetIndex;
@@ -1529,9 +1553,16 @@ async function loadFile(file, isSample = false, reload = false, fromClipboard = 
         const info=await request('sheet-list',{filename,bytes:bytes.slice(0)});
         if(info.sheets.length>1){
           opening.pause();
-          chosenSheets=await chooseWorkbookSheets(info.sheets,filename);
+          const choice=await chooseWorkbookSheets(info.sheets,filename,null,{allowOverlay:true});
+          if(!choice){status('読み込みをキャンセルしました。','ready');return false;}
           opening.resume('選択したシートを読み込んでいます…');
-          if(!chosenSheets?.length){status('読み込みをキャンセルしました。','ready');return false;}
+          chosenSheets=choice.sheets;
+          overlay=choice.overlay&&chosenSheets.length>1;
+          if(overlay){
+            const handle=sourceHandles.get(file)||null;
+            const sources=chosenSheets.map(sheetIndex=>({filename,bytes,sheetIndex,headerRow}));
+            return await loadCombinedData(sources,sources.map(()=>handle),opening,{overlay:true});
+          }
           sheetIndex=chosenSheets[0];
         }
       }
@@ -1603,6 +1634,7 @@ async function loadFile(file, isSample = false, reload = false, fromClipboard = 
     status(`読み込みに失敗しました: ${error.message}`, "error");
     // The worker retains the previous data when a load fails.
     if (metadata) drawMetadata();
+    if(overlay)renderWanted=!!metadata&&!!config.series.length;
     return false;
   } finally {
     opening.release();
@@ -2515,7 +2547,7 @@ async function restoreUpdateSession() {
     let restoredMetadata=null;
     if(record.sourceData){
       const data=record.sourceData;
-      restoredMetadata=data.files?await request('load-many',{filename:data.filename,tableEdits:data.tableEdits,files:data.files.map(file=>({...file,bytes:file.bytes.slice(0)}))}):
+      restoredMetadata=data.files?await request('load-many',{filename:data.filename,tableEdits:data.tableEdits,files:copySheetSources(data.files)}):
         await request('load',{filename:data.filename,tableEdits:data.tableEdits,bytes:data.bytes.slice(0),sheetIndex:record.metadata.sheetIndex,headerRow:record.loadedHeader});
       if(restoredMetadata.filename!==record.metadata.filename || restoredMetadata.sheetIndex!==record.metadata.sheetIndex)throw new Error('データのシートを復元できませんでした。');
     }
@@ -2606,7 +2638,7 @@ async function readProject(file, saved, options={}) {
     const projectText=saved?null:await opening.read(file,{text:true});
     opening.stage('プロジェクトの内容を確認しています…');await opening.paint();
     const raw=saved || JSON.parse(projectText),project=parseProject(raw),identity=await openedPlotIdentity(await identifyPlotProject(raw),file.name);
-    const retainedData={filename:project.data.filename,figureStudioProjectId:identity.projectId,figureStudioContent:identity.content,figureStudioProjectFileName:identity.projectFileName,figureStudioLegacyProjectId:identity.legacyProjectId||undefined,...(project.data.selectedSheets?{selectedSheets:[...project.data.selectedSheets]}:{}),...(project.data.tableEdits?{tableEdits:project.data.tableEdits}:{}),...(project.data.files?{files:project.data.files.map(file=>({...file,bytes:file.bytes.slice(0)}))}:{bytes:project.data.bytes.slice(0)})};
+    const retainedData={filename:project.data.filename,figureStudioProjectId:identity.projectId,figureStudioContent:identity.content,figureStudioProjectFileName:identity.projectFileName,figureStudioLegacyProjectId:identity.legacyProjectId||undefined,...(project.data.selectedSheets?{selectedSheets:[...project.data.selectedSheets]}:{}),...(project.data.tableEdits?{tableEdits:project.data.tableEdits}:{}),...(project.data.files?{files:copySheetSources(project.data.files)}:{bytes:project.data.bytes.slice(0)})};
     const retainedFonts=project.fonts.map(font=>({...font,bytes:font.bytes.slice(0)}));
     await checkFigureStudioProjectReplacement(options);
     opening.stage('データとフォントを復元しています…');
@@ -3834,7 +3866,7 @@ function validateFigureWorkspaceState(snapshot){
   if(data.figureStudioProjectFileName!==undefined&&(!string(data.figureStudioProjectFileName,255)||!data.figureStudioProjectFileName||/[\\/\u0000-\u001f]/.test(data.figureStudioProjectFileName)))fail();
   if(data.selectedSheets!==undefined&&(!list(data.selectedSheets,1001)||!data.selectedSheets.length||new Set(data.selectedSheets).size!==data.selectedSheets.length||data.selectedSheets.some(index=>!Number.isInteger(index)||index<0||index>=meta.sheets.length)||!data.selectedSheets.includes(meta.sheetIndex)))fail();
   validateTableEdits(data.tableEdits);
-  const files=data.files??[data];if(!list(files,16)||!files.length)fail();let total=0;for(const file of files){if(!string(file?.filename,255)||!/\.(xlsx|xlsm|xls|csv|txt)$/i.test(file.filename)||!(file.bytes instanceof ArrayBuffer)||!file.bytes.byteLength)fail();total+=file.bytes.byteLength;if(data.files&&(!Number.isInteger(file.sheetIndex)||file.sheetIndex<0||file.sheetIndex>1000||!Number.isInteger(file.headerRow)||file.headerRow<1||file.headerRow>1000))fail();}if(total>30*1024*1024)fail();
+  const files=data.files??[data];if(!list(files,MAX_SHEET_SOURCES)||!files.length)fail();for(const file of files){if(!string(file?.filename,255)||!/\.(xlsx|xlsm|xls|csv|txt)$/i.test(file.filename)||!(file.bytes instanceof ArrayBuffer)||!file.bytes.byteLength)fail();if(data.files&&(!Number.isInteger(file.sheetIndex)||file.sheetIndex<0||file.sheetIndex>1000||!Number.isInteger(file.headerRow)||file.headerRow<1||file.headerRow>1000))fail();}if(groupSheetSources(files).sources.reduce((total,file)=>total+file.bytes.byteLength,0)>30*1024*1024)fail();
   if(state.config.series.length)restoreSettings(makeSettings(state.config,meta,state.loadedHeader),meta);
  }else if(state.metadata!==null)fail();
  for(const entry of state.sheetSettings)if(!list(entry,2)||entry.length!==2||!Number.isInteger(entry[0])||entry[0]<0||entry[0]>1000||entry[1]?.format!=='plotlauncher-web'||entry[1].version!==1)fail();
@@ -3907,7 +3939,7 @@ async function restoreFigureWorkspace(snapshot){
  figureWorkspaceRestoring=true;loading=true;updateButtons();
  try{
   let restoredMetadata=null;
-  if(record.sourceData){const data=record.sourceData;restoredMetadata=data.files?await request('load-many',{filename:data.filename,tableEdits:data.tableEdits,files:data.files.map(file=>({...file,bytes:file.bytes.slice(0)}))}):await request('load',{filename:data.filename,tableEdits:data.tableEdits,bytes:data.bytes.slice(0),sheetIndex:record.metadata.sheetIndex,headerRow:record.loadedHeader});if(restoredMetadata.filename!==record.metadata.filename||restoredMetadata.sheetIndex!==record.metadata.sheetIndex)throw Error('元データのシートを復元できませんでした。');}
+  if(record.sourceData){const data=record.sourceData;restoredMetadata=data.files?await request('load-many',{filename:data.filename,tableEdits:data.tableEdits,files:copySheetSources(data.files)}):await request('load',{filename:data.filename,tableEdits:data.tableEdits,bytes:data.bytes.slice(0),sheetIndex:record.metadata.sheetIndex,headerRow:record.loadedHeader});if(restoredMetadata.filename!==record.metadata.filename||restoredMetadata.sheetIndex!==record.metadata.sheetIndex)throw Error('元データのシートを復元できませんでした。');}
   for(const font of record.fonts)await request('font',{filename:font.name,bytes:font.bytes.slice(0)});
   $$('dialog[open]').forEach(dialog=>dialog.close());
   config=record.config;sourceData=record.sourceData;metadata=restoredMetadata;importedFonts.clear();record.fonts.forEach(font=>importedFonts.set(font.name,font));

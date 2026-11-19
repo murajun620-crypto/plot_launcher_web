@@ -10,7 +10,7 @@
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
   <link rel="stylesheet" href="./style.css?v=d08c8b9af140">
   <link rel="stylesheet" href="./colors.css?v=unified-palette-1">
-  <script type="module" src="./release-loader.mjs?v=release-gate-1" data-release-app="plot" data-release-version="2.5.17" data-release-build="2b75f4a536bd" data-release-entry="./app.js?v=2b75f4a536bd"></script>
+  <script type="module" src="./release-loader.mjs?v=release-gate-1" data-release-app="plot" data-release-version="2.5.18" data-release-build="5d107be1dfb1" data-release-entry="./app.js?v=5d107be1dfb1"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -255,6 +255,11 @@
   <dialog id="sheet-picker" class="plot-dialog sheet-picker" aria-labelledby="sheet-picker-title">
     <div class="dialog-heading"><strong id="sheet-picker-title">読み込むシートを選択</strong></div>
     <p id="sheet-picker-file"></p>
+    <label id="sheet-picker-layout-field" hidden>グラフの作り方<select id="sheet-picker-layout">
+      <option value="separate">シートごと</option>
+      <option value="overlay">1つのグラフに重ねる</option>
+    </select></label>
+    <p id="sheet-picker-limit" class="field-hint" role="status" hidden>重ね描きは最大16シートです。チェックを減らしてください。</p>
     <div class="sheet-picker-toolbar"><button id="sheet-picker-all" type="button" class="button quiet">すべてON</button><button id="sheet-picker-none" type="button" class="button quiet">すべてOFF</button><output id="sheet-picker-count" aria-live="polite"></output></div>
     <div id="sheet-picker-list" class="sheet-picker-list"></div>
     <p class="field-hint">選択したシートを表示・一括保存・Studio送信の対象にします。あとから変更できます。</p>

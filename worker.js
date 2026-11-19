@@ -1,8 +1,9 @@
-import { APP_VERSION, restoreSettings } from "./state.js?v=2b75f4a536bd";
+import {MAX_SHEET_SOURCES,groupSheetSources} from './sheet-sources.mjs?v=5d107be1dfb1';
+import { APP_VERSION, restoreSettings, initialCombinedSeries } from "./state.js?v=5d107be1dfb1";
 import { validateTableEdits } from './table-edits.mjs?v=27ae7675c457';
 // All user data stays in this worker's in-memory filesystem.
 const PYODIDE_VERSION = "0.29.3";
-const WORKER_BUILD = '2b75f4a536bd';
+const WORKER_BUILD = '5d107be1dfb1';
 const INDEX_URL = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
 let pyodide, dispatch, currentPath = "", uploadNumber = 0;
 let currentSources = [];
@@ -85,14 +86,17 @@ self.onmessage = ({ data }) => {
         payload={path:uploadPath,filename:args.filename};
       } else if (operation === 'load-many' || operation === 'project' && args.files) {
         if(args.files){
-          if(!Array.isArray(args.files) || !args.files.length || args.files.length>16 || args.files.reduce((sum,file)=>sum+(file.bytes?.byteLength || 0),0)>30*1024*1024)throw new Error('複数ファイルは16個・合計30 MB以内にしてください。');
-          nextSources=args.files.map(file=>{
+          if(!Array.isArray(args.files)||!args.files.length||args.files.length>MAX_SHEET_SOURCES)throw new Error('重ね描きの対象は16件まで選べます。');
+          const {sources,sourceIndexes}=groupSheetSources(args.files);
+          if(sources.reduce((sum,file)=>sum+file.bytes.byteLength,0)>30*1024*1024)throw new Error('元ファイルは合計30 MB以内にしてください。');
+          const paths=sources.map(file=>{
             const extension=file.filename.split('.').pop().toLowerCase();
             if(!['xlsx','xlsm','xls','csv','txt'].includes(extension))throw new Error('Excel、CSVまたはTXTファイルを選んでください。');
             const path=`/data/upload-${++uploadNumber}.${extension}`;uploadedPaths.push(path);
             pyodide.FS.writeFile(path,new Uint8Array(file.bytes));
-            return {path,filename:file.filename,sheetIndex:file.sheetIndex ?? 0,headerRow:file.headerRow ?? 1};
+            return path;
           });
+          nextSources=args.files.map((file,index)=>({path:paths[sourceIndexes[index]],filename:file.filename,sheetIndex:file.sheetIndex ?? 0,headerRow:file.headerRow ?? 1}));
         }else nextSources=args.sources.map(item=>{if(!Number.isInteger(item.index)||!currentSources[item.index])throw new Error('元ファイルが見つかりません。');return {...currentSources[item.index],sheetIndex:item.sheetIndex,headerRow:item.headerRow};});
         payload={sources:nextSources,filename:args.filename,table_edits:validateTableEdits(args.tableEdits)};dispatchOperation='load-many';
       } else if (operation === "load" || operation === "project") {
@@ -117,6 +121,15 @@ self.onmessage = ({ data }) => {
       }
       if(['load','load-many','project','sheet-list'].includes(operation))operationProgress(operation==='sheet-list'?'Excelのシートを確認しています…':'データを解析しています…');
       let result = JSON.parse(dispatch(dispatchOperation, JSON.stringify(payload)));
+      if(operation==='load-many'&&args.requirePlottableSheets){
+        const counts=result.groups.map(group=>initialCombinedSeries(group).length);
+        const empty=counts.indexOf(0);
+        if(empty!==-1){
+          const {sheets,sheetIndex}=result.sources[empty];
+          throw new Error(`「${sheets[sheetIndex]}」に描画できるX列とY列がありません。シートの選択を確認してください。`);
+        }
+        if(counts.reduce((sum,count)=>sum+count,0)>32)throw new Error('重ね描きは32系列までです。読み込むシートを減らしてください。');
+      }
       if(operation==='project')operationProgress('グラフ設定を確認しています…');
       if (operation === "project") {
         if (result.sheets[result.sheetIndex] !== args.settings.data.sheet) throw new Error("プロジェクトのシートが設定と一致しません。");

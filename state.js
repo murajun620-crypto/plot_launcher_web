@@ -1,7 +1,8 @@
+import {MAX_SHEET_SOURCES} from './sheet-sources.mjs?v=5d107be1dfb1';
 import {validateMatrixOptions} from './matrix-model.mjs?v=d08c8b9af140';
 import { resetPresetUnitScales, unitConversion, configureAFMUnits } from "./units.js?v=9127ec4c4f31";
 import { validateTableEdits } from './table-edits.mjs?v=27ae7675c457';
-export const APP_VERSION = '2.5.17';
+export const APP_VERSION = '2.5.18';
 
 // Accept one numeric value or fraction without evaluating JavaScript expressions.
 export function parseCoefficient(value) {
@@ -139,6 +140,11 @@ export function initialSeries(columns, plotType = 'General') {
     .map((column, index) => createSeries(x, column.index, column.name, index, plotType));
 }
 
+export function initialCombinedSeries(group) {
+  const type = ['XPS Fit','Particle Histogram','bar_graph_general','Raman 3D','Surface Map','Surface Histogram'].includes(group.plotType) ? 'General' : group.plotType;
+  return initialSeries(group.columns.map(column => ({...column, name:column.originalName})), type);
+}
+
 export function safeStem(name) {
   return String(name || "graph").replace(/(?:\.plot)?\.(xlsx|xlsm|xls|csv|txt|svg|png|pdf|pptx|json)$/i, "").replace(/[\\/:*?"<>|\x00-\x1f]/g, "_").slice(0, 120).replace(/[. ]+$/, "") || "graph";
 }
@@ -173,9 +179,19 @@ function projectBase64(bytes) {
   return btoa(binary);
 }
 
+function encodeProjectFiles(files) {
+  const firstByBytes = new Map();
+  return files.map(({filename,bytes,sheetIndex,headerRow},index) => {
+    const first = firstByBytes.get(bytes);
+    if (first !== undefined && files[first].filename === filename) return {filename,sheetIndex,headerRow,sameFileAs:first};
+    firstByBytes.set(bytes,index);
+    return {filename,sheetIndex,headerRow,base64:projectBase64(bytes)};
+  });
+}
+
 export function makeProject(settings, data, fonts = [], workspace = {}) {
   const saved = {format:'plotlauncher-project', version:1, settings:structuredClone(settings),
-    data:{filename:data.filename, base64:data.files?'':projectBase64(data.bytes), ...(data.files?{files:data.files.map(file=>({filename:file.filename,base64:projectBase64(file.bytes),sheetIndex:file.sheetIndex,headerRow:file.headerRow}))}:{}), ...(data.tableEdits?.length?{tableEdits:structuredClone(validateTableEdits(data.tableEdits))}:{}), ...(data.selectedSheets?{selectedSheets:[...data.selectedSheets]}:{}), sheetIndex:data.sheetIndex, headerRow:data.headerRow, sample:!!data.sample},
+    data:{filename:data.filename, base64:data.files?'':projectBase64(data.bytes), ...(data.files?{files:encodeProjectFiles(data.files)}:{}), ...(data.tableEdits?.length?{tableEdits:structuredClone(validateTableEdits(data.tableEdits))}:{}), ...(data.selectedSheets?{selectedSheets:[...data.selectedSheets]}:{}), sheetIndex:data.sheetIndex, headerRow:data.headerRow, sample:!!data.sample},
     fonts:fonts.map(font => ({name:font.name, family:font.family, base64:projectBase64(font.bytes)})), workspace:structuredClone(workspace)};
   parseProject(saved);
   return saved;
@@ -219,14 +235,22 @@ export function parseProject(saved) {
   }
   let files;
   if(data.files!==undefined){
-    if(!Array.isArray(data.files)||!data.files.length||data.files.length>16)throw new Error('プロジェクトの複数ファイルを確認してください。');
+    if(!Array.isArray(data.files)||!data.files.length||data.files.length>MAX_SHEET_SOURCES)throw new Error('プロジェクトの複数ファイルを確認してください。');
     let size=0;
-    files=data.files.map(file=>{
+    files=[];
+    for(const file of data.files){
       if(typeof file?.filename!=='string'||file.filename.length>255||!/\.(xlsx|xlsm|xls|csv|txt)$/i.test(file.filename)||!Number.isInteger(file.sheetIndex)||file.sheetIndex<0||file.sheetIndex>1000||!Number.isInteger(file.headerRow)||file.headerRow<1||file.headerRow>1000)throw new Error('プロジェクトの元ファイル・シート・ヘッダー行を確認してください。');
-      const bytes=projectBytes(file.base64,30*MB);size+=bytes.byteLength;
-      if(size>30*MB)throw new Error('元データは合計30 MB以内にしてください。');
-      return {filename:file.filename,sheetIndex:file.sheetIndex,headerRow:file.headerRow,bytes};
-    });
+      let bytes;
+      if(file.sameFileAs!==undefined){
+        const original=Number.isInteger(file.sameFileAs)&&files[file.sameFileAs];
+        if(!original||original.filename!==file.filename||file.base64!==undefined)throw new Error('プロジェクトの元ファイルの参照が不正です。');
+        bytes=original.bytes;
+      }else{
+        bytes=projectBytes(file.base64,30*MB);size+=bytes.byteLength;
+        if(size>30*MB)throw new Error('元データは合計30 MB以内にしてください。');
+      }
+      files.push({filename:file.filename,sheetIndex:file.sheetIndex,headerRow:file.headerRow,bytes});
+    }
   }
   return {settings:structuredClone(settings), data:{...data,...(files?{files}:{bytes:projectBytes(data.base64,30 * MB)})}, fonts, workspace:structuredClone(workspace)};
 }
