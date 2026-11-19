@@ -9,6 +9,7 @@ import {serializeOfficeSVG} from './svg-export.mjs?v=source-save-v0736-1';
 import {preparePNG} from './png-export.mjs?v=source-save-v0736-1';
 import {importedImageSize,replacedImageSize,replacedMiFiToImageSize,miFiToSizeCorrection,imageInsertionPoint} from './image-placement.mjs?v=source-save-v0736-1';
 import {rasterResolution} from './image-resolution.mjs?v=image-quality-v066-1';
+import {encodeProjectFile,readProjectFile} from './project-format.mjs?v=large-project-v0739-1';
 import {saveDraft,loadDraft,saveProjectFileTarget,loadProjectFileTarget} from './storage.mjs?v=0.3.6-1';
 import {stageStudioUpdate,restoreStudioUpdate,isLegacyStudioUpdate,finishLegacyStudioUpdate} from './startup-session.mjs?v=source-save-v0736-1';
 import {createDemo} from './demo.mjs?v=source-save-v0736-1';
@@ -35,7 +36,7 @@ import {readMifitoIdentity} from './integration/mifito-sync.mjs?v=0.3.5-1';
 import {readPlotIdentity,resolvePlotImage,currentPlotImageId} from './integration/plot-sync.mjs?v=source-save-v0736-1';
 import {planMiFiToSync} from './mifito-batch.mjs?v=source-save-v0736-1';
 import {setupUpdateCheck} from './update-check.mjs?v=source-save-v0736-1';
-import {installWorkspaceUpdater} from './workspace-update.mjs?v=source-save-v0736-1';
+import {installWorkspaceUpdater} from './workspace-update.mjs?v=large-project-v0739-1';
 import {marqueeSelection,resolveObjectSelection,clickObjectSelection,selectionDescription} from './selection.mjs?v=source-save-v0736-1';
 import {renderGroupLayers} from './group-layers.mjs?v=source-save-v0736-1';
 import {drawSelectionFrames} from './selection-overlay.mjs?v=source-save-v0736-1';
@@ -56,7 +57,7 @@ import {installWorkspacePersistence} from './workspace-session.mjs?v=source-save
 import {decodeWorkspaceState} from './workspace-state.mjs?v=project-switch-v051-1';
 import {validateWorkspaceBinding} from './integration/bridge-host.mjs?v=source-save-v0736-1';
 
-const STUDIO_RELEASE={version:'0.7.38',build:'tex-spacing-v0738-1'};
+const STUDIO_RELEASE={version:'0.7.39',build:'large-project-v0739-1'};
 installBrowserZoomGuard();
 window.FigureAppRelease?.assertRunning(STUDIO_RELEASE);
 if(window.FigureAppRelease&&!await window.FigureAppRelease.startup())throw Error('最新版へ切り替えています。');
@@ -542,9 +543,6 @@ async function importDirectFigure(payload){
  const name=String(sourceName||`Figure${app==='mifito'?'.mifito':'.plotproject'}`).replace(/[\\/]/g,'_').slice(0,240);
  const [image,projectURL]=await Promise.all([imageAsset(preview,name.replace(/\.(plotproject|mifito)$/i,'')+(preview.type==='image/svg+xml'?'.svg':'.png')),blobToDataURL(project)]);
  if(doc.id!==documentId)throw Error('受け取り先のFigureが切り替わりました。もう一度送ってください。');
- const used=assetIds();let estimated=image.dataUrl.length+projectURL.length+JSON.stringify(snapshot()).length*3+4096;
- for(const id of used)estimated+=(assets.get(id)?.dataUrl?.length||0)+1024;
- if(estimated>400*1024*1024)throw Error('この追加でプロジェクトの400 MB上限を超えます。不要な図を減らしてください。');
  const before=snapshot(),source={id:uid(),name,mime:project.type||'application/octet-stream',dataUrl:projectURL};
  if(initialDemo&&revision===0){doc.objects=[];doc.name='Fig. 1';initialDemo=false;}
  const size=importedImageSize(image,doc,app);
@@ -628,8 +626,9 @@ async function saveProject(saveAs=false){
   const captured=workspace?await workspace.captureWorkspace():null;
   if(bookId!==capturedBook||revision!==capturedRevision)throw Error('保存中にFigureの内容が変わりました。もう一度保存してください。');
   if(captured)packaged.workspace=captured.data;
-  const blob=new Blob([JSON.stringify(packaged)],{type:'application/json'});
-  if(blob.size>400*1024*1024)throw Error('全体の保存サイズが400 MBを超えています。不要なFigureや画像を減らしてください。');
+  toast('保存データを準備しています…');
+  const blob=encodeProjectFile(packaged);
+  toast('プロジェクトをファイルに書き込んでいます…');
   const saved=await projectFiles.write(target,{revision:capturedRevision,blob});studioWritten=true;
   try{await saveProjectFileTarget(saved.bookId,{handle:saved.handle,name:saved.name});}catch{}
   const editorsUnchanged=captured?await workspace.markWorkspaceSaved(captured):true;
@@ -695,13 +694,13 @@ async function readProject(file,handle=null,{recovery=false}={}){
    try{if(!await window.FigureAppRelease.ensureCurrent({file,handle}))return false;}
    finally{projectVersionChecking=false;}
   }
-  if(file.size>400*1024*1024)throw Error('プロジェクトは400 MB以内で開いてください。');
   toast('プロジェクトのデータを読み込んでいます…');
-  const raw=JSON.parse(await file.text()),next=raw.format==='figure-studio-book'?validateBook(raw):{format:'figure-studio-book',version:1,id:uid(),activeId:raw.id,figures:[validateDocument(raw)]};
+  const {project:raw,assets:assetRecords}=await readProjectFile(file);
+  const next=raw.format==='figure-studio-book'?validateBook(raw):{format:'figure-studio-book',version:1,id:uid(),activeId:raw.id,figures:[validateDocument(raw)]};
   toast('プロジェクトの画像を復元しています…');
   const loaded=new Map(),imageIds=new Set(next.figures.flatMap(f=>f.objects.filter(o=>o.type==='image').map(o=>o.assetId)));
-  for(const[id,a]of Object.entries(raw.assets||{})){
-   if(typeof a.dataUrl!=='string'||!a.dataUrl.startsWith('data:'))throw Error('素材データが不正です。');
+  for await(const [id,a] of assetRecords){
+   if(typeof a?.dataUrl!=='string'||!a.dataUrl.startsWith('data:'))throw Error('素材データが不正です。');
    if(imageIds.has(id)){const restored=await imageAsset(dataURLToBlob(a.dataUrl),a.name);loaded.set(id,{...restored,id});}else loaded.set(id,{...a,id});
   }
   for(const o of next.figures.flatMap(f=>f.objects))if(o.assetId&&!loaded.has(o.assetId)||o.source?.assetId&&!loaded.has(o.source.assetId))throw Error('必要な素材がありません。');
@@ -817,9 +816,6 @@ async function syncMiFiToFigures(result,{app='mifito',guard,anchorPanelId,target
   destination.objects.push(panel);added.push(panel.id);
  }
  const newAssets=new Map([...prepared.values()].map(a=>[a.id,a]));newAssets.set(project.id,project);
- const used=new Set(next.flatMap(f=>f.objects.flatMap(o=>[o.assetId,o.source?.assetId])).filter(Boolean));let estimated=JSON.stringify(next).length*3+4096;
- for(const id of used)estimated+=(newAssets.get(id)||assets.get(id))?.dataUrl?.length||0;
- if(estimated>400*1024*1024)throw Error('この反映でプロジェクトの400 MB上限を超えます。不要な図を減らしてください。');
  check();const before=snapshot(),activeId=doc.id;for(const[id,asset]of newAssets)assets.set(id,asset);
  figures=next;doc=figures.find(f=>f.id===activeId);if(initialDemo&&revision===0&&!guard)initialDemo=false;
  if(doc.id===targetFigureId&&added.length)selection=added;record(before);(app==='plot'?plotIdentities:mifitoIdentities).set(project.id,Promise.resolve(identity));
@@ -920,16 +916,15 @@ window.FigureStudioWorkspaceUpdate={
    // Undo may refer to deleted images, so recovery also retains those assets.
    for(const[id,asset]of assets){const {previewUrl,persisted,...saved}=asset;project.assets[id]=saved;}
    if(bookId!==capturedBook||revision!==capturedRevision)throw Error('保存中にFigureの内容が変わりました。もう一度更新してください。');
-   if(new Blob([JSON.stringify(project)]).size>400*1024*1024)throw Error('更新前の保存サイズが400 MBを超えています。不要な素材を減らしてください。');
-   clearTimeout(saveTimer);await saveDraft(snapshot(),assets);
-   if(bookId!==capturedBook||revision!==capturedRevision)throw Error('保存中にFigureの内容が変わりました。もう一度更新してください。');
-   return {project,name:projectFiles.target(bookId)?.name||`${safeName(figures[0].name)}.figurestudio`,local:{dirty,revision,manualSavedRevision,selection:[...selection],groupScope,past:clone(history.past),future:clone(history.future),scale,scroll:{left:viewport.scrollLeft,top:viewport.scrollTop},target:projectFiles.target(bookId)||null}};
+   const projectFile=encodeProjectFile(project);
+   return {projectFile,active:project.workspace?.active||'studio',name:projectFiles.target(bookId)?.name||`${safeName(figures[0].name)}.figurestudio`,local:{dirty,revision,manualSavedRevision,selection:[...selection],groupScope,past:clone(history.past),future:clone(history.future),scale,scroll:{left:viewport.scrollLeft,top:viewport.scrollTop},target:projectFiles.target(bookId)||null}};
   }catch(error){updateReloading=false;throw error;}
  },
  async restore(saved){
-  const local=saved?.local;if(!saved?.project||!local||typeof local.dirty!=='boolean'||!Number.isSafeInteger(local.revision)||local.revision<0||!Number.isSafeInteger(local.manualSavedRevision)||!Array.isArray(local.selection)||!Array.isArray(local.past)||!Array.isArray(local.future))throw Error('Studioの更新前の状態が正しくありません。');
+  const local=saved?.local;if((!saved?.projectFile&&!saved?.project)||!local||typeof local.dirty!=='boolean'||!Number.isSafeInteger(local.revision)||local.revision<0||!Number.isSafeInteger(local.manualSavedRevision)||!Array.isArray(local.selection)||!Array.isArray(local.past)||!Array.isArray(local.future))throw Error('Studioの更新前の状態が正しくありません。');
   const past=local.past.map(validateBook),future=local.future.map(validateBook);
-  const file=new File([JSON.stringify(saved.project)],saved.name||'recovered.figurestudio',{type:'application/json'});
+  const blob=saved.projectFile??encodeProjectFile(saved.project);
+  const file=new File([blob],saved.name||'recovered.figurestudio',{type:blob.type});
   if(!await readProject(file,local.target?.handle||null,{recovery:true}))throw Error('Studioのプロジェクトを復元できませんでした。');
   history.past=past;history.future=future;dirty=local.dirty;revision=local.revision;manualSavedRevision=local.manualSavedRevision;
   selection=local.selection.filter(id=>doc.objects.some(o=>o.id===id));groupScope=doc.objects.some(o=>o.groupId===local.groupScope)?local.groupScope:null;

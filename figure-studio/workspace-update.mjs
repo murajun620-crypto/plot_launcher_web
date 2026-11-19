@@ -1,3 +1,4 @@
+import {encodeProjectFile} from './project-format.mjs?v=large-project-v0739-1';
 import {parseRelease,hasNewRelease} from './update-check.mjs?v=panel-labels-v0723-1';
 import {SOURCE_APPS} from './integration/bridge-client.mjs?v=studio-send-v0714-1';
 
@@ -34,7 +35,7 @@ export function installWorkspaceUpdater(api,{windowRef=window,documentRef=window
  function notice(text,{persistent=false,backup=false}={}){
   windowRef.clearTimeout(noticeTimer);status.replaceChildren(documentRef.createTextNode(text));status.hidden=!text;
   if(backup&&recovery){const link=documentRef.createElement('button');link.type='button';link.textContent='復元用プロジェクトを保存';link.style.cssText='margin-left:10px;padding:5px 8px;';link.onclick=()=>{
-   const blob=new windowRef.Blob([JSON.stringify(recovery.studio.project)],{type:'application/json'}),url=windowRef.URL.createObjectURL(blob),a=documentRef.createElement('a');a.href=url;a.download=recovery.studio.name||'recovered.figurestudio';documentRef.body.append(a);a.click();a.remove();windowRef.setTimeout(()=>windowRef.URL.revokeObjectURL(url),30000);
+   const blob=recovery.studio.projectFile??encodeProjectFile(recovery.studio.project),url=windowRef.URL.createObjectURL(blob),a=documentRef.createElement('a');a.href=url;a.download=recovery.studio.name||'recovered.figurestudio';documentRef.body.append(a);a.click();a.remove();windowRef.setTimeout(()=>windowRef.URL.revokeObjectURL(url),30000);
   };status.append(link);}
   if(!persistent)noticeTimer=windowRef.setTimeout(()=>{status.hidden=true;},15000);
  }
@@ -129,10 +130,10 @@ export function installWorkspaceUpdater(api,{windowRef=window,documentRef=window
   busy=true;lock(true);paint();notice('更新前のプロジェクトと3アプリの編集状態を復元しています…',{persistent:true});let restored=false;
   try{
    const record=await sessionStore(windowRef,'get',token),original=record&&new URL(record.url);
-   if(record?.format!=='figure-studio-update'||record.version!==1||!record.studio?.project||original.origin!==windowRef.location.origin||original.pathname!==windowRef.location.pathname)throw Error('更新前の一時保存が見つかりません。');
+   if(record?.format!=='figure-studio-update'||record.version!==1||(!record.studio?.projectFile&&!record.studio?.project)||original.origin!==windowRef.location.origin||original.pathname!==windowRef.location.pathname)throw Error('更新前の一時保存が見つかりません。');
    recovery=record;recoveryToken=token;const studio=await studioAPI();await studio.restore(record.studio);lock(true);
    for(const app of ['plot','mifito'])if(record.handles?.[app])await child(app)?.FigureStudioWorkspaceState?.restoreReloadHandles?.(record.handles[app]);
-   lock(false);api.show(record.studio.project.workspace?.active||'studio');
+   lock(false);api.show(record.studio.active??record.studio.project?.workspace?.active??'studio');
    original.searchParams.set('_appBuild',shellRelease.build);original.searchParams.set('_appReload',windowRef.crypto.randomUUID());const pendingToken=new URL(windowRef.location.href).searchParams.get('_projectOpen');if(pendingToken)original.searchParams.set('_projectOpen',pendingToken);windowRef.history.replaceState(null,'',original.href);
    // The recovery record remains available until all three restorations succeed.
    try{await sessionStore(windowRef,'delete',token);}catch{}
