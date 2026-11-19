@@ -15,7 +15,7 @@ export function createLiveTexPreview({renderer,root,svg,status,sourceSlot,paint,
   catch(error){if(token!==generation||!visible)return;label(lastGood?'入力中…最後のプレビューを表示':'式を入力してください','incomplete');status.title=error.message;}
  }
  function show(object,{source:nextSource='canvas',composition=false}={}){
-  visible=true;source=nextSource;root.hidden=false;root.dataset.source=source;sourceSlot.hidden=source!=='canvas';composing=composition;
+  visible=true;source=nextSource;root.hidden=false;root.dataset.source=source;if(sourceSlot)sourceSlot.hidden=source!=='canvas';composing=composition;
   currentKey=renderer.key(object);const next=JSON.stringify(object);
   if(next!==fingerprint){fingerprint=next;generation++;if(timer!==null)clearTimer(timer);label('更新中…','pending');const token=generation,copy={...object};if(!composing)timer=setTimer(()=>{timer=null;updatePreview(copy,token);},delay);}
   else if(!composing&&timer===null&&root.dataset.state==='pending'){const token=generation,copy={...object};timer=setTimer(()=>{timer=null;updatePreview(copy,token);},delay);}

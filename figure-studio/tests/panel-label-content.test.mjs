@@ -5,6 +5,7 @@ import {applyPanelLabels} from '../panel-labels.mjs';
 import {panelLabelDisplay,readPanelLabelContent,writePanelLabelContent} from '../panel-label-content.mjs';
 import {createPanelLabelEditor} from '../panel-label-editor.mjs';
 import {fitTextBox} from '../text-fit.mjs';
+import {createTexRenderer} from '../tex.mjs';
 
 const image=(id,x=10,extra={})=>makeObject('image',{id,x,y:80,w:60,h:40,assetId:'asset',...extra});
 const scene=(...objects)=>({...newDocument(),objects});
@@ -55,6 +56,30 @@ test('multiline supplemental text is fitted above the image and invalid input is
  assert.throws(()=>validateDocument({...doc,objects:[{...label,panelLabelContent:{text:'a',subtext:'x',parentheses:'yes'}}]}),/ラベル/);
 });
 
+test('generated panels use textbox TeX detection in both the label and its supplement',async()=>{
+ const panel=image('a'),doc=scene(panel),calls=[];
+ const renderer=createTexRenderer({convert:async(source,display)=>{
+  calls.push([source,display]);return {viewBox:[0,-1600,1000,2200],nodes:[]};
+ }});
+ applyPanelLabels(doc,[],{scope:'all',subtext:'$$\\frac{a}{b}$$'},fit);
+ const label=doc.objects.find(object=>object.panelLabel);
+ assert.equal(label.textMode,'auto');
+ assert.ok(label.y+label.h<panel.y);
+ assert.equal(label.text,'(a) $$\\frac{a}{b}$$');
+ const ordinary=makeObject('text',{...label,panelLabel:false});
+ await renderer.prepare([label,ordinary]);
+ assert.deepEqual(calls,[['\\frac{a}{b}',true]]);
+ assert.equal(renderer.getLayout(label),renderer.getLayout(ordinary));
+
+ writePanelLabelContent(label,{text:'$a_1$',subtext:'$$x^2$$',parentheses:false});
+ const restored=validateDocument(JSON.parse(JSON.stringify(doc))).objects.at(-1);
+ await renderer.prepare([restored]);
+ assert.deepEqual(calls.slice(1),[['a_1',false],['x^2',true]]);
+ applyPanelLabels(doc,[],{scope:'all',textMode:'plain'},fit);
+ assert.equal(renderer.hasMath(doc.objects.at(-1)),false);
+ assert.match(doc.objects.at(-1).text,/\$\$x\^2\$\$/);
+});
+
 test('panel content survives save, undo and redo with ordinary text attributes',()=>{
  const doc=scene(makeObject('text',{panelLabel:true,text:'(a)',groupId:'panel',fontFamily:'Arial'})),before=clone(doc),history=new History();
  writePanelLabelContent(doc.objects[0],{text:'b-2',subtext:'Revised\ncaption',parentheses:true});fit(doc.objects[0]);
@@ -63,7 +88,7 @@ test('panel content survives save, undo and redo with ordinary text attributes',
  const undone=history.undo(doc);assert.deepEqual(undone,before);assert.deepEqual(history.redo(undone),doc);
 });
 
-function editorHarness(doc){
+function editorHarness(doc,mathPreview){
  let current=doc,applied=[];
  const fields=Object.fromEntries(['text','subtext','parentheses','textMode','fontSize'].map(name=>[name,{value:'',checked:false,focus(){this.focused=true;},select(){}}]));
  const form=new EventTarget();form.elements={namedItem:name=>fields[name]};form.reportValidity=()=>true;
@@ -71,9 +96,24 @@ function editorHarness(doc){
  const preview={},error={},cancel=new EventTarget(),root=new EventTarget();
  root.querySelector=selector=>selector==='form'?form:selector==='[data-panel-preview]'?preview:error;
  root.querySelectorAll=()=>[cancel];root.showModal=()=>{root.open=true;};root.close=()=>{root.open=false;root.dispatchEvent(new Event('close'));};
- const editor=createPanelLabelEditor({root,getDocument:()=>current,onApply:(id,options)=>applied.push({id,options})});
+ const editor=createPanelLabelEditor({root,getDocument:()=>current,mathPreview,onApply:(id,options)=>applied.push({id,options})});
  return {editor,root,form,fields,preview,error,cancel,applied,setDocument:next=>{current=next;}};
 }
+
+test('double-click editor previews the same composed TeX source and mode it applies',()=>{
+ const label=makeObject('text',{panelLabel:true,text:'(a)',textMode:'plain'}),doc=scene(label),previews=[];
+ const h=editorHarness(doc,{show(style){previews.push(style);return style?.textMode==='auto';},hide(){previews.push(null);}});
+ h.editor.show(label);
+ assert.equal(h.fields.textMode.value,'plain');
+ h.fields.textMode.value='auto';h.fields.text.value='$a_2$';h.fields.subtext.value='$$x^2$$';
+ h.form.dispatchEvent(new Event('input'));
+ assert.equal(h.preview.hidden,true);
+ assert.equal(previews.at(-1).text,'($a_2$) $$x^2$$');
+ h.form.requestSubmit();
+ assert.equal(h.applied[0].options.textMode,'auto');
+ assert.equal(panelLabelDisplay(h.applied[0].options.content),'($a_2$) $$x^2$$');
+ assert.equal(previews.at(-1),null);
+});
 
 test('the label editor submits only the chosen label, and cancel does not mutate it',()=>{
  const first=makeObject('text',{id:'first',panelLabel:true,text:'(a)'}),second=makeObject('text',{id:'second',panelLabel:true,text:'(b)'});

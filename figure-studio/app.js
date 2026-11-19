@@ -20,14 +20,14 @@ import {installBrowserZoomGuard} from './browser-zoom.mjs?v=source-save-v0736-1'
 import {imageArrayUnits,arrangeImageArray} from './image-array.mjs?v=source-save-v0736-1';
 import {createImageArrayDialog} from './image-array-dialog.mjs?v=source-save-v0736-1';
 import {writePanelLabelContent} from './panel-label-content.mjs?v=source-save-v0736-1';
-import {createPanelLabelEditor} from './panel-label-editor.mjs?v=source-save-v0736-1';
-import {applyPanelLabels} from './panel-labels.mjs?v=source-save-v0736-1';
+import {createPanelLabelEditor} from './panel-label-editor.mjs?v=panel-label-tex-v0737-1';
+import {applyPanelLabels} from './panel-labels.mjs?v=panel-label-tex-v0737-1';
 import {plotPanelBounds} from './plot-frame.mjs?v=source-save-v0736-1';
-import {createPanelLabelDialog} from './panel-label-dialog.mjs?v=source-save-v0736-1';
+import {createPanelLabelDialog} from './panel-label-dialog.mjs?v=panel-label-tex-v0737-1';
 import {createColorPickers} from './colors.mjs?v=unified-palette-1';
 import {renderTextPaint} from './text-paint.mjs?v=tex-v061-1';
-import {createTexRenderer} from './tex.mjs?v=micro-v0711-2';
-import {createLiveTexPreview} from './live-tex-preview.mjs?v=live-v062-1';
+import {createTexRenderer} from './tex.mjs?v=panel-label-tex-v0737-1';
+import {createLiveTexPreview} from './live-tex-preview.mjs?v=panel-label-tex-v0737-1';
 import {openSource,SOURCE_APPS,setupSourceDiscovery,closeSourceSessions} from './integration/bridge-client.mjs?v=studio-send-v0714-1';
 import {createFigureSidebar} from './thumbnails.mjs?v=live-v062-1';
 import {setupTransferReceiver,getFigureWorkspace} from './integration/direct-transfer.mjs?v=studio-send-v0714-1';
@@ -56,7 +56,7 @@ import {installWorkspacePersistence} from './workspace-session.mjs?v=source-save
 import {decodeWorkspaceState} from './workspace-state.mjs?v=project-switch-v051-1';
 import {validateWorkspaceBinding} from './integration/bridge-host.mjs?v=source-save-v0736-1';
 
-const STUDIO_RELEASE={version:'0.7.36',build:'source-save-v0736-1'};
+const STUDIO_RELEASE={version:'0.7.37',build:'panel-label-tex-v0737-1'};
 installBrowserZoomGuard();
 window.FigureAppRelease?.assertRunning(STUDIO_RELEASE);
 if(window.FigureAppRelease&&!await window.FigureAppRelease.startup())throw Error('最新版へ切り替えています。');
@@ -88,21 +88,28 @@ const nodes=new Map(),svg=$('#canvas'),objects=$('#objects'),overlays=$('#overla
 svg.setAttribute('tabindex','0');svg.setAttribute('role','application');svg.setAttribute('aria-label','Figure編集キャンバス');
 const ribbon=createRibbon({onResize:()=>{renderOverlay();positionEditor();},onFocusCanvas:()=>svg.focus({preventScroll:true})});
 const imageArrayDialog=createImageArrayDialog({root:$('#imageArrayDialog'),getDocument:()=>doc,getSelection:()=>selection,getSelectionOptions:()=>({individual:!!groupScope}),onApply:(ids,gaps)=>{let result;change(()=>{result=arrangeImageArray(doc,ids,gaps);});toast(`${result.rows}行 × ${result.columns}列に配列しました · Ctrl+Zで戻せます`);},onClose:()=>svg.focus({preventScroll:true})});
-const panelLabelDialog=createPanelLabelDialog({root:$('#panelLabelDialog'),getDocument:()=>doc,getSelection:()=>selection,onApply:(ids,options)=>{let result;change(()=>{result=applyPanelLabels(doc,ids,options,fitText,(text,object)=>{measure.font=font(object);return measure.measureText(text);},object=>plotPanelBounds(object,assets.get(object.assetId)));});setSelection(result.ids,{focus:false});toast(`${result.count}パネルにラベルを付けました · Ctrl+Zで戻せます`);},onClose:()=>svg.focus({preventScroll:true})});
-const panelLabelEditor=createPanelLabelEditor({root:$('#panelLabelEditor'),getDocument:()=>doc,onApply:(id,options)=>{
- change(()=>{const object=doc.objects.find(object=>object.id===id),oldHeight=object.h;
-  const panels=doc.objects.filter(other=>other.type==='image'&&object.groupId&&other.groupId===object.groupId);
-  const outside=!(object.rotation||0)&&panels.length&&object.y<Math.min(...panels.map(image=>(plotPanelBounds(image,assets.get(image.assetId))||objectBounds(image)).y));
-  writePanelLabelContent(object,options.content);object.textMode=options.textMode;object.fontSize=options.fontSize;fitText(object);
-  if(outside)object.y+=oldHeight-object.h;
- });
-},onClose:()=>svg.focus({preventScroll:true})});
 const colorPickers=createColorPickers();
 pathDrawing=createPathDrawing({svg,point:svgPoint,scale:()=>scale,onDraft:draft=>{pathDraft=draft;if(!pathPreviewFrame)pathPreviewFrame=requestAnimationFrame(()=>{pathPreviewFrame=0;renderOverlay();});},onCommit:commitDrawnPath,onCancel:()=>{if(!pathToolTransition)setTool('select');},onHint:message=>{if(message)$('#statusText').textContent=message;}});
 const measure=document.createElement('canvas').getContext('2d');
 let texFrame=0,editingTexSession=false,editorComposing=false;
-const texRenderer=createTexRenderer({measure:(text,object)=>{measure.font=font(object);return measure.measureText(text).width;},onReady:key=>{let resized=false;for(const figure of figures)for(const object of figure.objects)if(object.textAutoSize&&texRenderer.key(object)===key)resized=fitText(object)||resized;if(resized&&!editingId){dirty=true;revision++;scheduleSave();}figureSidebar.invalidate(figures.filter(f=>f.objects.some(o=>o.type==='text'&&texRenderer.key(o)===key)).map(f=>f.id));if(!texFrame)texFrame=requestAnimationFrame(()=>{texFrame=0;render();});},onError:(error,key)=>{if(!editingId&&!livePreview.ownsKey(key)&&doc.objects.some(o=>o.type==='text'&&texRenderer.key(o)===key))toast(error.message);}});
+const texRenderer=createTexRenderer({measure:(text,object)=>{measure.font=font(object);return measure.measureText(text).width;},onReady:key=>{let resized=false;for(const figure of figures)for(const object of figure.objects)if(object.textAutoSize&&texRenderer.key(object)===key)resized=(object.panelLabel?fitPanelLabelText(object,figure):fitText(object))||resized;if(resized&&!editingId){dirty=true;revision++;scheduleSave();}figureSidebar.invalidate(figures.filter(f=>f.objects.some(o=>o.type==='text'&&texRenderer.key(o)===key)).map(f=>f.id));if(!texFrame)texFrame=requestAnimationFrame(()=>{texFrame=0;render();});},onError:(error,key)=>{if(!editingId&&!livePreview.ownsKey(key)&&doc.objects.some(o=>o.type==='text'&&texRenderer.key(o)===key))toast(error.message);}});
 const livePreview=createLiveTexPreview({renderer:texRenderer,root:$('#texPreviewPanel'),svg:$('#texPreviewSvg'),status:$('#texPreviewStatus'),sourceSlot:$('#texSourceSlot'),paint:renderTextPaint,el,onPosition:placeTexSource});
+function createPanelMathPreview(dialog){
+ const root=dialog.querySelector('[data-panel-math-preview]');
+ const preview=createLiveTexPreview({renderer:texRenderer,root,svg:root.querySelector('svg'),status:root.querySelector('[role=status]'),paint:renderTextPaint,el});
+ const defaults=makeObject('text',{fill:'#000000'});
+ return {show(style,composition){
+  const object=style&&{...defaults,...style,textAutoSize:true};
+  if(!object||!Number.isFinite(object.fontSize)||object.fontSize<1||object.fontSize>1000||!texRenderer.hasMath(object)){preview.hide();return false;}
+  preview.show(object,{source:'panel-label',composition});return true;
+ },hide:preview.hide};
+}
+const panelLabelDialog=createPanelLabelDialog({root:$('#panelLabelDialog'),mathPreview:createPanelMathPreview($('#panelLabelDialog')),getDocument:()=>doc,getSelection:()=>selection,onApply:(ids,options)=>{let result;change(()=>{result=applyPanelLabels(doc,ids,options,fitText,(text,object)=>{measure.font=font(object);return measure.measureText(text);},object=>plotPanelBounds(object,assets.get(object.assetId)));});setSelection(result.ids,{focus:false});toast(`${result.count}パネルにラベルを付けました · Ctrl+Zで戻せます`);},onClose:()=>svg.focus({preventScroll:true})});
+const panelLabelEditor=createPanelLabelEditor({root:$('#panelLabelEditor'),mathPreview:createPanelMathPreview($('#panelLabelEditor')),getDocument:()=>doc,onApply:(id,options)=>{
+ change(()=>{const object=doc.objects.find(object=>object.id===id);
+  writePanelLabelContent(object,options.content);object.textMode=options.textMode;object.fontSize=options.fontSize;fitPanelLabelText(object);
+ });
+},onClose:()=>svg.focus({preventScroll:true})});
 const presentationTexRenderer=createTexRenderer({measure:(text,object)=>{measure.font=font(object);return measure.measureText(text).width;}});
 let presentationScroll=null;
 const presentation=createPresentation({
@@ -160,6 +167,14 @@ function svgPoint(e){const r=svg.getBoundingClientRect();return{x:(e.clientX-r.l
 function transform(o){return `translate(${o.x} ${o.y}) rotate(${o.rotation||0} ${o.w/2} ${o.h/2})`+(o.flipX||o.flipY?` translate(${o.w/2} ${o.h/2}) scale(${o.flipX?-1:1} ${o.flipY?-1:1}) translate(${-o.w/2} ${-o.h/2})`:'');}
 function font(o){return `${o.italic?'italic ':''}${o.bold?'bold ':''}${o.fontSize}px ${o.fontFamily||'Arial'}`;}
 function fitText(o){if(o?.type!=='text'||o.locked)return false;o.textAutoSize=true;const layout=texRenderer.hasMath(o)?texRenderer.getLayout(o):null;if(texRenderer.hasMath(o)&&!layout)return false;return fitTextBox(o,{layout,measure:(text,object)=>{measure.font=font(object);return measure.measureText(text);}});}
+function fitPanelLabelText(object,figure=doc){
+ const oldHeight=object.h;
+ const panels=object.groupId?figure.objects.filter(other=>other.type==='image'&&other.groupId===object.groupId):[];
+ const outside=!object.rotation&&panels.length&&object.y<Math.min(...panels.map(image=>(plotPanelBounds(image,assets.get(image.assetId))||objectBounds(image)).y));
+ const changed=fitText(object);
+ if(outside&&changed)object.y+=oldHeight-object.h;
+ return changed;
+}
 function textLines(o){if(o.textAutoSize)return naturalTextLines(o.text);measure.font=font(o);const out=[];for(const paragraph of o.text.split('\n')){let line='';for(const c of paragraph){if(line&&measure.measureText(line+c).width>Math.max(1,o.w-2)){out.push(line);line=c;}else line+=c;}out.push(line);}return out;}
 function drawContent(o,g,full=false,sourceAssets,textRenderer=texRenderer){
  const mathText=o.type==='text'&&textRenderer.hasMath(o);

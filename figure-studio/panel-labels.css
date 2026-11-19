@@ -14,3 +14,5 @@
 :is(#panelLabelDialog,#panelLabelEditor) .panel-label-fields .image-array-separate{flex-direction:row;align-items:center}:is(#panelLabelDialog,#panelLabelEditor) .image-array-separate input{width:auto}
 
 .panel-label-fields textarea{resize:vertical;min-height:58px;font:14px Arial,sans-serif;line-height:1.4;box-sizing:border-box}.panel-label-preview{white-space:pre-wrap;overflow-wrap:anywhere}
+.panel-label-math-preview [role=status]{display:block;margin-bottom:4px;font:12px Arial,sans-serif;color:var(--muted)}
+.panel-label-math-preview svg{display:block;width:100%;height:96px}

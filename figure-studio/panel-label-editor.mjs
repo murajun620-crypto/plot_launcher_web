@@ -1,17 +1,19 @@
 import {readPanelLabelContent,panelLabelDisplay} from './panel-label-content.mjs?v=panel-content-v0735-1';
 
-export function createPanelLabelEditor({root,getDocument,onApply,onClose=()=>{}}){
+export function createPanelLabelEditor({root,getDocument,onApply,onClose=()=>{},mathPreview}){
  const form=root.querySelector('form'),field=name=>form.elements.namedItem(name),preview=root.querySelector('[data-panel-preview]'),error=root.querySelector('[data-panel-error]');
  let session=null;
  const content=()=>({text:field('text').value,subtext:field('subtext').value,parentheses:field('parentheses').checked});
- function sync(){
-  preview.textContent=panelLabelDisplay(content())||'（文字なし）';
+ function sync(event){
+  const text=panelLabelDisplay(content());
+  preview.textContent=text||'（文字なし）';
+  preview.hidden=mathPreview?.show(text?{...session?.object,text,textMode:field('textMode').value,fontSize:Number(field('fontSize').value)}:null,event?.isComposing)??false;
   error.hidden=true;
  }
  function show(object){
   const document=getDocument();
   if(object.type!=='text'||!object.panelLabel||object.locked||document.objects.some(other=>object.groupId&&other.groupId===object.groupId&&other.locked))return;
-  session={document,id:object.id};
+  session={document,id:object.id,object};
   const saved=readPanelLabelContent(object);
   for(const key of ['text','subtext']){field(key).maxLength=Math.max(200,saved[key].length);field(key).value=saved[key];}
   field('parentheses').checked=saved.parentheses;
@@ -34,6 +36,6 @@ export function createPanelLabelEditor({root,getDocument,onApply,onClose=()=>{}}
   if((event.ctrlKey||event.metaKey)&&!event.altKey&&event.key==='Enter'){event.preventDefault();event.stopPropagation();form.requestSubmit();}
  });
  for(const button of root.querySelectorAll('[data-panel-cancel]'))button.addEventListener('click',()=>root.close());
- root.addEventListener('close',()=>{session=null;onClose();});
+ root.addEventListener('close',()=>{session=null;mathPreview?.hide();onClose();});
  return {show};
 }

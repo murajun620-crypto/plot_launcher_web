@@ -121,6 +121,10 @@ function instantiate(el,descriptor,paint,scale){
 
 const normalStyle=o=>({'font-family':o.fontFamily||'Arial','font-size':o.fontSize,'font-weight':o.bold?'700':'400','font-style':o.italic?'italic':'normal','text-decoration':o.underline?'underline':'none','text-anchor':'start','xml:space':'preserve'});
 
+export function hasTexMath(object){
+ return object?.type==='text'&&object.textMode!=='plain'&&(object.textMode==='tex'||splitTex(object.text,object.textMode).some(piece=>piece.type==='math'));
+}
+
 /** Build wrapped text/math rows without raster images or foreignObject. */
 export async function makeTexLayout(object,{measure,convert}){
  const o={...object},fontSize=Number(o.fontSize),width=o.textAutoSize?Infinity:Math.max(1,Number(o.w)-2);
@@ -172,7 +176,7 @@ export async function makeTexLayout(object,{measure,convert}){
 export function createTexRenderer({measure=(text,o)=>[...text].length*o.fontSize*.6,onReady=()=>{},onError=()=>{},documentRef=globalThis.document,convert}={}){
  const cache=new Map(),mathCache=new Map();let queue=Promise.resolve();
  const key=o=>JSON.stringify([o.textMode||'auto',String(o.text??''),o.fontSize,o.fontFamily||'Arial',!!o.bold,!!o.italic,!!o.underline,o.textAutoSize?'natural':o.w,o.textAlign||'left']);
- const hasMath=o=>o?.type==='text'&&o.textMode!=='plain'&&(o.textMode==='tex'||splitTex(o.text,o.textMode).some(piece=>piece.type==='math'));
+ const hasMath=hasTexMath;
  async function convertMath(source,display,object){
   const mathKey=JSON.stringify([source,display,object.fontFamily||'Arial',!!object.bold,!!object.italic]);if(mathCache.has(mathKey))return mathCache.get(mathKey);
   const work=queue.then(async()=>{
