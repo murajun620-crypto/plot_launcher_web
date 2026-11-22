@@ -1,9 +1,9 @@
-import {MAX_SHEET_SOURCES,groupSheetSources} from './sheet-sources.mjs?v=5d107be1dfb1';
-import { APP_VERSION, restoreSettings, initialCombinedSeries } from "./state.js?v=5d107be1dfb1";
+import {MAX_SHEET_SOURCES,groupSheetSources} from './sheet-sources.mjs?v=a41c9b028d75';
+import { APP_VERSION, restoreSettings, initialCombinedSeries } from "./state.js?v=a41c9b028d75";
 import { validateTableEdits } from './table-edits.mjs?v=27ae7675c457';
 // All user data stays in this worker's in-memory filesystem.
 const PYODIDE_VERSION = "0.29.3";
-const WORKER_BUILD = '5d107be1dfb1';
+const WORKER_BUILD = 'a41c9b028d75';
 const INDEX_URL = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
 let pyodide, dispatch, currentPath = "", uploadNumber = 0;
 let currentSources = [];

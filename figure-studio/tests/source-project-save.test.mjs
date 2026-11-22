@@ -6,8 +6,8 @@ import {createWorkspaceSession} from '../workspace-session.mjs';
 function fixture({failReady,failPrepare,failWrite,empty=[]}={}){
  const events=[],host={},choose=()=>{},editors=['plot','mifito'].map(app=>{
   let held=false,prepared=false,changed=false;
-  return {app,api:{hasWork:()=>!empty.includes(app),sourceSaveReady(){events.push(app+':ready');if(failReady===app)throw Error('unfinished input');return !empty.includes(app);},async prepareSourceSave(options){
-   assert.equal(options.host,host);assert.equal(options.choose,choose);assert.equal(options.requireFile,true);events.push(app+':prepare');if(failPrepare===app)throw new DOMException('cancelled','AbortError');held=true;prepared=true;
+  return {app,api:{hasWork:()=>!empty.includes(app),sourceSaveReady({editedOnly}){assert.equal(editedOnly,true);events.push(app+':ready');if(failReady===app)throw Error('unfinished input');return !empty.includes(app);},async prepareSourceSave(options){
+   assert.equal(options.host,host);assert.equal(typeof options.choose,"function");assert.equal(options.requireFile,true);events.push(app+':prepare');if(failPrepare===app)throw new DOMException('cancelled','AbortError');held=true;prepared=true;
    return {name:app+'.project',validate(){assert.equal(held,true);if(changed)throw Error('changed after preparation');events.push(app+':validate');},cancel(){held=false;events.push(app+':release');},async write({hold}){assert.equal(hold,true);assert.equal(held,true);assert.equal(prepared,true);events.push(app+':write');if(failWrite===app)throw Error('disk full');return {name:app+'.project'};}};
   },invalidate(){changed=true;},get held(){return held;}}};
  });
@@ -58,6 +58,25 @@ test('workspace persistence stays locked through the whole source batch and capt
 });
 test('workspace API never creates unloaded editors just to bulk save',async()=>{
  const created=[];const session=createWorkspaceSession({editor:async(app,create)=>{created.push(create);return null;}}),plan=await session.prepareSourceSaves();assert.equal(plan.count,0);assert.deepEqual(await plan.write(),[]);assert.deepEqual(created,[false,false]);assert.equal(session.busy,false);
+});
+test('a stalled source can continue with Studio after releasing every prepared native target',async()=>{
+ const f=fixture(),calls=[];
+ f.editors[1].api.prepareSourceSave=async()=>{throw new DOMException('元ファイルの確認がタイムアウトしました。','TimeoutError');};
+ f.options.choose=async info=>{calls.push(info);assert.equal(f.editors.some(e=>e.api.held),false);return 'studio-only';};
+ const plan=await prepareSourceProjectSaves(f.options);
+ assert.equal(plan,null);
+ assert.match(calls[0].message,/MiFiTo/);
+ assert.equal(calls[0].kind,'timeout');
+ assert.equal(f.events.some(e=>e.endsWith(':write')),false);
+ assert.equal(f.events.filter(e=>e==='unlock').length,1);
+});
+test('the normal source confirmation also offers Studio-only saving',async()=>{
+ const f=fixture();
+ f.editors[0].api.prepareSourceSave=async({choose})=>choose({kind:'missing',name:'graph.plotproject'});
+ f.options.choose=async info=>{assert.equal(info.allowStudioOnly,true);return 'studio-only';};
+ assert.equal(await prepareSourceProjectSaves(f.options),null);
+ assert.equal(f.events.includes('mifito:prepare'),false);
+ assert.equal(f.events.at(-1),'unlock');
 });
 test('cancellation and ordinary Studio write failures retain accurate source receipts',()=>{
  const completed=[{app:'mifito',name:'images.mifito'}];assert.match(sourceSaveMessage(Error('Studio disk full'),completed),/images.mifito/);assert.match(sourceSaveMessage(new DOMException('cancel','AbortError'),completed),/キャンセル/);assert.doesNotMatch(sourceSaveMessage(Error('failure')),/保存済み/);

@@ -9,7 +9,7 @@ import {serializeOfficeSVG} from './svg-export.mjs?v=source-save-v0736-1';
 import {preparePNG} from './png-export.mjs?v=source-save-v0736-1';
 import {importedImageSize,replacedImageSize,replacedMiFiToImageSize,miFiToSizeCorrection,imageInsertionPoint} from './image-placement.mjs?v=source-save-v0736-1';
 import {rasterResolution} from './image-resolution.mjs?v=image-quality-v066-1';
-import {encodeProjectFile,readProjectFile} from './project-format.mjs?v=compact-project-v0740-1';
+import {encodeProjectFile,readProjectFile} from './project-format.mjs?v=source-save-recovery-v0741-1';
 import {saveDraft,loadDraft,saveProjectFileTarget,loadProjectFileTarget} from './storage.mjs?v=0.3.6-1';
 import {stageStudioUpdate,restoreStudioUpdate,isLegacyStudioUpdate,finishLegacyStudioUpdate} from './startup-session.mjs?v=source-save-v0736-1';
 import {createDemo} from './demo.mjs?v=source-save-v0736-1';
@@ -36,7 +36,7 @@ import {readMifitoIdentity} from './integration/mifito-sync.mjs?v=0.3.5-1';
 import {readPlotIdentity,resolvePlotImage,currentPlotImageId} from './integration/plot-sync.mjs?v=source-save-v0736-1';
 import {planMiFiToSync} from './mifito-batch.mjs?v=source-save-v0736-1';
 import {setupUpdateCheck} from './update-check.mjs?v=source-save-v0736-1';
-import {installWorkspaceUpdater} from './workspace-update.mjs?v=compact-project-v0740-1';
+import {installWorkspaceUpdater} from './workspace-update.mjs?v=source-save-recovery-v0741-1';
 import {marqueeSelection,resolveObjectSelection,clickObjectSelection,selectionDescription} from './selection.mjs?v=source-save-v0736-1';
 import {renderGroupLayers} from './group-layers.mjs?v=source-save-v0736-1';
 import {drawSelectionFrames} from './selection-overlay.mjs?v=source-save-v0736-1';
@@ -53,11 +53,11 @@ import {reorderFigures} from './figure-order.mjs';
 import {renumberFigureNames} from './figure-names.mjs?v=0.3.3-1';
 import {deleteFigures,duplicateFigures} from './figure-commands.mjs?v=source-save-v0736-1';
 import {ProjectFileSession,projectFilePickerOptions} from './project-file.mjs?v=project-switch-v051-1';
-import {installWorkspacePersistence} from './workspace-session.mjs?v=source-save-v0736-1';
+import {installWorkspacePersistence} from './workspace-session.mjs?v=source-save-recovery-v0741-1';
 import {decodeWorkspaceState} from './workspace-state.mjs?v=project-switch-v051-1';
 import {validateWorkspaceBinding} from './integration/bridge-host.mjs?v=source-save-v0736-1';
 
-const STUDIO_RELEASE={version:'0.7.40',build:'compact-project-v0740-1'};
+const STUDIO_RELEASE={version:'0.7.41',build:'source-save-recovery-v0741-1'};
 installBrowserZoomGuard();
 window.FigureAppRelease?.assertRunning(STUDIO_RELEASE);
 if(window.FigureAppRelease&&!await window.FigureAppRelease.startup())throw Error('最新版へ切り替えています。');
@@ -607,7 +607,7 @@ function updateProjectFileUI(){
 async function saveProject(saveAs=false){
  if(projectSaving||projectOpening||updateReloading)return;
  if(gesture)endGesture(null,false);finishText();
- const capturedBook=bookId;let sourcePlan=null,savedSources=[],studioWritten=false,savingSources=false;
+ const capturedBook=bookId;let sourcePlan=null,savedSources=[],studioWritten=false,savingSources=false,studioOnly=false;
  try{
   projectSaving=true;updateProjectFileUI();
   const name=`${safeName(figures[0].name)}${figures.length>1?`_and_${figures.length}_figures`:''}.figurestudio`;
@@ -620,7 +620,7 @@ async function saveProject(saveAs=false){
   if(!saveAs&&saveSourceOption.checked&&workspace){
    savingSources=true;sourcePlan=await workspace.prepareSourceProjectSaves({status:toast});
    if(bookId!==capturedBook)throw Error('保存準備中にStudioのプロジェクトが変わりました。');
-   savedSources=await sourcePlan.write();
+   if(sourcePlan)savedSources=await sourcePlan.write();else studioOnly=true;
   }
   const capturedRevision=revision,packaged=packageProject();
   const captured=workspace?await workspace.captureWorkspace():null;
@@ -633,7 +633,7 @@ async function saveProject(saveAs=false){
   try{await saveProjectFileTarget(saved.bookId,{handle:saved.handle,name:saved.name});}catch{}
   const editorsUnchanged=captured?await workspace.markWorkspaceSaved(captured):true;
   if(bookId===saved.bookId)preservedWorkspace=packaged.workspace??null;
-  if(bookId===saved.bookId&&revision===saved.revision&&!editingId&&!gesture&&editorsUnchanged){dirty=false;manualSavedRevision=saved.revision;toast(`${saved.name} に${captured?'3タブの最新状態と未反映の編集':'配置・画像・元プロジェクト'}を保存しました${savedSources.length?`。元プロジェクトも保存済み：${savedSources.map(item=>item.name).join('、')}`:''}`);}
+  if(bookId===saved.bookId&&revision===saved.revision&&!editingId&&!gesture&&editorsUnchanged){dirty=false;manualSavedRevision=saved.revision;toast(`${saved.name} に${captured?'3タブの最新状態と未反映の編集':'配置・画像・元プロジェクト'}を保存しました${savedSources.length?`。元プロジェクトも保存済み：${savedSources.map(item=>item.name).join('、')}`:studioOnly?'。元ファイルの保存は保留しました':''}`);}
   else{if(bookId===saved.bookId)dirty=true;toast(`${saved.name} を保存しました。保存開始後の編集は次の保存で反映されます`);}
  }catch(error){toast(studioWritten?`Studioのファイルは保存しましたが、保存後の処理を完了できませんでした：${error.message}`:sourceSaveMessage(error,savedSources));}
  finally{sourcePlan?.cancel();projectSaving=false;updateProjectFileUI();const shell=savingSources?document.defaultView?.parent?.document:null;if(!editingId&&!gesture&&(document.activeElement?.closest('#projectSaveControls')||savingSources&&shell&&shell.activeElement===shell.body))svg.focus();}

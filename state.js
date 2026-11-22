@@ -1,8 +1,8 @@
-import {MAX_SHEET_SOURCES} from './sheet-sources.mjs?v=5d107be1dfb1';
+import {MAX_SHEET_SOURCES} from './sheet-sources.mjs?v=a41c9b028d75';
 import {validateMatrixOptions} from './matrix-model.mjs?v=d08c8b9af140';
 import { resetPresetUnitScales, unitConversion, configureAFMUnits } from "./units.js?v=9127ec4c4f31";
 import { validateTableEdits } from './table-edits.mjs?v=27ae7675c457';
-export const APP_VERSION = '2.5.18';
+export const APP_VERSION = '2.5.19';
 
 // Accept one numeric value or fraction without evaluating JavaScript expressions.
 export function parseCoefficient(value) {

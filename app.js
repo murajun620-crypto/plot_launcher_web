@@ -1,6 +1,6 @@
-import {MAX_SHEET_SOURCES,groupSheetSources,copySheetSources} from './sheet-sources.mjs?v=5d107be1dfb1';
-import {createProjectFileLinks,portableFileLink} from './project-file-links.mjs?v=d08c8b9af140';
-import {chooseProjectFileAction} from './project-file-dialog.mjs?v=d08c8b9af140';
+import {MAX_SHEET_SOURCES,groupSheetSources,copySheetSources} from './sheet-sources.mjs?v=a41c9b028d75';
+import {createProjectFileLinks,portableFileLink} from './project-file-links.mjs?v=a41c9b028d75';
+import {chooseProjectFileAction} from './project-file-dialog.mjs?v=a41c9b028d75';
 import {createAnnotationFormatDialog} from './annotation-format-dialog.mjs?v=d08c8b9af140';
 import {formatTargets,applyAnnotationFormat} from './annotation-format.mjs?v=d08c8b9af140';
 import {localFontFaces} from './local-font-faces.mjs?v=d08c8b9af140';
@@ -15,9 +15,9 @@ import {identifyPlotProject,openedPlotIdentity,plotSheetIndex,currentPlotImageId
 import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=9127ec4c4f31";
 import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=9127ec4c4f31";
 import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9127ec4c4f31";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=5d107be1dfb1";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=5d107be1dfb1";
-import { APP_VERSION, COLORS, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, initialCombinedSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=5d107be1dfb1";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=a41c9b028d75";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=a41c9b028d75";
+import { APP_VERSION, COLORS, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, initialCombinedSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=a41c9b028d75";
 
 import {alignmentOffsets} from './object-layout.mjs?v=27ae7675c457';
 import {createDataEditor} from './data-editor.mjs?v=27ae7675c457';
@@ -31,7 +31,7 @@ let annotationFormatDialog=null;
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 const fileProgress=createFileProgress();
-const APP_BUILD = '5d107be1dfb1';
+const APP_BUILD = 'a41c9b028d75';
 window.FigureAppRelease?.assertRunning({version:APP_VERSION,build:APP_BUILD});
 function makeProject(settings,data,fonts,workspace={}){
   const live=sourceData&&data.filename===sourceData.filename&&(data.bytes===sourceData.bytes||data.files&&data.files===sourceData.files);
@@ -492,7 +492,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=5d107be1dfb1", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=a41c9b028d75", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") {
       if(data.id)requests.get(data.id)?.progressTask?.stage(data.text,{completed:data.completed,total:data.total,unit:data.unit||''});
@@ -2391,11 +2391,12 @@ $("#open-project").addEventListener("click", () => $("#project-file").click());
 $("#project-file").addEventListener("change", event => {
   const file=event.target.files[0]; event.target.value=""; if(file) readProject(file);
 });
-function sourceProjectSaveReady(){
+function sourceProjectSaveReady({editedOnly=false}={}){
   if(projectVersionChecking||loading||exporting||pendingDataFiles)throw Error('PlotLauncherの読み込みや保存が完了してから保存してください。');
   if(!sourceData||!metadata||!config.series.length)return false;
   if(!engineReady||figureWorkspaceBusy()||figureBridgePendingInput()||pendingDataFiles)throw Error('PlotLauncherの処理や入力中の編集を確定してから保存してください。');
-  figureWorkspaceUI({rejectInvalid:true});return true;
+  figureWorkspaceUI({rejectInvalid:true});
+  return !editedOnly||!projectFileLink?.token||hasUnsavedChanges();
 }
 async function prepareSourceProjectSave({saveAs=false,host=window,choose=chooseProjectFileAction,requireFile=false}={}){
   if(requireFile&&!sourceProjectSaveReady())return null;

@@ -153,6 +153,22 @@ test('a long first save cannot exhaust the gesture needed for the next new file 
   const target=await f.api.prepare({projectId,name:f.name,requireFile:true,host:{navigator:{userActivation:activation},async showSaveFilePicker(){assert.equal(activation.isActive,true);events.push('picker');return copy;}},choose:async info=>{assert.equal(info.kind,'new');events.push('Studio-dialog');activation.isActive=true;return 'saveAs';}});
   assert.equal(target.handle,copy);assert.equal(target.saveAs,false);assert.equal(copy.state().writes,0);assert.deepEqual(events,['Studio-dialog','picker']);
 });
+test('a stalled original file read times out before any writer or fallback picker',async t=>{
+  const f=setup('plot'),original=fileHandle(f.name),opened=await f.api.opened({file:await original.getFile(),projectId,handle:original});
+  let started,complete;
+  const reading=new Promise(resolve=>started=resolve),lateFile=new Promise(resolve=>complete=resolve);
+  original.getFile=()=>{started();return lateFile;};
+  t.mock.timers.enable({apis:['setTimeout']});
+  const pending=f.api.prepare({projectId,name:f.name,handle:original,link:opened.link,knownSource:true,requireFile:true});
+  await reading;
+  const outcome=assert.rejects(pending,{name:'TimeoutError'});
+  t.mock.timers.tick(15000);
+  await outcome;
+  complete(new File(['arrived later'],f.name));
+  await Promise.resolve();
+  assert.equal(original.state().opens,0);
+  assert.deepEqual(f.picker,{opens:0,saves:0});
+});
 test('portable descriptors strip all file access data and reject invalid fingerprints',()=>{
   const descriptor={token:crypto.randomUUID(),fingerprint:'a'.repeat(64),path:'C:\\OneDrive\\private',handle:{kind:'file'}};
   assert.deepEqual(portableFileLink(descriptor),{token:descriptor.token,fingerprint:descriptor.fingerprint});assert.equal(portableFileLink({...descriptor,fingerprint:'invalid'}),null);assert.equal(portableFileLink({...descriptor,token:'../else'}),null);
@@ -172,4 +188,11 @@ test('save dialog uses escaped filenames, defaults to cancel, and leaves no moda
 test('missing-source dialog opens binding only after a deliberate button click',async()=>{
   const doc={body:new Element('body'),createElement:tag=>new Element(tag)},promise=chooseProjectFileAction({kind:'missing',name:'file.mifito'},doc),dialog=doc.body.children[0];
   dialog.children.at(-1).children.find(b=>b.textContent==='元ファイルを選択して上書き').fire('click');assert.equal(await promise,'bind');assert.equal(dialog.removed,true);
+});
+test('timeout dialog can continue with the Studio file after the user chooses it',async()=>{
+  const doc={body:new Element('body'),createElement:tag=>new Element(tag)};
+  const waiting=chooseProjectFileAction({kind:'timeout',message:'元ファイルを確認できませんでした。',allowStudioOnly:true},doc);
+  const dialog=doc.body.children[0],buttons=dialog.children.at(-1).children;
+  assert.deepEqual(buttons.map(button=>button.textContent),['キャンセル','Studioだけ保存']);
+  buttons[1].fire('click');assert.equal(await waiting,'studio-only');assert.equal(dialog.removed,true);
 });

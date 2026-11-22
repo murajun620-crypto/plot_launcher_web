@@ -4,6 +4,12 @@ const NAMES={plot:'PlotLauncher',mifito:'MiFiTo'};
  * rolled back, so preserve an exact receipt of completed saves on any failure. */
 export async function prepareSourceProjectSaves({editors,host,choose,status=()=>{},release=()=>{}}){
  const plans=[],saved=[],seen=new Set();let ended=false,writing=false,cancelled=false;
+ const skipSources=new DOMException('Studioだけ保存','AbortError');
+ const chooseTarget=choose&&(async info=>{
+  const answer=await choose({...info,allowStudioOnly:true});
+  if(answer==='studio-only')throw skipSources;
+  return answer;
+ });
  const finish=()=>{if(ended)return;ended=true;for(const {plan}of plans)try{plan.cancel();}catch{}plans.length=0;release();};
  const failure=(error,app)=>{
   const result=new Error(`${app?NAMES[app]+'：':''}${error.message}`,{cause:error});result.name=error.name;result.savedSourceProjects=[...saved];return result;
@@ -16,15 +22,23 @@ export async function prepareSourceProjectSaves({editors,host,choose,status=()=>
     if(!entry.api.hasWork())continue;
     throw Error(`${NAMES[entry.app]}の「更新確認」から最新版へ更新して、もう一度保存してください。`);
    }
-   if(entry.api.sourceSaveReady())targets.push(entry);
+   if(entry.api.sourceSaveReady({editedOnly:true}))targets.push(entry);
   }
   for(const {app,api}of targets){
    status(`${NAMES[app]}の保存先と内容を確認しています…`);
-   try{const plan=await api.prepareSourceSave({host,choose,requireFile:true});if(!plan)throw Error('保存準備中に内容が変わりました。もう一度保存してください。');plans.push({app,plan});}
-   catch(error){throw failure(error,app);}
+   try{const plan=await api.prepareSourceSave({host,choose:chooseTarget,requireFile:true});if(!plan)throw Error('保存準備中に内容が変わりました。もう一度保存してください。');plans.push({app,plan});}
+   catch(error){if(error===skipSources)throw error;throw failure(error,app);}
   }
   for(const {plan}of plans)plan.validate();
- }catch(error){finish();throw failure(error);}
+ }catch(error){
+  finish();
+  if(error===skipSources)return null;
+  if(error.name==='TimeoutError'&&choose){
+   if(await choose({kind:'timeout',message:error.message,allowStudioOnly:true})==='studio-only')return null;
+   throw new DOMException('保存をキャンセルしました。','AbortError');
+  }
+  throw failure(error);
+ }
  const count=plans.length;
  return {count,get saved(){return [...saved];},cancel(){if(writing&&!ended)cancelled=true;else finish();},async write(){
   if(ended||writing)throw Error('一括保存の処理は終了しています。');writing=true;
