@@ -113,12 +113,16 @@ test('Studio opens a read/write folder picker on demand and publishes selections
  const notices=[],unsubscribe=provider.subscribe(()=>notices.push('changed'));
  ui.updateProjectWorkFolderUI();
  assert.equal(await provider.getDirectory('book'),null);
+ assert.equal(nodes.get('#workFolderStatusName').textContent,'Studioファイルと同じフォルダ');
  await ui.chooseProjectWorkFolder();
  assert.deepEqual(calls,[{id:'figure-studio-work-folder',mode:'readwrite',startIn:studioFile},{id:'book',handle:bookFolder}]);
  assert.equal(await provider.getDirectory('book'),bookFolder);
  assert.match(nodes.get('#projectWorkFolder').textContent,/measurements/);
+ assert.equal(nodes.get('#workFolderStatusName').textContent,'measurements');
+ assert.match(nodes.get('#workFolderStatus').title,/作業フォルダ.*measurements/);
  await ui.clearProjectWorkFolder();
  assert.equal(await provider.getDirectory('book'),null);
+ assert.equal(nodes.get('#workFolderStatusName').textContent,'Studioファイルと同じフォルダ');
  ui.switchBook('other');
  assert.equal(await provider.getDirectory('book'),null);
  assert.equal(notices.length,4);
@@ -153,13 +157,17 @@ test('restoring a Studio file derives its folder and starts search before reconn
  const source={app:'mifito',projectId:'image-project',name:'images.mifito',assetId:'attached'};
  const figures=[{id:'figure',objects:[{id:'panel',source}]}];
  const started=deferred(),finish=deferred(),found={kind:'file',name:source.name};
- const {ui,provider,studioFile}=workspaceUI({committed:false,known:[granted],figures,scan:details=>{
+ const {ui,provider,studioFile,nodes}=workspaceUI({committed:false,known:[granted],figures,scan:details=>{
   started.resolve(details);return finish.promise;
  }});
+ ui.updateProjectWorkFolderUI();
+ assert.equal(nodes.get('#workFolderStatusName').textContent,'未指定');
  ui.stageProject(studioFile);
  const {directory:scanned,requests}=await started.promise;
  assert.equal(scanned,granted);
  assert.equal(requests[0].projectId,source.projectId);
+ assert.equal(nodes.get('#workFolderStatusName').textContent,'experiment');
+ assert.match(nodes.get('#workFolderStatus').title,/既定の作業フォルダ.*experiment/);
  const original=provider.findSource({sourceKey:'book/figure/panel/attached',...source});
  finish.resolve(new Map([[requests[0].key,found]]));
  assert.equal(await original,found);

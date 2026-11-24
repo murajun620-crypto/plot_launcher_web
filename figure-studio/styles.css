@@ -76,6 +76,27 @@
 @media(max-width:800px){.arrow-endpoint label{font-size:9px;gap:4px}.arrow-endpoint select{font-size:10px;padding-inline:3px}.arrow-size-fields{gap:5px}.arrow-size-fields label{flex-direction:column;align-items:stretch;gap:3px}.arrow-endpoint legend{font-size:10px}}
 
 .preview-quality-control{display:flex;align-items:center;gap:6px;white-space:nowrap;font-size:10px;color:var(--muted);margin-right:8px}.preview-quality-control select{height:27px;padding:3px 5px;font-size:11px;background:white}.canvas-footer #statusText{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.canvas-footer .zoom-controls{flex-shrink:0}
+.canvas-workspace{container:studio-canvas/inline-size}
+.canvas-footer-info{display:flex;align-items:center;gap:6px;flex:1;min-width:0}
+.canvas-footer #statusText{flex:1}
+.canvas-work-folder{display:flex;align-items:center;gap:5px;min-width:0;max-width:min(50%,280px);white-space:nowrap}
+.canvas-work-folder .icon{width:13px;height:13px}
+.canvas-work-folder-label{flex:none}
+.canvas-work-folder-name{overflow:hidden;text-overflow:ellipsis;color:#526661}
+@container studio-canvas (max-width:550px){
+  .canvas-work-folder-label{position:absolute;width:1px;height:1px;clip-path:inset(50%);overflow:hidden}
+}
+@container studio-canvas (max-width:390px){
+  .canvas-footer{display:grid;grid-template-columns:minmax(0,1fr);height:auto;min-height:36px;padding-block:3px;row-gap:1px}
+  .canvas-footer .zoom-controls{justify-content:flex-end;flex-wrap:wrap}
+  .canvas-footer .preview-quality-control{min-width:0;max-width:100%;margin-right:0}
+}
+@container studio-canvas (max-width:200px){
+  .canvas-footer-info{flex-direction:column;align-items:stretch;gap:1px}
+  .canvas-work-folder{max-width:100%}
+  .canvas-footer .zoom-controls{justify-content:flex-start}
+  .canvas-footer .preview-quality-control{width:100%}
+}
 /* Keep browser focus scrolling inside the inspector/sidebar, not the whole editor. */
 html{height:100%;overflow:clip}.app-shell{position:fixed;inset:0}
 .project-save-controls{display:inline-flex;align-items:center;gap:0}

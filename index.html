@@ -8,9 +8,9 @@
   <link rel="stylesheet" href="./matrix-editor.css?v=d08c8b9af140">
   <link rel="stylesheet" href="./file-progress.css?v=file-open-1">
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./style.css?v=d08c8b9af140">
+  <link rel="stylesheet" href="./style.css?v=74af74acac67">
   <link rel="stylesheet" href="./colors.css?v=unified-palette-1">
-  <script type="module" src="./release-loader.mjs?v=release-gate-1" data-release-app="plot" data-release-version="2.5.22" data-release-build="052ade738fc1" data-release-entry="./app.js?v=052ade738fc1"></script>
+  <script type="module" src="./release-loader.mjs?v=release-gate-1" data-release-app="plot" data-release-version="2.5.23" data-release-build="74af74acac67" data-release-entry="./app.js?v=74af74acac67"></script>
 </head>
 <body>
   <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -186,7 +186,14 @@
         </div>
         <div class="stage-caption"><button id="refresh-preview" class="button quiet" disabled><svg><use href="#i-refresh"/></svg>更新</button></div>
       </div>
-      <div id="status" class="status" role="status" aria-live="polite"><span class="status-dot"></span><span id="status-text">描画機能を読み込んでいます…</span><button id="retry-engine" class="button quiet" hidden>再読み込み</button></div>
+      <div class="preview-status-bar">
+        <div id="status" class="status" role="status" aria-live="polite"><span class="status-dot"></span><span id="status-text">描画機能を読み込んでいます…</span><button id="retry-engine" class="button quiet" hidden>再読み込み</button></div>
+        <div class="editing-file" title="編集中のファイル：—">
+          <svg aria-hidden="true"><use href="#i-file"/></svg>
+          <span class="editing-file-label">編集中のファイル</span>
+          <bdi id="editing-file-name">—</bdi>
+        </div>
+      </div>
       <details id="plot-warnings" class="plot-warnings" hidden><summary>描画データの確認</summary><ul id="warning-list"></ul></details>
       <section id="series-table-panel" class="series-table-panel" aria-labelledby="series-table-title" hidden>
         <div class="series-table-heading"><h2 id="series-table-title">系列表</h2><output id="series-table-summary" aria-live="polite"></output><button id="toggle-series-table" type="button" class="button quiet" aria-label="系列表を閉じる" aria-expanded="true" aria-controls="series-table-content" title="系列表を開閉します。">−</button></div>

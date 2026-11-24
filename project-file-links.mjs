@@ -1,4 +1,4 @@
-import {findProjectInWorkFolder} from './source-folder.mjs?v=052ade738fc1';
+import {findProjectInWorkFolder} from './source-folder.mjs?v=74af74acac67';
 
 // Writable handles live only in this browser's IndexedDB. Portable snapshots
 // carry an opaque token and a byte fingerprint, never paths or permissions.
