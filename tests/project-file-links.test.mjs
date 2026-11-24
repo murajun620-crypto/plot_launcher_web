@@ -55,6 +55,43 @@ for(const app of ['plot','mifito']){
     const unknownCopy=fileHandle(f.name);assert.equal((await f.api.opened({file:await unknownCopy.getFile(),projectId})).handle,null);
     assert.equal((await f.api.opened({file:new File(['generated legacy snapshot'],f.name),projectId,embedded:true})).handle,null);
   });
+  test(`${app}: a tokenless Studio attachment remembers its chosen folder across reopened panels`,async()=>{
+    const f=setup(app,{answers:['bind','cancel']}),one=fileHandle(f.name),two=fileHandle(f.name);
+    const file=await one.getFile(),sourceKey='book/figure/panel/asset';
+    await f.api.opened({file,projectId,handle:one});
+    await f.api.opened({file,projectId,handle:two});
+    const initial=await f.api.opened({file,projectId,sourceKey,embedded:true});
+    assert.equal(initial.handle,null);
+    f.setOpen(two);
+    const target=await f.api.prepare({projectId,name:f.name,link:initial.link,knownSource:true,sourceKey});
+    const hash=await target.write(new Blob([JSON.stringify({id:projectId,content:'editor save'})]));
+    await target.remember(projectId,hash);
+    const reopened=await f.api.opened({file,projectId,sourceKey:'book/other-figure/another-panel/asset',embedded:true});
+    assert.equal(reopened.handle,two);
+    assert.equal(reopened.link.fingerprint,initial.link.fingerprint);
+    const otherBook=await f.api.opened({file,projectId,sourceKey:'separate/figure/panel/asset',embedded:true});
+    assert.equal(otherBook.handle,null);
+    // A stale attachment still checks newer native bytes before overwriting.
+    await assert.rejects(f.api.prepare({projectId,name:f.name,link:reopened.link,knownSource:true,sourceKey}),{name:'AbortError'});
+    assert.deepEqual(f.prompts.map(prompt=>prompt.kind),['missing','changed']);
+    assert.equal(f.picker.opens,1);
+    assert.equal(one.state().opens,0);
+    assert.equal(two.state().writes,1);
+    const otherPC=setup(app);
+    assert.equal((await otherPC.api.opened({file,projectId,sourceKey,embedded:true,link:reopened.link})).handle,null);
+  });
+  test(`${app}: a manually attached file keeps its physical basename for an older Studio snapshot`,async()=>{
+    const f=setup(app),sourceKey='book/figure/panel/asset',native=fileHandle('other'+fExtension(app));
+    const file=await native.getFile();
+    await f.api.opened({file,projectId,handle:native,sourceKey});
+    const copiedSnapshot=new File([file],f.name);
+    const found=await f.api.opened({file:copiedSnapshot,projectId,sourceKey,embedded:true});
+    assert.equal(found.name,native.name);
+    assert.equal(found.handle,native);
+    const target=await f.api.prepare({projectId,name:f.name,link:found.link,sourceKey,knownSource:true});
+    assert.equal(target.handle,native);
+    assert.deepEqual(f.picker,{opens:0,saves:0});
+  });
   test(`${app}: old Studio version detects newer native saves even if the registry has the new hash`,async()=>{
     const f=setup(app,{answers:['cancel']}),original=fileHandle(f.name),old=await f.api.opened({file:await original.getFile(),projectId,handle:original});
     original.replace('newer OneDrive version');await f.api.opened({file:await original.getFile(),projectId,handle:original});

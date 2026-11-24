@@ -9,7 +9,7 @@ import {serializeOfficeSVG} from './svg-export.mjs?v=source-save-v0736-1';
 import {preparePNG} from './png-export.mjs?v=source-save-v0736-1';
 import {importedImageSize,replacedImageSize,replacedMiFiToImageSize,miFiToSizeCorrection,imageInsertionPoint} from './image-placement.mjs?v=source-save-v0736-1';
 import {rasterResolution} from './image-resolution.mjs?v=image-quality-v066-1';
-import {encodeProjectFile,readProjectFile} from './project-format.mjs?v=source-save-recovery-v0741-1';
+import {encodeProjectFile,readProjectFile} from './project-format.mjs?v=remember-source-v0742-1';
 import {saveDraft,loadDraft,saveProjectFileTarget,loadProjectFileTarget} from './storage.mjs?v=0.3.6-1';
 import {stageStudioUpdate,restoreStudioUpdate,isLegacyStudioUpdate,finishLegacyStudioUpdate} from './startup-session.mjs?v=source-save-v0736-1';
 import {createDemo} from './demo.mjs?v=source-save-v0736-1';
@@ -33,10 +33,11 @@ import {openSource,SOURCE_APPS,setupSourceDiscovery,closeSourceSessions} from '.
 import {createFigureSidebar} from './thumbnails.mjs?v=live-v062-1';
 import {setupTransferReceiver,getFigureWorkspace} from './integration/direct-transfer.mjs?v=studio-send-v0714-1';
 import {readMifitoIdentity} from './integration/mifito-sync.mjs?v=0.3.5-1';
-import {readPlotIdentity,resolvePlotImage,currentPlotImageId} from './integration/plot-sync.mjs?v=source-save-v0736-1';
+import {createProjectFileLinks} from '../project-file-links.mjs?v=c924e38b15d0';
+import {readPlotIdentity,openedPlotIdentity,resolvePlotImage,currentPlotImageId} from './integration/plot-sync.mjs?v=source-save-v0736-1';
 import {planMiFiToSync} from './mifito-batch.mjs?v=source-save-v0736-1';
 import {setupUpdateCheck} from './update-check.mjs?v=source-save-v0736-1';
-import {installWorkspaceUpdater} from './workspace-update.mjs?v=source-save-recovery-v0741-1';
+import {installWorkspaceUpdater} from './workspace-update.mjs?v=remember-source-v0742-1';
 import {marqueeSelection,resolveObjectSelection,clickObjectSelection,selectionDescription} from './selection.mjs?v=source-save-v0736-1';
 import {renderGroupLayers} from './group-layers.mjs?v=source-save-v0736-1';
 import {drawSelectionFrames} from './selection-overlay.mjs?v=source-save-v0736-1';
@@ -53,11 +54,11 @@ import {reorderFigures} from './figure-order.mjs';
 import {renumberFigureNames} from './figure-names.mjs?v=0.3.3-1';
 import {deleteFigures,duplicateFigures} from './figure-commands.mjs?v=source-save-v0736-1';
 import {ProjectFileSession,projectFilePickerOptions} from './project-file.mjs?v=project-switch-v051-1';
-import {installWorkspacePersistence} from './workspace-session.mjs?v=source-save-recovery-v0741-1';
+import {installWorkspacePersistence} from './workspace-session.mjs?v=remember-source-v0742-1';
 import {decodeWorkspaceState} from './workspace-state.mjs?v=project-switch-v051-1';
-import {validateWorkspaceBinding} from './integration/bridge-host.mjs?v=source-save-v0736-1';
+import {validateWorkspaceBinding} from './integration/bridge-host.mjs?v=remember-source-v0742-1';
 
-const STUDIO_RELEASE={version:'0.7.41',build:'source-save-recovery-v0741-1'};
+const STUDIO_RELEASE={version:'0.7.42',build:'remember-source-v0742-1'};
 installBrowserZoomGuard();
 window.FigureAppRelease?.assertRunning(STUDIO_RELEASE);
 if(window.FigureAppRelease&&!await window.FigureAppRelease.startup())throw Error('最新版へ切り替えています。');
@@ -472,7 +473,7 @@ function execute(action,payload={}){
  if(action==='move-figure-left'||action==='move-figure-right'){finishText();const before=snapshot(),i=figures.findIndex(f=>f.id===doc.id),j=i+(action==='move-figure-left'?-1:1);if(j>=0&&j<figures.length){[figures[i],figures[j]]=[figures[j],figures[i]];record(before);}return;}
  if(action==='new'||action==='sample'){finishText();if(dirty&&!confirm(shortcutLabel('現在のFigureを閉じます。必要な場合は先にCtrl+Sで保存してください。続けますか？')))return;const before=snapshot();if(action==='sample'){const demo=createDemo();doc=demo.doc;for(const [k,v]of demo.assets)assets.set(k,v);}else{doc=newDocument();doc.name='Fig. 1';}bookId=uid();preservedWorkspace=null;figures=[doc];selection=[];previewQuality.clear();record(before);fit();return;}
  if(action==='export-svg')return exportSVG();if(action==='export-png')return exportPNG();if(action==='export-pdf')return exportPDF();
- if(action==='attach-source'){if(selected().length!==1||selected()[0].type!=='image'){toast('画像・グラフを1つ選択してください');return;}$('#sourceInput').click();return;}
+ if(action==='attach-source'){if(selected().length!==1||selected()[0].type!=='image'){toast('画像・グラフを1つ選択してください');return;}return pickSourceProject(selected()[0]);}
  if(action==='edit-source'){const o=selected()[0];if(o?.source)editSource(o);else toast('先に「元プロジェクトを関連付け」で .plotproject / .mifito を選択してください');return;}
 }
 const shortcut=createShortcutHandler({execute,isEditing:e=>e.target===editor?'canvas-text':e.target.isContentEditable||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName),isCanvasActive:()=>document.querySelector('dialog[open]')?false:document.activeElement?.closest('#studioRibbon,#ribbonSelectionPane,.app-header')?'ribbon':(document.activeElement===svg||document.activeElement===document.body||document.activeElement===editor||!!document.activeElement?.closest('#figureTabs')),onHint:text=>{$('#keyHint').textContent=text;$('#keyHint').hidden=!text;}});
@@ -540,7 +541,7 @@ async function importDirectFigure(payload){
  if(project.size>280*1024*1024)throw Error('元プロジェクトは280 MB以内にしてください。');
  if(app==='mifito'&&sourceImage){const identity=await readMifitoIdentity(project),entry=identity.images.find(image=>image.imageId===sourceImage.imageId);if(identity.projectId!==sourceImage.projectId||entry?.fingerprint!==sourceImage.fingerprint)throw Error('画像とMiFiToプロジェクトの対応情報が一致しません。');}
  finishText();if(gesture)endGesture(null,true);const documentId=doc.id;
- const name=String(sourceName||`Figure${app==='mifito'?'.mifito':'.plotproject'}`).replace(/[\\/]/g,'_').slice(0,240);
+ const name=String(sourceName||`Figure${app==='mifito'?'.mifito':'.plotproject'}`).replace(/[\\/]/g,'_').slice(0,255);
  const [image,projectURL]=await Promise.all([imageAsset(preview,name.replace(/\.(plotproject|mifito)$/i,'')+(preview.type==='image/svg+xml'?'.svg':'.png')),blobToDataURL(project)]);
  if(doc.id!==documentId)throw Error('受け取り先のFigureが切り替わりました。もう一度送ってください。');
  const before=snapshot(),source={id:uid(),name,mime:project.type||'application/octet-stream',dataUrl:projectURL};
@@ -733,7 +734,35 @@ async function readProject(file,handle=null,{recovery=false}={}){
 }
 
 $('#projectInput').addEventListener('change',async e=>{const file=e.target.files[0];e.target.value='';if(!file||projectSaving||projectOpening||updateReloading)return;projectOpening=true;updateProjectFileUI();try{await readProject(file);}finally{projectOpening=false;updateProjectFileUI();}});
-$('#sourceInput').addEventListener('change',async e=>{const f=e.target.files[0],o=selected()[0];e.target.value='';if(!f||!o)return;const documentId=doc.id,panelId=o.id;try{if(f.size>280*1024*1024)throw Error('元プロジェクトは280 MB以内です。');const app=/\.mifito$/i.test(f.name)?'mifito':'plot',a={id:uid(),name:f.name,mime:'application/octet-stream',dataUrl:await blobToDataURL(f)};if(doc.id!==documentId)return;const target=doc.objects.find(n=>n.id===panelId);if(!target)return;assets.set(a.id,a);change(()=>target.source={app,name:f.name,assetId:a.id});toast('元プロジェクトを関連付けました');}catch(error){toast(error.message);}});
+async function pickSourceProject(panel){
+ if(typeof window.showOpenFilePicker!=='function'){ $('#sourceInput').click();return; }
+ const owner={book:bookId,figure:doc.id,panel,previousSource:panel.source};
+ try{
+  const startIn=projectFiles.target(bookId)?.handle;
+  const [handle]=await window.showOpenFilePicker({id:'figure-studio-source',types:[{description:'PlotLauncher／MiFiToプロジェクト',accept:{'application/octet-stream':['.plotproject','.mifito']}}],...(startIn?{startIn}:{})});
+  if(handle)await attachSourceProject(await handle.getFile(),owner,handle);
+ }catch(error){if(error.name!=='AbortError')toast(error.message);}
+}
+async function attachSourceProject(file,{book,figure,panel,previousSource},handle=null){
+ if(file.size>280*1024*1024)throw Error('元プロジェクトは280 MB以内です。');
+ if(!/\.(?:plotproject|mifito)$/i.test(file.name))throw Error('.plotproject または .mifito を選択してください。');
+ const app=/\.mifito$/i.test(file.name)?'mifito':'plot',id=uid();
+ const asset={id,name:file.name,mime:'application/octet-stream',dataUrl:await blobToDataURL(file)};
+ let remembered=false;
+ if(handle){
+  const identity=app==='plot'?await openedPlotIdentity(await readPlotIdentity(file),file.name):await readMifitoIdentity(file);
+  const result=await createProjectFileLinks({app}).opened({file,projectId:identity.projectId,handle,sourceKey:sourceEditKey(book,figure,panel.id,id)});
+  remembered=result.remembered;
+ }
+ if(bookId!==book||doc.id!==figure||!doc.objects.includes(panel)||panel.source!==previousSource)return;
+ assets.set(id,asset);change(()=>panel.source={app,name:file.name,assetId:id});
+ toast(remembered?'元プロジェクトを関連付け、このブラウザに保存先を記憶しました':'元プロジェクトを関連付けました');
+}
+$('#sourceInput').addEventListener('change',async event=>{
+ const file=event.target.files[0],panel=selected()[0];event.target.value='';
+ if(!file||panel?.type!=='image')return;
+ try{await attachSourceProject(file,{book:bookId,figure:doc.id,panel,previousSource:panel.source});}catch(error){toast(error.message);}
+});
 function sourceEditKey(book,figure,panel,sourceAsset){return [book,figure,panel,sourceAsset].join('/');}
 const mifitoIdentities=new Map(),plotIdentities=new Map();
 function sourceIdentity(asset,app){
@@ -789,7 +818,7 @@ async function syncMiFiToFigures(result,{app='mifito',guard,anchorPanelId,target
   return {summary,message:syncSummary(summary),anchorSourceAssetId:panel?.source?.assetId,anchorImageId,detached:!!anchorImageId&&!definitions.has(anchorImageId)};
  };
  if(!plan.summary.updated&&!plan.summary.added&&!needsIdentity&&!sizeCorrections.size){const done=response();toast(done.message);return done;}
- const name=String(result.sourceName||(app==='plot'?'figure.plotproject':'figure.mifito')).replace(/[\\/]/g,'_').slice(0,240);
+ const name=String(result.sourceName||(app==='plot'?'figure.plotproject':'figure.mifito')).replace(/[\\/]/g,'_').slice(0,255);
  const project={id:uid(),name,mime:result.project.type||'application/octet-stream',dataUrl:await blobToDataURL(result.project)};
  check();syncFigure();
  // Source associations must still be the ones used to prepare this atomic edit.

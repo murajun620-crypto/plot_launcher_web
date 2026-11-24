@@ -1,6 +1,6 @@
-import {MAX_SHEET_SOURCES,groupSheetSources,copySheetSources} from './sheet-sources.mjs?v=a41c9b028d75';
-import {createProjectFileLinks,portableFileLink} from './project-file-links.mjs?v=a41c9b028d75';
-import {chooseProjectFileAction} from './project-file-dialog.mjs?v=a41c9b028d75';
+import {MAX_SHEET_SOURCES,groupSheetSources,copySheetSources} from './sheet-sources.mjs?v=c924e38b15d0';
+import {createProjectFileLinks,portableFileLink} from './project-file-links.mjs?v=c924e38b15d0';
+import {chooseProjectFileAction} from './project-file-dialog.mjs?v=c924e38b15d0';
 import {createAnnotationFormatDialog} from './annotation-format-dialog.mjs?v=d08c8b9af140';
 import {formatTargets,applyAnnotationFormat} from './annotation-format.mjs?v=d08c8b9af140';
 import {localFontFaces} from './local-font-faces.mjs?v=d08c8b9af140';
@@ -9,15 +9,15 @@ import {statisticNumber,statisticAvailable,statisticFormat,defaultStatisticForma
 import {createMatrixEditor} from './matrix-editor.mjs?v=d08c8b9af140';
 import {isMatrixPlot,isCombinedHistogram,matrixColorbarVisible} from './matrix-model.mjs?v=d08c8b9af140';
 import {createFileProgress} from './file-progress.mjs?v=file-open-1';
-import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=d08c8b9af140';
+import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=c924e38b15d0';
 import {setupDirectSendButton,getFigureWorkspace} from './direct-transfer.mjs?v=baaeeccc3ee1';
 import {identifyPlotProject,openedPlotIdentity,plotSheetIndex,currentPlotImageId,resolvePlotImage,savedPlotProjectId,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=d08c8b9af140';
 import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=9127ec4c4f31";
 import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=9127ec4c4f31";
 import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9127ec4c4f31";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=a41c9b028d75";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=a41c9b028d75";
-import { APP_VERSION, COLORS, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, initialCombinedSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=a41c9b028d75";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=c924e38b15d0";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=c924e38b15d0";
+import { APP_VERSION, COLORS, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, initialCombinedSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=c924e38b15d0";
 
 import {alignmentOffsets} from './object-layout.mjs?v=27ae7675c457';
 import {createDataEditor} from './data-editor.mjs?v=27ae7675c457';
@@ -31,7 +31,7 @@ let annotationFormatDialog=null;
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 const fileProgress=createFileProgress();
-const APP_BUILD = 'a41c9b028d75';
+const APP_BUILD = 'c924e38b15d0';
 window.FigureAppRelease?.assertRunning({version:APP_VERSION,build:APP_BUILD});
 function makeProject(settings,data,fonts,workspace={}){
   const live=sourceData&&data.filename===sourceData.filename&&(data.bytes===sourceData.bytes||data.files&&data.files===sourceData.files);
@@ -492,7 +492,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=a41c9b028d75", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=c924e38b15d0", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") {
       if(data.id)requests.get(data.id)?.progressTask?.stage(data.text,{completed:data.completed,total:data.total,unit:data.unit||''});
@@ -2406,7 +2406,7 @@ async function prepareSourceProjectSave({saveAs=false,host=window,choose=chooseP
   const release=()=>{if(released)return;released=true;exporting=false;updateButtons();if(renderWanted)renderPreview();};
   try{
     const name=projectFilename || `${safeStem($("#save-name").value)}.plotproject`;
-    const target=await projectFiles.prepare({projectId:sourceData.figureStudioProjectId,name,link:projectFileLink,handle:projectHandle,saveAs,knownSource:!!projectFilename,host,choose,requireFile,startIn:projectHandle||saveDirectory||sourceDirectory||sourceHandle,fallback:async(blob,filename)=>{download(blob,filename);return filename;}});
+    const target=await projectFiles.prepare({projectId:sourceData.figureStudioProjectId,name,link:projectFileLink,handle:projectHandle,sourceKey:figureStudioBridge?.sourceKey,saveAs,knownSource:!!projectFilename,host,choose,requireFile,startIn:projectHandle||saveDirectory||sourceDirectory||sourceHandle,fallback:async(blob,filename)=>{download(blob,filename);return filename;}});
     if(target.saveAs)await figureStudioBridge?.captureWorkspaceBinding();
     const savedState=projectEditState(),savingSource=sourceData;
     const currentId=sourceData.figureStudioProjectId||crypto.randomUUID();
@@ -2644,7 +2644,8 @@ async function readProject(file, saved, options={}) {
     await checkFigureStudioProjectReplacement(options);
     opening.stage('データとフォントを復元しています…');
     const result=await request('project',{filename:project.data.filename,selectedSheets:project.data.selectedSheets,tableEdits:project.data.tableEdits,bytes:project.data.bytes,...(project.data.files?{files:project.data.files}:{}),sheetIndex:project.data.sheetIndex,headerRow:project.data.headerRow,settings:project.settings,fonts:project.fonts,sheetSettings:project.workspace.sheetSettings || [],sharedSettings:project.workspace.sharedSettings});
-    const fileTarget=await projectFiles.opened({file,projectId:identity.projectId,handle:sourceHandles.get(file)||null,embedded:!!options.fromBridge,link:project.workspace.sourceFileLink});
+    const fileTarget=await projectFiles.opened({file,projectId:identity.projectId,handle:sourceHandles.get(file)||null,embedded:!!options.fromBridge,link:project.workspace.sourceFileLink,sourceKey:options.fromBridge?options.sourceKey:undefined});
+    if(fileTarget.name)retainedData.figureStudioProjectFileName=fileTarget.name;
     prepareFigureStudioProjectReplacement(options);
     opening.stage('グラフ設定を復元しています…');await opening.paint();
     metadata=result.metadata; config=result.config; sourceData=retainedData; sample=project.data.sample; dataFileHandles=[];
@@ -2652,7 +2653,7 @@ async function readProject(file, saved, options={}) {
     // Older projects may contain distinct sheet styles; keep those individual.
     sheetMode=project.workspace.sheetMode || 'individual'; sharedSettings=project.workspace.sharedSettings || null;
     sourceHandle=sourceHandles.get(file) || null; sourceDirectory=null;
-    projectHandle=fileTarget.handle;projectFilename=file.name;projectFileLink=fileTarget.link;
+    projectHandle=fileTarget.handle;projectFilename=fileTarget.name||file.name;projectFileLink=fileTarget.link;
     $('#save-destination').value=folderSupported?'source':'download'; refreshSaveDestination(); loadedHeader=metadata.headerRow;
     importedFonts.clear(); retainedFonts.forEach(font=>importedFonts.set(font.name,font));
     loadedFonts.clear(); ['Liberation Sans','Noto Sans JP','DejaVu Sans',...result.families].forEach(family=>loadedFonts.add(family));
@@ -3768,25 +3769,35 @@ function currentPlotMatchesIdentity(identity,imageId){
  if(identity.projectId!==sourceData?.figureStudioProjectId||index===undefined||!selectedSheetIndices().includes(index))return false;
  return image.imageId===currentPlotImageId({config,metadata,sheetMode,sheetSettings,sharedSettings,sourceData},index);
 }
+async function currentPlotMatchesFileLink(saved,identity,sourceKey){
+ const incoming=portableFileLink(saved.workspace?.sourceFileLink);
+ if(incoming?.token&&incoming.token===projectFileLink?.token)return true;
+ if(!incoming?.token&&(!projectHandle&&!projectFileLink?.token||sourceKey&&sourceKey===figureStudioBridge?.sourceKey))return true;
+ if(!projectHandle)return false;
+ const handle=incoming?.token
+  ?await projectFiles.resolve({projectId:identity.projectId,name:identity.projectFileName,link:incoming})
+  :await projectFiles.resolveSource({projectId:identity.projectId,sourceKey});
+ try{return !!handle&&await projectHandle.isSameEntry(handle);}catch{return false;}
+}
 function figureStudioHasUnreflectedContent(){return !!metadata&&!!sourceData&&(figureBridgeBaseline?figureBridgeIsDirty():hasUnsavedChanges());}
 figureStudioBridge=setupFigureBridge({
   app:'plot',
   hasContent:figureStudioHasUnreflectedContent,
-  async canReuseProject({project,imageId,sourceName}){
+  async canReuseProject({project,imageId,sourceName,editKey}){
     if(!sourceData||!metadata||loading||exporting||dragging||colormapApplying||pendingDataFiles||figureBridgePendingInput())return false;
-    const rawIdentity=await identifyPlotProject(JSON.parse(await project.text())),identity=await openedPlotIdentity(rawIdentity,sourceName||rawIdentity.projectFileName);
-    return currentPlotMatchesIdentity(identity,imageId||identity.activeImageId);
+    const saved=JSON.parse(await project.text()),rawIdentity=await identifyPlotProject(saved),identity=await openedPlotIdentity(rawIdentity,sourceName||rawIdentity.projectFileName);
+    return currentPlotMatchesIdentity(identity,imageId||identity.activeImageId)&&await currentPlotMatchesFileLink(saved,identity,editKey);
   },
   canAdoptAccepted:result=>!!sourceData&&!loading&&!exporting&&!dragging&&!colormapApplying&&!pendingDataFiles&&!figureBridgePendingInput()&&sourceData===result?.bridgeState?.source,
   onConnectionChange(connected){figureStudioDirectSender?.setBridgeConnected(connected);},
-  async loadProject(file,{reconnect,imageId,force=false}={}) {
+  async loadProject(file,{reconnect,imageId,sourceKey,force=false,adopted=false}={}) {
     const opening=fileProgress.begin(file);let saved,incomingIdentity;
     try{const text=await opening.read(file,{text:true});opening.stage('プロジェクトの内容を確認しています…');await opening.paint();saved=JSON.parse(text);parseProject(saved);
       opening.stage('描画機能の準備を待っています…');await figureBridgeWait(() => engineReady && !loading && !exporting);incomingIdentity=await openedPlotIdentity(await identifyPlotProject(saved),file.name);
     }catch(error){opening.fail(error);throw error;}
     finally{opening.release();}
-    figureBridgePreservedOnReconnect=!!(!force&&reconnect&&metadata&&sourceData&&currentPlotMatchesIdentity(incomingIdentity,imageId||incomingIdentity.activeImageId));
-    if (!figureBridgePreservedOnReconnect && !await readProject(file,saved,{fromBridge:true,...(force?{force:true}:{})})) throw new Error('プロジェクトを復元できませんでした。編集画面のエラーを確認してください。');
+    figureBridgePreservedOnReconnect=!!(!force&&reconnect&&metadata&&sourceData&&currentPlotMatchesIdentity(incomingIdentity,imageId||incomingIdentity.activeImageId)&&(adopted||await currentPlotMatchesFileLink(saved,incomingIdentity,sourceKey)));
+    if (!figureBridgePreservedOnReconnect && !await readProject(file,saved,{fromBridge:true,...(sourceKey?{sourceKey}:{}),...(force?{force:true}:{})})) throw new Error('プロジェクトを復元できませんでした。編集画面のエラーを確認してください。');
     if(imageId)await chooseFigureStudioSheet(imageId);
     await figureBridgeWait(() => !loading && !renderRunning && renderedRevision === revision,
       () => !renderRunning && $('#preview-state').classList.contains('error') ? 'グラフを描画できませんでした。編集画面で設定を確認してください。' : null);

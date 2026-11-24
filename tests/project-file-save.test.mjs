@@ -13,23 +13,44 @@ const maker=section('function makeProject(','function positionDialog(');
 const original=JSON.parse(await readFile(new URL('../samples/general.plotproject',import.meta.url),'utf8'));
 original.workspace.figureStudioProjectId='test-source-project-000001';original.workspace.projectFileName='source.plotproject';
 function handle(name,blob){let bytes=blob;return {name,kind:'file',fail:false,async getFile(){return new File([bytes],name);},async queryPermission(){return 'granted';},async isSameEntry(other){return this===other;},async createWritable(){let pending;const h=this;return {async write(blob){if(h.fail)throw Error('disk full');pending=blob;},async close(){bytes=pending;},async abort(){}};}};}
-async function fixture({saveAs=false,fail=false,cancel=false,unbound=false}={}){
+async function fixture({saveAs=false,fail=false,cancel=false,unbound=false,sourceKey}={}){
   const project=parseProject(original),native=handle('source.plotproject',new Blob([JSON.stringify(original)])),copy=handle('copy.plotproject',new Blob());copy.fail=fail;native.fail=fail;
   const records=new Map(),store={async get(key){return records.get(key);},async list(key){return [...records.values()].filter(r=>r.project===key);},async put(record){records.set(record.token,record);}};
   const pickerHost={async showSaveFilePicker(){if(cancel)throw new DOMException('cancelled','AbortError');return copy;}};
   const projectFiles=createProjectFileLinks({app:'plot',store,host:pickerHost,choose:()=>assert.fail('Unexpected confirmation'),identify:async file=>openedPlotIdentity(await identifyPlotProject(JSON.parse(await file.text())),file.name)});
   const opened=await projectFiles.opened({file:await native.getFile(),projectId:original.workspace.figureStudioProjectId,handle:native});
   const data={...project.data,figureStudioProjectId:original.workspace.figureStudioProjectId,figureStudioProjectFileName:'source.plotproject'};
-  const events=[],nodes=new Map([['#save-name',{value:'figure'}],['#png-dpi',{value:'600'}]]);
-  const env={projectVersionChecking:false,window:pickerHost,chooseProjectFileAction:()=>assert.fail('Unexpected confirmation'),figureWorkspaceBusy:()=>false,figureBridgePendingInput:()=>false,pendingDataFiles:null,dataEditor:null,figureWorkspaceUI(){},engineReady:true,loading:false,exporting:false,sourceData:data,metadata:{sheetIndex:project.data.sheetIndex},config:{series:[{}]},updateButtons(){},safeStem,projectFilename:'source.plotproject',projectFileLink:opened.link,projectHandle:native,projectFiles,saveDirectory:null,sourceDirectory:null,sourceHandle:null,download(){assert.fail('Unexpected download');},figureStudioBridge:{async captureWorkspaceBinding(){},resetWorkspaceBinding(){events.push('detach');}},projectEditState:()=>({source:data,fonts:[],content:JSON.stringify(project.settings)}),savedPlotProjectId,makeSettings:()=>project.settings,loadedHeader:1,sample:false,importedFonts:new Map(),$:id=>nodes.get(id),$$:()=>[],view:project.workspace.view,projectSheetSettings:()=>[],sheetMode:'individual',sharedSettings:null,currentSharedSettings:()=>null,PROJECT_MAX_SIZE,figureBridgeBaseline:{source:data},figureBridgePreservedOnReconnect:true,plotCollectionCache:{},savedProjectState:null,status:(message,kind)=>events.push({message,kind}),renderWanted:false,renderPreview(){},encodePlotProject,portableFileLink};
+  const events=[],prepared=[];
+  const originalPrepare=projectFiles.prepare;
+  projectFiles.prepare=options=>{prepared.push(options);return originalPrepare(options);};
+  const nodes=new Map([['#save-name',{value:'figure'}],['#png-dpi',{value:'600'}]]);
+  const env={projectVersionChecking:false,window:pickerHost,chooseProjectFileAction:()=>assert.fail('Unexpected confirmation'),figureWorkspaceBusy:()=>false,figureBridgePendingInput:()=>false,pendingDataFiles:null,dataEditor:null,figureWorkspaceUI(){},engineReady:true,loading:false,exporting:false,sourceData:data,metadata:{sheetIndex:project.data.sheetIndex},config:{series:[{}]},updateButtons(){},safeStem,projectFilename:'source.plotproject',projectFileLink:opened.link,projectHandle:native,projectFiles,saveDirectory:null,sourceDirectory:null,sourceHandle:null,download(){assert.fail('Unexpected download');},figureStudioBridge:{sourceKey,async captureWorkspaceBinding(){},resetWorkspaceBinding(){events.push('detach');}},projectEditState:()=>({source:data,fonts:[],content:JSON.stringify(project.settings)}),savedPlotProjectId,makeSettings:()=>project.settings,loadedHeader:1,sample:false,importedFonts:new Map(),$:id=>nodes.get(id),$$:()=>[],view:project.workspace.view,projectSheetSettings:()=>[],sheetMode:'individual',sharedSettings:null,currentSharedSettings:()=>null,PROJECT_MAX_SIZE,figureBridgeBaseline:{source:data},figureBridgePreservedOnReconnect:true,plotCollectionCache:{},savedProjectState:null,status:(message,kind)=>events.push({message,kind}),renderWanted:false,renderPreview(){},encodePlotProject,portableFileLink};
   if(unbound){env.projectHandle=null;env.projectFilename='';env.projectFileLink=null;records.clear();}
   const keys=Object.keys(env),api=Function(...keys,maker+nativeChanges+saver+'return {prepare:prepareSourceProjectSave,ready:sourceProjectSaveReady,save:saveProject,make:makeProject,state:()=>({projectHandle,projectFilename,projectFileLink,sourceData,savedProjectState,exporting,plotCollectionCache})};')(...keys.map(key=>env[key]));
-  return {api,native,copy,opened,events,records,saveAs,project,pickerHost};
+  return {api,native,copy,opened,events,records,prepared,saveAs,project,pickerHost,projectFiles};
 }
 test('actual Plot save writes a reopenable project, keeps original identity and refreshes its portable version',async()=>{
   const f=await fixture();await f.api.save();const state=f.api.state(),raw=JSON.parse(await (await f.native.getFile()).text());
   assert.equal(raw.workspace.figureStudioProjectId,original.workspace.figureStudioProjectId);assert.equal(raw.workspace.sourceFileLink,undefined);assert.ok(parseProject(raw));assert.equal(state.projectHandle,f.native);assert.equal(state.exporting,false);assert.equal(state.savedProjectState.source,state.sourceData);assert.equal(state.plotCollectionCache,null);assert.notEqual(state.projectFileLink.fingerprint,f.opened.link.fingerprint);assert.equal(state.projectFileLink.token,f.opened.link.token);
   const snapshot=f.api.make(raw.settings,{...state.sourceData},[],raw.workspace);assert.deepEqual(snapshot.workspace.sourceFileLink,state.projectFileLink);assert.equal(snapshot.workspace.projectFileName,'source.plotproject');assert.equal(f.events.includes('detach'),false);
+});
+test('Plot saving from a Studio route supplies the exact attachment key to the native file registry',async()=>{
+  const sourceKey='book/figure/panel/asset',f=await fixture({sourceKey});
+  await f.api.save();
+  assert.equal(f.prepared[0].sourceKey,sourceKey);
+  assert.equal(f.prepared[0].projectId,original.workspace.figureStudioProjectId);
+  assert.equal(f.api.state().projectHandle,f.native);
+  assert.equal(JSON.parse(await (await f.native.getFile()).text()).workspace.sourceKey,undefined);
+});
+test('a Studio attachment reopens the local file saved under another name, before it receives a new embedded token',async()=>{
+  const sourceKey='book/figure/panel/asset',f=await fixture({unbound:true,sourceKey});
+  await f.api.save();
+  const projectId=original.workspace.figureStudioProjectId;
+  const embedded=new File([JSON.stringify(original)],'source.plotproject');
+  const target=await f.projectFiles.opened({file:embedded,projectId,embedded:true,sourceKey});
+  assert.equal(target.handle,f.copy);
+  assert.equal(target.name,f.copy.name);
+  assert.equal(f.api.state().sourceData.figureStudioProjectId,projectId);
 });
 test('actual Plot Save As creates an independent identity and retains the original target registration',async()=>{
   const f=await fixture(),before=await (await f.native.getFile()).text();await f.api.save({saveAs:true});const state=f.api.state(),raw=JSON.parse(await (await f.copy.getFile()).text());

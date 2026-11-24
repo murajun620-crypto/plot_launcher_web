@@ -40,8 +40,27 @@ async function sameFile(a,b){try{return !!a&&!!b&&await a.isSameEntry(b);}catch{
 
 export function createProjectFileLinks({app,identify,choose,host=globalThis,store=localFileLinkStore(),digest=fileFingerprint}){
   const key=(projectId,name)=>JSON.stringify([app,projectId,name.normalize('NFC')]);
+  // A Studio asset can back several panels. Its book and asset IDs identify
+  // the attachment across reloads, independently of a portable token or name.
+  const scope=(projectId,sourceKey)=>{
+    if(typeof projectId!=='string'||!projectId||typeof sourceKey!=='string'||sourceKey.length>2048)return null;
+    const parts=sourceKey.split('/');
+    if(parts.length!==4||parts.some(part=>!part))return null;
+    return 'studio-source:'+JSON.stringify([app,projectId,parts[0],parts[3]]);
+  };
   const records=async(projectId,name)=>{try{return await store.list(key(projectId,name));}catch{return [];}};
   const matching=(record,projectId,name)=>record?.project===key(projectId,name)&&record.handle?.kind==='file'&&record.handle.name?.normalize('NFC')===name.normalize('NFC');
+  async function findScopedTarget(projectId,sourceKey,strict=false){
+    const binding=scope(projectId,sourceKey);if(!binding)return null;
+    try{
+      return await checkFile(async()=>{
+        const alias=await store.get(binding);
+        if(!token(alias?.nativeToken)||!filename(alias.name))return null;
+        const record=await store.get(alias.nativeToken);
+        return matching(record,projectId,alias.name)?record:null;
+      },'保存先の確認に時間がかかっています。');
+    }catch(error){if(strict&&error.name==='TimeoutError')throw error;return null;}
+  }
   async function resolve({projectId,name,link,strict=false}){
     link=portableFileLink(link);if(!filename(name)||!link?.token)return null;
     try{
@@ -49,31 +68,48 @@ export function createProjectFileLinks({app,identify,choose,host=globalThis,stor
       return matching(record,projectId,name)?record.handle:null;
     }catch(error){if(strict&&error.name==='TimeoutError')throw error;return null;}
   }
-  async function remember({projectId,name,handle,fingerprint:hash,aliasToken}){
+  async function remember({projectId,name,handle,fingerprint:hash,aliasToken,sourceKey}){
     if(!handle||!filename(name)||!fingerprint(hash))return {link:{token:'',fingerprint:hash},remembered:false};
     const candidates=await records(projectId,name);let previous;
     for(const record of candidates)if(matching(record,projectId,name)&&await sameFile(record.handle,handle)){previous=record;break;}
     let preferred;
     if(token(aliasToken))try{const existing=await store.get(aliasToken);if(!existing||matching(existing,projectId,name)&&await sameFile(existing.handle,handle))preferred=aliasToken;}catch{}
     const link={token:preferred||previous?.token||crypto.randomUUID(),fingerprint:hash};
-    try{await store.put({token:link.token,project:key(projectId,name),handle,fingerprint:hash});return {link,remembered:true};}
+    try{
+      await store.put({token:link.token,project:key(projectId,name),handle,fingerprint:hash});
+      const binding=scope(projectId,sourceKey);
+      if(binding)await store.put({token:binding,nativeToken:link.token,name});
+      return {link,remembered:true};
+    }
     catch{return {link,remembered:false};}
   }
-  async function opened({file,projectId,name=file.name,handle=null,embedded=false,link=null}){
+  async function opened({file,projectId,name=file.name,handle=null,embedded=false,link=null,sourceKey}){
     const portable=portableFileLink(link);
-    if(embedded&&portable)return {link:portable,handle:await resolve({projectId,name,link:portable})};
+    if(embedded&&!handle){
+      const target=await findScopedTarget(projectId,sourceKey);
+      if(target){
+        // The latest registry hash describes the disk, not this snapshot.
+        // An old attachment must still show the changed-file confirmation.
+        return {link:{token:target.token,fingerprint:portable?.fingerprint||await digest(file)},handle:target.handle,name:target.handle.name};
+      }
+      if(portable)return {link:portable,handle:await resolve({projectId,name,link:portable})};
+    }
     const hash=await digest(file);
-    if(handle){const result=await remember({projectId,name,handle,fingerprint:hash});return {...result,handle};}
+    if(handle){const result=await remember({projectId,name,handle,fingerprint:hash,sourceKey});return {...result,handle};}
     // Even identical bytes/name/ID cannot identify a folder. Legacy snapshots
     // without an opaque link require explicit selection of the original file.
     return {link:{token:'',fingerprint:hash},handle:null};
   }
-  async function prepare({projectId,name,link,handle=null,saveAs=false,knownSource=false,startIn,fallback,host:pickerHost=host,choose:chooseAction=choose,requireFile=false}){
+  async function prepare({projectId,name,link,handle=null,saveAs=false,knownSource=false,startIn,fallback,host:pickerHost=host,choose:chooseAction=choose,requireFile=false,sourceKey}){
     if(!filename(name))throw Error('プロジェクトのファイル名を確認してください。');
     const extension=app==='plot'?'.plotproject':'.mifito',description=app==='plot'?'PlotLauncherプロジェクト':'MiFiToプロジェクト';
     const options={id:`${app}-source-project`,types:[{description,accept:{'application/octet-stream':[extension]}}]};
     link=portableFileLink(link);
-    if(!saveAs&&!handle)handle=await resolve({projectId,name,link,strict:true});
+    if(!saveAs&&!handle){
+      const target=await findScopedTarget(projectId,sourceKey,true);
+      if(target){handle=target.handle;name=handle.name;}
+      else handle=await resolve({projectId,name,link,strict:true});
+    }
     if(!pickerHost.showSaveFilePicker&&(saveAs||!handle)){
       if(requireFile)throw Error('このブラウザでは元プロジェクトへ一括保存できません。Chrome／Edgeで開くか、保存メニューの「元プロジェクトも保存」をオフにしてください。');
       return {handle:null,name,saveAs,write:blob=>fallback(blob,name),remember:async()=>({link:null,remembered:false})};
@@ -81,12 +117,12 @@ export function createProjectFileLinks({app,identify,choose,host=globalThis,stor
     let baseline=link?.fingerprint||'',binding=false,file=null;
     const getFile=target=>checkFile(()=>target.getFile(),'元ファイルを開くまでに時間がかかっています。');
     const readHash=file=>checkFile(()=>digest(file),'元ファイルの読み取りに時間がかかっています。');
-    const saveCopy=()=>prepare({projectId,name,link,handle,saveAs:true,knownSource,startIn,fallback,host:pickerHost,choose:chooseAction,requireFile});
+    const saveCopy=()=>prepare({projectId,name,link,handle,saveAs:true,knownSource,startIn,fallback,host:pickerHost,choose:chooseAction,requireFile,sourceKey});
     const permit=async target=>{
       const options={mode:'readwrite'};
       const state=target.queryPermission?await checkFile(()=>target.queryPermission(options),'元ファイルのアクセス権の確認に時間がかかっています。'):'granted';
       if(state==='granted')return true;
-      if(requireFile&&state==='prompt'){
+      if(state==='prompt'&&(requireFile||pickerHost.navigator?.userActivation?.isActive===false)){
         // A click inside Studio's iframe does not activate its sibling editors.
         // The visible shell dialog provides the gesture for every same-origin child.
         const answer=await chooseAction({kind:'permission',name:target.name});
@@ -147,7 +183,8 @@ export function createProjectFileLinks({app,identify,choose,host=globalThis,stor
       };
       // Serialize saves by other tabs on this origin, then check disk again.
       return host.navigator?.locks?.request?host.navigator.locks.request('source-project-write:'+key(projectId,target.name),commit):commit();
-    },async remember(savedId,hash){return remember({projectId:savedId,name:target.name,handle:target,fingerprint:hash,...(!saveAs&&savedId===projectId?{aliasToken:link?.token}:{})});}};
+    },async remember(savedId,hash){return remember({projectId:savedId,name:target.name,handle:target,fingerprint:hash,...(!saveAs&&savedId===projectId?{aliasToken:link?.token,sourceKey}:{})});}};
   }
-  return {opened,resolve,prepare,remember};
+  const resolveSource=async({projectId,sourceKey})=>(await findScopedTarget(projectId,sourceKey))?.handle??null;
+  return {opened,resolve,resolveSource,prepare,remember};
 }

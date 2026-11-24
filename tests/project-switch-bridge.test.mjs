@@ -1,14 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
+import {portableFileLink} from '../project-file-links.mjs';
 const source=await readFile(new URL('../app.js',import.meta.url),'utf8');
 function section(start,end){const a=source.indexOf(start),b=source.indexOf(end,a);assert.ok(a>=0&&b>a,start);return source.slice(a,b);}
 const helpers=section('async function checkFigureStudioProjectReplacement(','async function readProject('),reader=section('async function readProject(','async function openGalleryProject('),acceptance=section('function figureStudioResultMatchesCurrentProject(','figureStudioBridge=setupFigureBridge(');
+const nativeMatch=section('async function currentPlotMatchesFileLink(','function figureStudioHasUnreflectedContent(');
 const dirtySource=section('async function figureBridgeIsDirty(){','const figureBridgeWait');
-function fixture({parseError,workerError,bridgeBusy=false,directBusy=false,uninitialized=false,remember=async()=>{}}={}){
+function fixture({parseError,workerError,bridgeBusy=false,directBusy=false,uninitialized=false,remember=async()=>{},openTarget=async()=>({handle:null,link:null})}={}){
  const events=[],oldSource={filename:'same.csv',bytes:new Uint8Array([1]).buffer},oldMetadata={filename:'same.csv',sheetIndex:0,headerRow:1},baseline={source:oldSource,content:'old baseline'};
  const project={data:{filename:'same.csv',bytes:new Uint8Array([2]).buffer,sheetIndex:0,headerRow:1,sample:false},fonts:[],settings:{},workspace:{view:{zoom:1,x:0,y:0},saveName:'new',pngDpi:600,sections:[]}},nodes=new Map();
  const env={identifyPlotProject:async()=>({projectId:"project-new"}),plotAcknowledgements:{accept(){}},samePlotCheckpoint:(a,b)=>!!a&&a.source===b.source&&a.content===b.content,hasUnsavedChanges:()=>true,engineReady:true,loading:false,exporting:false,PROJECT_MAX_SIZE:1e7,updateButtons(){},status:message=>events.push(message),parseProject(){events.push('parse');if(parseError)throw parseError;return project;},
+  projectVersionChecking:false,window:{},dataEditor:null,projectFileLink:null,portableFileLink,projectFiles:{opened:openTarget},
+  openedPlotIdentity:async(identity,projectFileName)=>({...identity,projectFileName}),
+  fileProgress:{begin(){return {stage(){},async paint(){},async read(file){return file.text();},fail(){},release(){},waitForRender(){}};}},
   async request(){events.push('worker');if(workerError)throw workerError;return {metadata:{...oldMetadata},config:{axes:{xLabel:'new'},series:[{}]},families:[]};},
   figureStudioBridge:uninitialized?undefined:{async captureWorkspaceBinding(){events.push('check-binding');if(bridgeBusy)throw Error('bridge busy');return {};},resetWorkspaceBinding(){events.push('detach');},rememberAccepted:remember},figureStudioDirectSender:uninitialized?undefined:{sender:{busy:directBusy,resetPending(){events.push('reset-pending');}}},
   figureBridgeBaseline:baseline,figureBridgePreservedOnReconnect:true,figureWorkspaceSavedSignature:'saved',sourceData:oldSource,metadata:oldMetadata,config:{axes:{xLabel:'old'},series:[{}]},sample:false,dataFileHandles:[],sheetSettings:new Map(),sheetMode:'shared',sharedSettings:null,sourceHandles:new WeakMap(),sourceHandle:{},sourceDirectory:{},projectHandle:{},projectFilename:'same.plotproject',folderSupported:false,
@@ -25,6 +30,41 @@ test('manual project replacement detaches after successful read, even for identi
 });
 test('Studio-requested project loads retain their binding and do not reset direct send state',async()=>{
  const f=fixture();assert.equal(await f.api.read(f.file,undefined,{fromBridge:true}),true);assert.equal(f.events.includes('detach'),false);assert.equal(f.events.includes('check-binding'),false);assert.equal(f.events.includes('reset-pending'),false);assert.equal(f.api.state().baseline,f.baseline);
+});
+test('a Studio open retains the plot identity and uses the scoped native filename for later saves and transfers',async()=>{
+ const sourceKey='book/figure/panel/asset',fileName='saved-from-studio.plotproject';
+ const f=fixture({openTarget:async options=>{
+   assert.equal(options.embedded,true);assert.equal(options.sourceKey,sourceKey);
+   assert.equal(options.projectId,'project-new');assert.equal(options.file.name,'same.plotproject');
+   return {name:fileName,handle:{name:fileName},link:{token:'scoped'}};
+ }});
+ assert.equal(await f.api.read(f.file,undefined,{fromBridge:true,sourceKey}),true,f.events.join('\n'));
+ assert.equal(f.api.state().sourceData.figureStudioProjectId,'project-new');
+ assert.equal(f.api.state().sourceData.figureStudioProjectFileName,fileName);
+ assert.equal(f.api.state().projectFilename,fileName);
+});
+test('a warm Plot editor only reuses different file tokens for the same verified file entry',async()=>{
+ const token=crypto.randomUUID(),link={token,fingerprint:'a'.repeat(64)},alias={token:crypto.randomUUID(),fingerprint:link.fingerprint};
+ const live={async isSameEntry(candidate){return candidate===live;}},identity={projectId:'plot-project',projectFileName:'same.plotproject'};
+ const incoming={workspace:{sourceFileLink:alias}};
+ for(const candidate of [null,{name:'same.plotproject'},live]){
+  const check=Function('portableFileLink','projectFileLink','projectHandle','projectFiles',nativeMatch+'return currentPlotMatchesFileLink;')(
+   portableFileLink,link,live,{async resolve(options){assert.deepEqual(options,{projectId:identity.projectId,name:identity.projectFileName,link:alias});return candidate;}}
+  );
+  assert.equal(await check(incoming,identity),candidate===live);
+  assert.equal(await check({workspace:{sourceFileLink:link}},identity),true);
+ }
+});
+test('tokenless attachments can reuse a live native target only on the same route or with a verified destination',async()=>{
+ const active='book/figure/old/asset-a',sourceKey='book/figure/new/asset-b';
+ const live={async isSameEntry(candidate){return candidate===live;}},identity={projectId:'plot-project'};
+ for(const candidate of [null,{name:'same.plotproject'},live]){
+  const check=Function('portableFileLink','projectFileLink','projectHandle','projectFiles','figureStudioBridge',nativeMatch+'return currentPlotMatchesFileLink;')(
+   portableFileLink,null,live,{async resolveSource(options){assert.deepEqual(options,{projectId:identity.projectId,sourceKey});return candidate;}},{sourceKey:active}
+  );
+  assert.equal(await check({},identity,active),true);
+  assert.equal(await check({},identity,sourceKey),candidate===live);
+ }
 });
 
 test('confirmed replacement discards transient input only after a valid staged worker import',async()=>{

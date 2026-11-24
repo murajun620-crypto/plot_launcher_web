@@ -40,7 +40,7 @@ test('normal editors register without bridge UI and load an empty workspace thro
 
 test('dirty manually opened editor can confirm a forced load on its first Studio connection',async()=>{
  let prompts=0;const e=environment({hasContent:()=>true,confirmDiscard:()=>{prompts++;return true;}});
- try{const c=e.connect();await c.load({imageId:'image-a'});assert.equal(prompts,1);assert.equal(e.loads.length,1);assert.deepEqual(e.loads[0].meta,{reconnect:false,force:true,imageId:'image-a'});assert.equal(c.sent.at(-1).type,'loaded');assert.equal(e.host.isConnected,true);}finally{e.host.close();}
+ try{const c=e.connect();await c.load({imageId:'image-a'});assert.equal(prompts,1);assert.equal(e.loads.length,1);assert.deepEqual(e.loads[0].meta,{reconnect:false,sourceKey:'book/figure/panel-a/source-a',force:true,imageId:'image-a'});assert.equal(c.sent.at(-1).type,'loaded');assert.equal(e.host.isConnected,true);}finally{e.host.close();}
 });
 
 test('cancelling a dirty manual editor keeps it detached and permits a later confirmed attempt',async()=>{

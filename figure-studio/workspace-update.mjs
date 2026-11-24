@@ -1,4 +1,4 @@
-import {encodeProjectFile} from './project-format.mjs?v=source-save-recovery-v0741-1';
+import {encodeProjectFile} from './project-format.mjs?v=remember-source-v0742-1';
 import {parseRelease,hasNewRelease} from './update-check.mjs?v=panel-labels-v0723-1';
 import {SOURCE_APPS} from './integration/bridge-client.mjs?v=studio-send-v0714-1';
 

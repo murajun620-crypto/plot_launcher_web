@@ -215,7 +215,7 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
           windowRef.addEventListener('keydown',blockInput,true);
           releaseInteraction=()=>{body.inert=previous;windowRef.removeEventListener('keydown',blockInput,true);};
         }
-        await loadProject(new File([data.project],active.sourceName,{type:data.project.type||'application/octet-stream'}),{reconnect,...(forceProject?{force:true}:{}),...(active.imageId?{imageId:active.imageId}:{})});
+        await loadProject(new File([data.project],active.sourceName,{type:data.project.type||'application/octet-stream'}),{reconnect,sourceKey:active.editKey,...(adoptedCheckpoint?{adopted:true}:{}),...(forceProject?{force:true}:{}),...(active.imageId?{imageId:active.imageId}:{})});
         if(disposed)return;
         if(adoptedCheckpoint){
           const sameWorkspace=await canAdoptAccepted(adoptedCheckpoint.result);
@@ -277,7 +277,7 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
     if(disposed||discard.hidden||!loaded||!baseline||busy||awaiting)return;
     busy=true;setDisabled(true);discard.disabled=true;setMessage('最後にFigureと同期した状態へ戻しています…');
     try{
-      await loadProject(new File([baseline.project],baseline.sourceName,{type:baseline.project.type||'application/octet-stream'}),{reconnect:false,...(active.imageId?{imageId:active.imageId}:{})});
+      await loadProject(new File([baseline.project],baseline.sourceName,{type:baseline.project.type||'application/octet-stream'}),{reconnect:false,sourceKey:active.editKey,...(active.imageId?{imageId:active.imageId}:{})});
       if(disposed)return;
       await onProjectLoaded?.({...active,reconnect:false,discard:true});
       if(disposed)return;
@@ -319,6 +319,7 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
   }
   return {
     get isConnected(){return mounted&&!!parent&&!parent.closed;},
+    get sourceKey(){return loaded?active.editKey:null;},
     async captureWorkspaceBinding(){
       if(disposed||busy||awaiting||loadingRequest)throw Error('読み込み・反映処理が終わってから、作業内容を保存してください。');
       if(!loaded||!baseline)return null;
