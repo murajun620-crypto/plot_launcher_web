@@ -206,6 +206,29 @@ test('a stalled original file read times out before any writer or fallback picke
   assert.equal(original.state().opens,0);
   assert.deepEqual(f.picker,{opens:0,saves:0});
 });
+test('work-folder lookup on another PC finds the source before save and keeps the overwrite baseline',async()=>{
+  const first=setup('plot'),source=fileHandle(first.name);
+  const editKey='book/figure/panel/asset';
+  const original=await first.api.opened({file:await source.getFile(),projectId,handle:source});
+  const second=setup('plot',{answers:['overwrite']});
+  const synced=fileHandle(second.name,'newer OneDrive bytes');
+  let lookups=0;
+  const directory={kind:'directory',async *values(){lookups++;yield synced;}};
+  const found=await second.api.findInWorkFolder({directory,projectId,name:second.name,sourceKey:editKey,link:original.link});
+  assert.equal(found.handle,synced);
+  assert.equal(found.link.fingerprint,original.link.fingerprint);
+  assert.equal(second.store.values.size,0);
+  assert.equal(synced.state().opens,0);
+
+  const target=await second.api.prepare({projectId,name:second.name,sourceKey:editKey,...found,knownSource:true});
+  assert.deepEqual(second.prompts.map(prompt=>prompt.kind),['changed']);
+  const hash=await target.write(new Blob([JSON.stringify({id:projectId,content:'edited on second PC'})]));
+  await target.remember(projectId,hash);
+  assert.equal(await second.api.resolveSource({projectId,sourceKey:editKey}),synced);
+  assert.equal(lookups,1);
+  assert.deepEqual(second.picker,{opens:0,saves:0});
+  assert.equal(source.state().opens,0);
+});
 test('portable descriptors strip all file access data and reject invalid fingerprints',()=>{
   const descriptor={token:crypto.randomUUID(),fingerprint:'a'.repeat(64),path:'C:\\OneDrive\\private',handle:{kind:'file'}};
   assert.deepEqual(portableFileLink(descriptor),{token:descriptor.token,fingerprint:descriptor.fingerprint});assert.equal(portableFileLink({...descriptor,fingerprint:'invalid'}),null);assert.equal(portableFileLink({...descriptor,token:'../else'}),null);

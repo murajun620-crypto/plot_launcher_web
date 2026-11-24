@@ -1,6 +1,6 @@
 import {encodeWorkspaceState,decodeWorkspaceState} from './workspace-state.mjs?v=project-switch-v051-1';
 import {prepareSourceProjectSaves} from './source-project-save.mjs?v=source-save-recovery-v0741-1';
-import {chooseProjectFileAction} from '../project-file-dialog.mjs?v=c924e38b15d0';
+import {chooseProjectFileAction} from '../project-file-dialog.mjs?v=7c5e2ab19f04';
 
 const APPS=['plot','mifito'];
 const empty=()=>({format:'figure-studio-workspace',version:1,active:'studio',editors:{plot:null,mifito:null}});

@@ -1,3 +1,5 @@
+import {findProjectInWorkFolder} from './source-folder.mjs?v=7c5e2ab19f04';
+
 // Writable handles live only in this browser's IndexedDB. Portable snapshots
 // carry an opaque token and a byte fingerprint, never paths or permissions.
 const DB='figure-source-project-files-v1',STORE='targets';
@@ -186,5 +188,13 @@ export function createProjectFileLinks({app,identify,choose,host=globalThis,stor
     },async remember(savedId,hash){return remember({projectId:savedId,name:target.name,handle:target,fingerprint:hash,...(!saveAs&&savedId===projectId?{aliasToken:link?.token,sourceKey}:{})});}};
   }
   const resolveSource=async({projectId,sourceKey})=>(await findScopedTarget(projectId,sourceKey))?.handle??null;
-  return {opened,resolve,resolveSource,prepare,remember};
+  async function findInWorkFolder({projectId,name,link,sourceKey,directory,signal}){
+    if(!scope(projectId,sourceKey)||!filename(name))return null;
+    const found=await findProjectInWorkFolder({directory,app,name,projectId,identify,signal});
+    if(!found||signal?.aborted)return null;
+    // Keep the embedded snapshot's fingerprint as the overwrite baseline.
+    // Merely finding a file must not register it or acknowledge newer bytes.
+    return {handle:found.handle,link:portableFileLink(link)};
+  }
+  return {opened,resolve,resolveSource,findInWorkFolder,prepare,remember};
 }

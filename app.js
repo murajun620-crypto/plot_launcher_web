@@ -1,6 +1,6 @@
-import {MAX_SHEET_SOURCES,groupSheetSources,copySheetSources} from './sheet-sources.mjs?v=c924e38b15d0';
-import {createProjectFileLinks,portableFileLink} from './project-file-links.mjs?v=c924e38b15d0';
-import {chooseProjectFileAction} from './project-file-dialog.mjs?v=c924e38b15d0';
+import {MAX_SHEET_SOURCES,groupSheetSources,copySheetSources} from './sheet-sources.mjs?v=7c5e2ab19f04';
+import {createProjectFileLinks,portableFileLink} from './project-file-links.mjs?v=7c5e2ab19f04';
+import {chooseProjectFileAction} from './project-file-dialog.mjs?v=7c5e2ab19f04';
 import {createAnnotationFormatDialog} from './annotation-format-dialog.mjs?v=d08c8b9af140';
 import {formatTargets,applyAnnotationFormat} from './annotation-format.mjs?v=d08c8b9af140';
 import {localFontFaces} from './local-font-faces.mjs?v=d08c8b9af140';
@@ -9,15 +9,15 @@ import {statisticNumber,statisticAvailable,statisticFormat,defaultStatisticForma
 import {createMatrixEditor} from './matrix-editor.mjs?v=d08c8b9af140';
 import {isMatrixPlot,isCombinedHistogram,matrixColorbarVisible} from './matrix-model.mjs?v=d08c8b9af140';
 import {createFileProgress} from './file-progress.mjs?v=file-open-1';
-import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=c924e38b15d0';
+import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=7c5e2ab19f04';
 import {setupDirectSendButton,getFigureWorkspace} from './direct-transfer.mjs?v=baaeeccc3ee1';
 import {identifyPlotProject,openedPlotIdentity,plotSheetIndex,currentPlotImageId,resolvePlotImage,savedPlotProjectId,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=d08c8b9af140';
 import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=9127ec4c4f31";
 import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=9127ec4c4f31";
 import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9127ec4c4f31";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=c924e38b15d0";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=c924e38b15d0";
-import { APP_VERSION, COLORS, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, initialCombinedSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=c924e38b15d0";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=7c5e2ab19f04";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=7c5e2ab19f04";
+import { APP_VERSION, COLORS, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, initialCombinedSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=7c5e2ab19f04";
 
 import {alignmentOffsets} from './object-layout.mjs?v=27ae7675c457';
 import {createDataEditor} from './data-editor.mjs?v=27ae7675c457';
@@ -31,7 +31,7 @@ let annotationFormatDialog=null;
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 const fileProgress=createFileProgress();
-const APP_BUILD = 'c924e38b15d0';
+const APP_BUILD = '7c5e2ab19f04';
 window.FigureAppRelease?.assertRunning({version:APP_VERSION,build:APP_BUILD});
 function makeProject(settings,data,fonts,workspace={}){
   const live=sourceData&&data.filename===sourceData.filename&&(data.bytes===sourceData.bytes||data.files&&data.files===sourceData.files);
@@ -148,6 +148,7 @@ const folderSupported = typeof window.showDirectoryPicker === 'function';
 const importedFonts = new Map();
 let savedProjectState = null;
 let projectHandle=null, projectFilename='',projectFileLink=null;
+let studioWorkFolderWatch=null;
 const projectFiles=createProjectFileLinks({app:'plot',choose:chooseProjectFileAction,identify:async file=>openedPlotIdentity(await identifyPlotProject(JSON.parse(await file.text())),file.name)});
 let updateChecking=false, updateReloading=false, availableUpdate=null, updateRecovery=null,projectVersionChecking=false;
 let pendingDataFiles = null;
@@ -492,7 +493,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=c924e38b15d0", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=7c5e2ab19f04", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") {
       if(data.id)requests.get(data.id)?.progressTask?.stage(data.text,{completed:data.completed,total:data.total,unit:data.unit||''});
@@ -2401,12 +2402,13 @@ function sourceProjectSaveReady({editedOnly=false}={}){
 async function prepareSourceProjectSave({saveAs=false,host=window,choose=chooseProjectFileAction,requireFile=false}={}){
   if(requireFile&&!sourceProjectSaveReady())return null;
   if(projectVersionChecking||!engineReady||loading||exporting||!sourceData||!metadata||!config.series.length)return null;
+  studioWorkFolderWatch?.cancel();
   exporting=true;updateButtons();status('元ファイルと保存先を確認しています…');
   let released=false,written=false,writing=false;
-  const release=()=>{if(released)return;released=true;exporting=false;updateButtons();if(renderWanted)renderPreview();};
+  const release=()=>{if(released)return;released=true;exporting=false;updateButtons();if(renderWanted)renderPreview();studioWorkFolderWatch?.resume();};
   try{
     const name=projectFilename || `${safeStem($("#save-name").value)}.plotproject`;
-    const target=await projectFiles.prepare({projectId:sourceData.figureStudioProjectId,name,link:projectFileLink,handle:projectHandle,sourceKey:figureStudioBridge?.sourceKey,saveAs,knownSource:!!projectFilename,host,choose,requireFile,startIn:projectHandle||saveDirectory||sourceDirectory||sourceHandle,fallback:async(blob,filename)=>{download(blob,filename);return filename;}});
+    const target=await projectFiles.prepare({projectId:sourceData.figureStudioProjectId,name,link:projectFileLink,handle:projectHandle,sourceKey:figureStudioBridge?.sourceKey,saveAs,knownSource:!!projectFilename,host,choose,requireFile,startIn:projectHandle||studioWorkFolderWatch?.directory||saveDirectory||sourceDirectory||sourceHandle,fallback:async(blob,filename)=>{download(blob,filename);return filename;}});
     if(target.saveAs)await figureStudioBridge?.captureWorkspaceBinding();
     const savedState=projectEditState(),savingSource=sourceData;
     const currentId=sourceData.figureStudioProjectId||crypto.randomUUID();
@@ -2433,6 +2435,7 @@ async function prepareSourceProjectSave({saveAs=false,host=window,choose=chooseP
           if(savedId!==currentId){delete sourceData.figureStudioLegacyProjectId;figureBridgeBaseline=null;figureBridgePreservedOnReconnect=false;figureStudioBridge?.resetWorkspaceBinding();}
           else if(figureBridgeBaseline?.source===savingSource)figureBridgeBaseline={...figureBridgeBaseline,source:sourceData};
         }
+        if(studioWorkFolderWatch)studioWorkFolderWatch.candidate=null;
         projectHandle=target.handle || null;projectFilename=savedName;projectFileLink=remembered.link;plotCollectionCache=null;savedProjectState=savedState;
         status(target.handle?`${savedName} を保存しました。${remembered.remembered?'元ファイルへの保存先をこのブラウザに記憶しました。':'保存先をブラウザに記憶できなかったため、Studioから開き直す際は元ファイルを選び直してください。'}`:'プロジェクトをダウンロードしました。このブラウザではファイルへ直接上書きできません。','ready');
         written=true;return {app:'plot',name:savedName};
@@ -2482,7 +2485,7 @@ function captureUpdateSession(target) {
     config,sourceData,metadata,fonts:[...importedFonts.values()],fontFamilies:[...loadedFonts],fontAliases:[...localFontAliases],
     savedProjectState,loadedHeader,sample,sheetSettings:[...sheetSettings],sheetMode,sharedSettings,
     history,future,lastState,selected:[...selected],clipboard,
-    projectFileLink,handles:{projectHandle,projectFilename,sourceHandle,sourceDirectory,saveDirectory,dataFileHandles},
+    projectFileLink,handles:{projectHandle:studioWorkFolderWatch?.candidate?.handle===projectHandle?null:projectHandle,projectFilename,sourceHandle,sourceDirectory,saveDirectory,dataFileHandles},
     workspace:{saveName:$('#save-name').value,pngDpi:$('#png-dpi').value,saveDestination:$('#save-destination').value,
       view,tableHidden:$('#series-table-content').hidden,tableDetails:$('#series-table-details').checked,
       details:$$('#controls-panel details').map(node=>({id:node.id,open:node.open})),
@@ -3780,6 +3783,56 @@ async function currentPlotMatchesFileLink(saved,identity,sourceKey){
  try{return !!handle&&await projectHandle.isSameEntry(handle);}catch{return false;}
 }
 function figureStudioHasUnreflectedContent(){return !!metadata&&!!sourceData&&(figureBridgeBaseline?figureBridgeIsDirty():hasUnsavedChanges());}
+function clearStudioWorkFolderWatch(){
+  studioWorkFolderWatch?.cancel();
+  studioWorkFolderWatch?.unsubscribe?.();
+  studioWorkFolderWatch?.invalidate();
+  studioWorkFolderWatch=null;
+}
+function watchStudioWorkFolder({editKey,getWorkFolder,subscribeWorkFolder}){
+  if(!editKey||typeof getWorkFolder!=='function'){clearStudioWorkFolderWatch();return;}
+  const previous=studioWorkFolderWatch;
+  const candidate=previous?.editKey===editKey?previous.candidate:null;
+  if(candidate)previous.candidate=null;
+  clearStudioWorkFolderWatch();
+  let controller,refreshPending=false;
+  const watch={editKey,candidate,directory:null,cancel:()=>controller?.abort(),unsubscribe:null};
+  watch.invalidate=()=>{
+    const old=watch.candidate;watch.candidate=null;
+    if(!old||projectHandle!==old.handle||projectFileLink!==old.link)return;
+    projectHandle=null;projectFileLink=old.previousLink;
+    plotCollectionCache=null;updateButtons();
+  };
+  studioWorkFolderWatch=watch;
+  const matchesRoute=()=>studioWorkFolderWatch===watch&&figureStudioBridge?.sourceKey===editKey;
+  const search=()=>{
+    watch.cancel();watch.directory=null;
+    const projectId=sourceData?.figureStudioProjectId,name=projectFilename,link=projectFileLink;
+    if(!projectId||!name||!matchesRoute()||projectHandle||loading||exporting)return;
+    controller=new AbortController();
+    const {signal}=controller;
+    const stillCurrent=()=>!signal.aborted&&matchesRoute()&&sourceData?.figureStudioProjectId===projectId&&projectFilename===name&&projectFileLink===link&&!projectHandle&&!loading&&!exporting;
+    void (async()=>{
+      const directory=await getWorkFolder();
+      if(!stillCurrent()||!directory)return;
+      watch.directory=directory;
+      const match=await projectFiles.findInWorkFolder({projectId,name,link,sourceKey:editKey,directory,signal});
+      if(!stillCurrent()||!match?.handle)return;
+      watch.candidate={handle:match.handle,link:match.link??link,previousLink:link};
+      projectHandle=watch.candidate.handle;projectFileLink=watch.candidate.link;
+      plotCollectionCache=null;updateButtons();
+    })().catch(()=>{});
+  };
+  const refresh=()=>{
+    if(!matchesRoute())return;
+    watch.cancel();watch.directory=null;
+    if(exporting){refreshPending=true;return;}
+    refreshPending=false;watch.invalidate();search();
+  };
+  watch.resume=()=>{if(refreshPending)refresh();};
+  if(typeof subscribeWorkFolder==='function')watch.unsubscribe=subscribeWorkFolder(refresh);
+  search();
+}
 figureStudioBridge=setupFigureBridge({
   app:'plot',
   hasContent:figureStudioHasUnreflectedContent,
@@ -3789,7 +3842,10 @@ figureStudioBridge=setupFigureBridge({
     return currentPlotMatchesIdentity(identity,imageId||identity.activeImageId)&&await currentPlotMatchesFileLink(saved,identity,editKey);
   },
   canAdoptAccepted:result=>!!sourceData&&!loading&&!exporting&&!dragging&&!colormapApplying&&!pendingDataFiles&&!figureBridgePendingInput()&&sourceData===result?.bridgeState?.source,
-  onConnectionChange(connected){figureStudioDirectSender?.setBridgeConnected(connected);},
+  onConnectionChange(connected){
+    if(!connected)clearStudioWorkFolderWatch();
+    figureStudioDirectSender?.setBridgeConnected(connected);
+  },
   async loadProject(file,{reconnect,imageId,sourceKey,force=false,adopted=false}={}) {
     const opening=fileProgress.begin(file);let saved,incomingIdentity;
     try{const text=await opening.read(file,{text:true});opening.stage('プロジェクトの内容を確認しています…');await opening.paint();saved=JSON.parse(text);parseProject(saved);
@@ -3807,6 +3863,7 @@ figureStudioBridge=setupFigureBridge({
   captureBatchResult:captureFigureStudioBatch,
   isDirty:figureBridgeIsDirty,
   onProjectLoaded:figureStudioProjectLoaded,
+  onSourceReady:context=>watchStudioWorkFolder(context),
   onAccepted:acceptFigureStudioResult
 });
 figureStudioDirectSender = setupDirectSendButton({app:'plot',standalone:true,captureResult:captureFigureStudioResult,captureBatchResult:captureFigureStudioBatch,container:'.header-actions',
@@ -3987,7 +4044,7 @@ window.FigureStudioWorkspaceState={version:1,app:'plot',capture:captureFigureWor
  sourceSaveReady:sourceProjectSaveReady,prepareSourceSave:prepareSourceProjectSave,
  release:{version:APP_VERSION,build:APP_BUILD},
  setUpdateReloading(value){updateReloading=!!value;},
- captureReloadHandles(){return sourceData||projectHandle?structuredClone({projectId:sourceData?.figureStudioProjectId??null,handles:{projectHandle,projectFilename,sourceHandle,sourceDirectory,saveDirectory,dataFileHandles}}):null;},
+ captureReloadHandles(){return sourceData||projectHandle?structuredClone({projectId:sourceData?.figureStudioProjectId??null,handles:{projectHandle:studioWorkFolderWatch?.candidate?.handle===projectHandle?null:projectHandle,projectFilename,sourceHandle,sourceDirectory,saveDirectory,dataFileHandles}}):null;},
  restoreReloadHandles(saved){
   if(saved?.projectId!==(sourceData?.figureStudioProjectId??null)||!saved.handles)throw Error('元データと保存先の対応を確認できませんでした。');
   const value=saved.handles,handle=(entry,kind)=>entry?.kind===kind?entry:null;

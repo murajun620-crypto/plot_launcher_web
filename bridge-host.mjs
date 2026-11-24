@@ -32,7 +32,7 @@ export function getFigureBridgeContext(locationRef = location) {
  * onAccepted receives the exact captured result, including private extra
  * fields. Those extra fields stay in this editor and are never transmitted.
  */
-export function setupFigureBridge({app,loadProject,buildProject,renderPreview,captureResult,captureBatchResult,selectImage,isDirty=()=>false,hasContent,canReuseProject,canAdoptAccepted=()=>false,confirmDiscard,onProjectLoaded,onAccepted,onConnectionChange=()=>{},startDetached=false,
+export function setupFigureBridge({app,loadProject,buildProject,renderPreview,captureResult,captureBatchResult,selectImage,isDirty=()=>false,hasContent,canReuseProject,canAdoptAccepted=()=>false,confirmDiscard,onProjectLoaded,onSourceReady,onAccepted,onConnectionChange=()=>{},startDetached=false,
   windowRef=window,documentRef=windowRef.document,locationRef=windowRef.location,registerEditorRef=registerEditor,channelFactory}) {
   if(!['plot','mifito'].includes(app))return null;
   // An updater may restore local work that no longer belongs to the URL's old
@@ -43,7 +43,7 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
   const nativeOwner=context?(context.ownerId||crypto.randomUUID()):null;
   let normalVisit=!context;
   const hostId=crypto.randomUUID();
-  let dismissConfirmation=null,restoredBinding=null;
+  let dismissConfirmation=null,restoredBinding=null,stopWatchingFolder=null;
   let active={panelId:'',requestId:'',editKey:'',sourceName:''},revision=0,initialized=false,loaded=false,busy=false,awaiting=0,awaitTimer=0,captured=null,baseline=null,disposed=false,clientBatch=false,clientAdd=false,acceptedCheckpoint=null,loadingRequest=null;
   const send=(type,extra={})=>{if(!disposed&&context&&parent&&!parent.closed)parent.postMessage({protocol:PROTOCOL,nonce:context.nonce,hostId,app,type,panelId:active.panelId,requestId:active.requestId,editKey:active.editKey,...extra},context.origin);};
   const ready=()=>send('ready',{capabilities:['reuse-v1',...(captureBatchResult?['batch-v1']:[])],loaded,busy:busy||!!awaiting});
@@ -64,7 +64,29 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
   // Editors without the shared header still get an in-flow fallback.
   panel.append(actions.scope,button,addButton,discard,message);
   function mount(){if(mounted)return;mounted=true;onConnectionChange(true);(documentRef.querySelector?.('.header-actions')||documentRef.body).append(panel);}
-  function unmount(){if(!mounted)return;mounted=false;panel.remove();onConnectionChange(false);}
+  function stopFolderWatch(){stopWatchingFolder?.();stopWatchingFolder=null;}
+  function unmount(){stopFolderWatch();if(!mounted)return;mounted=false;panel.remove();onConnectionChange(false);}
+  function announceSourceReady(){
+    if(!onSourceReady||!loaded||!parent)return;
+    stopFolderWatch();
+    const source={...active},owner=parent,parts=source.editKey.split('/');
+    if(parts.length!==4||parts.some(part=>!part))return;
+    const current=()=>!disposed&&loaded&&parent===owner&&!owner.closed&&active.editKey===source.editKey;
+    const provider=()=>{
+      if(!current())return null;
+      try{return owner.FigureStudioWorkFolder??owner.FigureStudioWorkspace?.studioWindow?.FigureStudioWorkFolder??null;}
+      catch{return null;}
+    };
+    const getWorkFolder=()=>provider()?.getDirectory?.(parts[0])??null;
+    const subscribeWorkFolder=listener=>{
+      stopFolderWatch();
+      const stop=provider()?.subscribe?.(()=>{if(current())return listener();});
+      stopWatchingFolder=stop??null;
+      return ()=>{stop?.();if(stopWatchingFolder===stop)stopWatchingFolder=null;};
+    };
+    // Folder lookup is optional and must never delay the editor's loaded reply.
+    void Promise.resolve().then(()=>{if(current())return onSourceReady({...source,getWorkFolder,subscribeWorkFolder});}).catch(()=>{});
+  }
   const readyTimer=setInterval(()=>{if(parent?.closed){parent=null;context=null;unmount();}ready();registry?.update();},1500);
   async function digest(blob){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await blob.arrayBuffer())),n=>n.toString(16).padStart(2,'0')).join('');}
   async function adoptionProof(project){
@@ -86,7 +108,7 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
       active.requestId=data.requestId||'';
       if(data.imageId)active.imageId=data.imageId;
       clientBatch=Array.isArray(data.capabilities)&&data.capabilities.includes('batch-v1');clientAdd=Array.isArray(data.capabilities)&&data.capabilities.includes('add-v1');
-      setMessage('');send('loaded',{reused:true});
+      setMessage('');send('loaded',{reused:true});announceSourceReady();
     }catch(error){
       if(disposed)return;
       loaded=false;setMessage(error.message||'対象の画像を表示できませんでした。');
@@ -225,7 +247,7 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
         }
         await onProjectLoaded?.({...active,reconnect});
         if(disposed)return;
-        baseline={project:data.project,sourceName:active.sourceName};loaded=true;setMessage('');send('loaded');
+        baseline={project:data.project,sourceName:active.sourceName};loaded=true;setMessage('');send('loaded');announceSourceReady();
       }catch(error){
         // A failed import might already have changed the source editor.
         // Disable Apply, instead of attaching that content to the previous panel.
@@ -246,7 +268,7 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
         if(captured?.intent!=='add')await onAccepted?.(captured,{...active,revision:data.revision,...transferReceipt(data)});
         if(!disposed)setMessage(transferReceipt(data).message||'Figureに反映しました。');
       }catch{if(!disposed)setMessage('Figureに反映しました。編集状態を確認してから次のグラフを開いてください。');}
-      finally{captured=null;busy=false;if(!disposed){setDisabled(false);discard.disabled=false;showFigureWorkspaceStudio(windowRef);}}
+      finally{captured=null;busy=false;if(!disposed){setDisabled(false);discard.disabled=false;announceSourceReady();showFigureWorkspaceStudio(windowRef);}}
     }else if(data.type==='rejected'){
       clearTimeout(awaitTimer);awaitTimer=0;awaiting=0;captured=null;setDisabled(false);discard.disabled=false;setMessage(data.message||'Figureへの反映に失敗しました。');
     }
@@ -281,7 +303,7 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
       if(disposed)return;
       await onProjectLoaded?.({...active,reconnect:false,discard:true});
       if(disposed)return;
-      discard.hidden=true;setMessage('未反映の編集を取り消しました。');send('loaded',{restored:true});
+      discard.hidden=true;setMessage('未反映の編集を取り消しました。');send('loaded',{restored:true});announceSourceReady();
     }catch(error){loaded=false;setMessage(error.message||'元のプロジェクトへ戻せませんでした。');send('error',{code:'load-failed',loaded:false,message:message.textContent});}
     finally{busy=false;if(!disposed){setDisabled(!loaded);discard.disabled=!loaded;}}
   });

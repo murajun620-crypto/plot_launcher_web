@@ -25,6 +25,31 @@ test('workspace iframe uses the shell Studio window without an opener and return
  }finally{e.host.close();}
 });
 
+test('folder discovery starts after the source is ready and never delays the load reply',async()=>{
+ const callbacks=[],folders=[],watches=new Set(),scan=deferred(),directory={kind:'directory'};
+ const e=environment({async onSourceReady(source){
+  callbacks.push(source);
+  source.subscribeWorkFolder(async()=>folders.push(await source.getWorkFolder()));
+  folders.push(await source.getWorkFolder());
+  await scan.promise;
+ }});
+ e.parent.FigureStudioWorkFolder={
+  getDirectory(book){assert.equal(book,'book-id');return directory;},
+  subscribe(listener){watches.add(listener);return ()=>watches.delete(listener);}
+ };
+ try{
+  await e.load('a',{editKey:'book-id/figure-a/a/asset-a'});
+  assert.equal(e.sent.at(-1).data.type,'loaded');
+  assert.equal(callbacks[0].editKey,'book-id/figure-a/a/asset-a');
+  assert.deepEqual(folders,[directory]);
+  await [...watches][0]();
+  assert.deepEqual(folders,[directory,directory]);
+  e.host.resetWorkspaceBinding();
+  assert.equal(watches.size,0);
+  assert.equal(await callbacks[0].getWorkFolder(),null);
+ }finally{scan.resolve();e.host.close();}
+});
+
 test('workspace navigation failure cannot turn a committed bridge edit into a rejection',async()=>{
  const e=environment({},true);e.windowRef.parent.FigureStudioWorkspace.show=()=>{throw Error('UI unavailable');};
  try{await e.load('a');await e.button.fire('click');await e.emit('accepted',{panelId:'a',requestId:'request-a',revision:1});assert.equal(e.accepted.length,1);assert.equal(e.button.disabled,false);assert.equal(e.sent.some(m=>m.data.type==='error'),false);}
