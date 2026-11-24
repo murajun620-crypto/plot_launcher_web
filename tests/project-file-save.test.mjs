@@ -14,7 +14,7 @@ const maker=section('function makeProject(','function positionDialog(');
 const original=JSON.parse(await readFile(new URL('../samples/general.plotproject',import.meta.url),'utf8'));
 original.workspace.figureStudioProjectId='test-source-project-000001';original.workspace.projectFileName='source.plotproject';
 function handle(name,blob){let bytes=blob;return {name,kind:'file',fail:false,async getFile(){return new File([bytes],name);},async queryPermission(){return 'granted';},async isSameEntry(other){return this===other;},async createWritable(){let pending;const h=this;return {async write(blob){if(h.fail)throw Error('disk full');pending=blob;},async close(){bytes=pending;},async abort(){}};}};}
-async function fixture({saveAs=false,fail=false,cancel=false,unbound=false,sourceKey,folderSearch,keepRegistry=false}={}){
+async function fixture({saveAs=false,fail=false,cancel=false,unbound=false,sourceKey,folderSearch,chooseAction,keepRegistry=false}={}){
   const project=parseProject(original),native=handle('source.plotproject',new Blob([JSON.stringify(original)])),copy=handle('copy.plotproject',new Blob());copy.fail=fail;native.fail=fail;
   const records=new Map(),store={async get(key){return records.get(key);},async list(key){return [...records.values()].filter(r=>r.project===key);},async put(record){records.set(record.token,record);}};
   const pickerHost={async showSaveFilePicker(){if(cancel)throw new DOMException('cancelled','AbortError');return copy;}};
@@ -25,7 +25,7 @@ async function fixture({saveAs=false,fail=false,cancel=false,unbound=false,sourc
   const originalPrepare=projectFiles.prepare;
   projectFiles.prepare=options=>{prepared.push(options);return originalPrepare(options);};
   const nodes=new Map([['#save-name',{value:'figure'}],['#png-dpi',{value:'600'}]]);
-  const env={studioWorkFolderWatch:null,projectVersionChecking:false,window:pickerHost,chooseProjectFileAction:()=>assert.fail('Unexpected confirmation'),figureWorkspaceBusy:()=>false,figureBridgePendingInput:()=>false,pendingDataFiles:null,dataEditor:null,figureWorkspaceUI(){},engineReady:true,loading:false,exporting:false,sourceData:data,metadata:{sheetIndex:project.data.sheetIndex},config:{series:[{}]},updateButtons(){},safeStem,projectFilename:'source.plotproject',projectFileLink:opened.link,projectHandle:native,projectFiles,saveDirectory:null,sourceDirectory:null,sourceHandle:null,download(){assert.fail('Unexpected download');},figureStudioBridge:{sourceKey,async captureWorkspaceBinding(){},resetWorkspaceBinding(){events.push('detach');}},projectEditState:()=>({source:data,fonts:[],content:JSON.stringify(project.settings)}),savedPlotProjectId,makeSettings:()=>project.settings,loadedHeader:1,sample:false,importedFonts:new Map(),$:id=>nodes.get(id),$$:()=>[],view:project.workspace.view,projectSheetSettings:()=>[],sheetMode:'individual',sharedSettings:null,currentSharedSettings:()=>null,PROJECT_MAX_SIZE,figureBridgeBaseline:{source:data},figureBridgePreservedOnReconnect:true,plotCollectionCache:{},savedProjectState:null,status:(message,kind)=>events.push({message,kind}),renderWanted:false,renderPreview(){},encodePlotProject,portableFileLink};
+  const env={studioWorkFolderWatch:null,projectVersionChecking:false,window:pickerHost,chooseProjectFileAction:chooseAction??(()=>assert.fail('Unexpected confirmation')),figureWorkspaceBusy:()=>false,figureBridgePendingInput:()=>false,pendingDataFiles:null,dataEditor:null,figureWorkspaceUI(){},engineReady:true,loading:false,exporting:false,sourceData:data,metadata:{sheetIndex:project.data.sheetIndex},config:{series:[{}]},updateButtons(){},safeStem,projectFilename:'source.plotproject',projectFileLink:opened.link,projectHandle:native,projectFiles,saveDirectory:null,sourceDirectory:null,sourceHandle:null,download(){assert.fail('Unexpected download');},figureStudioBridge:{sourceKey,async captureWorkspaceBinding(){},resetWorkspaceBinding(){events.push('detach');}},projectEditState:()=>({source:data,fonts:[],content:JSON.stringify(project.settings)}),savedPlotProjectId,makeSettings:()=>project.settings,loadedHeader:1,sample:false,importedFonts:new Map(),$:id=>nodes.get(id),$$:()=>[],view:project.workspace.view,projectSheetSettings:()=>[],sheetMode:'individual',sharedSettings:null,currentSharedSettings:()=>null,PROJECT_MAX_SIZE,figureBridgeBaseline:{source:data},figureBridgePreservedOnReconnect:true,plotCollectionCache:{},savedProjectState:null,status:(message,kind)=>events.push({message,kind}),renderWanted:false,renderPreview(){},encodePlotProject,portableFileLink};
   if(folderSearch){env.projectHandle=null;projectFiles.findInWorkFolder=folderSearch;if(!keepRegistry)records.clear();}
   if(unbound){env.projectHandle=null;env.projectFilename='';env.projectFileLink=null;records.clear();}
   const keys=Object.keys(env),api=Function(...keys,maker+nativeChanges+workFolder+saver+'return {watch:watchStudioWorkFolder,route:key=>{figureStudioBridge.sourceKey=key;},prepare:prepareSourceProjectSave,ready:sourceProjectSaveReady,save:saveProject,make:makeProject,state:()=>({projectHandle,projectFilename,projectFileLink,sourceData,savedProjectState,exporting,plotCollectionCache})};')(...keys.map(key=>env[key]));
@@ -109,7 +109,7 @@ test('Plot resolves a Studio work folder on connect and saves directly to the di
   assert.equal((await f.copy.getFile()).size,0);
 });
 
-test('Plot saving aborts an unfinished work folder lookup without waiting or adopting its late answer',async()=>{
+test('Plot saving leaves an unfinished work folder lookup running without waiting or replacing the saved file',async()=>{
   const editKey='book/figure/panel/asset',directory={kind:'directory',name:'work'};
   let resolveLookup,notifyStarted;
   const pending=new Promise(resolve=>resolveLookup=resolve),started=new Promise(resolve=>notifyStarted=resolve);
@@ -117,11 +117,47 @@ test('Plot saving aborts an unfinished work folder lookup without waiting or ado
   f.api.watch({editKey,getWorkFolder:()=>directory});
   const signal=await started;
   await f.api.save();
-  assert.equal(signal.aborted,true);
+  assert.equal(signal.aborted,false);
   assert.equal(f.api.state().projectHandle,f.native);
   resolveLookup({handle:f.copy,link:null});
   await new Promise(resolve=>setImmediate(resolve));
   assert.equal(f.api.state().projectHandle,f.native);
+});
+
+test('Plot shares the ongoing Studio lookup and adopts its answer after a cancelled save',async()=>{
+  const editKey='book/figure/panel/asset';
+  let finishSearch,finishChoice,notifyChoice,lookupCalls=0;
+  const pendingSearch=new Promise(resolve=>finishSearch=resolve);
+  const pendingChoice=new Promise(resolve=>finishChoice=resolve);
+  const choosing=new Promise(resolve=>notifyChoice=resolve);
+  let signal;
+  const f=await fixture({
+    sourceKey:editKey,
+    folderSearch:()=>assert.fail('A Studio lookup must not start a second editor scan'),
+    chooseAction({kind}){assert.equal(kind,'missing');notifyChoice();return pendingChoice;}
+  });
+  f.api.watch({
+    editKey,getWorkFolder:()=>new Promise(()=>{}),
+    findWorkFolderSource(details,searchSignal){
+      lookupCalls++;
+      assert.deepEqual(details,{projectId:original.workspace.figureStudioProjectId,name:f.native.name});
+      signal=searchSignal;
+      return pendingSearch;
+    }
+  });
+  const saving=f.api.save();
+  await choosing;
+  assert.equal(lookupCalls,1);assert.equal(signal.aborted,false);
+  finishSearch(f.native);
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(f.api.state().projectHandle,null);
+  finishChoice('cancel');
+  await saving;
+  assert.equal(f.api.state().projectHandle,f.native);
+  assert.deepEqual(f.api.state().projectFileLink,f.opened.link);
+  await f.api.save();
+  assert.equal(f.api.state().projectHandle,f.native);
+  assert.equal(lookupCalls,1);
 });
 
 test('Plot switches pending targets with the Studio work folder and keeps a completed save target',async()=>{

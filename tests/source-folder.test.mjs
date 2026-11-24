@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {findProjectInWorkFolder} from '../source-folder.mjs';
+import {findProjectInWorkFolder,findProjectsInWorkFolder} from '../source-folder.mjs';
+import {readMifitoIdentity} from '../figure-studio/integration/mifito-sync.mjs';
 
 const projectId='source-project-123456',otherId='other-project-123456';
 function file(name,id=projectId,content='saved'){
@@ -59,27 +60,49 @@ test('does not prompt for permission during search',async()=>{
   assert.deepEqual({prompts,scans},{prompts:0,scans:0});
 });
 
-test('does not trust an apparent match if a candidate is unreadable or a search budget is exhausted',async()=>{
+test('does not trust an apparent match if another candidate is unreadable',async()=>{
   const candidate=file('source.plotproject');
   const unreadable={...file('source.plotproject'),async getFile(){throw Error('OneDrive file is not available');}};
   assert.equal(await find(folder(folder(candidate,folder(unreadable)))),null);
-  assert.equal(await find(folder(candidate,folder()),{maxEntries:1}),null);
 });
-test('includes deeply nested folders within the time and entry limits',async()=>{
+test('includes deeply nested folders after traversing more than 2,048 entries',async()=>{
   const candidate=file('source.plotproject');
   let tree=folder(candidate);
   for(let depth=0;depth<10;depth++)tree=folder(tree);
-  assert.deepEqual(await find(tree),{handle:candidate});
+  const unrelated=Array.from({length:2200},(_,index)=>({kind:'file',name:index+'.png'}));
+  assert.deepEqual(await find(folder(...unrelated,tree)),{handle:candidate});
 });
 
-test('bounds an unresponsive file read and does not inspect its late result',async()=>{
-  let release,inspections=0;
-  const handle={...file('source.plotproject'),getFile:()=>new Promise(resolve=>{release=resolve;})};
-  const search=find(folder(handle),{timeoutMs:30,identify(){inspections++;}});
-  assert.equal(await search,null);
-  release?.(await file('source.plotproject').getFile());
-  await new Promise(resolve=>setImmediate(resolve));
-  assert.equal(inspections,0);
+test('continues through a OneDrive-style delay to find a valid MiFiTo project two subfolders down',async t=>{
+  t.mock.timers.enable({apis:['setTimeout','Date']});
+  let release,started,finished=false;
+  const manifest=Buffer.from(JSON.stringify({application:'MiFiTo',version:1,activeIndex:0,ui:{figureStudioProjectId:projectId},
+    images:[{name:'image.png',sha256:'1'.repeat(64),bytes:1,width:1,height:1,settings:{}}]}));
+  const header=Buffer.alloc(12);header.write('MiFiTo\r\n');header.writeUInt32LE(manifest.length,8);
+  const name='measurement.mifito',native=new File([header,manifest,Buffer.from([0])],name);
+  const reading=new Promise(resolve=>started=resolve);
+  const handle={kind:'file',name,getFile(){started();return new Promise(resolve=>release=resolve);}};
+  const lookup=find(folder(folder(folder(handle))),{app:'mifito',name,identify:readMifitoIdentity}).then(match=>{finished=true;return match;});
+  await reading;
+  t.mock.timers.tick(9000);
+  await Promise.resolve();
+  assert.equal(finished,false);
+  release(native);
+  assert.deepEqual(await lookup,{handle});
+});
+
+test('scans one tree for multiple sources and publishes a ready result while another file is pending',async()=>{
+  let release,reportReady,scans=0;
+  const fast=file('fast.plotproject'),slow={...file('slow.plotproject'),getFile:()=>new Promise(resolve=>release=resolve)};
+  const directory={...folder(),async *values(){scans++;yield fast;yield slow;}};
+  const ready=new Promise(resolve=>reportReady=resolve);
+  const identify=async blob=>JSON.parse(await blob.text());
+  const requests=[fast,slow].map(({name})=>({key:name,app:'plot',name,identify,projectId}));
+  const batch=findProjectsInWorkFolder({directory,requests,onResult(key,handle){if(key===fast.name)reportReady(handle);}});
+  assert.equal(await ready,fast);
+  release(await file(slow.name).getFile());
+  assert.deepEqual(await batch,new Map([[fast.name,fast],[slow.name,slow]]));
+  assert.equal(scans,1);
 });
 
 test('aborting a background lookup leaves no candidate',async()=>{

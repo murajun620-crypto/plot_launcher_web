@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {createProjectWorkFolders,isProjectFolder} from '../work-folder.mjs';
+import {createSourcePrefetch} from '../source-prefetch.mjs';
 
 const directory=name=>({kind:'directory',name,getFileHandle(){assert.fail('UI must only select the folder');}});
 const deferred=()=>{let resolve;return {promise:new Promise(ok=>resolve=ok),resolve};};
@@ -92,13 +93,18 @@ test('a lookup started for the previous Studio file cannot replace its new defau
 
 const source=await readFile(new URL('../app.js',import.meta.url),'utf8');
 const uiCode=source.slice(source.indexOf('const workFolders=createProjectWorkFolders()'),source.indexOf('function updateProjectFileUI()'));
-function workspaceUI({saved=null}={}){
+function workspaceUI({saved=null,known=[],figures=[],scan=async()=>new Map(),committed=true}={}){
  const bookFolder=directory('measurements'),studioFile={kind:'file',name:'layout.figurestudio'},nodes=new Map(),calls=[],messages=[];
  const window={parent:{async showDirectoryPicker(options){calls.push(options);return bookFolder;}}};
  const env={window,$:selector=>{if(!nodes.has(selector))nodes.set(selector,{});return nodes.get(selector);},bookId:'book',projectSaving:false,projectOpening:false,startupRestoring:false,updateReloading:false,
-  createProjectWorkFolders:()=>createProjectWorkFolders({load:async()=>saved,loadKnown:async()=>[],store:async(id,handle)=>calls.push({id,handle})}),
-  getFigureWorkspace:()=>({}),isProjectFolder,projectFiles:{target:()=>({handle:studioFile})},toast:message=>messages.push(message)};
- const ui=Function(...Object.keys(env),uiCode+'return {chooseProjectWorkFolder,clearProjectWorkFolder,allowProjectWorkFolder,updateProjectWorkFolderUI,switchBook:id=>{bookId=id;updateProjectWorkFolderUI();}};')(...Object.values(env));
+  createProjectWorkFolders:()=>createProjectWorkFolders({load:async()=>saved,loadKnown:async()=>known,store:async(id,handle)=>calls.push({id,handle})}),
+  createSourcePrefetch,findProjectsInWorkFolder:scan,readMifitoIdentity(){},figures,revision:0,
+  getFigureWorkspace:()=>({}),isProjectFolder,projectFiles:{target:()=>committed?{handle:studioFile}:null},toast:message=>messages.push(message)};
+ const ui=Function(...Object.keys(env),uiCode+`return {
+  chooseProjectWorkFolder,clearProjectWorkFolder,allowProjectWorkFolder,updateProjectWorkFolderUI,
+  switchBook(id){bookId=id;updateProjectWorkFolderUI();},
+  stageProject(handle){pendingWorkFolderFile={bookId,handle};projectOpening=true;updateProjectWorkFolderUI();}
+ };`)(...Object.values(env));
  return {ui,provider:window.FigureStudioWorkFolder,bookFolder,studioFile,nodes,calls,messages};
 }
 
@@ -140,4 +146,21 @@ test('Studio offers a new permission gesture for a remembered folder and publish
  assert.equal(await provider.getDirectory('book'),saved);
  assert.deepEqual(notices,['changed','changed']);
  assert.match(messages[0],/許可されました/);
+});
+
+test('restoring a Studio file derives its folder and starts search before reconnecting an editor',async()=>{
+ const granted={...directory('experiment'),async resolve(file){return [file.name];}};
+ const source={app:'mifito',projectId:'image-project',name:'images.mifito',assetId:'attached'};
+ const figures=[{id:'figure',objects:[{id:'panel',source}]}];
+ const started=deferred(),finish=deferred(),found={kind:'file',name:source.name};
+ const {ui,provider,studioFile}=workspaceUI({committed:false,known:[granted],figures,scan:details=>{
+  started.resolve(details);return finish.promise;
+ }});
+ ui.stageProject(studioFile);
+ const {directory:scanned,requests}=await started.promise;
+ assert.equal(scanned,granted);
+ assert.equal(requests[0].projectId,source.projectId);
+ const original=provider.findSource({sourceKey:'book/figure/panel/attached',...source});
+ finish.resolve(new Map([[requests[0].key,found]]));
+ assert.equal(await original,found);
 });

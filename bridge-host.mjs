@@ -84,8 +84,12 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
       stopWatchingFolder=stop??null;
       return ()=>{stop?.();if(stopWatchingFolder===stop)stopWatchingFolder=null;};
     };
+    const findWorkFolderSource=typeof provider()?.findSource==='function'?async({projectId,name},signal)=>{
+      const handle=await provider()?.findSource?.({sourceKey:source.editKey,app,projectId,name},{signal});
+      return current()&&!signal?.aborted?handle??null:null;
+    }:null;
     // Folder lookup is optional and must never delay the editor's loaded reply.
-    void Promise.resolve().then(()=>{if(current())return onSourceReady({...source,getWorkFolder,subscribeWorkFolder});}).catch(()=>{});
+    void Promise.resolve().then(()=>{if(current())return onSourceReady({...source,getWorkFolder,subscribeWorkFolder,findWorkFolderSource});}).catch(()=>{});
   }
   const readyTimer=setInterval(()=>{if(parent?.closed){parent=null;context=null;unmount();}ready();registry?.update();},1500);
   async function digest(blob){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await blob.arrayBuffer())),n=>n.toString(16).padStart(2,'0')).join('');}

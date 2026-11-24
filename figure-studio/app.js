@@ -9,9 +9,11 @@ import {serializeOfficeSVG} from './svg-export.mjs?v=source-save-v0736-1';
 import {preparePNG} from './png-export.mjs?v=source-save-v0736-1';
 import {importedImageSize,replacedImageSize,replacedMiFiToImageSize,miFiToSizeCorrection,imageInsertionPoint} from './image-placement.mjs?v=source-save-v0736-1';
 import {rasterResolution} from './image-resolution.mjs?v=image-quality-v066-1';
-import {encodeProjectFile,readProjectFile} from './project-format.mjs?v=work-folder-v0743-1';
+import {encodeProjectFile,readProjectFile} from './project-format.mjs?v=prefetch-sources-v0744-1';
 import {saveDraft,loadDraft,saveProjectFileTarget,loadProjectFileTarget} from './storage.mjs?v=0.3.6-1';
-import {createProjectWorkFolders,isProjectFolder} from './work-folder.mjs?v=work-folder-v0743-1';
+import {createProjectWorkFolders,isProjectFolder} from './work-folder.mjs?v=prefetch-sources-v0744-1';
+import {createSourcePrefetch} from './source-prefetch.mjs?v=prefetch-sources-v0744-1';
+import {findProjectsInWorkFolder} from '../source-folder.mjs?v=052ade738fc1';
 import {stageStudioUpdate,restoreStudioUpdate,isLegacyStudioUpdate,finishLegacyStudioUpdate} from './startup-session.mjs?v=source-save-v0736-1';
 import {createDemo} from './demo.mjs?v=source-save-v0736-1';
 import {createShortcutHandler,shortcutLabel} from './shortcuts.mjs?v=nested-groups-v0712-1';
@@ -34,11 +36,11 @@ import {openSource,SOURCE_APPS,setupSourceDiscovery,closeSourceSessions} from '.
 import {createFigureSidebar} from './thumbnails.mjs?v=live-v062-1';
 import {setupTransferReceiver,getFigureWorkspace} from './integration/direct-transfer.mjs?v=studio-send-v0714-1';
 import {readMifitoIdentity} from './integration/mifito-sync.mjs?v=0.3.5-1';
-import {createProjectFileLinks} from '../project-file-links.mjs?v=7c5e2ab19f04';
+import {createProjectFileLinks} from '../project-file-links.mjs?v=052ade738fc1';
 import {readPlotIdentity,openedPlotIdentity,resolvePlotImage,currentPlotImageId} from './integration/plot-sync.mjs?v=source-save-v0736-1';
 import {planMiFiToSync} from './mifito-batch.mjs?v=source-save-v0736-1';
 import {setupUpdateCheck} from './update-check.mjs?v=source-save-v0736-1';
-import {installWorkspaceUpdater} from './workspace-update.mjs?v=work-folder-v0743-1';
+import {installWorkspaceUpdater} from './workspace-update.mjs?v=prefetch-sources-v0744-1';
 import {marqueeSelection,resolveObjectSelection,clickObjectSelection,selectionDescription} from './selection.mjs?v=source-save-v0736-1';
 import {renderGroupLayers} from './group-layers.mjs?v=source-save-v0736-1';
 import {drawSelectionFrames} from './selection-overlay.mjs?v=source-save-v0736-1';
@@ -55,11 +57,11 @@ import {reorderFigures} from './figure-order.mjs';
 import {renumberFigureNames} from './figure-names.mjs?v=0.3.3-1';
 import {deleteFigures,duplicateFigures} from './figure-commands.mjs?v=source-save-v0736-1';
 import {ProjectFileSession,projectFilePickerOptions} from './project-file.mjs?v=project-switch-v051-1';
-import {installWorkspacePersistence} from './workspace-session.mjs?v=work-folder-v0743-1';
+import {installWorkspacePersistence} from './workspace-session.mjs?v=prefetch-sources-v0744-1';
 import {decodeWorkspaceState} from './workspace-state.mjs?v=project-switch-v051-1';
-import {validateWorkspaceBinding} from './integration/bridge-host.mjs?v=work-folder-v0743-1';
+import {validateWorkspaceBinding} from './integration/bridge-host.mjs?v=prefetch-sources-v0744-1';
 
-const STUDIO_RELEASE={version:'0.7.43',build:'work-folder-v0743-1'};
+const STUDIO_RELEASE={version:'0.7.44',build:'prefetch-sources-v0744-1'};
 installBrowserZoomGuard();
 window.FigureAppRelease?.assertRunning(STUDIO_RELEASE);
 if(window.FigureAppRelease&&!await window.FigureAppRelease.startup())throw Error('最新版へ切り替えています。');
@@ -611,13 +613,42 @@ const saveSourceOption=$('#saveSourceProjects');
 try{saveSourceOption.checked=localStorage.getItem('figure-studio-save-source-projects')!=='off';}catch{}
 saveSourceOption.addEventListener('change',()=>{try{localStorage.setItem('figure-studio-save-source-projects',saveSourceOption.checked?'on':'off');}catch{}});
 const workFolders=createProjectWorkFolders(),workFolderListeners=new Set();
+const sourcePrefetch=createSourcePrefetch({
+ scan:findProjectsInWorkFolder,
+ identify:{plot:async file=>openedPlotIdentity(await readPlotIdentity(file),file.name),mifito:readMifitoIdentity},
+ async resolveProjectId(source){
+  const identity=await sourceIdentity(assets.get(source.assetId),source.app);
+  return (source.app==='plot'?await openedPlotIdentity(identity,source.name):identity).projectId;
+ }
+});
 let workFolderBook='',workFolderFile=null,workFolder=null,workFolderUsesDefault=false,workFolderAccess=null,workFolderSerial=0,workFolderChanging=false;
+let pendingWorkFolderFile=null,prefetchRevision=-1,prefetchDirectory=null;
+function currentWorkFolderFile(){
+ return pendingWorkFolderFile?.bookId===bookId?pendingWorkFolderFile.handle:projectFiles.target(bookId)?.handle??null;
+}
+function restartSourcePrefetch(){
+ prefetchRevision=-1;prefetchDirectory=null;sourcePrefetch.reset();
+}
+function prefetchWorkFolder(directory){
+ if(prefetchRevision===revision&&prefetchDirectory===directory)return;
+ prefetchRevision=revision;prefetchDirectory=directory;
+ sourcePrefetch.start({bookId,directory,figures});
+}
+async function getCurrentWorkFolder(expectedBookId=bookId){
+ if(expectedBookId!==bookId)return null;
+ const projectFile=currentWorkFolderFile(),serial=workFolderSerial;
+ const folder=await workFolders.getDirectory(expectedBookId,projectFile);
+ return expectedBookId===bookId&&projectFile===currentWorkFolderFile()&&serial===workFolderSerial?folder:null;
+}
 window.FigureStudioWorkFolder=Object.freeze({
- async getDirectory(expectedBookId=bookId){
-  if(expectedBookId!==bookId)return null;
-  const projectFile=projectFiles.target(expectedBookId)?.handle??null;
-  const folder=await workFolders.getDirectory(expectedBookId,projectFile);
-  return expectedBookId===bookId&&projectFile===(projectFiles.target(bookId)?.handle??null)?folder:null;
+ getDirectory:getCurrentWorkFolder,
+ async findSource(request,{signal}={}){
+  if(signal?.aborted||typeof request?.sourceKey!=='string')return null;
+  const owner=request.sourceKey.split('/')[0];
+  const folder=await getCurrentWorkFolder(owner);
+  if(!folder||signal?.aborted)return null;
+  prefetchWorkFolder(folder);
+  return sourcePrefetch.findSource(request,{signal});
  },
  subscribe(listener){
   workFolderListeners.add(listener);
@@ -645,13 +676,15 @@ function paintProjectWorkFolder(){
  $('#projectWorkFolderHelp').textContent=!supported?'このブラウザでは作業フォルダを指定できません。':workFolderAccess==='denied'?'作業フォルダを指定し直すと、フォルダへのアクセスを許可できます。':'Studioファイルと同じフォルダが既定です。元プロジェクトの編集に使うため、作業フォルダの読み取りと書き込みを許可します。';
 }
 function loadCurrentWorkFolder(){
- workFolderBook=bookId;workFolderFile=projectFiles.target(bookId)?.handle??null;
+ restartSourcePrefetch();
+ workFolderBook=bookId;workFolderFile=currentWorkFolderFile();
  workFolder=null;workFolderUsesDefault=false;workFolderAccess=null;
  const owner=bookId,file=workFolderFile,serial=++workFolderSerial;
  void workFolders.getSelection(owner,file).then(saved=>{
   if(owner!==bookId||serial!==workFolderSerial)return;
   const handle=saved?.handle??null;
   workFolder=handle;workFolderUsesDefault=!!saved?.followProject;paintProjectWorkFolder();
+  if(handle)prefetchWorkFolder(handle);
   if(typeof handle?.queryPermission==='function'){
    void handle.queryPermission({mode:'readwrite'}).then(permission=>{
     if(owner!==bookId||serial!==workFolderSerial)return;
@@ -662,7 +695,8 @@ function loadCurrentWorkFolder(){
  notifyWorkFolderListeners();
 }
 function updateProjectWorkFolderUI(){
- if(workFolderBook!==bookId||workFolderFile!==(projectFiles.target(bookId)?.handle??null))loadCurrentWorkFolder();
+ if(workFolderBook!==bookId||workFolderFile!==currentWorkFolderFile())loadCurrentWorkFolder();
+ else if(workFolder)prefetchWorkFolder(workFolder);
  paintProjectWorkFolder();
 }
 async function updateProjectWorkFolder(pick){
@@ -679,6 +713,7 @@ async function updateProjectWorkFolder(pick){
   if(handle){
    ++workFolderSerial;
    workFolder=handle;workFolderUsesDefault=followProject;workFolderAccess='granted';
+   restartSourcePrefetch();prefetchWorkFolder(handle);
    paintProjectWorkFolder();notifyWorkFolderListeners();
   }else loadCurrentWorkFolder();
   const remembered=await stored;
@@ -697,7 +732,7 @@ async function allowProjectWorkFolder(){
   const permission=await handle.requestPermission({mode:'readwrite'});
   if(owner!==bookId||handle!==workFolder)return;
   workFolderAccess=permission;
-  if(permission==='granted'){notifyWorkFolderListeners();toast('作業フォルダへのアクセスが許可されました');}
+  if(permission==='granted'){restartSourcePrefetch();prefetchWorkFolder(handle);notifyWorkFolderListeners();toast('作業フォルダへのアクセスが許可されました');}
   else toast('作業フォルダへのアクセスが許可されませんでした');
  }catch(error){if(error.name!=='AbortError')toast('作業フォルダへのアクセスを許可できませんでした。'+error.message);}
  finally{workFolderChanging=false;updateProjectWorkFolderUI();}
@@ -822,18 +857,20 @@ async function readProject(file,handle=null,{recovery=false}={}){
   previous={book:snapshot(),assets,selection:[...selection],groupScope,dirty,revision,manualSavedRevision,preservedWorkspace,past:history.past,future:history.future};
   if(plan){previousBindings=await savedEditorBindings({editors:plan.previousEditors},previous.book,previous.assets);await plan.apply();}
   closeSourceSessions();
+  restartSourcePrefetch();
+  pendingWorkFolderFile={bookId:next.id,handle};
   restoreBook(next);renumberFigureNames(figures);assets=loaded;preservedWorkspace=raw.workspace??null;previewQuality.clear();history.reset();selection=[];dirty=false;revision++;manualSavedRevision=revision;render();fit();
   if(plan){
    await plan.bind(bindings);
    await connectSavedEditors(bindings);
    await plan.complete();
   }
-  projectFiles.opened(bookId,{handle,name:file.name});const openedBook=bookId;
-  scheduleSave();try{await saveProjectFileTarget(openedBook,{handle,name:file.name});}catch{}
+  projectFiles.opened(bookId,{handle,name:file.name});pendingWorkFolderFile=null;const openedBook=bookId;
+  updateProjectWorkFolderUI();scheduleSave();try{await saveProjectFileTarget(openedBook,{handle,name:file.name});}catch{}
   toast(raw.workspace?'3タブの最新状態と未反映の編集を復元しました':'プロジェクトを開きました');
   return true;
  }catch(error){
-  if(previous)closeSourceSessions();
+  if(previous){closeSourceSessions();pendingWorkFolderFile=null;restartSourcePrefetch();}
   if(previous){restoreBook(previous.book);assets=previous.assets;selection=previous.selection;groupScope=previous.groupScope;dirty=previous.dirty;revision=previous.revision;manualSavedRevision=previous.manualSavedRevision;preservedWorkspace=previous.preservedWorkspace;history.past=previous.past;history.future=previous.future;render();}
   try{await plan?.cancel();if(previousBindings)await connectSavedEditors(previousBindings);}catch(rollbackError){toast(rollbackError.message);return;}
   if(recovery)throw error;

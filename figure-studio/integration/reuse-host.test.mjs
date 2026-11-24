@@ -26,7 +26,7 @@ test('workspace iframe uses the shell Studio window without an opener and return
 });
 
 test('folder discovery starts after the source is ready and never delays the load reply',async()=>{
- const callbacks=[],folders=[],watches=new Set(),scan=deferred(),directory={kind:'directory'};
+ const callbacks=[],folders=[],lookups=[],watches=new Set(),scan=deferred(),directory={kind:'directory'},file={kind:'file'};
  const e=environment({async onSourceReady(source){
   callbacks.push(source);
   source.subscribeWorkFolder(async()=>folders.push(await source.getWorkFolder()));
@@ -35,6 +35,7 @@ test('folder discovery starts after the source is ready and never delays the loa
  }});
  e.parent.FigureStudioWorkFolder={
   getDirectory(book){assert.equal(book,'book-id');return directory;},
+  async findSource(request){lookups.push(request);return file;},
   subscribe(listener){watches.add(listener);return ()=>watches.delete(listener);}
  };
  try{
@@ -42,11 +43,15 @@ test('folder discovery starts after the source is ready and never delays the loa
   assert.equal(e.sent.at(-1).data.type,'loaded');
   assert.equal(callbacks[0].editKey,'book-id/figure-a/a/asset-a');
   assert.deepEqual(folders,[directory]);
+  const nativeRequest={projectId:'source-id',name:'a.plotproject'};
+  assert.equal(await callbacks[0].findWorkFolderSource(nativeRequest),file);
+  assert.deepEqual(lookups,[{sourceKey:'book-id/figure-a/a/asset-a',app:'plot',...nativeRequest}]);
   await [...watches][0]();
   assert.deepEqual(folders,[directory,directory]);
   e.host.resetWorkspaceBinding();
   assert.equal(watches.size,0);
   assert.equal(await callbacks[0].getWorkFolder(),null);
+  assert.equal(await callbacks[0].findWorkFolderSource(nativeRequest),null);
  }finally{scan.resolve();e.host.close();}
 });
 
