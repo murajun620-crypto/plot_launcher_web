@@ -83,6 +83,7 @@
 .canvas-work-folder .icon{width:13px;height:13px}
 .canvas-work-folder-label{flex:none}
 .canvas-work-folder-name{overflow:hidden;text-overflow:ellipsis;color:#526661}
+.canvas-work-folder-setup{flex:none;padding:2px 5px;border-radius:4px;color:#15665d;font-size:inherit;text-decoration:underline;text-underline-offset:2px}
 @container studio-canvas (max-width:550px){
   .canvas-work-folder-label{position:absolute;width:1px;height:1px;clip-path:inset(50%);overflow:hidden}
 }

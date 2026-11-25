@@ -96,12 +96,12 @@ const uiCode=source.slice(source.indexOf('const workFolders=createProjectWorkFol
 function workspaceUI({saved=null,known=[],figures=[],scan=async()=>new Map(),committed=true}={}){
  const bookFolder=directory('measurements'),studioFile={kind:'file',name:'layout.figurestudio'},nodes=new Map(),calls=[],messages=[];
  const window={parent:{async showDirectoryPicker(options){calls.push(options);return bookFolder;}}};
- const env={window,$:selector=>{if(!nodes.has(selector))nodes.set(selector,{});return nodes.get(selector);},bookId:'book',projectSaving:false,projectOpening:false,startupRestoring:false,updateReloading:false,
+ const env={window,$:selector=>{if(!nodes.has(selector))nodes.set(selector,{setAttribute(name,value){this[name]=value;}});return nodes.get(selector);},bookId:'book',projectSaving:false,projectOpening:false,startupRestoring:false,updateReloading:false,
   createProjectWorkFolders:()=>createProjectWorkFolders({load:async()=>saved,loadKnown:async()=>known,store:async(id,handle)=>calls.push({id,handle})}),
   createSourcePrefetch,findProjectsInWorkFolder:scan,readMifitoIdentity(){},figures,revision:0,
   getFigureWorkspace:()=>({}),isProjectFolder,projectFiles:{target:()=>committed?{handle:studioFile}:null},toast:message=>messages.push(message)};
  const ui=Function(...Object.keys(env),uiCode+`return {
-  chooseProjectWorkFolder,clearProjectWorkFolder,allowProjectWorkFolder,updateProjectWorkFolderUI,
+  chooseProjectWorkFolder,setupProjectWorkFolder,clearProjectWorkFolder,allowProjectWorkFolder,updateProjectWorkFolderUI,
   switchBook(id){bookId=id;updateProjectWorkFolderUI();},
   stageProject(handle){pendingWorkFolderFile={bookId,handle};projectOpening=true;updateProjectWorkFolderUI();}
  };`)(...Object.values(env));
@@ -113,16 +113,18 @@ test('Studio opens a read/write folder picker on demand and publishes selections
  const notices=[],unsubscribe=provider.subscribe(()=>notices.push('changed'));
  ui.updateProjectWorkFolderUI();
  assert.equal(await provider.getDirectory('book'),null);
- assert.equal(nodes.get('#workFolderStatusName').textContent,'Studioファイルと同じフォルダ');
- await ui.chooseProjectWorkFolder();
+ assert.equal(nodes.get('#workFolderStatusName').textContent,'未設定');
+ assert.equal(nodes.get('#workFolderStatusSetup').hidden,false);
+ await ui.setupProjectWorkFolder();
  assert.deepEqual(calls,[{id:'figure-studio-work-folder',mode:'readwrite',startIn:studioFile},{id:'book',handle:bookFolder}]);
  assert.equal(await provider.getDirectory('book'),bookFolder);
  assert.match(nodes.get('#projectWorkFolder').textContent,/measurements/);
  assert.equal(nodes.get('#workFolderStatusName').textContent,'measurements');
+ assert.equal(nodes.get('#workFolderStatusSetup').hidden,true);
  assert.match(nodes.get('#workFolderStatus').title,/作業フォルダ.*measurements/);
  await ui.clearProjectWorkFolder();
  assert.equal(await provider.getDirectory('book'),null);
- assert.equal(nodes.get('#workFolderStatusName').textContent,'Studioファイルと同じフォルダ');
+ assert.equal(nodes.get('#workFolderStatusName').textContent,'未設定');
  ui.switchBook('other');
  assert.equal(await provider.getDirectory('book'),null);
  assert.equal(notices.length,4);
@@ -138,18 +140,44 @@ test('Studio offers a new permission gesture for a remembered folder and publish
  const {ui,provider,nodes,calls,messages}=workspaceUI({saved});
  const notices=[];provider.subscribe(()=>notices.push('changed'));
  ui.updateProjectWorkFolderUI();
- await provider.getDirectory('book');
- await Promise.resolve();
+ assert.equal(await provider.getDirectory('book'),null);
  const allow=nodes.get('[data-action="allow-work-folder"]');
  assert.equal(allow.hidden,false);
- assert.deepEqual(permissions,[['query',{mode:'readwrite'}]]);
- await ui.allowProjectWorkFolder();
- assert.deepEqual(permissions,[['query',{mode:'readwrite'}],['request',{mode:'readwrite'}]]);
+ assert.equal(nodes.get('#workFolderStatusSetup').textContent,'許可…');
+ assert.match(nodes.get('#workFolderStatusName').textContent,/アクセス許可が必要/);
+ assert.deepEqual(permissions,[['query',{mode:'readwrite'}],['query',{mode:'read'}]]);
+ await ui.setupProjectWorkFolder();
+ assert.deepEqual(permissions,[['query',{mode:'readwrite'}],['query',{mode:'read'}],['request',{mode:'readwrite'}]]);
  assert.deepEqual(calls,[]);
  assert.equal(allow.hidden,true);
  assert.equal(await provider.getDirectory('book'),saved);
  assert.deepEqual(notices,['changed','changed']);
  assert.match(messages[0],/許可されました/);
+});
+
+test('one local folder choice restarts lookup for both editors after moving to a new browser',async()=>{
+ const plot={app:'plot',projectId:'plot-project',name:'profile.plotproject',assetId:'plot-asset'};
+ const mifito={app:'mifito',projectId:'image-project',name:'images.mifito',assetId:'mifito-asset'};
+ const figures=[{id:'figure',objects:[{id:'graph',source:plot},{id:'image',source:mifito}]}];
+ const scans=[];
+ const {ui,provider,bookFolder,studioFile,nodes,calls}=workspaceUI({figures,scan:async details=>{
+  scans.push(details);
+  return new Map(details.requests.map(({key,name})=>[key,{kind:'file',name}]));
+ }});
+ const findPlot=()=>provider.findSource({sourceKey:'book/figure/graph/plot-asset',...plot});
+ const findMiFiTo=()=>provider.findSource({sourceKey:'book/figure/image/mifito-asset',...mifito});
+ assert.deepEqual(await Promise.all([findPlot(),findMiFiTo()]),[null,null]);
+ assert.equal(scans.length,0);
+ assert.equal(nodes.get('#workFolderStatusName').textContent,'未設定');
+ assert.match(nodes.get('#projectWorkFolderHelp').textContent,/このPC/);
+
+ await ui.setupProjectWorkFolder();
+ assert.deepEqual(calls[0],{id:'figure-studio-work-folder',mode:'readwrite',startIn:studioFile});
+ assert.deepEqual(await Promise.all([findPlot(),findMiFiTo()]),[
+  {kind:'file',name:plot.name},{kind:'file',name:mifito.name}
+ ]);
+ assert.equal(scans.length,1);
+ assert.equal(scans[0].directory,bookFolder);
 });
 
 test('restoring a Studio file derives its folder and starts search before reconnecting an editor',async()=>{
@@ -161,7 +189,8 @@ test('restoring a Studio file derives its folder and starts search before reconn
   started.resolve(details);return finish.promise;
  }});
  ui.updateProjectWorkFolderUI();
- assert.equal(nodes.get('#workFolderStatusName').textContent,'未指定');
+ await provider.getDirectory('book');
+ assert.equal(nodes.get('#workFolderStatusName').textContent,'未設定');
  ui.stageProject(studioFile);
  const {directory:scanned,requests}=await started.promise;
  assert.equal(scanned,granted);
