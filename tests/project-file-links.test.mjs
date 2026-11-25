@@ -113,6 +113,15 @@ for(const app of ['plot','mifito']){
     const f=setup(app),original=fileHandle(f.name),opened=await f.api.opened({file:await original.getFile(),projectId,handle:original});original.replace('other data',otherId);
     await assert.rejects(f.api.prepare({projectId,name:f.name,link:opened.link,handle:original,knownSource:true}),/一致しません/);assert.equal(f.prompts.length,0);assert.equal(original.state().opens,0);
   });
+  test(`${app}: a remembered path now occupied by another project can recover a verified folder match`,async()=>{
+    const f=setup(app),original=fileHandle(f.name),relocated=fileHandle(f.name);
+    const opened=await f.api.opened({file:await original.getFile(),projectId,handle:original});
+    original.replace('unrelated project',otherId);
+    const target=await f.api.prepare({projectId,name:f.name,link:opened.link,handle:original,knownSource:true,getWorkFolderTarget:()=>relocated});
+    assert.equal(target.handle,relocated);
+    assert.equal(f.prompts.length,0);
+    assert.equal(original.state().opens,0);
+  });
   test(`${app}: missing local target can save a separate copy without touching the original`,async()=>{
     const f=setup(app,{answers:['saveAs']}),copy=fileHandle('copy'+fExtension(app));f.setSave(copy);
     const target=await f.api.prepare({projectId,name:f.name,knownSource:true});assert.equal(target.saveAs,true);assert.equal(target.handle,copy);assert.equal(f.picker.saves,1);

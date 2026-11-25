@@ -1,6 +1,6 @@
-import {MAX_SHEET_SOURCES,groupSheetSources,copySheetSources} from './sheet-sources.mjs?v=74af74acac67';
-import {createProjectFileLinks,portableFileLink} from './project-file-links.mjs?v=74af74acac67';
-import {chooseProjectFileAction} from './project-file-dialog.mjs?v=74af74acac67';
+import {MAX_SHEET_SOURCES,groupSheetSources,copySheetSources} from './sheet-sources.mjs?v=dce6ded29eb5';
+import {createProjectFileLinks,portableFileLink} from './project-file-links.mjs?v=dce6ded29eb5';
+import {chooseProjectFileAction} from './project-file-dialog.mjs?v=dce6ded29eb5';
 import {createAnnotationFormatDialog} from './annotation-format-dialog.mjs?v=d08c8b9af140';
 import {formatTargets,applyAnnotationFormat} from './annotation-format.mjs?v=d08c8b9af140';
 import {localFontFaces} from './local-font-faces.mjs?v=d08c8b9af140';
@@ -9,15 +9,15 @@ import {statisticNumber,statisticAvailable,statisticFormat,defaultStatisticForma
 import {createMatrixEditor} from './matrix-editor.mjs?v=d08c8b9af140';
 import {isMatrixPlot,isCombinedHistogram,matrixColorbarVisible} from './matrix-model.mjs?v=d08c8b9af140';
 import {createFileProgress} from './file-progress.mjs?v=file-open-1';
-import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=74af74acac67';
+import {setupFigureBridge,getFigureBridgeContext} from './bridge-host.mjs?v=dce6ded29eb5';
 import {setupDirectSendButton,getFigureWorkspace} from './direct-transfer.mjs?v=baaeeccc3ee1';
 import {identifyPlotProject,openedPlotIdentity,plotSheetIndex,currentPlotImageId,resolvePlotImage,savedPlotProjectId,mergePlotCheckpoint,samePlotCheckpoint,createPlotAcknowledgements} from './plot-sync.mjs?v=d08c8b9af140';
 import { compactHelp, documentSaver, filePickerOptions } from "./ui-common.js?v=9127ec4c4f31";
 import { UNIT_FAMILIES, unitSuggestion, unitConversion, convertAxisUnit } from "./units.js?v=9127ec4c4f31";
 import { parsePastedTable, pastedTableCSV } from "./data-paste.js?v=9127ec4c4f31";
-import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=74af74acac67";
-import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=74af74acac67";
-import { APP_VERSION, COLORS, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, initialCombinedSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=74af74acac67";
+import { configForSheet, sheetFileStem, zipFiles } from "./sheets.js?v=dce6ded29eb5";
+import { USER_PRESET_KEY, USER_PRESET_FILE_LIMIT, captureUserPreset, encodeUserPresets, decodeUserPresets, readUserPresets, writeUserPresets, upsertUserPreset, renameUserPreset, mergeUserPresets, applyUserPreset, userPresetName } from "./user-presets.js?v=dce6ded29eb5";
+import { APP_VERSION, COLORS, UNIT_GROUPS, makeProject as encodePlotProject, parseProject, PROJECT_MAX_SIZE, applyPreset, createSeries, initialSeries, initialCombinedSeries, defaultAxes, makeSettings, restoreSettings, safeStem, sampleCSV, zoomAt, shiftCoordinate, snapPoint, parseCoefficient } from "./state.js?v=dce6ded29eb5";
 
 import {alignmentOffsets} from './object-layout.mjs?v=27ae7675c457';
 import {createDataEditor} from './data-editor.mjs?v=27ae7675c457';
@@ -31,7 +31,7 @@ let annotationFormatDialog=null;
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 const fileProgress=createFileProgress();
-const APP_BUILD = '74af74acac67';
+const APP_BUILD = 'dce6ded29eb5';
 window.FigureAppRelease?.assertRunning({version:APP_VERSION,build:APP_BUILD});
 function makeProject(settings,data,fonts,workspace={}){
   const live=sourceData&&data.filename===sourceData.filename&&(data.bytes===sourceData.bytes||data.files&&data.files===sourceData.files);
@@ -504,7 +504,7 @@ function fatal(message) {
 }
 
 function startWorker() {
-  worker = new Worker(new URL("./worker.js?v=74af74acac67", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=dce6ded29eb5", import.meta.url), { type: "module" });
   worker.onmessage = async ({ data }) => {
     if (data.type === "progress") {
       if(data.id)requests.get(data.id)?.progressTask?.stage(data.text,{completed:data.completed,total:data.total,unit:data.unit||''});
@@ -2413,13 +2413,14 @@ function sourceProjectSaveReady({editedOnly=false}={}){
 async function prepareSourceProjectSave({saveAs=false,host=window,choose=chooseProjectFileAction,requireFile=false}={}){
   if(requireFile&&!sourceProjectSaveReady())return null;
   if(projectVersionChecking||!engineReady||loading||exporting||!sourceData||!metadata||!config.series.length)return null;
-  studioWorkFolderWatch?.applyMatch();
+  const workFolderWatch=studioWorkFolderWatch;
+  workFolderWatch?.applyMatch();
   exporting=true;updateButtons();status('元ファイルと保存先を確認しています…');
   let released=false,written=false,writing=false;
   const release=()=>{if(released)return;released=true;exporting=false;updateButtons();if(renderWanted)renderPreview();studioWorkFolderWatch?.resume();};
   try{
     const name=projectFilename || `${safeStem($("#save-name").value)}.plotproject`;
-    const target=await projectFiles.prepare({projectId:sourceData.figureStudioProjectId,name,link:projectFileLink,handle:projectHandle,sourceKey:figureStudioBridge?.sourceKey,saveAs,knownSource:!!projectFilename,host,choose,requireFile,startIn:projectHandle||studioWorkFolderWatch?.directory||saveDirectory||sourceDirectory||sourceHandle,fallback:async(blob,filename)=>{download(blob,filename);return filename;}});
+    const target=await projectFiles.prepare({projectId:sourceData.figureStudioProjectId,name,link:projectFileLink,handle:projectHandle,sourceKey:figureStudioBridge?.sourceKey,saveAs,knownSource:!!projectFilename,host,choose,requireFile,getWorkFolderTarget:workFolderWatch?.getMatch,startIn:projectHandle||workFolderWatch?.directory||saveDirectory||sourceDirectory||sourceHandle,fallback:async(blob,filename)=>{download(blob,filename);return filename;}});
     if(target.saveAs)await figureStudioBridge?.captureWorkspaceBinding();
     const savedState=projectEditState(),savingSource=sourceData;
     const currentId=sourceData.figureStudioProjectId||crypto.randomUUID();
@@ -3800,7 +3801,7 @@ function clearStudioWorkFolderWatch(){
   studioWorkFolderWatch?.invalidate();
   studioWorkFolderWatch=null;
 }
-function watchStudioWorkFolder({editKey,getWorkFolder,subscribeWorkFolder,findWorkFolderSource}){
+function watchStudioWorkFolder({editKey,sourceName,getWorkFolder,subscribeWorkFolder,findWorkFolderSource}){
   if(!editKey||typeof getWorkFolder!=='function'){clearStudioWorkFolderWatch();return;}
   const previous=studioWorkFolderWatch;
   const candidate=previous?.editKey===editKey?previous.candidate:null;
@@ -3818,11 +3819,11 @@ function watchStudioWorkFolder({editKey,getWorkFolder,subscribeWorkFolder,findWo
   const matchesRoute=()=>studioWorkFolderWatch===watch&&figureStudioBridge?.sourceKey===editKey;
   const search=()=>{
     watch.cancel();watch.directory=null;pendingMatch=null;
-    const projectId=sourceData?.figureStudioProjectId,name=projectFilename,link=projectFileLink;
-    if(!projectId||!name||!matchesRoute()||projectHandle)return;
+    const projectId=sourceData?.figureStudioProjectId,editingName=projectFilename,name=sourceName||editingName,link=projectFileLink;
+    if(!projectId||!name||!matchesRoute())return;
     controller=new AbortController();
     const {signal}=controller;
-    const stillCurrent=()=>!signal.aborted&&matchesRoute()&&sourceData?.figureStudioProjectId===projectId&&projectFilename===name&&projectFileLink===link&&!projectHandle;
+    const stillCurrent=()=>!signal.aborted&&matchesRoute()&&sourceData?.figureStudioProjectId===projectId&&projectFilename===editingName&&projectFileLink===link;
     const readDirectory=async()=>{
       const directory=await getWorkFolder();
       if(!stillCurrent()||!directory)return null;
@@ -3847,11 +3848,14 @@ function watchStudioWorkFolder({editKey,getWorkFolder,subscribeWorkFolder,findWo
       watch.applyMatch();
     })().catch(()=>{});
   };
+  watch.getMatch=()=>{
+    if(pendingMatch&&!pendingMatch.stillCurrent())pendingMatch=null;
+    return pendingMatch?.match.handle??null;
+  };
   watch.applyMatch=()=>{
-    if(!pendingMatch)return;
-    const {match,link,stillCurrent}=pendingMatch;
-    if(!stillCurrent()){pendingMatch=null;return;}
-    if(loading||exporting)return;
+    const found=watch.getMatch();
+    if(!found||projectHandle||loading||exporting||found.name.normalize('NFC')!==projectFilename.normalize('NFC'))return;
+    const {match,link}=pendingMatch;
     pendingMatch=null;
     watch.candidate={handle:match.handle,link:match.link??link,previousLink:link};
     projectHandle=watch.candidate.handle;projectFileLink=watch.candidate.link;

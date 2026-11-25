@@ -109,6 +109,29 @@ test('Plot resolves a Studio work folder on connect and saves directly to the di
   assert.equal((await f.copy.getFile()).size,0);
 });
 
+test('Plot uses a ready work-folder result only when the remembered file becomes unavailable',async()=>{
+  const editKey='book/figure/panel/asset',f=await fixture({sourceKey:editKey});
+  const relocated=handle(f.native.name,await f.native.getFile());
+  let finishSearch;
+  const lookup=new Promise(resolve=>{finishSearch=resolve;});
+  f.api.watch({editKey,getWorkFolder:async()=>null,findWorkFolderSource:()=>lookup});
+  finishSearch(relocated);
+  await new Promise(resolve=>setImmediate(resolve));
+
+  const ordinary=await f.api.prepare();
+  assert.equal(ordinary.handle,f.native);
+  ordinary.cancel();
+  f.native.getFile=async()=>{throw new DOMException('The file has moved','NotFoundError');};
+  f.native.createWritable=async()=>assert.fail('The stale file must never be opened for writing');
+
+  const recovery=await f.api.prepare({requireFile:true});
+  assert.equal(recovery.handle,relocated);
+  await recovery.write();
+  assert.equal(f.api.state().projectHandle,relocated);
+  assert.equal(await f.projectFiles.resolveSource({projectId:original.workspace.figureStudioProjectId,sourceKey:editKey}),relocated);
+  assert.equal((await f.copy.getFile()).size,0);
+});
+
 test('Plot saving leaves an unfinished work folder lookup running without waiting or replacing the saved file',async()=>{
   const editKey='book/figure/panel/asset',directory={kind:'directory',name:'work'};
   let resolveLookup,notifyStarted;

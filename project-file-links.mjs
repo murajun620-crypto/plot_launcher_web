@@ -1,4 +1,4 @@
-import {findProjectInWorkFolder} from './source-folder.mjs?v=74af74acac67';
+import {findProjectInWorkFolder} from './source-folder.mjs?v=dce6ded29eb5';
 
 // Writable handles live only in this browser's IndexedDB. Portable snapshots
 // carry an opaque token and a byte fingerprint, never paths or permissions.
@@ -102,7 +102,7 @@ export function createProjectFileLinks({app,identify,choose,host=globalThis,stor
     // without an opaque link require explicit selection of the original file.
     return {link:{token:'',fingerprint:hash},handle:null};
   }
-  async function prepare({projectId,name,link,handle=null,saveAs=false,knownSource=false,startIn,fallback,host:pickerHost=host,choose:chooseAction=choose,requireFile=false,sourceKey}){
+  async function prepare({projectId,name,link,handle=null,saveAs=false,knownSource=false,startIn,fallback,host:pickerHost=host,choose:chooseAction=choose,requireFile=false,sourceKey,getWorkFolderTarget}){
     if(!filename(name))throw Error('プロジェクトのファイル名を確認してください。');
     const extension=app==='plot'?'.plotproject':'.mifito',description=app==='plot'?'PlotLauncherプロジェクト':'MiFiToプロジェクト';
     const options={id:`${app}-source-project`,types:[{description,accept:{'application/octet-stream':[extension]}}]};
@@ -116,7 +116,7 @@ export function createProjectFileLinks({app,identify,choose,host=globalThis,stor
       if(requireFile)throw Error('このブラウザでは元プロジェクトへ一括保存できません。Chrome／Edgeで開くか、保存メニューの「元プロジェクトも保存」をオフにしてください。');
       return {handle:null,name,saveAs,write:blob=>fallback(blob,name),remember:async()=>({link:null,remembered:false})};
     }
-    let baseline=link?.fingerprint||'',binding=false,file=null;
+    let baseline=link?.fingerprint||'',binding=false,inspected=null;
     const getFile=target=>checkFile(()=>target.getFile(),'元ファイルを開くまでに時間がかかっています。');
     const readHash=file=>checkFile(()=>digest(file),'元ファイルの読み取りに時間がかかっています。');
     const saveCopy=()=>prepare({projectId,name,link,handle,saveAs:true,knownSource,startIn,fallback,host:pickerHost,choose:chooseAction,requireFile,sourceKey});
@@ -133,9 +133,39 @@ export function createProjectFileLinks({app,identify,choose,host=globalThis,stor
       if(!target.requestPermission||await target.requestPermission(options)!=='granted')throw new DOMException('元ファイルへの上書きが許可されていません。','NotAllowedError');
       return true;
     };
-    if(!saveAs&&handle){
-      try{if(!await permit(handle))return saveCopy();file=await getFile(handle);}
-      catch(error){if(!['NotFoundError','NotAllowedError','SecurityError'].includes(error.name))throw error;handle=null;}
+    const mismatch=()=>Error('選択したファイルは元のプロジェクトと一致しません。元ファイルを選ぶか、「名前を付けて保存」を使ってください。');
+    const inspect=async(target,expectedName,verifyIdentity=false)=>{
+      if(!await permit(target))return null;
+      const file=await getFile(target),hash=await readHash(file);
+      if(verifyIdentity||baseline!==hash){
+        // Picker handles can belong to Studio's parent realm. Give validators
+        // a File from the editor realm (notably MiFiTo's Blob brand check).
+        const identity=await checkFile(()=>identify(new File([file],file.name,{type:file.type,lastModified:file.lastModified})),'元プロジェクトの内容確認に時間がかかっています。');
+        if(identity.projectId!==projectId||file.name.normalize('NFC')!==expectedName.normalize('NFC'))return {matches:false};
+      }
+      return {matches:true,name:file.name,hash};
+    };
+    if(!saveAs){
+      const remembered=handle;
+      let wrongProject=false;
+      // Consult the completed folder result only after checking the remembered
+      // target, and keep the original fingerprint for either target.
+      for(const getTarget of [()=>remembered,getWorkFolderTarget]){
+        const candidate=getTarget?.(),fromWorkFolder=getTarget===getWorkFolderTarget;
+        if(!candidate||(fromWorkFolder&&candidate===remembered))continue;
+        try{
+          const candidateName=fromWorkFolder?candidate.name:name;
+          const found=await inspect(candidate,candidateName,fromWorkFolder);
+          if(!found)return saveCopy();
+          if(fromWorkFolder&&getWorkFolderTarget()!==candidate)continue;
+          if(found.matches){handle=candidate;name=candidateName;inspected=found;break;}
+          wrongProject=true;
+        }catch(error){
+          if(!['NotFoundError','NotAllowedError','SecurityError','NotReadableError'].includes(error.name))throw error;
+        }
+        handle=null;
+      }
+      if(!handle&&wrongProject)throw mismatch();
     }
     if(!saveAs&&!handle&&knownSource){
       const answer=await chooseAction({kind:'missing',name,canBind:!!pickerHost.showOpenFilePicker});
@@ -150,22 +180,14 @@ export function createProjectFileLinks({app,identify,choose,host=globalThis,stor
       handle=await pickerHost.showSaveFilePicker({...options,suggestedName:name,...(startIn?{startIn}:{})});
       baseline=await readHash(await getFile(handle));
     }else{
-      if(!file){
-        if(!await permit(handle))return saveCopy();
-        file=await getFile(handle);
+      inspected??=await inspect(handle,name,binding);
+      if(!inspected)return saveCopy();
+      if(!inspected.matches)throw mismatch();
+      if(baseline!==inspected.hash){
+        const answer=await chooseAction({kind:baseline?'changed':'unknown',name:inspected.name});
+        if(answer==='saveAs')return saveCopy();if(answer!=='overwrite')cancel();
       }
-      const current=await readHash(file);
-      if(binding||!baseline||baseline!==current){
-        // Picker handles can belong to Studio's parent realm. Give validators
-        // a File from the editor realm (notably MiFiTo's Blob brand check).
-        const identity=await checkFile(()=>identify(new File([file],file.name,{type:file.type,lastModified:file.lastModified})),'元プロジェクトの内容確認に時間がかかっています。');
-        if(identity.projectId!==projectId||file.name.normalize('NFC')!==name.normalize('NFC'))throw Error('選択したファイルは元のプロジェクトと一致しません。元ファイルを選ぶか、「名前を付けて保存」を使ってください。');
-        if(!baseline||baseline!==current){
-          const answer=await chooseAction({kind:baseline?'changed':'unknown',name:file.name});
-          if(answer==='saveAs')return saveCopy();if(answer!=='overwrite')cancel();
-        }
-      }
-      baseline=current;
+      baseline=inspected.hash;
     }
     const target=handle;
     return {handle:target,name:target.name,saveAs,async write(blob){
