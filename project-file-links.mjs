@@ -1,4 +1,4 @@
-import {findProjectInWorkFolder} from './source-folder.mjs?v=c17496a9a841';
+import {findProjectInWorkFolder} from './source-folder.mjs?v=763af978d615';
 
 // Writable handles live only in this browser's IndexedDB. Portable snapshots
 // carry an opaque token and a byte fingerprint, never paths or permissions.
@@ -41,6 +41,7 @@ const changed=()=>Error('保存先のファイルが保存処理中に更新さ�
 async function sameFile(a,b){try{return !!a&&!!b&&await a.isSameEntry(b);}catch{return false;}}
 
 const MATCH_LABELS={
+  unchecked:'元ファイルはまだ照合していません',
   match:'元ファイルの内容が完全に一致しています',
   different:'同じファイル名が見つかりました。内容が異なるか、同じ版か確認できません',
   missing:'元ファイルが見つかりません'
@@ -56,12 +57,12 @@ export function workFolderLookup(value){
 export function createProjectFileLinks({app,identify,choose,host=globalThis,store=localFileLinkStore(),digest=fileFingerprint}){
   const matchStates=new WeakMap();
   function setMatch(link,state){if(link)matchStates.set(link,state);}
-  function paintMatch(element,link){
+  function paintMatch(element,link,hasProjectName=true){
     if(!element)return;
-    const state=link&&matchStates.get(link);
-    if(element.dataset.match===(state||''))return;
+    const state=hasProjectName?((link&&matchStates.get(link))||'unchecked'):'';
+    if(element.dataset.match===state)return;
     element.hidden=!state;
-    element.dataset.match=state||'';
+    element.dataset.match=state;
     element.title=MATCH_LABELS[state]||'';
     element.setAttribute('aria-label',element.title);
   }

@@ -180,6 +180,10 @@ test('the status indicator exposes the file comparison result and a tooltip for 
   const f=setup('mifito'),original=fileHandle(f.name),different=fileHandle(f.name,'changed version');
   const opened=await f.api.opened({file:await original.getFile(),projectId,handle:original});
   const dot={dataset:{},setAttribute(name,value){this[name]=value;}};
+  f.api.paintMatch(dot,null);
+  assert.equal(dot.dataset.match,'unchecked');
+  assert.equal(dot.hidden,false);
+  assert.match(dot.title,/まだ照合していません/);
   for(const [state,lookup,tooltip] of [
     ['match',{handle:original,sameName:true},/完全に一致/],
     ['different',{handle:different,sameName:true},/異なる/],
@@ -194,6 +198,8 @@ test('the status indicator exposes the file comparison result and a tooltip for 
     assert.match(dot.title,tooltip);
     assert.equal(dot['aria-label'],dot.title);
   }
+  f.api.paintMatch(dot,opened.link,false);
+  assert.equal(dot.hidden,true);
 });
 function fExtension(app){return app==='plot'?'.plotproject':'.mifito';}
 test('app identity and filename must match even when an opaque token is copied',async()=>{
