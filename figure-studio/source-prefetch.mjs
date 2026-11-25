@@ -1,5 +1,6 @@
 const targetKey=({app,name,projectId})=>JSON.stringify([app,name,projectId]);
 const later=()=>new Promise(resolve=>setTimeout(resolve,0));
+const panelKey=sourceKey=>sourceKey.slice(0,sourceKey.lastIndexOf('/'));
 
 function linkedSources(bookId,figures){
  const routes=new Map(),sources=new Map();
@@ -22,6 +23,7 @@ function deferred(){
  const ready=new Promise(finish=>{resolve=finish;});
  return {ready,resolve};
 }
+const sourceRecord=source=>({source,...deferred(),started:false,missing:false});
 
 function waitFor(result,signal){
  if(!signal)return result;
@@ -33,61 +35,64 @@ function waitFor(result,signal){
  });
 }
 
-/** One background folder walk per configured Studio book and set of linked projects. */
+/** Resolve a source after its panel is explicitly opened for editing. */
 export function createSourcePrefetch({scan,resolveProjectId,identify,defer=later}){
+ const opened=new Map();
  let active=null;
- function reset(){
+ function stop(){
   const previous=active;active=null;
   if(!previous)return;
   previous.controller.abort();
   for(const record of previous.records.values())record.resolve(null);
  }
- function start({bookId,directory,figures}){
-  if(!directory){reset();return;}
+ function reset(){opened.clear();stop();}
+ function start({bookId,directories,figures}){
+  if(!directories.length){stop();return;}
   const {routes,sources}=linkedSources(bookId,figures);
-  if(active?.bookId===bookId&&active.directory===directory&&active.records.size===sources.size&&[...sources.keys()].every(key=>active.records.has(key))){
-   active.routes=routes;return;
-  }
-  reset();
-  if(!sources.size)return;
-  const records=new Map([...sources].map(([key,source])=>[key,{source,...deferred()}]));
-  const state={bookId,directory,routes,records,controller:new AbortController()};
-  active=state;
-  void run(state).catch(()=>{for(const record of records.values())record.resolve(null);});
+  if(active&&(active.bookId!==bookId||active.directories!==directories))reset();
+  active??={bookId,directories,routes,records:new Map(),controller:new AbortController()};
+  const previous=active.records;
+  active.records=new Map([...sources].map(([key,source])=>[key,previous.get(key)??sourceRecord(source)]));
+  for(const [key,record] of previous)if(!sources.has(key))record.resolve(null);
+  active.routes=routes;
  }
- async function run(state){
+ function openSource(sourceKey,{app,name,projectId}){
+  if(typeof name!=='string')return;
+  opened.set(panelKey(sourceKey),{app,name:name.normalize('NFC'),projectId});
+  const key=active?.routes.get(sourceKey),record=active?.records.get(key);
+  if(record?.missing)active.records.set(key,sourceRecord(record.source));
+ }
+ const isOpened=({sourceKey,app,projectId},name)=>{
+  const entry=opened.get(panelKey(sourceKey));
+  return entry?.app===app&&entry.name===name&&(!entry.projectId||entry.projectId===projectId);
+ };
+ async function run(state,key,source){
   await defer();
-  const {controller,records,directory}=state,{signal}=controller;
-  const groups=new Map();
-  for(const record of records.values()){
-   if(signal.aborted)return;
-   const {source}=record;
-   try{
-    const projectId=source.projectId||await resolveProjectId(source);
-    if(signal.aborted)return;
-    if(!projectId){record.resolve(null);continue;}
-    const request={app:source.app,name:source.name,projectId,identify:identify[source.app]};
-    const key=targetKey(request),group=groups.get(key);
-    if(group)group.records.push(record);
-    else groups.set(key,{request:{key,...request},records:[record]});
-   }catch{record.resolve(null);}
-  }
-  if(signal.aborted||!groups.size)return;
-  function publish(key,handle){
-   if(active!==state)return;
-   const group=groups.get(key);
-   if(group)for(const record of group.records)record.resolve(handle?{handle,projectId:group.request.projectId}:null);
-  }
-  const matches=await scan({directory,requests:[...groups.values()].map(group=>group.request),signal,onResult:publish});
-  for(const [key,handle] of matches)publish(key,handle);
-  for(const record of records.values())record.resolve(null);
+  const {controller,directories}=state,{signal}=controller;
+  if(signal.aborted)return null;
+  const projectId=source.projectId||await resolveProjectId(source);
+  if(signal.aborted||!projectId)return null;
+  const request={key,app:source.app,name:source.name,projectId,identify:identify[source.app]};
+  const matches=await scan({directories,requests:[request],signal});
+  const handle=matches.get(key);
+  return handle?{handle,projectId}:null;
  }
- async function findSource({sourceKey,app,projectId,name},{signal}={}){
-  if(typeof name!=='string')return null;
+ async function findSource(request,{signal}={}){
+  const {sourceKey,app,projectId,name}=request;
+  if(signal?.aborted||typeof name!=='string'||typeof sourceKey!=='string')return null;
+  const normalized=name.normalize('NFC');
+  if(!isOpened(request,normalized))return null;
   const state=active,key=state?.routes.get(sourceKey),record=state?.records.get(key);
-  if(!record||record.source.app!==app||record.source.name!==name.normalize('NFC'))return null;
+  if(!record||record.source.app!==app||record.source.name!==normalized||
+     (record.source.projectId&&record.source.projectId!==projectId))return null;
+  if(!record.started){
+   record.started=true;
+   const finish=match=>{record.missing=!match;record.resolve(match);};
+   void run(state,key,record.source).then(finish,()=>finish(null));
+  }
   const match=await waitFor(record.ready,signal);
-  return !signal?.aborted&&active===state&&state.routes.get(sourceKey)===key&&match?.projectId===projectId?match.handle:null;
+  return !signal?.aborted&&active===state&&state.routes.get(sourceKey)===key&&
+   isOpened(request,normalized)&&match?.projectId===projectId?match.handle:null;
  }
- return {start,findSource,reset};
+ return {start,openSource,findSource,reset};
 }

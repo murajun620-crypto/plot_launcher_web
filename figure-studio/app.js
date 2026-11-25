@@ -9,11 +9,11 @@ import {serializeOfficeSVG} from './svg-export.mjs?v=source-save-v0736-1';
 import {preparePNG} from './png-export.mjs?v=source-save-v0736-1';
 import {importedImageSize,replacedImageSize,replacedMiFiToImageSize,miFiToSizeCorrection,imageInsertionPoint} from './image-placement.mjs?v=source-save-v0736-1';
 import {rasterResolution} from './image-resolution.mjs?v=image-quality-v066-1';
-import {encodeProjectFile,readProjectFile} from './project-format.mjs?v=local-work-folder-v0747-1';
+import {encodeProjectFile,readProjectFile} from './project-format.mjs?v=multi-work-folders-v0748-1';
 import {saveDraft,loadDraft,saveProjectFileTarget,loadProjectFileTarget} from './storage.mjs?v=0.3.6-1';
-import {createProjectWorkFolders,isProjectFolder} from './work-folder.mjs?v=local-work-folder-v0747-1';
-import {createSourcePrefetch} from './source-prefetch.mjs?v=local-work-folder-v0747-1';
-import {findProjectsInWorkFolder} from '../source-folder.mjs?v=dce6ded29eb5';
+import {createProjectWorkFolders,isProjectFolder} from './work-folder.mjs?v=multi-work-folders-v0748-1';
+import {createSourcePrefetch} from './source-prefetch.mjs?v=multi-work-folders-v0748-1';
+import {findProjectsInWorkFolder} from '../source-folder.mjs?v=multi-work-folders-v0748-1';
 import {stageStudioUpdate,restoreStudioUpdate,isLegacyStudioUpdate,finishLegacyStudioUpdate} from './startup-session.mjs?v=source-save-v0736-1';
 import {createDemo} from './demo.mjs?v=source-save-v0736-1';
 import {createShortcutHandler,shortcutLabel} from './shortcuts.mjs?v=nested-groups-v0712-1';
@@ -40,7 +40,7 @@ import {createProjectFileLinks} from '../project-file-links.mjs?v=dce6ded29eb5';
 import {readPlotIdentity,openedPlotIdentity,resolvePlotImage,currentPlotImageId} from './integration/plot-sync.mjs?v=source-save-v0736-1';
 import {planMiFiToSync} from './mifito-batch.mjs?v=source-save-v0736-1';
 import {setupUpdateCheck} from './update-check.mjs?v=source-save-v0736-1';
-import {installWorkspaceUpdater} from './workspace-update.mjs?v=local-work-folder-v0747-1';
+import {installWorkspaceUpdater} from './workspace-update.mjs?v=multi-work-folders-v0748-1';
 import {marqueeSelection,resolveObjectSelection,clickObjectSelection,selectionDescription} from './selection.mjs?v=source-save-v0736-1';
 import {renderGroupLayers} from './group-layers.mjs?v=source-save-v0736-1';
 import {drawSelectionFrames} from './selection-overlay.mjs?v=source-save-v0736-1';
@@ -57,11 +57,11 @@ import {reorderFigures} from './figure-order.mjs';
 import {renumberFigureNames} from './figure-names.mjs?v=0.3.3-1';
 import {deleteFigures,duplicateFigures} from './figure-commands.mjs?v=source-save-v0736-1';
 import {ProjectFileSession,projectFilePickerOptions} from './project-file.mjs?v=project-switch-v051-1';
-import {installWorkspacePersistence} from './workspace-session.mjs?v=local-work-folder-v0747-1';
+import {installWorkspacePersistence} from './workspace-session.mjs?v=multi-work-folders-v0748-1';
 import {decodeWorkspaceState} from './workspace-state.mjs?v=project-switch-v051-1';
-import {validateWorkspaceBinding} from './integration/bridge-host.mjs?v=local-work-folder-v0747-1';
+import {validateWorkspaceBinding} from './integration/bridge-host.mjs?v=multi-work-folders-v0748-1';
 
-const STUDIO_RELEASE={version:'0.7.47',build:'local-work-folder-v0747-1'};
+const STUDIO_RELEASE={version:'0.7.48',build:'multi-work-folders-v0748-1'};
 installBrowserZoomGuard();
 window.FigureAppRelease?.assertRunning(STUDIO_RELEASE);
 if(window.FigureAppRelease&&!await window.FigureAppRelease.startup())throw Error('最新版へ切り替えています。');
@@ -479,13 +479,12 @@ function execute(action,payload={}){
  if(action==='choose-work-folder')return chooseProjectWorkFolder();
  if(action==='setup-work-folder')return setupProjectWorkFolder();
  if(action==='clear-work-folder')return clearProjectWorkFolder();
- if(action==='allow-work-folder')return allowProjectWorkFolder();
  if(action==='attach-source'){if(selected().length!==1||selected()[0].type!=='image'){toast('画像・グラフを1つ選択してください');return;}return pickSourceProject(selected()[0]);}
  if(action==='edit-source'){const o=selected()[0];if(o?.source)editSource(o);else toast('先に「元プロジェクトを関連付け」で .plotproject / .mifito を選択してください');return;}
 }
 const shortcut=createShortcutHandler({execute,isEditing:e=>e.target===editor?'canvas-text':e.target.isContentEditable||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName),isCanvasActive:()=>document.querySelector('dialog[open]')?false:document.activeElement?.closest('#studioRibbon,#ribbonSelectionPane,.app-header')?'ribbon':(document.activeElement===svg||document.activeElement===document.body||document.activeElement===editor||!!document.activeElement?.closest('#figureTabs')),onHint:text=>{$('#keyHint').textContent=text;$('#keyHint').hidden=!text;}});
 window.addEventListener('keydown',shortcut);document.addEventListener('pointerdown',()=>shortcut.reset());
-document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b||b.disabled)return;const action=b.dataset.action;execute(action);for(const d of $$('details:not(.sidebar-text-panel)[open]'))d.open=false;if(['new-figure','duplicate-figure','delete-figure','move-figure-left','move-figure-right'].includes(action)){focusFigure();return;}if(!['labels','image-array','help','open','import','save','save-as','choose-work-folder','setup-work-folder','allow-work-folder','attach-source','edit-source','export-pdf','toggle-selection-pane','show-text-pane','present'].includes(action)&&!editingId)svg.focus({preventScroll:true});});
+document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b||b.disabled)return;const action=b.dataset.action;execute(action);for(const d of $$('details:not(.sidebar-text-panel)[open]'))d.open=false;if(['new-figure','duplicate-figure','delete-figure','move-figure-left','move-figure-right'].includes(action)){focusFigure();return;}if(!['labels','image-array','help','open','import','save','save-as','choose-work-folder','setup-work-folder','attach-source','edit-source','export-pdf','toggle-selection-pane','show-text-pane','present'].includes(action)&&!editingId)svg.focus({preventScroll:true});});
 for(const button of $$('#studioRibbon [data-action],#ribbonSelectionPane [data-action]'))button.addEventListener('pointerdown',event=>{if(editingId&&isRibbonTextControl(button))event.preventDefault();});
 $('#docName').addEventListener('input',e=>{const name=e.target.value||'Untitled Figure';change(()=>doc.name=name);});
 for(const [id,key]of [['pageWidth','width'],['pageHeight','height']])$('#'+id).addEventListener('change',e=>{const v=Number(e.target.value);if(v>=10&&v<=2000){change(()=>doc[key]=mm(v));fit();}else{toast('用紙サイズは10〜2000 mmです');renderInspector();}});
@@ -622,35 +621,34 @@ const sourcePrefetch=createSourcePrefetch({
   return (source.app==='plot'?await openedPlotIdentity(identity,source.name):identity).projectId;
  }
 });
-let workFolderBook='',workFolderFile=null,workFolder=null,workFolderUsesDefault=false,workFolderAccess=null,workFolderSerial=0,workFolderChanging=false;
-let workFolderReadable=false,workFolderLoad=null;
-let pendingWorkFolderFile=null,prefetchRevision=-1,prefetchDirectory=null;
+let workFolderBook='',workFolderFile=null,workFolderEntries=[],readableWorkFolders=[],workFolderSerial=0,workFolderChanging=false,workFolderLoad=null;
+let pendingWorkFolderFile=null,prefetchRevision=-1,prefetchDirectories=null;
 function currentWorkFolderFile(){
  return pendingWorkFolderFile?.bookId===bookId?pendingWorkFolderFile.handle:projectFiles.target(bookId)?.handle??null;
 }
-function restartSourcePrefetch(){
- prefetchRevision=-1;prefetchDirectory=null;sourcePrefetch.reset();
+function resetSourcePrefetch(){
+ prefetchRevision=-1;prefetchDirectories=null;sourcePrefetch.reset();
 }
-function prefetchWorkFolder(directory){
- if(prefetchRevision===revision&&prefetchDirectory===directory)return;
- prefetchRevision=revision;prefetchDirectory=directory;
- sourcePrefetch.start({bookId,directory,figures});
+function configureSourcePrefetch(directories){
+ if(prefetchRevision===revision&&prefetchDirectories===directories)return;
+ prefetchRevision=revision;prefetchDirectories=directories;
+ sourcePrefetch.start({bookId,directories,figures});
 }
-async function getCurrentWorkFolder(expectedBookId=bookId){
- if(expectedBookId!==bookId)return null;
+async function getCurrentWorkFolders(expectedBookId=bookId){
+ if(expectedBookId!==bookId)return [];
  if(workFolderBook!==bookId||workFolderFile!==currentWorkFolderFile())loadCurrentWorkFolder();
  const projectFile=currentWorkFolderFile(),serial=workFolderSerial;
  await workFolderLoad;
- return expectedBookId===bookId&&projectFile===currentWorkFolderFile()&&serial===workFolderSerial&&workFolderReadable?workFolder:null;
+ return expectedBookId===bookId&&projectFile===currentWorkFolderFile()&&serial===workFolderSerial?readableWorkFolders:[];
 }
 window.FigureStudioWorkFolder=Object.freeze({
- getDirectory:getCurrentWorkFolder,
+ async getDirectory(owner){return (await getCurrentWorkFolders(owner))[0]??null;},
  async findSource(request,{signal}={}){
   if(signal?.aborted||typeof request?.sourceKey!=='string')return null;
   const owner=request.sourceKey.split('/')[0];
-  const folder=await getCurrentWorkFolder(owner);
-  if(!folder||signal?.aborted)return null;
-  prefetchWorkFolder(folder);
+  const folders=await getCurrentWorkFolders(owner);
+  if(!folders.length||signal?.aborted)return null;
+  configureSourcePrefetch(folders);
   return sourcePrefetch.findSource(request,{signal});
  },
  subscribe(listener){
@@ -662,54 +660,80 @@ function notifyWorkFolderListeners(){
  for(const listener of workFolderListeners){try{listener();}catch{}}
 }
 function workFolderPickerHost(){return getFigureWorkspace(window)?window.parent:window;}
-function canAllowWorkFolder(){return workFolderAccess==='prompt'&&typeof workFolder?.requestPermission==='function';}
+function workFolderBusy(){return projectSaving||projectOpening||startupRestoring||updateReloading||workFolderChanging;}
+function canAllowWorkFolder({handle,access}){return access==='prompt'&&typeof handle.requestPermission==='function';}
 async function checkWorkFolderPermission(handle,mode){
- if(!handle)return null;
  try{return await (handle.queryPermission?.({mode})??'granted');}
  catch{return 'denied';}
 }
+function setWorkFolderEntries(entries){
+ workFolderEntries=entries;
+ const handles=entries.filter(folder=>folder.readable).map(folder=>folder.handle);
+ if(handles.length!==readableWorkFolders.length||handles.some((handle,index)=>handle!==readableWorkFolders[index]))readableWorkFolders=handles;
+}
+function workFolderLabel(folder){
+ const {handle,access,readable}=folder;
+ return handle.name+(access==='granted'?'':readable?'（書き込み許可が必要）':'（アクセス許可が必要）');
+}
+let previousWorkFolderRows=null,previousWorkFolderBusy=false;
+function paintWorkFolderRows(busy){
+ if(previousWorkFolderRows===workFolderEntries&&previousWorkFolderBusy===busy)return;
+ previousWorkFolderRows=workFolderEntries;previousWorkFolderBusy=busy;
+ const rows=workFolderEntries.map(folder=>{
+  const row=document.createElement('li'),name=document.createElement('span'),remove=document.createElement('button');
+  name.textContent=workFolderLabel(folder)+(folder.followProject?'（既定）':'');name.title=name.textContent;row.append(name);
+  if(canAllowWorkFolder(folder)){
+   const allow=document.createElement('button');allow.type='button';allow.textContent='許可…';allow.disabled=busy;
+   allow.setAttribute('aria-label',folder.handle.name+'へのアクセスを許可');
+   allow.onclick=()=>allowProjectWorkFolder(folder);row.append(allow);
+  }
+  remove.type='button';remove.textContent='外す';remove.disabled=busy;
+  remove.setAttribute('aria-label',folder.handle.name+'を作業フォルダから外す');
+  remove.onclick=()=>changeProjectWorkFolders(folder);
+  row.append(remove);return row;
+ });
+ $('#projectWorkFolderList').replaceChildren(...rows);
+}
 function paintProjectWorkFolder(){
  const note=$('#projectWorkFolder'),choose=$('[data-action="choose-work-folder"]'),clear=$('[data-action="clear-work-folder"]');
- const allow=$('[data-action="allow-work-folder"]'),setup=$('#workFolderStatusSetup');
+ const setup=$('#workFolderStatusSetup'),first=workFolderEntries[0],count=workFolderEntries.length;
+ const needsPermission=workFolderEntries.find(canAllowWorkFolder);
  const supported=typeof workFolderPickerHost().showDirectoryPicker==='function';
- const busy=projectSaving||projectOpening||startupRestoring||updateReloading||workFolderChanging;
- const folderLabel=!supported?'利用不可':workFolderLoad?'確認中…':!workFolder?'未設定':workFolder.name;
- const accessLabel=workFolder&&workFolderAccess!=='granted'?(workFolderReadable?'（書き込み許可が必要）':'（アクセス許可が必要）'):'';
+ const busy=workFolderBusy();
+ const folderLabel=!supported?'利用不可':workFolderLoad?'確認中…':!count?'未設定':count===1?workFolderLabel(first):count+'件';
  const help=!supported?'このブラウザでは作業フォルダを選べません。ChromeまたはEdgeで開いてください。'
-  :!workFolder?'このPCで元ファイルを探すフォルダを選びます。.figurestudioを置いているOneDriveフォルダを選ぶと、その下もまとめて検索します。'
-  :accessLabel?(canAllowWorkFolder()?'このブラウザで作業フォルダへのアクセスを許可してください。':'作業フォルダを選び直し、アクセスを許可してください。')
-  :'このフォルダとサブフォルダにある元ファイルを検索します。';
- note.textContent=(workFolderUsesDefault?'既定の作業フォルダ　':'作業フォルダ　')+folderLabel+accessLabel;
- $('#workFolderStatusName').textContent=folderLabel+accessLabel;
- $('#workFolderStatus').title=note.textContent+'。'+help;
- setup.hidden=!supported||workFolderAccess==='granted';
+  :!count?'このPCで元ファイルを探すフォルダを追加します。.figurestudioが入っているフォルダから指定できます。'
+  :'図を開くと、利用できる作業フォルダとそのサブフォルダから元ファイルを探します。';
+ note.textContent='作業フォルダ　'+folderLabel;
+ $('#workFolderStatusName').textContent=folderLabel;
+ $('#workFolderStatus').title=note.textContent+(count>1?'\n'+workFolderEntries.map(workFolderLabel).join('\n'):'')+'\n'+help;
+ setup.hidden=!supported;
  setup.disabled=busy;
- setup.textContent=canAllowWorkFolder()?'許可…':workFolder?'再選択…':'選択…';
- setup.setAttribute('aria-label',canAllowWorkFolder()?'このPCで作業フォルダへのアクセスを許可':'このPCで作業フォルダを選択');
+ setup.textContent=needsPermission?'許可…':count?'追加…':'選択…';
+ setup.setAttribute('aria-label',needsPermission?'作業フォルダへのアクセスを許可':'このPCで作業フォルダを追加');
  setup.title=help;
- choose.textContent=workFolder?'作業フォルダを変更…':'このPCで作業フォルダを選択…';
- note.title=workFolder?.name||'';
+ choose.textContent='作業フォルダを追加…';
  choose.disabled=busy||!supported;
  choose.title=supported?'元プロジェクトを探すフォルダの読み取りと書き込みを許可します':'このブラウザではフォルダを指定できません';
- allow.hidden=!canAllowWorkFolder();
- allow.disabled=busy;
- clear.hidden=!workFolder||workFolderUsesDefault;
+ clear.hidden=count===1&&first.followProject;
  clear.disabled=busy;
+ paintWorkFolderRows(busy);
  $('#projectWorkFolderHelp').textContent=help;
 }
 function loadCurrentWorkFolder(){
- restartSourcePrefetch();
+ resetSourcePrefetch();
  workFolderBook=bookId;workFolderFile=currentWorkFolderFile();
- workFolder=null;workFolderUsesDefault=false;workFolderAccess=null;workFolderReadable=false;
+ setWorkFolderEntries([]);
  const owner=bookId,file=workFolderFile,serial=++workFolderSerial;
- workFolderLoad=workFolders.getSelection(owner,file).then(async saved=>{
+ workFolderLoad=workFolders.getSelections(owner,file).then(async saved=>{
   if(owner!==bookId||serial!==workFolderSerial)return;
-  const handle=saved?.handle??null;
-  const permission=await checkWorkFolderPermission(handle,'readwrite');
-  const readable=permission==='granted'||await checkWorkFolderPermission(handle,'read')==='granted';
+  const entries=await Promise.all(saved.map(async folder=>{
+   const access=await checkWorkFolderPermission(folder.handle,'readwrite');
+   const readable=access==='granted'||await checkWorkFolderPermission(folder.handle,'read')==='granted';
+   return {...folder,access,readable};
+  }));
   if(owner!==bookId||serial!==workFolderSerial)return;
-  workFolder=handle;workFolderUsesDefault=!!saved?.followProject;workFolderAccess=permission;workFolderReadable=readable;
-  if(readable)prefetchWorkFolder(handle);
+  setWorkFolderEntries(entries);
  }).catch(()=>{}).finally(()=>{
   if(owner!==bookId||serial!==workFolderSerial)return;
   workFolderLoad=null;paintProjectWorkFolder();
@@ -718,44 +742,57 @@ function loadCurrentWorkFolder(){
 }
 function updateProjectWorkFolderUI(){
  if(workFolderBook!==bookId||workFolderFile!==currentWorkFolderFile())loadCurrentWorkFolder();
- else if(workFolderReadable)prefetchWorkFolder(workFolder);
  paintProjectWorkFolder();
 }
-async function updateProjectWorkFolder(pick){
- if(projectSaving||projectOpening||startupRestoring||updateReloading||workFolderChanging)return;
+async function changeProjectWorkFolders(change){
+ if(workFolderBusy())return;
  const owner=bookId,host=workFolderPickerHost();
- if(pick&&typeof host.showDirectoryPicker!=='function')return;
+ if(change==='add'&&typeof host.showDirectoryPicker!=='function')return;
  workFolderChanging=true;paintProjectWorkFolder();
  try{
-  const file=projectFiles.target(owner)?.handle??null,startIn=workFolder||file;
-  const handle=pick?await host.showDirectoryPicker({id:'figure-studio-work-folder',mode:'readwrite',...(startIn?{startIn}:{})}):null;
-  const followProject=!!handle&&await isProjectFolder(handle,file);
-  if(owner!==bookId||file!==(projectFiles.target(bookId)?.handle??null))return;
-  const stored=workFolders.setDirectory(owner,handle,{followProject});
-  if(handle){
-   ++workFolderSerial;
-   workFolderLoad=null;workFolder=handle;workFolderUsesDefault=followProject;workFolderAccess='granted';workFolderReadable=true;
-   restartSourcePrefetch();prefetchWorkFolder(handle);
-   paintProjectWorkFolder();notifyWorkFolderListeners();
-  }else loadCurrentWorkFolder();
+  const file=currentWorkFolderFile(),current=()=>owner===bookId&&file===currentWorkFolderFile();
+  let folders=null,message='作業フォルダを既定に戻しました';
+  if(change==='add'){
+   const startIn=workFolderEntries[0]?.handle||file;
+   const handle=await host.showDirectoryPicker({id:'figure-studio-work-folder',mode:'readwrite',...(startIn?{startIn}:{})});
+   if(!current())return;
+   folders=await workFolders.getSelections(owner,file);
+   let existing=-1;
+   for(let index=0;index<folders.length;index++){
+    const previous=folders[index].handle;
+    try{if(previous===handle||await handle.isSameEntry?.(previous)){existing=index;break;}}
+    catch{/* Keep different folders separate unless the browser confirms a match. */}
+   }
+   const folder={handle,followProject:await isProjectFolder(handle,file)};
+   if(existing===-1)folders=[...folders,folder];
+   else folders=folders.map((entry,index)=>index===existing?folder:entry);
+   message='作業フォルダ「'+handle.name+(existing===-1?'」を追加しました':'」を更新しました');
+  }else if(change!=='reset'){
+   folders=workFolderEntries.filter(folder=>folder!==change);
+   message='「'+change.handle.name+'」を作業フォルダから外しました';
+  }
+  if(!current())return;
+  const stored=workFolders.setSelections(owner,folders);
+  loadCurrentWorkFolder();
   const remembered=await stored;
-  if(owner!==bookId)return;
-  if(handle)toast('作業フォルダ「'+handle.name+'」を設定しました'+(remembered?'':'。このタブを閉じると再設定が必要です'));
-  else toast(remembered?'作業フォルダを既定に戻しました':'このタブで作業フォルダを既定に戻しました。ブラウザの記憶を更新できませんでした');
+  if(current())toast(message+(remembered?'':'。ブラウザの記憶を更新できませんでした'));
  }catch(error){if(error.name!=='AbortError')toast('作業フォルダを設定できませんでした。'+error.message);}
  finally{workFolderChanging=false;updateProjectWorkFolderUI();}
 }
-const chooseProjectWorkFolder=()=>updateProjectWorkFolder(true),clearProjectWorkFolder=()=>updateProjectWorkFolder(false);
-const setupProjectWorkFolder=()=>canAllowWorkFolder()?allowProjectWorkFolder():chooseProjectWorkFolder();
-async function allowProjectWorkFolder(){
- const handle=workFolder,owner=bookId;
- if(projectSaving||projectOpening||startupRestoring||updateReloading||workFolderChanging||!canAllowWorkFolder())return;
+const chooseProjectWorkFolder=()=>changeProjectWorkFolders('add'),clearProjectWorkFolder=()=>changeProjectWorkFolders('reset');
+function setupProjectWorkFolder(){
+ const folder=workFolderEntries.find(canAllowWorkFolder);
+ return folder?allowProjectWorkFolder(folder):chooseProjectWorkFolder();
+}
+async function allowProjectWorkFolder(folder){
+ const {handle}=folder,owner=bookId;
+ if(workFolderBusy()||!canAllowWorkFolder(folder))return;
  workFolderChanging=true;paintProjectWorkFolder();
  try{
   const permission=await handle.requestPermission({mode:'readwrite'});
-  if(owner!==bookId||handle!==workFolder)return;
-  workFolderAccess=permission;
-  if(permission==='granted'){workFolderReadable=true;restartSourcePrefetch();prefetchWorkFolder(handle);notifyWorkFolderListeners();toast('作業フォルダへのアクセスが許可されました');}
+  if(owner!==bookId||!workFolderEntries.includes(folder))return;
+  setWorkFolderEntries(workFolderEntries.map(entry=>entry===folder?{...folder,access:permission,readable:permission==='granted'||folder.readable}:entry));
+  if(permission==='granted'){resetSourcePrefetch();notifyWorkFolderListeners();toast('作業フォルダへのアクセスが許可されました');}
   else toast('作業フォルダへのアクセスが許可されませんでした');
  }catch(error){if(error.name!=='AbortError')toast('作業フォルダへのアクセスを許可できませんでした。'+error.message);}
  finally{workFolderChanging=false;updateProjectWorkFolderUI();}
@@ -850,7 +887,7 @@ async function connectSavedEditors(bindings){
  for(const app of ['plot','mifito'])if(bindings[app]){
   const figure=figures.find(f=>f.objects.some(o=>o.id===bindings[app].panelId&&o.source?.app===app&&sourceEditKey(bookId,f.id,o.id,o.source.assetId)===bindings[app].editKey));
   const panel=figure?.objects.find(o=>o.id===bindings[app].panelId);
-  if(panel){const session=editSource(panel,{figureId:figure.id});if(!(await session.ready).connected)throw Error('復元した編集画面へ接続できませんでした。');}
+  if(panel){const session=editSource(panel,{figureId:figure.id,lookupOriginal:false});if(!(await session.ready).connected)throw Error('復元した編集画面へ接続できませんでした。');}
  }
 }
 async function readProject(file,handle=null,{recovery=false}={}){
@@ -880,7 +917,7 @@ async function readProject(file,handle=null,{recovery=false}={}){
   previous={book:snapshot(),assets,selection:[...selection],groupScope,dirty,revision,manualSavedRevision,preservedWorkspace,past:history.past,future:history.future};
   if(plan){previousBindings=await savedEditorBindings({editors:plan.previousEditors},previous.book,previous.assets);await plan.apply();}
   closeSourceSessions();
-  restartSourcePrefetch();
+  resetSourcePrefetch();
   pendingWorkFolderFile={bookId:next.id,handle};
   restoreBook(next);renumberFigureNames(figures);assets=loaded;preservedWorkspace=raw.workspace??null;previewQuality.clear();history.reset();selection=[];dirty=false;revision++;manualSavedRevision=revision;render();fit();
   if(plan){
@@ -893,7 +930,7 @@ async function readProject(file,handle=null,{recovery=false}={}){
   toast(raw.workspace?'3タブの最新状態と未反映の編集を復元しました':'プロジェクトを開きました');
   return true;
  }catch(error){
-  if(previous){closeSourceSessions();pendingWorkFolderFile=null;restartSourcePrefetch();}
+  if(previous){closeSourceSessions();pendingWorkFolderFile=null;resetSourcePrefetch();}
   if(previous){restoreBook(previous.book);assets=previous.assets;selection=previous.selection;groupScope=previous.groupScope;dirty=previous.dirty;revision=previous.revision;manualSavedRevision=previous.manualSavedRevision;preservedWorkspace=previous.preservedWorkspace;history.past=previous.past;history.future=previous.future;render();}
   try{await plan?.cancel();if(previousBindings)await connectSavedEditors(previousBindings);}catch(rollbackError){toast(rollbackError.message);return;}
   if(recovery)throw error;
@@ -1021,10 +1058,12 @@ async function syncMiFiToFigures(result,{app='mifito',guard,anchorPanelId,target
  catch{toast(done.message+'。自動保存できないためCtrl+Sで保存してください。');}
  return done;
 }
-function editSource(o,{figureId=doc.id}={}){
+function editSource(o,{figureId=doc.id,lookupOriginal=true}={}){
  const documentId=figureId,editingBook=bookId,panelId=o.id,app=o.source?.app;
  let expectedSourceAsset=o.source?.assetId;
  const asset=assets.get(expectedSourceAsset);if(!asset){toast('元プロジェクトを関連付けてください');return;}
+ const editKey=sourceEditKey(editingBook,documentId,panelId,expectedSourceAsset);
+ if(lookupOriginal)sourcePrefetch.openSource(editKey,o.source);
  const locate=()=>{
   if(bookId!==editingBook)throw Error('別のプロジェクトが開いています。元のFigureプロジェクトへ戻ってから編集を開き直してください。');
   syncFigure();const figure=figures.find(f=>f.id===documentId),target=figure?.objects.find(v=>v.id===panelId);
@@ -1034,7 +1073,7 @@ function editSource(o,{figureId=doc.id}={}){
  };
  const local=['localhost','127.0.0.1','[::1]'].includes(location.hostname);
  bridge=openSource({app,project:dataURLToBlob(asset.dataUrl),sourceName:o.source.name,panelId,imageId:o.source.imageId,
-  editKey:sourceEditKey(editingBook,documentId,panelId,expectedSourceAsset),
+  editKey,
   url:local?new URL(new URL(SOURCE_APPS[app].url).pathname,location.href).href:undefined,
   onStatus:({state,message,downloadProject,openInNewTab})=>{toast(message);if(['unavailable','blocked','error'].includes(state)){const box=$('#sourceSummary');box.textContent=message;if(downloadProject){const b=document.createElement('button');b.type='button';b.textContent='元プロジェクトを保存';b.onclick=downloadProject;box.append(b);}if(openInNewTab){const b=document.createElement('button');b.type='button';b.textContent='新しい編集タブで開く';b.onclick=()=>{bridge=openInNewTab();};box.append(b);}}},
   onResult:async result=>{

@@ -4,6 +4,7 @@ const folderPrefix='project-work-folder:',parentPrefix='project-work-parent:';
 const folderKey=bookId=>folderPrefix+bookId;
 const isDirectory=handle=>handle?.kind==='directory'&&typeof handle.getFileHandle==='function';
 const selection=value=>isDirectory(value)?{handle:value,followProject:false}:isDirectory(value?.handle)?{handle:value.handle,followProject:value.followProject===true}:null;
+const selections=value=>value==null?null:(Array.isArray(value)?value:[value]).map(selection).filter(Boolean);
 
 /** A folder selection only belongs to this browser and Studio project. */
 export async function loadProjectWorkFolder(bookId){
@@ -25,12 +26,13 @@ async function loadKnownWorkFolders(){
  });
 }
 
-async function storeProjectWorkFolder(bookId,handle,{followProject}){
+async function storeProjectWorkFolder(bookId,folders){
  const db=await database();
  return new Promise((resolve,reject)=>{
   const tx=db.transaction('documents','readwrite'),store=tx.objectStore('documents'),key=folderKey(bookId);
-  if(handle)store.put(followProject?{handle,followProject}:handle,key);else store.delete(key);
-  if(handle&&followProject)store.put(handle,parentPrefix+bookId);
+  if(folders===null)store.delete(key);else store.put(folders,key);
+  const parent=folders?.find(folder=>folder.followProject)?.handle;
+  if(parent)store.put(parent,parentPrefix+bookId);
   tx.oncomplete=()=>resolve();
   tx.onerror=tx.onabort=()=>reject(tx.error||Error('作業フォルダを記憶できませんでした。'));
  });
@@ -48,14 +50,14 @@ export async function isProjectFolder(directory,file){
 export function createProjectWorkFolders({load=loadProjectWorkFolder,store=storeProjectWorkFolder,loadKnown=loadKnownWorkFolders}={}){
  const cache=new Map(),writes=new Map(),defaults=new Map(),knownInTab=new Set();
  function readSelection(bookId){
-  if(!cache.has(bookId))cache.set(bookId,Promise.resolve().then(()=>load(bookId)).then(selection,()=>null));
+  if(!cache.has(bookId))cache.set(bookId,Promise.resolve().then(()=>load(bookId)).then(selections,()=>null));
   return cache.get(bookId);
  }
  async function findDefaultFolder(file,preferred){
   if(await isProjectFolder(preferred,file))return preferred;
   let persisted=[];
   try{persisted=await loadKnown();}catch{}
-  const candidates=new Set([preferred,...knownInTab,...persisted.map(value=>selection(value)?.handle)]);
+  const candidates=new Set([preferred,...knownInTab,...persisted.flatMap(value=>(selections(value)??[]).map(folder=>folder.handle))]);
   for(const candidate of candidates){
    const path=await projectPathIn(candidate,file);
    if(!path)continue;
@@ -67,35 +69,33 @@ export function createProjectWorkFolders({load=loadProjectWorkFolder,store=store
   }
   return null;
  }
- async function getSelection(bookId,file=null){
+ async function getSelections(bookId,file=null){
   const selected=await readSelection(bookId);
-  if(selected&&!selected.followProject)return selected;
-  if(file?.kind!=='file')return null;
+  const following=selected?.find(folder=>folder.followProject);
+  if(selected&&!following)return selected;
+  if(file?.kind!=='file')return selected?.filter(folder=>!folder.followProject)??[];
   let currentDefault=defaults.get(bookId);
   if(currentDefault?.file!==file){
-   currentDefault={file,folder:findDefaultFolder(file,selected?.handle)};
+   currentDefault={file,folder:findDefaultFolder(file,following?.handle)};
    defaults.set(bookId,currentDefault);
   }
   const folder=await currentDefault.folder;
   const latest=await readSelection(bookId);
-  if(latest&&!latest.followProject)return latest;
-  if(defaults.get(bookId)!==currentDefault)return null;
-  return folder?{handle:folder,followProject:true}:null;
+  const explicit=latest?.filter(entry=>!entry.followProject)??[];
+  if((latest&&explicit.length===latest.length)||defaults.get(bookId)!==currentDefault)return explicit;
+  return folder?[{handle:folder,followProject:true},...explicit]:explicit;
  }
- async function getDirectory(bookId,file){
-  return (await getSelection(bookId,file))?.handle??null;
- }
- async function setDirectory(bookId,handle,{followProject=false}={}){
-  if(handle!==null&&!isDirectory(handle))throw TypeError('作業フォルダを選択してください。');
-  const write=(writes.get(bookId)??Promise.resolve()).then(()=>store(bookId,handle,{followProject}));
+ async function setSelections(bookId,folders){
+  const selected=selections(folders);
+  const write=(writes.get(bookId)??Promise.resolve()).then(()=>store(bookId,selected));
   const pending=write.catch(()=>{});
   writes.set(bookId,pending);
-  if(handle)knownInTab.add(handle);
+  for(const {handle} of selected??[])knownInTab.add(handle);
   defaults.clear();
-  cache.set(bookId,Promise.resolve(handle?{handle,followProject}:null));
+  cache.set(bookId,Promise.resolve(selected));
   try{await write;return true;}
   catch{return false;}
   finally{if(writes.get(bookId)===pending)writes.delete(bookId);}
  }
- return {getDirectory,getSelection,setDirectory};
+ return {getSelections,setSelections};
 }

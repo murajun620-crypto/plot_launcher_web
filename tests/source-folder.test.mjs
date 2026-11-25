@@ -47,6 +47,22 @@ test('does not choose between multiple compatible copies in subfolders',async()=
   assert.equal(await find(folder(folder(first),folder(second))),null);
 });
 
+test('searches all registered folders but leaves distinct matching copies ambiguous',async()=>{
+  const first=folder(file('unrelated.plotproject')),candidate=file('source.plotproject');
+  assert.deepEqual(await find(null,{directories:[first,folder(folder(candidate))]}),{handle:candidate});
+  assert.equal(await find(null,{directories:[folder(candidate),folder(file(candidate.name))]}),null);
+});
+
+test('an overlapping root does not count the same native file twice or open it twice',async()=>{
+  const original=file('source.plotproject');
+  const entryId=Symbol('native file');
+  let reads=0;
+  const alias=()=>({...original,entryId,async getFile(){reads++;return original.getFile();},async isSameEntry(other){return other.entryId===entryId;}});
+  const entry=alias(),nested=folder(entry);
+  assert.deepEqual(await find(null,{directories:[folder(alias()),folder(nested)]}),{handle:entry});
+  assert.equal(reads,1);
+});
+
 test('does not pick a root file when an identical project also exists in a subfolder',async()=>{
   const root=file('source.plotproject'),copy=file('source.plotproject');
   assert.equal(await find(folder(root,folder(folder(copy)))),null);

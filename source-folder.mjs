@@ -2,12 +2,13 @@ const EXTENSIONS={plot:'.plotproject',mifito:'.mifito'};
 const CONCURRENT_NAMES=4;
 
 /**
- * Enumerate the selected folder once, then verify only requested filenames.
+ * Enumerate the selected folders, then verify only requested filenames.
  * Wait for traversal to finish before offering matches, since an unopened
  * subfolder could contain an identical project. This runs outside Save.
  */
-export async function findProjectsInWorkFolder({directory,requests,signal,onResult}){
-  if(directory?.kind!=='directory'||typeof directory.values!=='function'||signal?.aborted)return new Map();
+export async function findProjectsInWorkFolder({directory,directories=[directory],requests,signal,onResult}){
+  const roots=directories.filter(root=>root?.kind==='directory'&&typeof root.values==='function');
+  if(!roots.length||signal?.aborted)return new Map();
   const groups=new Map();
   for(const request of requests){
     const {app,name,projectId,identify}=request;
@@ -30,9 +31,11 @@ export async function findProjectsInWorkFolder({directory,requests,signal,onResu
   finally{signal?.removeEventListener('abort',cancel);}
 
   async function search(){
-    if(directory.queryPermission&&await directory.queryPermission({mode:'read'})!=='granted')return new Map();
-    if(!active())return new Map();
-    const pending=[directory];
+    const pending=[];
+    for(const root of roots){
+      if(!active())return new Map();
+      if(!root.queryPermission||await root.queryPermission({mode:'read'})==='granted')pending.push(root);
+    }
     while(pending.length){
       for await(const entry of pending.pop().values()){
         if(!active())return new Map();
@@ -61,8 +64,12 @@ export async function findProjectsInWorkFolder({directory,requests,signal,onResu
   }
 
   async function verify({wanted,identify,files,ids}){
-    const matches=new Map();
+    const matches=new Map(),checked=[];
     for(const handle of files){
+      if(!active())break;
+      if(await alreadyChecked(handle,checked))continue;
+      if(!active())break;
+      checked.push(handle);
       const file=await handle.getFile();
       if(!active())break;
       if(file.name.normalize('NFC')!==wanted)throw Error('The candidate filename changed during the search.');
@@ -78,9 +85,18 @@ export async function findProjectsInWorkFolder({directory,requests,signal,onResu
   }
 }
 
-export async function findProjectInWorkFolder({directory,signal,...request}){
+async function alreadyChecked(handle,checked){
+  for(const previous of checked){
+    if(previous===handle)return true;
+    try{if(await handle.isSameEntry?.(previous))return true;}
+    catch{/* Keep candidates separate unless the browser proves they are the same file. */}
+  }
+  return false;
+}
+
+export async function findProjectInWorkFolder({directory,directories,signal,...request}){
   const key='source';
-  const matches=await findProjectsInWorkFolder({directory,signal,requests:[{...request,key}]});
+  const matches=await findProjectsInWorkFolder({directory,directories,signal,requests:[{...request,key}]});
   const handle=matches.get(key);
   return handle?{handle}:null;
 }
