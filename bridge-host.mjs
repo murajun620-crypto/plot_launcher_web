@@ -85,8 +85,8 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
       return ()=>{stop?.();if(stopWatchingFolder===stop)stopWatchingFolder=null;};
     };
     const findWorkFolderSource=typeof provider()?.findSource==='function'?async({projectId,name},signal)=>{
-      const handle=await provider()?.findSource?.({sourceKey:source.editKey,app,projectId,name},{signal});
-      return current()&&!signal?.aborted?handle??null:null;
+      const result=await provider()?.findSource?.({sourceKey:source.editKey,app,projectId,name},{signal,details:true});
+      return current()&&!signal?.aborted?result??null:null;
     }:null;
     // Folder lookup is optional and must never delay the editor's loaded reply.
     void Promise.resolve().then(()=>{if(current())return onSourceReady({...source,getWorkFolder,subscribeWorkFolder,findWorkFolderSource});}).catch(()=>{});

@@ -53,6 +53,15 @@ test('searches all registered folders but leaves distinct matching copies ambigu
   assert.equal(await find(null,{directories:[folder(candidate),folder(file(candidate.name))]}),null);
 });
 
+test('candidate details distinguish a unique same-name file, multiple copies, and an absent source',async()=>{
+  const name='source.plotproject',candidate=file(name,otherId),copy=file(name,otherId);
+  const request={key:'source',name,app:'plot',projectId,identify:async blob=>JSON.parse(await blob.text())};
+  const lookup=async (...roots)=>(await findProjectsInWorkFolder({directories:roots,requests:[request],includeCandidates:true})).get(request.key);
+  assert.deepEqual(await lookup(folder(candidate)),{name,handle:candidate,verified:false,sameName:true,multiple:false});
+  assert.deepEqual(await lookup(folder(candidate),folder(copy)),{name,handle:null,verified:false,sameName:true,multiple:true});
+  assert.deepEqual(await lookup(folder(file('unrelated.plotproject'))),{name,handle:null,verified:false,sameName:false,multiple:false});
+});
+
 test('an overlapping root does not count the same native file twice or open it twice',async()=>{
   const original=file('source.plotproject');
   const entryId=Symbol('native file');

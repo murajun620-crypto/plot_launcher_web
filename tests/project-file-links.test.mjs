@@ -122,6 +122,32 @@ for(const app of ['plot','mifito']){
     assert.equal(f.prompts.length,0);
     assert.equal(original.state().opens,0);
   });
+  test(`${app}: a discovered filename with a different identity asks once and writes only after confirmation`,async()=>{
+    const f=setup(app,{answers:['cancel','overwrite']});
+    const original=fileHandle(f.name),candidate=fileHandle(f.name,'another version',otherId);
+    const opened=await f.api.opened({file:await original.getFile(),projectId});
+    const lookup={name:f.name,handle:candidate,verified:false,sameName:true,multiple:false};
+    const options={projectId,name:f.name,link:opened.link,knownSource:true,getWorkFolderTarget:()=>lookup};
+    await assert.rejects(f.api.prepare(options),{name:'AbortError'});
+    assert.equal(candidate.state().opens,0);
+    const target=await f.api.prepare(options);
+    assert.deepEqual(f.prompts.map(prompt=>prompt.kind),['unverified','unverified']);
+    assert.equal(f.picker.opens,0);
+    assert.equal(candidate.state().opens,0);
+    await target.write(new Blob(['approved replacement']));
+    assert.equal(candidate.state().bytes,'approved replacement');
+    assert.equal(original.state().writes,0);
+  });
+  test(`${app}: multiple same-named files use an explicit target choice and still verify before writing`,async()=>{
+    const f=setup(app,{answers:['bind','cancel']});
+    const original=fileHandle(f.name),candidate=fileHandle(f.name,'another version',otherId);
+    const opened=await f.api.opened({file:await original.getFile(),projectId});
+    f.setOpen(candidate);
+    const lookup={name:f.name,handle:null,verified:false,sameName:true,multiple:true};
+    await assert.rejects(f.api.prepare({projectId,name:f.name,link:opened.link,knownSource:true,getWorkFolderTarget:()=>lookup}),{name:'AbortError'});
+    assert.deepEqual(f.prompts.map(prompt=>prompt.kind),['multiple','unverified']);
+    assert.equal(candidate.state().writes,0);
+  });
   test(`${app}: missing local target can save a separate copy without touching the original`,async()=>{
     const f=setup(app,{answers:['saveAs']}),copy=fileHandle('copy'+fExtension(app));f.setSave(copy);
     const target=await f.api.prepare({projectId,name:f.name,knownSource:true});assert.equal(target.saveAs,true);assert.equal(target.handle,copy);assert.equal(f.picker.saves,1);
@@ -150,6 +176,25 @@ for(const app of ['plot','mifito']){
     await assert.rejects(f.api.prepare({projectId,name:f.name,knownSource:true}),{name:'AbortError'});assert.deepEqual(f.prompts.map(p=>p.kind),['missing','unknown']);assert.equal(original.state().opens,0);
   });
 }
+test('the status indicator exposes the file comparison result and a tooltip for every colour',async()=>{
+  const f=setup('mifito'),original=fileHandle(f.name),different=fileHandle(f.name,'changed version');
+  const opened=await f.api.opened({file:await original.getFile(),projectId,handle:original});
+  const dot={dataset:{},setAttribute(name,value){this[name]=value;}};
+  for(const [state,lookup,tooltip] of [
+    ['match',{handle:original,sameName:true},/完全に一致/],
+    ['different',{handle:different,sameName:true},/異なる/],
+    ['different',{handle:null,sameName:true},/異なる/],
+    ['missing',{handle:null,sameName:false},/見つかりません/]
+  ]){
+    const checked=await f.api.checkMatch({lookup,link:opened.link});
+    assert.equal(checked,state);
+    f.api.setMatch(opened.link,checked);f.api.paintMatch(dot,opened.link);
+    assert.equal(dot.dataset.match,state);
+    assert.equal(dot.hidden,false);
+    assert.match(dot.title,tooltip);
+    assert.equal(dot['aria-label'],dot.title);
+  }
+});
 function fExtension(app){return app==='plot'?'.plotproject':'.mifito';}
 test('app identity and filename must match even when an opaque token is copied',async()=>{
   const f=setup('plot'),original=fileHandle(f.name),opened=await f.api.opened({file:await original.getFile(),projectId,handle:original});

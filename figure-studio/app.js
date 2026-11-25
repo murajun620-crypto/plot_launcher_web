@@ -9,11 +9,11 @@ import {serializeOfficeSVG} from './svg-export.mjs?v=source-save-v0736-1';
 import {preparePNG} from './png-export.mjs?v=source-save-v0736-1';
 import {importedImageSize,replacedImageSize,replacedMiFiToImageSize,miFiToSizeCorrection,imageInsertionPoint} from './image-placement.mjs?v=source-save-v0736-1';
 import {rasterResolution} from './image-resolution.mjs?v=image-quality-v066-1';
-import {encodeProjectFile,readProjectFile} from './project-format.mjs?v=multi-work-folders-v0748-1';
+import {encodeProjectFile,readProjectFile} from './project-format.mjs?v=source-match-v0749-1';
 import {saveDraft,loadDraft,saveProjectFileTarget,loadProjectFileTarget} from './storage.mjs?v=0.3.6-1';
-import {createProjectWorkFolders,isProjectFolder} from './work-folder.mjs?v=multi-work-folders-v0748-1';
-import {createSourcePrefetch} from './source-prefetch.mjs?v=multi-work-folders-v0748-1';
-import {findProjectsInWorkFolder} from '../source-folder.mjs?v=multi-work-folders-v0748-1';
+import {createProjectWorkFolders,isProjectFolder} from './work-folder.mjs?v=source-match-v0749-1';
+import {createSourcePrefetch} from './source-prefetch.mjs?v=source-match-v0749-1';
+import {findProjectsInWorkFolder} from '../source-folder.mjs?v=source-match-v0749-1';
 import {stageStudioUpdate,restoreStudioUpdate,isLegacyStudioUpdate,finishLegacyStudioUpdate} from './startup-session.mjs?v=source-save-v0736-1';
 import {createDemo} from './demo.mjs?v=source-save-v0736-1';
 import {createShortcutHandler,shortcutLabel} from './shortcuts.mjs?v=nested-groups-v0712-1';
@@ -36,11 +36,11 @@ import {openSource,SOURCE_APPS,setupSourceDiscovery,closeSourceSessions} from '.
 import {createFigureSidebar} from './thumbnails.mjs?v=live-v062-1';
 import {setupTransferReceiver,getFigureWorkspace} from './integration/direct-transfer.mjs?v=studio-send-v0714-1';
 import {readMifitoIdentity} from './integration/mifito-sync.mjs?v=0.3.5-1';
-import {createProjectFileLinks} from '../project-file-links.mjs?v=dce6ded29eb5';
+import {createProjectFileLinks} from '../project-file-links.mjs?v=c17496a9a841';
 import {readPlotIdentity,openedPlotIdentity,resolvePlotImage,currentPlotImageId} from './integration/plot-sync.mjs?v=source-save-v0736-1';
 import {planMiFiToSync} from './mifito-batch.mjs?v=source-save-v0736-1';
 import {setupUpdateCheck} from './update-check.mjs?v=source-save-v0736-1';
-import {installWorkspaceUpdater} from './workspace-update.mjs?v=multi-work-folders-v0748-1';
+import {installWorkspaceUpdater} from './workspace-update.mjs?v=source-match-v0749-1';
 import {marqueeSelection,resolveObjectSelection,clickObjectSelection,selectionDescription} from './selection.mjs?v=source-save-v0736-1';
 import {renderGroupLayers} from './group-layers.mjs?v=source-save-v0736-1';
 import {drawSelectionFrames} from './selection-overlay.mjs?v=source-save-v0736-1';
@@ -57,11 +57,11 @@ import {reorderFigures} from './figure-order.mjs';
 import {renumberFigureNames} from './figure-names.mjs?v=0.3.3-1';
 import {deleteFigures,duplicateFigures} from './figure-commands.mjs?v=source-save-v0736-1';
 import {ProjectFileSession,projectFilePickerOptions} from './project-file.mjs?v=project-switch-v051-1';
-import {installWorkspacePersistence} from './workspace-session.mjs?v=multi-work-folders-v0748-1';
+import {installWorkspacePersistence} from './workspace-session.mjs?v=source-match-v0749-1';
 import {decodeWorkspaceState} from './workspace-state.mjs?v=project-switch-v051-1';
-import {validateWorkspaceBinding} from './integration/bridge-host.mjs?v=multi-work-folders-v0748-1';
+import {validateWorkspaceBinding} from './integration/bridge-host.mjs?v=source-match-v0749-1';
 
-const STUDIO_RELEASE={version:'0.7.48',build:'multi-work-folders-v0748-1'};
+const STUDIO_RELEASE={version:'0.7.49',build:'source-match-v0749-1'};
 installBrowserZoomGuard();
 window.FigureAppRelease?.assertRunning(STUDIO_RELEASE);
 if(window.FigureAppRelease&&!await window.FigureAppRelease.startup())throw Error('最新版へ切り替えています。');
@@ -643,13 +643,15 @@ async function getCurrentWorkFolders(expectedBookId=bookId){
 }
 window.FigureStudioWorkFolder=Object.freeze({
  async getDirectory(owner){return (await getCurrentWorkFolders(owner))[0]??null;},
- async findSource(request,{signal}={}){
+ async findSource(request,{signal,details=false}={}){
   if(signal?.aborted||typeof request?.sourceKey!=='string')return null;
   const owner=request.sourceKey.split('/')[0];
   const folders=await getCurrentWorkFolders(owner);
-  if(!folders.length||signal?.aborted)return null;
+  if(signal?.aborted)return null;
+  if(!folders.length)return details&&sourcePrefetch.wasOpened(request)?
+   {name:request.name,handle:null,verified:false,sameName:false,multiple:false}:null;
   configureSourcePrefetch(folders);
-  return sourcePrefetch.findSource(request,{signal});
+  return sourcePrefetch.findSource(request,{signal,details});
  },
  subscribe(listener){
   workFolderListeners.add(listener);

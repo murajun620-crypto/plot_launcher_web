@@ -1,4 +1,4 @@
-import {encodeProjectFile} from './project-format.mjs?v=multi-work-folders-v0748-1';
+import {encodeProjectFile} from './project-format.mjs?v=source-match-v0749-1';
 import {parseRelease,hasNewRelease} from './update-check.mjs?v=panel-labels-v0723-1';
 import {SOURCE_APPS} from './integration/bridge-client.mjs?v=studio-send-v0714-1';
 

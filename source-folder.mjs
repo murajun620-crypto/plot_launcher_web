@@ -6,7 +6,7 @@ const CONCURRENT_NAMES=4;
  * Wait for traversal to finish before offering matches, since an unopened
  * subfolder could contain an identical project. This runs outside Save.
  */
-export async function findProjectsInWorkFolder({directory,directories=[directory],requests,signal,onResult}){
+export async function findProjectsInWorkFolder({directory,directories=[directory],requests,signal,onResult,includeCandidates=false}){
   const roots=directories.filter(root=>root?.kind==='directory'&&typeof root.values==='function');
   if(!roots.length||signal?.aborted)return new Map();
   const groups=new Map();
@@ -49,13 +49,14 @@ export async function findProjectsInWorkFolder({directory,directories=[directory
     await Promise.all(Array.from({length:Math.min(CONCURRENT_NAMES,groups.size)},async()=>{
       for(const group of queue){
         if(!active())break;
-        let matches;
-        try{matches=await verify(group);}
-        catch{matches=new Map();}
+        const {matches,checked,incomplete}=await verify(group);
         if(!active())break;
         for(const {key,projectId} of group.requests){
-          const handle=matches.get(projectId)??null;
-          if(handle)results.set(key,handle);
+          const handle=incomplete?null:matches.get(projectId)??null;
+          if(includeCandidates){
+            results.set(key,{name:group.wanted,handle:handle??(checked.length===1?checked[0]:null),
+              verified:!!handle,sameName:checked.length>0,multiple:!handle&&checked.length>1});
+          }else if(handle)results.set(key,handle);
           try{onResult?.(key,handle);}catch{}
         }
       }
@@ -65,23 +66,26 @@ export async function findProjectsInWorkFolder({directory,directories=[directory
 
   async function verify({wanted,identify,files,ids}){
     const matches=new Map(),checked=[];
+    let incomplete=false;
     for(const handle of files){
       if(!active())break;
       if(await alreadyChecked(handle,checked))continue;
       if(!active())break;
       checked.push(handle);
-      const file=await handle.getFile();
-      if(!active())break;
-      if(file.name.normalize('NFC')!==wanted)throw Error('The candidate filename changed during the search.');
-      // Handles from Studio's window can return a File from a different realm.
-      const local=new File([file],file.name,{type:file.type,lastModified:file.lastModified});
-      const identity=await identify(local);
-      if(ids.has(identity?.projectId)){
-        const {projectId}=identity;
-        matches.set(projectId,matches.has(projectId)?null:handle);
-      }
+      try{
+        const file=await handle.getFile();
+        if(!active())break;
+        if(file.name.normalize('NFC')!==wanted)throw Error('The candidate filename changed during the search.');
+        // Handles from Studio's window can return a File from a different realm.
+        const local=new File([file],file.name,{type:file.type,lastModified:file.lastModified});
+        const identity=await identify(local);
+        if(ids.has(identity?.projectId)){
+          const {projectId}=identity;
+          matches.set(projectId,matches.has(projectId)?null:handle);
+        }
+      }catch{incomplete=true;}
     }
-    return matches;
+    return {matches,checked,incomplete};
   }
 }
 

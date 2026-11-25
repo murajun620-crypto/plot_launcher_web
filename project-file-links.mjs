@@ -1,4 +1,4 @@
-import {findProjectInWorkFolder} from './source-folder.mjs?v=dce6ded29eb5';
+import {findProjectInWorkFolder} from './source-folder.mjs?v=c17496a9a841';
 
 // Writable handles live only in this browser's IndexedDB. Portable snapshots
 // carry an opaque token and a byte fingerprint, never paths or permissions.
@@ -40,7 +40,41 @@ const cancel=()=>{throw new DOMException('保存をキャンセルしました�
 const changed=()=>Error('保存先のファイルが保存処理中に更新されました。上書きしていません。もう一度保存して、内容を確認してください。');
 async function sameFile(a,b){try{return !!a&&!!b&&await a.isSameEntry(b);}catch{return false;}}
 
+const MATCH_LABELS={
+  match:'元ファイルの内容が完全に一致しています',
+  different:'同じファイル名が見つかりました。内容が異なるか、同じ版か確認できません',
+  missing:'元ファイルが見つかりません'
+};
+
+export function workFolderLookup(value){
+  if(!value)return null;
+  if(Object.hasOwn(value,'verified'))return value;
+  const handle=value.handle??value;
+  return {handle,name:handle.name,verified:true,sameName:true,multiple:false};
+}
+
 export function createProjectFileLinks({app,identify,choose,host=globalThis,store=localFileLinkStore(),digest=fileFingerprint}){
+  const matchStates=new WeakMap();
+  function setMatch(link,state){if(link)matchStates.set(link,state);}
+  function paintMatch(element,link){
+    if(!element)return;
+    const state=link&&matchStates.get(link);
+    if(element.dataset.match===(state||''))return;
+    element.hidden=!state;
+    element.dataset.match=state||'';
+    element.title=MATCH_LABELS[state]||'';
+    element.setAttribute('aria-label',element.title);
+  }
+  async function checkMatch({handle,lookup,link}){
+    for(const target of new Set([handle,lookup.handle])){
+      if(!target)continue;
+      try{
+        const hash=await checkFile(async()=>digest(await target.getFile()),'元ファイルの読み取りに時間がかかっています。');
+        return hash===link?.fingerprint?'match':'different';
+      }catch{/* Try the discovered file if a remembered handle can no longer be read. */}
+    }
+    return lookup.sameName?'different':'missing';
+  }
   const key=(projectId,name)=>JSON.stringify([app,projectId,name.normalize('NFC')]);
   // A Studio asset can back several panels. Its book and asset IDs identify
   // the attachment across reloads, independently of a portable token or name.
@@ -77,6 +111,7 @@ export function createProjectFileLinks({app,identify,choose,host=globalThis,stor
     let preferred;
     if(token(aliasToken))try{const existing=await store.get(aliasToken);if(!existing||matching(existing,projectId,name)&&await sameFile(existing.handle,handle))preferred=aliasToken;}catch{}
     const link={token:preferred||previous?.token||crypto.randomUUID(),fingerprint:hash};
+    setMatch(link,'match');
     try{
       await store.put({token:link.token,project:key(projectId,name),handle,fingerprint:hash});
       const binding=scope(projectId,sourceKey);
@@ -106,6 +141,7 @@ export function createProjectFileLinks({app,identify,choose,host=globalThis,stor
     if(!filename(name))throw Error('プロジェクトのファイル名を確認してください。');
     const extension=app==='plot'?'.plotproject':'.mifito',description=app==='plot'?'PlotLauncherプロジェクト':'MiFiToプロジェクト';
     const options={id:`${app}-source-project`,types:[{description,accept:{'application/octet-stream':[extension]}}]};
+    const statusLink=link;
     link=portableFileLink(link);
     if(!saveAs&&!handle){
       const target=await findScopedTarget(projectId,sourceKey,true);
@@ -116,7 +152,7 @@ export function createProjectFileLinks({app,identify,choose,host=globalThis,stor
       if(requireFile)throw Error('このブラウザでは元プロジェクトへ一括保存できません。Chrome／Edgeで開くか、保存メニューの「元プロジェクトも保存」をオフにしてください。');
       return {handle:null,name,saveAs,write:blob=>fallback(blob,name),remember:async()=>({link:null,remembered:false})};
     }
-    let baseline=link?.fingerprint||'',binding=false,inspected=null;
+    let baseline=link?.fingerprint||'',binding=false,allowSameName=false,inspected=null;
     const getFile=target=>checkFile(()=>target.getFile(),'元ファイルを開くまでに時間がかかっています。');
     const readHash=file=>checkFile(()=>digest(file),'元ファイルの読み取りに時間がかかっています。');
     const saveCopy=()=>prepare({projectId,name,link,handle,saveAs:true,knownSource,startIn,fallback,host:pickerHost,choose:chooseAction,requireFile,sourceKey});
@@ -134,16 +170,25 @@ export function createProjectFileLinks({app,identify,choose,host=globalThis,stor
       return true;
     };
     const mismatch=()=>Error('選択したファイルは元のプロジェクトと一致しません。元ファイルを選ぶか、「名前を付けて保存」を使ってください。');
-    const inspect=async(target,expectedName,verifyIdentity=false)=>{
+    const inspect=async(target,expectedName,verifyIdentity=false,allowUnverified=false)=>{
       if(!await permit(target))return null;
       const file=await getFile(target),hash=await readHash(file);
+      if(file.name.normalize('NFC')!==expectedName.normalize('NFC'))return {matches:false};
+      if(hash===baseline&&allowUnverified)return {matches:true,name:file.name,hash};
+      let uncertain=false;
       if(verifyIdentity||baseline!==hash){
         // Picker handles can belong to Studio's parent realm. Give validators
         // a File from the editor realm (notably MiFiTo's Blob brand check).
-        const identity=await checkFile(()=>identify(new File([file],file.name,{type:file.type,lastModified:file.lastModified})),'元プロジェクトの内容確認に時間がかかっています。');
-        if(identity.projectId!==projectId||file.name.normalize('NFC')!==expectedName.normalize('NFC'))return {matches:false};
+        try{
+          const identity=await checkFile(()=>identify(new File([file],file.name,{type:file.type,lastModified:file.lastModified})),'元プロジェクトの内容確認に時間がかかっています。');
+          uncertain=identity.projectId!==projectId;
+        }catch(error){
+          if(!allowUnverified)throw error;
+          uncertain=true;
+        }
+        if(uncertain&&!allowUnverified)return {matches:false};
       }
-      return {matches:true,name:file.name,hash};
+      return {matches:true,name:file.name,hash,uncertain};
     };
     if(!saveAs){
       const remembered=handle;
@@ -151,13 +196,15 @@ export function createProjectFileLinks({app,identify,choose,host=globalThis,stor
       // Consult the completed folder result only after checking the remembered
       // target, and keep the original fingerprint for either target.
       for(const getTarget of [()=>remembered,getWorkFolderTarget]){
-        const candidate=getTarget?.(),fromWorkFolder=getTarget===getWorkFolderTarget;
-        if(!candidate||(fromWorkFolder&&candidate===remembered))continue;
+        const result=getTarget?.(),fromWorkFolder=getTarget===getWorkFolderTarget;
+        const lookup=fromWorkFolder?workFolderLookup(result):null;
+        const candidate=fromWorkFolder?lookup?.handle:result;
+        if(!candidate||(fromWorkFolder&&candidate===remembered&&lookup.verified))continue;
         try{
-          const candidateName=fromWorkFolder?candidate.name:name;
-          const found=await inspect(candidate,candidateName,fromWorkFolder);
+          const candidateName=fromWorkFolder?lookup.name:name;
+          const found=await inspect(candidate,candidateName,fromWorkFolder,lookup?.sameName&&!lookup.verified&&!lookup.multiple);
           if(!found)return saveCopy();
-          if(fromWorkFolder&&getWorkFolderTarget()!==candidate)continue;
+          if(fromWorkFolder&&getWorkFolderTarget()!==result)continue;
           if(found.matches){handle=candidate;name=candidateName;inspected=found;break;}
           wrongProject=true;
         }catch(error){
@@ -165,13 +212,18 @@ export function createProjectFileLinks({app,identify,choose,host=globalThis,stor
         }
         handle=null;
       }
-      if(!handle&&wrongProject)throw mismatch();
+      if(!handle&&wrongProject&&!workFolderLookup(getWorkFolderTarget?.())?.sameName){setMatch(statusLink,'different');throw mismatch();}
     }
     if(!saveAs&&!handle&&knownSource){
-      const answer=await chooseAction({kind:'missing',name,canBind:!!pickerHost.showOpenFilePicker});
+      const lookup=workFolderLookup(getWorkFolderTarget?.());
+      const multiple=lookup?.multiple===true;
+      setMatch(statusLink,lookup?.sameName?'different':'missing');
+      if(multiple)name=lookup.name;
+      const answer=await chooseAction({kind:multiple?'multiple':'missing',name,canBind:!!pickerHost.showOpenFilePicker});
       if(answer==='saveAs')return saveCopy();if(answer!=='bind')cancel();
       [handle]=await pickerHost.showOpenFilePicker({...options,multiple:false,...(startIn?{startIn}:{})});
       binding=true;
+      allowSameName=multiple;
     }
     if(saveAs||!handle){
       if(requireFile&&pickerHost.navigator?.userActivation?.isActive===false){
@@ -180,11 +232,12 @@ export function createProjectFileLinks({app,identify,choose,host=globalThis,stor
       handle=await pickerHost.showSaveFilePicker({...options,suggestedName:name,...(startIn?{startIn}:{})});
       baseline=await readHash(await getFile(handle));
     }else{
-      inspected??=await inspect(handle,name,binding);
+      inspected??=await inspect(handle,name,binding,allowSameName);
       if(!inspected)return saveCopy();
       if(!inspected.matches)throw mismatch();
+      setMatch(statusLink,baseline===inspected.hash?'match':'different');
       if(baseline!==inspected.hash){
-        const answer=await chooseAction({kind:baseline?'changed':'unknown',name:inspected.name});
+        const answer=await chooseAction({kind:inspected.uncertain?'unverified':baseline?'changed':'unknown',name:inspected.name});
         if(answer==='saveAs')return saveCopy();if(answer!=='overwrite')cancel();
       }
       baseline=inspected.hash;
@@ -218,5 +271,5 @@ export function createProjectFileLinks({app,identify,choose,host=globalThis,stor
     // Merely finding a file must not register it or acknowledge newer bytes.
     return {handle:found.handle,link:portableFileLink(link)};
   }
-  return {opened,resolve,resolveSource,findInWorkFolder,prepare,remember};
+  return {opened,resolve,resolveSource,findInWorkFolder,prepare,remember,checkMatch,setMatch,paintMatch};
 }

@@ -97,3 +97,14 @@ test('opening the panel again retries a completed search that found no file',asy
  assert.equal(await background.findSource(query(panel)),found);
  assert.equal(calls,2);
 });
+
+test('details mode reports same-name candidates without advertising them as verified handles',async()=>{
+ const panel=linked('one'),handle={kind:'file',name:panel.source.name};
+ const result={handle,name:handle.name,verified:false,sameName:true,multiple:false};
+ const background=fixture(({requests})=>new Map([[requests[0].key,result]]));
+ background.start(state([{}],[panel]));
+ assert.equal(await background.findSource(query(panel),{details:true}),null);
+ background.openSource(query(panel).sourceKey,panel.source);
+ assert.equal(await background.findSource(query(panel)),null);
+ assert.equal(await background.findSource(query(panel),{details:true}),result);
+});

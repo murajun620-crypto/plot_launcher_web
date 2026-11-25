@@ -66,6 +66,7 @@ export function createSourcePrefetch({scan,resolveProjectId,identify,defer=later
   const entry=opened.get(panelKey(sourceKey));
   return entry?.app===app&&entry.name===name&&(!entry.projectId||entry.projectId===projectId);
  };
+ const wasOpened=request=>typeof request?.sourceKey==='string'&&typeof request.name==='string'&&isOpened(request,request.name.normalize('NFC'));
  async function run(state,key,source){
   await defer();
   const {controller,directories}=state,{signal}=controller;
@@ -73,11 +74,13 @@ export function createSourcePrefetch({scan,resolveProjectId,identify,defer=later
   const projectId=source.projectId||await resolveProjectId(source);
   if(signal.aborted||!projectId)return null;
   const request={key,app:source.app,name:source.name,projectId,identify:identify[source.app]};
-  const matches=await scan({directories,requests:[request],signal});
-  const handle=matches.get(key);
-  return handle?{handle,projectId}:null;
+  const matches=await scan({directories,requests:[request],signal,includeCandidates:true});
+  const found=matches.get(key);
+  const result=found&&Object.hasOwn(found,'verified')?found:
+   {name:source.name,handle:found??null,verified:!!found,sameName:!!found,multiple:false};
+  return {result,projectId};
  }
- async function findSource(request,{signal}={}){
+ async function findSource(request,{signal,details=false}={}){
   const {sourceKey,app,projectId,name}=request;
   if(signal?.aborted||typeof name!=='string'||typeof sourceKey!=='string')return null;
   const normalized=name.normalize('NFC');
@@ -87,12 +90,13 @@ export function createSourcePrefetch({scan,resolveProjectId,identify,defer=later
      (record.source.projectId&&record.source.projectId!==projectId))return null;
   if(!record.started){
    record.started=true;
-   const finish=match=>{record.missing=!match;record.resolve(match);};
+   const finish=match=>{record.missing=!match?.result?.verified;record.resolve(match);};
    void run(state,key,record.source).then(finish,()=>finish(null));
   }
   const match=await waitFor(record.ready,signal);
-  return !signal?.aborted&&active===state&&state.routes.get(sourceKey)===key&&
-   isOpened(request,normalized)&&match?.projectId===projectId?match.handle:null;
+  if(signal?.aborted||active!==state||state.routes.get(sourceKey)!==key||
+     !isOpened(request,normalized)||match?.projectId!==projectId)return null;
+  return details?match.result:match.result.verified?match.result.handle:null;
  }
- return {start,openSource,findSource,reset};
+ return {start,openSource,wasOpened,findSource,reset};
 }
