@@ -74,7 +74,13 @@ export function setupFigureBridge({app,loadProject,buildProject,renderPreview,ca
     const current=()=>!disposed&&loaded&&parent===owner&&!owner.closed&&active.editKey===source.editKey;
     const provider=()=>{
       if(!current())return null;
-      try{return owner.FigureStudioWorkFolder??owner.FigureStudioWorkspace?.studioWindow?.FigureStudioWorkFolder??null;}
+      try{
+        // Discovery connects through a message-only proxy. A workspace editor
+        // can access the actual Studio frame through its own same-origin shell.
+        const ownerId=context?.ownerId;
+        const studio=connection&&ownerId&&workspace?.ownerId===ownerId?workspace.studioWindow:owner;
+        return studio?.FigureStudioWorkFolder??studio?.FigureStudioWorkspace?.studioWindow?.FigureStudioWorkFolder??null;
+      }
       catch{return null;}
     };
     const getWorkFolder=()=>provider()?.getDirectory?.(parts[0])??null;

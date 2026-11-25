@@ -6,11 +6,12 @@ import {createEditorDirectory,registerEditor} from './editor-discovery.mjs';
 const PROTOCOL='figure-studio-bridge-v1',origin='https://example.test',ownerId='12345678-1234-1234-1234-123456789012';
 const deferred=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};};
 function environment(options={}){
- const {native=false,...hostOptions}=options;
+ const {native=false,workspace,...hostOptions}=options;
  const elements=[],listeners=new Set(),changes=[],loads=[],loaded=[],accepted=[];let registration,registryClosed=false;
  const header={children:[],append(el){el.parent=this;this.children.push(el);}};
  const documentRef={body:header,querySelector:()=>header,createElement(tag){const handlers=new Map();const el={tag,style:{},children:[],disabled:false,textContent:'',append(...children){this.children.push(...children);},setAttribute(){},addEventListener(type,fn){handlers.set(type,fn);},remove(){if(this.parent)this.parent.children=this.parent.children.filter(el=>el!==this);},fire(type){return handlers.get(type)?.();}};elements.push(el);return el;}};
  const windowRef={location:{hash:'',origin,href:origin+'/editor/'},document:documentRef,opener:null,addEventListener(type,fn){if(type==='message')listeners.add(fn);},removeEventListener(type,fn){listeners.delete(fn);}};
+ if(workspace){windowRef.location.search='?figureWorkspace=1';windowRef.parent={location:{origin},FigureStudioWorkspace:workspace};}
  const nativeSent=[],nativeNonce=crypto.randomUUID();
  if(native){windowRef.opener={closed:false,postMessage(data,target){assert.equal(target,origin);nativeSent.push(data);}};windowRef.location.hash='#'+new URLSearchParams({figureBridge:nativeNonce,figureOrigin:origin,figureOwner:ownerId});}
  const nativeLoad=(extra={})=>Promise.all([...listeners].map(fn=>fn({source:windowRef.opener,origin,data:{protocol:PROTOCOL,nonce:nativeNonce,app:'plot',type:'load',panelId:'panel-a',requestId:'request-a',editKey:'book/figure/panel-a/source-a',project:new Blob(['saved']),sourceName:'source.plotproject',...extra}})));
@@ -24,7 +25,7 @@ function environment(options={}){
   const load=(extra={})=>emit('load',{panelId:'panel-a',requestId:'request-a',editKey:'book/figure/panel-a/source-a',project:new Blob(['saved']),sourceName:'source.plotproject',...extra});
   return {sent,parent,emit,load,close:()=>connection.close(),handlers};
  }
- return {host,connect,changes,loads,loaded,accepted,header,listeners,windowRef,nativeLoad,nativeSent,get registration(){return registration;},get registryClosed(){return registryClosed;},button:elements.find(e=>e.id==='send-to-figure-studio'),message:elements.find(e=>e.tag==='span'),discard:elements.find(e=>e.textContent==='未反映の編集を取り消す')};
+ return {host,connect,changes,loads,loaded,accepted,header,listeners,windowRef,nativeLoad,nativeSent,get registration(){return registration;},get registryClosed(){return registryClosed;},button:elements.find(e=>e.id==='figure-studio-bridge-send'),message:elements.find(e=>e.tag==='span'),discard:elements.find(e=>e.textContent==='未反映の編集を取り消す')};
 }
 
 test('normal editors register without bridge UI and load an empty workspace through the claimed connection',async()=>{
@@ -36,6 +37,30 @@ test('normal editors register without bridge UI and load an empty workspace thro
   await c.emit('ping');assert.equal(c.sent.at(-1).type,'ready');assert.equal(c.sent.at(-1).loaded,true);
  }finally{e.host.close();}
  assert.equal(e.registryClosed,true);assert.equal(e.listeners.size,0);assert.equal(e.header.children.length,0);assert.deepEqual(e.changes,[true,false]);
+});
+
+test('a discovered editor in the workspace uses its own Studio work folder',async()=>{
+ const calls=[],directory={kind:'directory'},match={handle:null,verified:false,sameName:false};
+ const studioWindow={location:{origin},postMessage(){},FigureStudioWorkFolder:{
+  getDirectory(bookId){assert.equal(bookId,'book');return directory;},
+  findSource(request,{details}){assert.equal(details,true);calls.push(request);return match;}
+ }};
+ const workspace={ownerId,studioWindow,show(){}};
+ let source;
+ const e=environment({workspace,onSourceReady:context=>{source=context;}});
+ try{
+  const c=e.connect();
+  assert.equal(c.parent.FigureStudioWorkFolder,undefined);
+  await c.load();
+  assert.equal(await source.getWorkFolder(),directory);
+  const request={projectId:'saved-plot',name:'source.plotproject'};
+  assert.equal(await source.findWorkFolderSource(request),match);
+  assert.deepEqual(calls,[{sourceKey:'book/figure/panel-a/source-a',app:'plot',...request}]);
+  workspace.ownerId=crypto.randomUUID();
+  assert.equal(await source.getWorkFolder(),null);
+  assert.equal(await source.findWorkFolderSource(request),null);
+  assert.equal(calls.length,1);
+ }finally{e.host.close();}
 });
 
 test('dirty manually opened editor can confirm a forced load on its first Studio connection',async()=>{
